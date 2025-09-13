@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  Calendar, 
-  Clock, 
+import Link from 'next/link'
+import {
+  Calendar,
+  Clock,
   CheckCircle,
   LogOut,
   Loader2,
@@ -86,7 +87,7 @@ export default function DashboardPage() {
       title: 'Manage Tools',
       icon: Wrench,
       iconGradient: 'from-orange-400 to-yellow-500',
-      action: () => console.log('Manage Tools clicked'),
+      action: () => router.push('/equipment-dashboard'),
       description: 'Asset and equipment management'
     },
     {
