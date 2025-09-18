@@ -11,7 +11,8 @@ import {
   Loader2,
   Wrench,
   User,
-  Activity
+  Activity,
+  FileText
 } from 'lucide-react'
 import { checkAuth, logout, getUserDisplayName } from '@/lib/auth'
 
@@ -67,21 +68,21 @@ export default function DashboardPage() {
       description: 'View and manage today\'s schedule'
     },
     {
+      title: 'Daily Job Ticket',
+      icon: FileText,
+      iconGradient: 'from-purple-400 to-pink-500',
+      action: () => router.push('/dashboard/job-ticket'),
+      description: 'Record daily work and progress'
+    },
+    {
       title: 'Time Tracking',
       icon: Clock,
-      iconGradient: 'from-purple-400 to-pink-500',
+      iconGradient: 'from-green-400 to-emerald-500',
       action: () => {
         console.log('Time Tracking clicked')
         setIsClocked(!isClocked)
       },
       description: 'Clock in/out and view timecard'
-    },
-    {
-      title: 'Complete Day',
-      icon: CheckCircle,
-      iconGradient: 'from-green-400 to-emerald-500',
-      action: () => console.log('Complete Day clicked'),
-      description: 'Mark daily tasks as finished'
     },
     {
       title: 'Manage Tools',

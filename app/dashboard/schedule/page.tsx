@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
+import {
   ArrowLeft,
   Calendar,
   MapPin,
@@ -19,111 +19,33 @@ import {
   ChevronRight as ArrowRight
 } from 'lucide-react'
 import { checkAuth } from '@/lib/auth'
+import {
+  getJobsByDate,
+  getJobsByDateRange,
+  searchJobs,
+  type Job as DatabaseJob
+} from '@/lib/jobs-service'
 
 interface Job {
   id: string
-  jobNumber: string
-  customerName: string
+  job_number: string
+  customer_name: string
   address: string
-  startTime: string
-  endTime: string
-  jobType: string
-  status: 'pending' | 'in-progress' | 'completed' | 'urgent'
+  start_time: string
+  end_time: string
+  job_type: string
+  status: 'scheduled' | 'dispatched' | 'in_progress' | 'completed' | 'cancelled' | 'on_hold'
   phone: string
-}
-
-// Mock data for demonstration
-const mockJobs: { [key: string]: Job[] } = {
-  '2025-09-03': [
-    {
-      id: '1',
-      jobNumber: 'JOB-2025-001',
-      customerName: 'Metro Green Construction',
-      address: '1234 Metro Plaza Dr, Seattle, WA',
-      startTime: '9:00 AM',
-      endTime: '11:00 AM',
-      jobType: 'Concrete Cutting',
-      status: 'pending',
-      phone: '(206) 555-0123'
-    },
-    {
-      id: '2',
-      jobNumber: 'JOB-2025-002',
-      customerName: 'ABC Concrete LLC',
-      address: '5678 Industrial Way, Bellevue, WA',
-      startTime: '11:30 AM',
-      endTime: '2:00 PM',
-      jobType: 'Core Drilling',
-      status: 'in-progress',
-      phone: '(425) 555-0456'
-    },
-    {
-      id: '3',
-      jobNumber: 'JOB-2025-003',
-      customerName: 'Downtown Development',
-      address: '910 Pike Street, Seattle, WA',
-      startTime: '2:00 PM',
-      endTime: '4:00 PM',
-      jobType: 'Wall Sawing',
-      status: 'pending',
-      phone: '(206) 555-0789'
-    },
-    {
-      id: '4',
-      jobNumber: 'JOB-2025-004',
-      customerName: 'City Infrastructure',
-      address: '321 Municipal Building, Seattle, WA',
-      startTime: '4:30 PM',
-      endTime: '6:30 PM',
-      jobType: 'Slab Sawing',
-      status: 'completed',
-      phone: '(206) 555-0234'
-    }
-  ],
-  '2025-09-04': [
-    {
-      id: '4',
-      jobNumber: 'JOB-2025-004',
-      customerName: 'Rainier Development',
-      address: '321 Mountain View Ave, Bellevue, WA',
-      startTime: '8:00 AM',
-      endTime: '11:00 AM',
-      jobType: 'Slab Sawing',
-      status: 'pending',
-      phone: '(425) 555-0234'
-    },
-    {
-      id: '5',
-      jobNumber: 'JOB-2025-005',
-      customerName: 'Sound Construction Co',
-      address: '789 Waterfront Way, Seattle, WA',
-      startTime: '2:00 PM',
-      endTime: '5:00 PM',
-      jobType: 'Concrete Cutting',
-      status: 'urgent',
-      phone: '(206) 555-0567'
-    }
-  ],
-  '2025-09-02': [
-    {
-      id: '6',
-      jobNumber: 'JOB-2025-006',
-      customerName: 'Northwest Builders',
-      address: '456 Cedar Lane, Everett, WA',
-      startTime: '10:00 AM',
-      endTime: '2:00 PM',
-      jobType: 'Core Drilling',
-      status: 'completed',
-      phone: '(425) 555-0890'
-    }
-  ]
+  title: string
+  priority: 'low' | 'normal' | 'high' | 'urgent'
 }
 
 export default function SchedulePage() {
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [jobs, setJobs] = useState<Job[]>([])
-  const [filter, setFilter] = useState<'all' | 'pending' | 'in-progress' | 'completed'>('all')
+  const [allJobs, setAllJobs] = useState<DatabaseJob[]>([])
+  const [filter, setFilter] = useState<'all' | 'scheduled' | 'in_progress' | 'completed'>('all')
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -135,30 +57,73 @@ export default function SchedulePage() {
       router.push('/login')
       return
     }
-    setLoading(false)
+    loadJobs()
   }, [router])
 
-  useEffect(() => {
-    // Load jobs for selected date
-    const dateKey = selectedDate.toISOString().split('T')[0]
-    const dayJobs = mockJobs[dateKey] || []
-    
+  const loadJobs = async () => {
+    try {
+      setLoading(true)
+      const dateKey = selectedDate.toISOString().split('T')[0]
+      const result = await getJobsByDate(dateKey)
+
+      if (result.success) {
+        setAllJobs(result.data)
+        processJobs(result.data)
+      } else {
+        console.error('Error loading jobs:', result.error)
+        setAllJobs([])
+        setJobs([])
+      }
+    } catch (error) {
+      console.error('Error loading jobs:', error)
+      setAllJobs([])
+      setJobs([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const processJobs = (jobsData: DatabaseJob[]) => {
+    // Convert database jobs to display format
+    let processedJobs = jobsData.map(job => ({
+      id: job.id!,
+      job_number: job.job_number || '',
+      customer_name: job.customer?.name || 'Unknown Customer',
+      address: job.address,
+      start_time: job.start_time || '09:00',
+      end_time: job.end_time || '17:00',
+      job_type: job.job_type?.name || 'General Work',
+      status: job.status || 'scheduled',
+      phone: job.customer?.phone || job.site_contact_phone || '',
+      title: job.title,
+      priority: job.priority || 'normal'
+    }))
+
     // Apply filter
-    let filteredJobs = filter === 'all' 
-      ? dayJobs 
-      : dayJobs.filter(job => job.status === filter)
-    
+    if (filter !== 'all') {
+      processedJobs = processedJobs.filter(job => job.status === filter)
+    }
+
     // Apply search filter
     if (searchQuery) {
-      filteredJobs = filteredJobs.filter(job =>
-        job.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      processedJobs = processedJobs.filter(job =>
+        job.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.jobType.toLowerCase().includes(searchQuery.toLowerCase())
+        job.job_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.title.toLowerCase().includes(searchQuery.toLowerCase())
       )
     }
-    
-    setJobs(filteredJobs)
-  }, [selectedDate, filter, searchQuery])
+
+    setJobs(processedJobs)
+  }
+
+  useEffect(() => {
+    loadJobs()
+  }, [selectedDate])
+
+  useEffect(() => {
+    processJobs(allJobs)
+  }, [filter, searchQuery, allJobs])
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
@@ -175,7 +140,9 @@ export default function SchedulePage() {
       const date = new Date(selectedDate)
       date.setDate(date.getDate() + i)
       const dateKey = date.toISOString().split('T')[0]
-      const jobCount = mockJobs[dateKey]?.length || 0
+
+      // Count jobs for this date (we'll load this from database in future)
+      const jobCount = 0 // TODO: Implement job counting for date navigation
       days.push({ date, jobCount, isToday: i === 0 })
     }
     return days
@@ -190,9 +157,11 @@ export default function SchedulePage() {
   const getStatusColor = (status: Job['status']) => {
     switch (status) {
       case 'completed': return 'bg-green-500'
-      case 'in-progress': return 'bg-yellow-500'
-      case 'pending': return 'bg-blue-500'
-      case 'urgent': return 'bg-red-500'
+      case 'in_progress': return 'bg-yellow-500'
+      case 'scheduled': return 'bg-blue-500'
+      case 'dispatched': return 'bg-cyan-500'
+      case 'cancelled': return 'bg-red-500'
+      case 'on_hold': return 'bg-orange-500'
       default: return 'bg-gray-500'
     }
   }
@@ -200,9 +169,21 @@ export default function SchedulePage() {
   const getStatusBgColor = (status: Job['status']) => {
     switch (status) {
       case 'completed': return 'bg-green-500/10 text-green-400 border-green-500/30'
-      case 'in-progress': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
-      case 'pending': return 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+      case 'in_progress': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
+      case 'scheduled': return 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+      case 'dispatched': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+      case 'cancelled': return 'bg-red-500/10 text-red-400 border-red-500/30'
+      case 'on_hold': return 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+      default: return 'bg-gray-500/10 text-gray-400 border-gray-500/30'
+    }
+  }
+
+  const getPriorityColor = (priority: Job['priority']) => {
+    switch (priority) {
       case 'urgent': return 'bg-red-500/10 text-red-400 border-red-500/30'
+      case 'high': return 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+      case 'normal': return 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+      case 'low': return 'bg-gray-500/10 text-gray-400 border-gray-500/30'
       default: return 'bg-gray-500/10 text-gray-400 border-gray-500/30'
     }
   }
@@ -217,9 +198,9 @@ export default function SchedulePage() {
     return colors[type] || 'bg-gray-500/10 text-gray-400 border-gray-500/30'
   }
 
-  const totalJobs = mockJobs[selectedDate.toISOString().split('T')[0]]?.length || 0
-  const completedJobs = mockJobs[selectedDate.toISOString().split('T')[0]]?.filter(j => j.status === 'completed').length || 0
-  const pendingJobs = mockJobs[selectedDate.toISOString().split('T')[0]]?.filter(j => j.status === 'pending' || j.status === 'urgent').length || 0
+  const totalJobs = jobs.length
+  const completedJobs = jobs.filter(j => j.status === 'completed').length
+  const pendingJobs = jobs.filter(j => j.status === 'scheduled' || j.status === 'dispatched').length
 
   if (loading) {
     return (
@@ -344,19 +325,19 @@ export default function SchedulePage() {
           {/* Filter Buttons */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {['all', 'pending', 'in-progress', 'completed'].map((f) => (
+              {['all', 'scheduled', 'in_progress', 'completed'].map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f as typeof filter)}
                   className={`
                     px-4 py-2 rounded-lg capitalize transition-all duration-200 whitespace-nowrap
-                    ${filter === f 
-                      ? 'bg-white/10 text-white border border-white/20' 
+                    ${filter === f
+                      ? 'bg-white/10 text-white border border-white/20'
                       : 'bg-white/5 text-white/60 hover:bg-white/10'
                     }
                   `}
                 >
-                  {f === 'in-progress' ? 'In Progress' : f}
+                  {f === 'in_progress' ? 'In Progress' : f}
                 </button>
               ))}
             </div>
@@ -405,28 +386,38 @@ export default function SchedulePage() {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className={`w-3 h-3 rounded-full ${getStatusColor(job.status)} animate-pulse`} />
-                          <span className="text-white/60 text-sm">{job.jobNumber}</span>
+                          <span className="text-white/60 text-sm">{job.job_number}</span>
                           <span className={`px-2 py-1 rounded-lg text-xs font-medium border ${getStatusBgColor(job.status)}`}>
-                            {job.status === 'in-progress' ? 'In Progress' : job.status}
+                            {job.status === 'in_progress' ? 'In Progress' : job.status.replace('_', ' ')}
                           </span>
                         </div>
                       </div>
                       
-                      {/* Customer Name - Now with search functionality */}
+                      {/* Job Title and Customer */}
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">
-                          {job.customerName}
-                        </h3>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSearchQuery(job.customerName)
-                          }}
-                          className="text-cyan-400 hover:text-cyan-300 text-sm px-2 py-1 rounded transition-colors"
-                          title="Filter by customer"
-                        >
-                          Filter
-                        </button>
+                        <div>
+                          <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">
+                            {job.title}
+                          </h3>
+                          <p className="text-blue-200/70 text-sm">{job.customer_name}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          {job.priority !== 'normal' && (
+                            <span className={`px-2 py-1 rounded-lg text-xs font-medium border ${getPriorityColor(job.priority)}`}>
+                              {job.priority}
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSearchQuery(job.customer_name)
+                            }}
+                            className="text-cyan-400 hover:text-cyan-300 text-sm px-2 py-1 rounded transition-colors"
+                            title="Filter by customer"
+                          >
+                            Filter
+                          </button>
+                        </div>
                       </div>
                       
                       {/* Job Details */}
@@ -442,15 +433,15 @@ export default function SchedulePage() {
                           <MapPin className="w-4 h-4" />
                           <span className="text-sm">{job.address}</span>
                         </button>
-                        
+
                         <div className="flex items-center gap-2 text-blue-200/70">
                           <Clock className="w-4 h-4" />
-                          <span className="text-sm font-semibold">{job.startTime} - {job.endTime}</span>
+                          <span className="text-sm font-semibold">{job.start_time} - {job.end_time}</span>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
-                          <span className={`px-3 py-1 rounded-lg text-xs font-medium border ${getJobTypeColor(job.jobType)}`}>
-                            {job.jobType}
+                          <span className={`px-3 py-1 rounded-lg text-xs font-medium border ${getJobTypeColor(job.job_type)}`}>
+                            {job.job_type}
                           </span>
                         </div>
                       </div>
@@ -494,7 +485,10 @@ export default function SchedulePage() {
         </div>
 
         {/* Floating Action Button */}
-        <button className="fixed bottom-6 right-6 p-4 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full shadow-lg shadow-cyan-500/25 hover:scale-110 transition-transform duration-200 z-30">
+        <button
+          onClick={() => router.push('/dashboard/schedule/create')}
+          className="fixed bottom-6 right-6 p-4 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full shadow-lg shadow-cyan-500/25 hover:scale-110 transition-transform duration-200 z-30"
+        >
           <Plus className="w-6 h-6 text-white" />
         </button>
       </div>
