@@ -233,19 +233,37 @@ export default function SchedulePage() {
                 <div>
                   <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                     <Calendar className="w-6 h-6 text-cyan-400" />
-                    Schedule & Jobs
+                    Job List View
                   </h1>
                   <p className="text-blue-200/70 text-sm">{formatDate(selectedDate)}</p>
                 </div>
               </div>
               
-              {/* Quick Stats */}
-              <div className="hidden md:flex items-center gap-2 backdrop-blur-xl bg-white/5 rounded-xl px-4 py-2 border border-white/10">
-                <span className="text-white font-semibold">{totalJobs} jobs today</span>
-                <span className="text-white/40">•</span>
-                <span className="text-green-400">{completedJobs} completed</span>
-                <span className="text-white/40">•</span>
-                <span className="text-yellow-400">{pendingJobs} pending</span>
+              <div className="flex items-center gap-4">
+                {/* View Toggle */}
+                <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                  <button
+                    onClick={() => router.push('/dashboard/schedule')}
+                    className="px-3 py-2 text-sm font-medium rounded-md bg-white/10 text-cyan-400 shadow-sm"
+                  >
+                    List View
+                  </button>
+                  <button
+                    onClick={() => router.push('/dashboard/schedule/board')}
+                    className="px-3 py-2 text-sm font-medium rounded-md text-white/60 hover:text-white transition-colors"
+                  >
+                    Board View
+                  </button>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="hidden md:flex items-center gap-2 backdrop-blur-xl bg-white/5 rounded-xl px-4 py-2 border border-white/10">
+                  <span className="text-white font-semibold">{totalJobs} jobs today</span>
+                  <span className="text-white/40">•</span>
+                  <span className="text-green-400">{completedJobs} completed</span>
+                  <span className="text-white/40">•</span>
+                  <span className="text-yellow-400">{pendingJobs} pending</span>
+                </div>
               </div>
             </div>
           </div>

@@ -61,11 +61,11 @@ export default function DashboardPage() {
 
   const menuCards: MenuCard[] = [
     {
-      title: 'Schedule & Jobs',
+      title: 'Schedule Board',
       icon: Calendar,
       iconGradient: 'from-blue-400 to-cyan-500',
-      action: () => router.push('/dashboard/schedule'),
-      description: 'View and manage today\'s schedule'
+      action: () => router.push('/dashboard/schedule/board'),
+      description: 'Drag & drop schedule management'
     },
     {
       title: 'Daily Job Ticket',
@@ -85,9 +85,16 @@ export default function DashboardPage() {
       description: 'Clock in/out and view timecard'
     },
     {
+      title: 'Real-Time Ops',
+      icon: Activity,
+      iconGradient: 'from-orange-400 to-yellow-500',
+      action: () => router.push('/dashboard/real-time'),
+      description: 'Live crew & equipment tracking'
+    },
+    {
       title: 'Manage Tools',
       icon: Wrench,
-      iconGradient: 'from-orange-400 to-yellow-500',
+      iconGradient: 'from-emerald-400 to-teal-500',
       action: () => router.push('/equipment-dashboard'),
       description: 'Asset and equipment management'
     },
