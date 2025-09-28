@@ -24,6 +24,7 @@ export interface AddEquipmentData {
   serial_number?: string;
   location?: string;
   notes?: string;
+  assigned_to?: string;
 }
 
 // Test database connection
@@ -117,24 +118,10 @@ export const testDirectInsert = async (): Promise<{ success: boolean; message: s
 
 export const addEquipment = async (data: AddEquipmentData): Promise<{ success: boolean; equipment?: Equipment; error?: string; details?: any }> => {
   try {
-    console.log('🔧 Starting addEquipment with data:', data);
+    console.log('🔧 Starting addEquipment with input data:', JSON.stringify(data, null, 2));
     
-    // Data cleaning and validation
-    const cleanedData = {
-      name: String(data.name || '').trim(),
-      brand: String(data.brand || '').trim() || null,
-      model: String(data.model || '').trim() || null,
-      serial_number: String(data.serial_number || '').trim() || null,
-      location: String(data.location || '').trim() || null,
-      notes: String(data.notes || '').trim() || null,
-      qr_code: 'EQ-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-      status: 'available' as const
-    };
-
-    console.log('🧹 Cleaned data for insert:', cleanedData);
-
-    // Validate required fields
-    if (!cleanedData.name) {
+    // Simple validation - only name is required
+    if (!data.name || !data.name.trim()) {
       console.error('❌ Validation failed: name is required');
       return {
         success: false,
@@ -142,26 +129,60 @@ export const addEquipment = async (data: AddEquipmentData): Promise<{ success: b
       };
     }
 
-    console.log('📤 Attempting database insert...');
+    // Generate QR code
+    const qrCode = 'EQ-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    console.log('🔖 Generated QR code:', qrCode);
+
+    // Prepare simple data object
+    const insertData = {
+      name: data.name.trim(),
+      brand: data.brand?.trim() || null,
+      model: data.model?.trim() || null,
+      serial_number: data.serial_number?.trim() || null,
+      location: data.location?.trim() || 'Shop',
+      notes: data.notes?.trim() || null,
+      qr_code: qrCode,
+      status: 'available',
+      assigned_to: data.assigned_to?.trim() || 'Shop'
+    };
+
+    console.log('📤 Data prepared for Supabase insert:', JSON.stringify(insertData, null, 2));
+    console.log('🔍 Insert data types:', Object.entries(insertData).map(([key, value]) => `${key}: ${typeof value} (${value === null ? 'null' : value})`));
+
+    // Attempt database insert
+    console.log('🚀 Calling supabase.from("equipment").insert()...');
+    
     const { data: equipment, error } = await supabase
       .from('equipment')
-      .insert([cleanedData])
+      .insert(insertData)
       .select()
       .single();
 
+    console.log('📥 Supabase response received');
+    console.log('📊 Error object:', error);
+    console.log('📊 Data object:', equipment);
+
     if (error) {
-      console.error('❌ Database insert failed:', error);
-      console.error('Error details:', {
+      console.error('❌ Database insert failed with error:', {
         message: error.message,
         details: error.details,
         hint: error.hint,
-        code: error.code
+        code: error.code,
+        fullError: error
       });
       
       return {
         success: false,
         error: `Database error: ${error.message}`,
         details: error
+      };
+    }
+
+    if (!equipment) {
+      console.error('❌ No equipment data returned from insert');
+      return {
+        success: false,
+        error: 'No equipment data returned from database'
       };
     }
 
@@ -172,10 +193,14 @@ export const addEquipment = async (data: AddEquipmentData): Promise<{ success: b
     };
 
   } catch (err: any) {
-    console.error('💥 Unexpected error in addEquipment:', err);
+    console.error('💥 Unexpected error in addEquipment:');
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    console.error('Full error object:', err);
+    
     return {
       success: false,
-      error: `Unexpected error: ${err.message || err}`,
+      error: `Unexpected error: ${err.message || 'Unknown error'}`,
       details: err
     };
   }
@@ -244,6 +269,9 @@ export const updateEquipmentStatus = async (
     if (status === 'assigned' && assignedTo) {
       updateData.assigned_to = assignedTo;
       updateData.assigned_at = new Date().toISOString();
+    } else if (status === 'maintenance' && assignedTo) {
+      updateData.assigned_to = assignedTo;
+      updateData.assigned_at = new Date().toISOString();
     } else if (status === 'available') {
       updateData.assigned_to = null;
       updateData.assigned_at = null;
@@ -289,6 +317,46 @@ export const updateEquipment = async (id: string, updates: Partial<Equipment>): 
     return data as Equipment;
   } catch (err) {
     console.error('💥 Unexpected error updating equipment:', err);
+    throw err;
+  }
+};
+
+export const getOperatorEquipment = async (operatorName: string): Promise<Equipment[]> => {
+  try {
+    console.log(`🔍 Getting equipment for operator: ${operatorName}`);
+    
+    const { data, error } = await supabase
+      .from('equipment')
+      .select('*')
+      .eq('assigned_to', operatorName)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Error fetching operator equipment:', error);
+      throw error;
+    }
+
+    console.log(`✅ Found ${data.length} equipment items for ${operatorName}`);
+    return data as Equipment[];
+  } catch (err) {
+    console.error('💥 Unexpected error fetching operator equipment:', err);
+    throw err;
+  }
+};
+
+export const getEquipmentForUser = async (userRole: string, userName: string): Promise<Equipment[]> => {
+  try {
+    console.log(`🔍 Getting equipment for user: ${userName}, role: ${userRole}`);
+    
+    // If admin/demo user, return all equipment
+    if (userRole === 'admin' || userName === 'Demo User') {
+      return await getAllEquipment();
+    }
+    
+    // If operator, return only their assigned equipment
+    return await getOperatorEquipment(userName);
+  } catch (err) {
+    console.error('💥 Unexpected error in getEquipmentForUser:', err);
     throw err;
   }
 };

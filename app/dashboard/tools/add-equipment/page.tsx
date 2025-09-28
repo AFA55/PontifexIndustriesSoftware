@@ -11,20 +11,51 @@ export default function AddEquipmentPage() {
     brand: '',
     model: '',
     serial_number: '',
-    location: '',
-    notes: ''
+    location: 'Shop', // Default location
+    notes: '',
+    assigned_to: 'Shop' // Default assignment
   });
+  
+  const [showOtherAssignment, setShowOtherAssignment] = useState(false);
+  const [otherAssignment, setOtherAssignment] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [savedEquipment, setSavedEquipment] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [qrImage, setQrImage] = useState<string>('');
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({
       ...prev,
       [name]: value
+    }));
+  };
+
+  const handleAssignmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === 'Other') {
+      setShowOtherAssignment(true);
+      setForm(prev => ({
+        ...prev,
+        assigned_to: otherAssignment || ''
+      }));
+    } else {
+      setShowOtherAssignment(false);
+      setOtherAssignment('');
+      setForm(prev => ({
+        ...prev,
+        assigned_to: value
+      }));
+    }
+  };
+
+  const handleOtherAssignmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setOtherAssignment(value);
+    setForm(prev => ({
+      ...prev,
+      assigned_to: value
     }));
   };
 
@@ -51,22 +82,34 @@ export default function AddEquipmentPage() {
       setError(null);
       console.log('🚀 Starting equipment save process...');
       
-      // Validate required fields
+      // Simple validation - only name is required
       if (!form.name.trim()) {
+        console.log('❌ Validation failed: name is required');
         setError('Equipment name is required');
         return;
       }
 
+      // Prepare minimal data with defaults
       const equipmentData = {
         name: form.name.trim(),
-        brand: form.brand.trim(),
-        model: form.model.trim(),
-        serial_number: form.serial_number.trim(),
-        location: form.location.trim(),
-        notes: form.notes.trim()
+        brand: form.brand.trim() || null,
+        model: form.model.trim() || null,
+        serial_number: form.serial_number.trim() || null,
+        location: form.location.trim() || 'Shop',
+        notes: form.notes.trim() || null,
+        assigned_to: form.assigned_to.trim() || 'Shop'
       };
 
       console.log('🔧 Sending equipment data to save:', equipmentData);
+      console.log('📊 Data types:', {
+        name: typeof equipmentData.name,
+        brand: typeof equipmentData.brand,
+        model: typeof equipmentData.model,
+        serial_number: typeof equipmentData.serial_number,
+        location: typeof equipmentData.location,
+        notes: typeof equipmentData.notes
+      });
+      
       const result = await addEquipment(equipmentData);
       
       console.log('📥 Received result from addEquipment:', result);
@@ -86,9 +129,12 @@ export default function AddEquipmentPage() {
           brand: '',
           model: '',
           serial_number: '',
-          location: '',
-          notes: ''
+          location: 'Shop',
+          notes: '',
+          assigned_to: 'Shop'
         });
+        setShowOtherAssignment(false);
+        setOtherAssignment('');
         
         console.log('🎉 Save process completed successfully');
       } else {
@@ -116,33 +162,39 @@ export default function AddEquipmentPage() {
       brand: '',
       model: '',
       serial_number: '',
-      location: '',
-      notes: ''
+      location: 'Shop',
+      notes: '',
+      assigned_to: 'Shop'
     });
+    setShowOtherAssignment(false);
+    setOtherAssignment('');
   };
 
   if (savedEquipment) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-slate-800 to-gray-900">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-blue-950">
         <div className="container mx-auto px-6 py-8">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-4">
               <Link
-                href="/dashboard"
-                className="p-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 text-white hover:bg-white/20 transition-colors"
+                href="/dashboard/tools"
+                className="group p-3 backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 text-white hover:bg-white/10 transition-all duration-300 hover:scale-105"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </Link>
-              <h1 className="text-3xl font-bold text-white">Equipment Added Successfully</h1>
+              <div>
+                <h1 className="text-4xl font-bold text-white mb-2">Equipment Added Successfully</h1>
+                <p className="text-blue-200">New equipment registered in the system</p>
+              </div>
             </div>
           </div>
 
           <div className="max-w-2xl mx-auto">
             {/* Success Card */}
-            <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-8 text-center">
+            <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-8 text-center">
               <div className="w-20 h-20 bg-green-500/20 rounded-xl flex items-center justify-center mx-auto mb-6">
                 <svg className="w-10 h-10 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -202,13 +254,13 @@ export default function AddEquipmentPage() {
               <div className="flex space-x-4">
                 <button
                   onClick={resetForm}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-xl transition-colors"
+                  className="flex-1 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-medium py-4 px-6 rounded-xl transition-all duration-300 hover:scale-105 min-h-[48px]"
                 >
                   Add Another Equipment
                 </button>
                 <Link
                   href="/dashboard/tools/my-equipment"
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-xl transition-colors text-center"
+                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-4 px-6 rounded-xl transition-all duration-300 hover:scale-105 text-center min-h-[48px] flex items-center justify-center"
                 >
                   View All Equipment
                 </Link>
@@ -221,27 +273,30 @@ export default function AddEquipmentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-slate-800 to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-blue-950">
       <div className="container mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
             <Link
-              href="/dashboard"
-              className="p-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 text-white hover:bg-white/20 transition-colors"
+              href="/dashboard/tools"
+              className="group p-3 backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 text-white hover:bg-white/10 transition-all duration-300 hover:scale-105"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
-            <h1 className="text-3xl font-bold text-white">Add New Equipment</h1>
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">Add New Equipment</h1>
+              <p className="text-blue-200">Register equipment and generate QR code</p>
+            </div>
           </div>
         </div>
 
         <div className="max-w-2xl mx-auto">
           {/* Error Display */}
           {error && (
-            <div className="bg-red-500/20 backdrop-blur-xl rounded-2xl border border-red-500/30 p-6 mb-6">
+            <div className="backdrop-blur-xl bg-red-500/10 rounded-2xl border border-red-500/20 p-6 mb-6">
               <div className="flex items-center space-x-3">
                 <svg className="w-6 h-6 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -253,7 +308,7 @@ export default function AddEquipmentPage() {
               </div>
               <button
                 onClick={() => setError(null)}
-                className="mt-3 text-red-300 hover:text-red-200 text-sm"
+                className="mt-3 text-red-300 hover:text-red-200 text-sm hover:underline"
               >
                 Dismiss
               </button>
@@ -261,7 +316,7 @@ export default function AddEquipmentPage() {
           )}
 
           {/* Form */}
-          <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-8">
+          <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-8">
             <h2 className="text-2xl font-bold text-white mb-8">Equipment Information</h2>
 
             <div className="space-y-6">
@@ -277,7 +332,7 @@ export default function AddEquipmentPage() {
                   onChange={handleInputChange}
                   placeholder="Enter equipment name"
                   required
-                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                  className="w-full px-4 py-4 backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400/50 transition-all duration-300 min-h-[48px]"
                 />
               </div>
 
@@ -291,7 +346,7 @@ export default function AddEquipmentPage() {
                     value={form.brand}
                     onChange={handleInputChange}
                     placeholder="Enter brand"
-                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                    className="w-full px-4 py-4 backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400/50 transition-all duration-300 min-h-[48px]"
                   />
                 </div>
                 
@@ -303,7 +358,7 @@ export default function AddEquipmentPage() {
                     value={form.model}
                     onChange={handleInputChange}
                     placeholder="Enter model"
-                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                    className="w-full px-4 py-4 backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400/50 transition-all duration-300 min-h-[48px]"
                   />
                 </div>
               </div>
@@ -317,7 +372,7 @@ export default function AddEquipmentPage() {
                   value={form.serial_number}
                   onChange={handleInputChange}
                   placeholder="Enter serial number"
-                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                  className="w-full px-4 py-4 backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400/50 transition-all duration-300 min-h-[48px]"
                 />
               </div>
 
@@ -329,9 +384,36 @@ export default function AddEquipmentPage() {
                   name="location"
                   value={form.location}
                   onChange={handleInputChange}
-                  placeholder="Enter current location"
-                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                  placeholder="Shop"
+                  className="w-full px-4 py-4 backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400/50 transition-all duration-300 min-h-[48px]"
                 />
+              </div>
+
+              {/* Assign To */}
+              <div>
+                <label className="block text-blue-200 font-medium mb-2">Assign To</label>
+                <select
+                  name="assigned_to_select"
+                  value={showOtherAssignment ? 'Other' : form.assigned_to}
+                  onChange={handleAssignmentChange}
+                  className="w-full px-4 py-4 backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400/50 transition-all duration-300 min-h-[48px]"
+                >
+                  <option value="Shop">Shop</option>
+                  <option value="Rex Z">Rex Z</option>
+                  <option value="Skinny H">Skinny H</option>
+                  <option value="Brandon R">Brandon R</option>
+                  <option value="Matt M">Matt M</option>
+                  <option value="Other">Other</option>
+                </select>
+                {showOtherAssignment && (
+                  <input
+                    type="text"
+                    value={otherAssignment}
+                    onChange={handleOtherAssignmentChange}
+                    placeholder="Enter custom assignment"
+                    className="w-full px-4 py-4 backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400/50 transition-all duration-300 min-h-[48px] mt-2"
+                  />
+                )}
               </div>
 
               {/* Notes */}
@@ -353,7 +435,7 @@ export default function AddEquipmentPage() {
               <button
                 onClick={saveEquipment}
                 disabled={isLoading || !form.name.trim()}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-colors min-h-[48px] flex items-center justify-center space-x-2"
+                className="flex-1 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 disabled:from-gray-600 disabled:to-gray-700 disabled:opacity-50 text-white font-medium py-4 px-6 rounded-xl transition-all duration-300 hover:scale-105 min-h-[48px] flex items-center justify-center space-x-2"
               >
                 {isLoading ? (
                   <>
@@ -374,8 +456,8 @@ export default function AddEquipmentPage() {
               </button>
 
               <Link
-                href="/dashboard"
-                className="bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-6 rounded-xl transition-colors min-h-[48px] flex items-center justify-center"
+                href="/dashboard/tools"
+                className="backdrop-blur-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium py-4 px-6 rounded-xl transition-all duration-300 hover:scale-105 min-h-[48px] flex items-center justify-center"
               >
                 Cancel
               </Link>

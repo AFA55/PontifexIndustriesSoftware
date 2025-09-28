@@ -3,11 +3,21 @@
 @tailwind utilities;
 
 :root {
-  --background: #0f172a;
-  --foreground: #e0e7ef;
-  --primary: #06b6d4;
-  --secondary: #3b82f6;
-  --error: #ef4444;
+  --background: #ffffff;
+  --surface: #ffffff;
+  --foreground: #1a365d;
+  --primary: #dc2626;
+  --secondary: #2563eb;
+  --accent: #1e40af;
+  --success: #059669;
+  --warning: #d97706;
+  --error: #dc2626;
+  --border: #e5e7eb;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --red: #dc2626;
+  --blue: #2563eb;
+  --navy: #1e40af;
 }
 
 body {
@@ -23,9 +33,12 @@ input, button, select, textarea {
 
 ::-webkit-scrollbar {
   width: 8px;
-  background: #1e293b;
+  background: var(--border);
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--accent);
   border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
 }
