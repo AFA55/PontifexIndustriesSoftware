@@ -52,7 +52,7 @@ PARK IN THE SMALL GRAVEL LOT ON THE BACK SIDE OF THE HOSPITAL`,
     onJobChecklist: [
       'Add Job Photos',
       'Time Card',
-      'Work Items',
+      'Work Performed',
       'Customer Sign Off'
     ]
   },
@@ -83,7 +83,7 @@ PARK IN THE SMALL GRAVEL LOT ON THE BACK SIDE OF THE HOSPITAL`,
     onJobChecklist: [
       'Add Job Photos',
       'Time Card',
-      'Work Items',
+      'Work Performed',
       'Customer Sign Off'
     ]
   }
@@ -93,6 +93,7 @@ export default function JobDetail() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [jobStatus, setJobStatus] = useState<'scheduled' | 'in-route' | 'in-progress' | 'completed'>('scheduled');
+  const [documentStatus, setDocumentStatus] = useState<{[key: string]: boolean}>({});
   const router = useRouter();
   const params = useParams();
   const jobId = params.id as string;
@@ -111,7 +112,23 @@ export default function JobDetail() {
     }
     setUser(currentUser);
     setLoading(false);
-  }, [router]);
+
+    // Check document completion status
+    const checkDocumentStatus = () => {
+      const silicaCompleted = localStorage.getItem(`silica-plan-${params.id}`) === 'completed';
+      const workPerformedCompleted = localStorage.getItem(`work-performed-${params.id}`) !== null;
+      setDocumentStatus({
+        silica: silicaCompleted,
+        workPerformed: workPerformedCompleted
+      });
+    };
+
+    checkDocumentStatus();
+
+    // Listen for storage changes
+    window.addEventListener('storage', checkDocumentStatus);
+    return () => window.removeEventListener('storage', checkDocumentStatus);
+  }, [router, params.id]);
 
   if (loading) {
     return (
@@ -217,19 +234,40 @@ export default function JobDetail() {
               { key: 'in-route', label: 'In Route', icon: '🚗' },
               { key: 'in-progress', label: 'In Progress', icon: '⚙️' },
               { key: 'completed', label: 'Complete', icon: '✅' }
-            ].map((status) => (
-              <button
-                key={status.key}
-                onClick={() => setJobStatus(status.key as any)}
+            ].map((status) => {
+              // Check if required documents are completed for "in-progress" status
+              const requiresDocuments = status.key === 'in-progress';
+              const hasRequiredDocs = job.requiredDocuments.length > 0;
+              const allDocsCompleted = hasRequiredDocs ? documentStatus.silica : true;
+              const isDisabled = requiresDocuments && hasRequiredDocs && !allDocsCompleted;
+
+              return (
+                <button
+                  key={status.key}
+                  onClick={() => {
+                    if (isDisabled) {
+                      alert('Please complete all required documents before marking job as "In Progress"');
+                      return;
+                    }
+                    setJobStatus(status.key as any);
+                  }}
                 className={`relative p-4 rounded-xl border-2 transition-all duration-200 ${
-                  jobStatus === status.key
+                  isDisabled
+                    ? 'bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed opacity-60'
+                    : jobStatus === status.key
                     ? `${getStatusColor(status.key)} text-white shadow-lg scale-105`
                     : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
                 }`}
+                disabled={isDisabled}
               >
                 <div className="flex flex-col items-center gap-2">
                   <span className="text-2xl">{status.icon}</span>
                   <span className="font-medium text-sm">{status.label}</span>
+                  {isDisabled && (
+                    <span className="text-xs text-red-500 font-medium">
+                      📋 Docs Required
+                    </span>
+                  )}
                 </div>
                 {jobStatus === status.key && (
                   <div className="absolute -top-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center">
@@ -239,7 +277,8 @@ export default function JobDetail() {
                   </div>
                 )}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -394,16 +433,76 @@ export default function JobDetail() {
               Required Documents
             </h3>
             <div className="space-y-3">
-              {job.requiredDocuments.map((doc, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
-                  <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </div>
-                  <span className="font-medium text-yellow-800">{doc}</span>
-                </div>
-              ))}
+              {job.requiredDocuments.map((doc, idx) => {
+                // Check if this is the Silica Dust Control Plan
+                const isSilicaPlan = doc.includes('Silica Dust') || doc.includes('B&D Silica');
+                const isCompleted = isSilicaPlan && documentStatus.silica;
+
+                if (isSilicaPlan) {
+                  if (isCompleted) {
+                    // Show completed state in green
+                    return (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-300 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-green-800">{doc}</span>
+                            <p className="text-sm text-green-600">✅ COMPLETED</p>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/dashboard/job-schedule/${params.id}/silica-exposure`}
+                          className="px-4 py-2 bg-green-200 text-green-800 rounded-lg hover:bg-green-300 font-medium text-sm transition-colors"
+                        >
+                          View Document
+                        </Link>
+                      </div>
+                    );
+                  } else {
+                    // Show incomplete state - needs to be filled out
+                    return (
+                      <Link
+                        key={idx}
+                        href={`/dashboard/job-schedule/${params.id}/silica-exposure`}
+                        className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 border-2 border-blue-200 hover:border-blue-300 rounded-xl transition-all duration-200 group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-500 group-hover:bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-blue-800 group-hover:text-blue-900">{doc}</span>
+                            <p className="text-sm text-blue-600 group-hover:text-blue-700">⚠️ OSHA Compliance Required</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-blue-600 group-hover:text-blue-700">
+                          <span className="text-sm font-medium">Fill Out Form</span>
+                          <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          </svg>
+                        </div>
+                      </Link>
+                    );
+                  }
+                } else {
+                  return (
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
+                      <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </div>
+                      <span className="font-medium text-yellow-800">{doc}</span>
+                    </div>
+                  );
+                }
+              })}
             </div>
           </div>
         </div>
@@ -431,14 +530,35 @@ export default function JobDetail() {
               <span className="font-medium text-blue-800 text-sm">Time Card</span>
             </button>
 
-            <button className="flex flex-col items-center gap-3 p-4 bg-orange-100 hover:bg-orange-200 rounded-xl transition-all duration-200 border-2 border-orange-300 hover:border-orange-400">
-              <div className="w-12 h-12 bg-orange-600 rounded-xl flex items-center justify-center">
+            <Link
+              href={`/dashboard/job-schedule/${params.id}/work-performed`}
+              className={`flex flex-col items-center gap-3 p-4 rounded-xl transition-all duration-200 border-2 relative ${
+                documentStatus.workPerformed
+                  ? 'bg-green-100 hover:bg-green-200 border-green-300 hover:border-green-400'
+                  : 'bg-orange-100 hover:bg-orange-200 border-orange-300 hover:border-orange-400'
+              }`}
+            >
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                documentStatus.workPerformed ? 'bg-green-600' : 'bg-orange-600'
+              }`}>
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
               </div>
-              <span className="font-medium text-orange-800 text-sm">Work Items</span>
-            </button>
+              <span className={`font-medium text-sm ${
+                documentStatus.workPerformed ? 'text-green-800' : 'text-orange-800'
+              }`}>
+                Work Performed
+                {documentStatus.workPerformed && <span className="block text-xs text-green-600">✅ Completed</span>}
+              </span>
+              {documentStatus.workPerformed && (
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+            </Link>
 
             <button className="flex flex-col items-center gap-3 p-4 bg-green-100 hover:bg-green-200 rounded-xl transition-all duration-200 border-2 border-green-300 hover:border-green-400">
               <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center">
