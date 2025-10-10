@@ -26,9 +26,9 @@ export default function AdminDashboard() {
       return;
     }
 
-    console.log('✅ Admin user authenticated:', currentUser);
-    setUser(currentUser);
-    setLoading(false);
+    console.log('✅ Admin user authenticated, redirecting to new admin dashboard:', currentUser);
+    // Redirect to the new admin dashboard
+    router.push('/dashboard/admin');
   }, [router]);
 
   const handleLogout = () => {
