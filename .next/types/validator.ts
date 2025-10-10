@@ -36,6 +36,66 @@ type LayoutConfig<Route extends LayoutRoutes = LayoutRoutes> = {
 }
 
 
+// Validate ../../app/admin/page.tsx
+{
+  const handler = {} as typeof import("../../app/admin/page.js")
+  handler satisfies AppPageConfig<"/admin">
+}
+
+// Validate ../../app/dashboard/admin/create-estimate/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/admin/create-estimate/page.js")
+  handler satisfies AppPageConfig<"/dashboard/admin/create-estimate">
+}
+
+// Validate ../../app/dashboard/admin/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/admin/page.js")
+  handler satisfies AppPageConfig<"/dashboard/admin">
+}
+
+// Validate ../../app/dashboard/admin/project-status-board/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/admin/project-status-board/page.js")
+  handler satisfies AppPageConfig<"/dashboard/admin/project-status-board">
+}
+
+// Validate ../../app/dashboard/admin/upcoming-projects/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/admin/upcoming-projects/page.js")
+  handler satisfies AppPageConfig<"/dashboard/admin/upcoming-projects">
+}
+
+// Validate ../../app/dashboard/job-schedule/[id]/equipment-checklist/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/job-schedule/[id]/equipment-checklist/page.js")
+  handler satisfies AppPageConfig<"/dashboard/job-schedule/[id]/equipment-checklist">
+}
+
+// Validate ../../app/dashboard/job-schedule/[id]/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/job-schedule/[id]/page.js")
+  handler satisfies AppPageConfig<"/dashboard/job-schedule/[id]">
+}
+
+// Validate ../../app/dashboard/job-schedule/[id]/silica-exposure/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/job-schedule/[id]/silica-exposure/page.js")
+  handler satisfies AppPageConfig<"/dashboard/job-schedule/[id]/silica-exposure">
+}
+
+// Validate ../../app/dashboard/job-schedule/[id]/work-performed/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/job-schedule/[id]/work-performed/page.js")
+  handler satisfies AppPageConfig<"/dashboard/job-schedule/[id]/work-performed">
+}
+
+// Validate ../../app/dashboard/job-schedule/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/job-schedule/page.js")
+  handler satisfies AppPageConfig<"/dashboard/job-schedule">
+}
+
 // Validate ../../app/dashboard/page.tsx
 {
   const handler = {} as typeof import("../../app/dashboard/page.js")
@@ -58,6 +118,12 @@ type LayoutConfig<Route extends LayoutRoutes = LayoutRoutes> = {
 {
   const handler = {} as typeof import("../../app/dashboard/tools/my-equipment/page.js")
   handler satisfies AppPageConfig<"/dashboard/tools/my-equipment">
+}
+
+// Validate ../../app/dashboard/tools/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/tools/page.js")
+  handler satisfies AppPageConfig<"/dashboard/tools">
 }
 
 // Validate ../../app/dashboard/tools/scan/page.tsx
