@@ -51,91 +51,172 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-red-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        className="backdrop-blur-sm bg-surface/95 rounded-2xl shadow-2xl border border-border p-8 w-full max-w-md"
+        transition={{ duration: 0.5 }}
+        className="relative z-10 backdrop-blur-xl bg-white/95 rounded-3xl shadow-2xl p-8 w-full max-w-md border border-gray-200"
       >
+        {/* Logo and Header */}
         <div className="flex flex-col items-center mb-8">
-          <Logo />
-          <h1 className="text-3xl font-bold text-foreground mt-4 mb-2 tracking-tight">Pontifex Industry Software</h1>
-          <p className="text-text-secondary text-sm">Concrete Cutting Management System</p>
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            <Logo />
+          </motion.div>
+          <motion.h1
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-red-700 bg-clip-text text-transparent mt-6 mb-2 tracking-tight"
+          >
+            Pontifex Industries
+          </motion.h1>
+          <p className="text-gray-600 text-sm font-medium">Concrete Cutting Management System</p>
         </div>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="relative">
-            <Mail className="absolute left-3 top-3 text-primary" size={20} />
+
+        {/* Login Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <motion.div
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="relative group"
+          >
+            <Mail className="absolute left-4 top-4 text-blue-600 group-focus-within:text-blue-700 transition-colors" size={20} />
             <input
               type="email"
               placeholder="Email"
               {...register('email')}
-              className="w-full pl-10 pr-4 py-3 rounded-lg bg-surface border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all duration-200"
+              className="w-full pl-12 pr-4 py-4 rounded-xl bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all duration-200 text-gray-800 placeholder-gray-400"
               autoComplete="email"
               required
             />
-          </div>
-          <div className="relative">
-            <Lock className="absolute left-3 top-3 text-primary" size={20} />
+          </motion.div>
+
+          <motion.div
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="relative group"
+          >
+            <Lock className="absolute left-4 top-4 text-blue-600 group-focus-within:text-blue-700 transition-colors" size={20} />
             <input
               type={showPassword ? 'text' : 'password'}
               placeholder="Password"
               {...register('password')}
-              className="w-full pl-10 pr-10 py-3 rounded-lg bg-surface border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all duration-200"
+              className="w-full pl-12 pr-12 py-4 rounded-xl bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all duration-200 text-gray-800 placeholder-gray-400"
               autoComplete="current-password"
               required
             />
             <button
               type="button"
-              className="absolute right-3 top-3 text-text-secondary hover:text-primary focus:outline-none transition-colors"
+              className="absolute right-4 top-4 text-gray-400 hover:text-blue-600 focus:outline-none transition-colors"
               onClick={() => setShowPassword((v) => !v)}
               tabIndex={-1}
             >
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2 text-text-secondary">
-              <input type="checkbox" {...register('remember')} className="accent-primary rounded" /> Remember me
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="flex items-center justify-between text-sm"
+          >
+            <label className="flex items-center gap-2 text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+              <input type="checkbox" {...register('remember')} className="w-4 h-4 accent-blue-600 rounded" />
+              <span>Remember me</span>
             </label>
-            <a href="#" className="text-primary hover:text-accent transition-colors">Forgot password?</a>
-          </div>
-          {error && <div className="text-red-500 text-sm text-center">{error}</div>}
-          <button
+            <a href="#" className="text-blue-600 hover:text-blue-700 font-medium transition-colors">
+              Forgot password?
+            </a>
+          </motion.div>
+
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium"
+            >
+              {error}
+            </motion.div>
+          )}
+
+          <motion.button
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.7 }}
             type="submit"
-            className="w-full py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 focus:ring-2 focus:ring-red-500/20 transform hover:scale-[1.02]"
+            className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white font-bold shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500/30 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-          <div className="text-center mt-4">
-            <Link href="/request-login" className="text-primary hover:text-accent text-sm transition-colors">
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Signing in...
+              </span>
+            ) : 'Sign In'}
+          </motion.button>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="text-center"
+          >
+            <Link href="/request-login" className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors">
               Need access? Request Login
             </Link>
-          </div>
+          </motion.div>
         </form>
-        
-        {/* Demo Credentials Info */}
-        <div className="mt-6 p-4 bg-surface border border-border rounded-xl">
-          <h3 className="text-foreground font-medium text-sm mb-3">Demo Accounts</h3>
+
+        {/* Demo Credentials - Modern Cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="mt-8 space-y-3"
+        >
+          <h3 className="text-gray-700 font-bold text-sm mb-4 text-center">Quick Access Demo Accounts</h3>
 
           {/* Operator Account */}
-          <div className="mb-4 p-3 bg-background rounded-lg border border-border">
-            <h4 className="text-accent font-medium text-xs mb-1">OPERATOR DASHBOARD</h4>
-            <div className="text-xs text-text-secondary space-y-1">
-              <div><span className="text-primary font-medium">Email:</span> demo@pontifex.com</div>
-              <div><span className="text-primary font-medium">Password:</span> Demo1234!</div>
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 hover:border-blue-300 transition-all hover:shadow-md cursor-default">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              <h4 className="text-blue-800 font-bold text-xs tracking-wider">OPERATOR DASHBOARD</h4>
+            </div>
+            <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+              <div><span className="text-blue-700 font-bold">Email:</span> demo@pontifex.com</div>
+              <div><span className="text-blue-700 font-bold">Password:</span> Demo1234!</div>
             </div>
           </div>
 
           {/* Admin Account */}
-          <div className="p-3 bg-background rounded-lg border border-border">
-            <h4 className="text-warning font-medium text-xs mb-1">ADMIN DASHBOARD</h4>
-            <div className="text-xs text-text-secondary space-y-1">
-              <div><span className="text-primary font-medium">Email:</span> admin@pontifex.com</div>
-              <div><span className="text-primary font-medium">Password:</span> Admin1234!</div>
+          <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200 hover:border-orange-300 transition-all hover:shadow-md cursor-default">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <h4 className="text-red-800 font-bold text-xs tracking-wider">ADMIN DASHBOARD</h4>
+            </div>
+            <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+              <div><span className="text-red-700 font-bold">Email:</span> admin@pontifex.com</div>
+              <div><span className="text-red-700 font-bold">Password:</span> Admin1234!</div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </motion.div>
     </div>
   );

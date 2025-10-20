@@ -3,18 +3,56 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
+  /* Pontifex Brand Identity - Blue to Red Gradient Theme */
+  --brand-blue-primary: #2563eb;
+  --brand-blue-secondary: #3b82f6;
+  --brand-blue-dark: #1e40af;
+  --brand-blue-light: #60a5fa;
+
+  --brand-red-primary: #dc2626;
+  --brand-red-secondary: #ef4444;
+  --brand-red-dark: #b91c1c;
+  --brand-red-light: #f87171;
+
+  --brand-indigo: #6366f1;
+  --brand-gradient: linear-gradient(135deg, #2563eb 0%, #dc2626 100%);
+  --brand-gradient-hover: linear-gradient(135deg, #1d4ed8 0%, #b91c1c 100%);
+
+  /* Core Colors */
+  --background: #ffffff;
+  --background-secondary: #f8fafc;
+  --background-tertiary: #f1f5f9;
   --surface: #ffffff;
-  --foreground: #1e293b;
-  --primary: #1e40af;
+  --surface-elevated: #ffffff;
+  --foreground: #0f172a;
+
+  /* Semantic Colors */
+  --primary: #2563eb;
   --secondary: #3b82f6;
-  --accent: #f97316;
+  --accent: #dc2626;
   --success: #10b981;
   --warning: #f59e0b;
   --error: #ef4444;
-  --border: #e2e8f0;
+  --info: #3b82f6;
+
+  /* Text Colors */
+  --text-primary: #0f172a;
   --text-secondary: #64748b;
   --text-muted: #94a3b8;
+  --text-inverse: #ffffff;
+
+  /* Border & Divider */
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --divider: #cbd5e1;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-brand: 0 10px 30px rgba(37, 99, 235, 0.15), 0 4px 12px rgba(220, 38, 38, 0.1);
 }
 
 .dark {
@@ -95,10 +133,51 @@ input, button, select, textarea {
   }
 
   .gradient-text {
-    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    background: var(--brand-gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .gradient-bg-brand {
+    background: var(--brand-gradient);
+  }
+
+  .gradient-bg-brand:hover {
+    background: var(--brand-gradient-hover);
+  }
+
+  .btn-brand {
+    background: var(--brand-gradient);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .btn-brand:hover {
+    background: var(--brand-gradient-hover);
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-2px);
+  }
+
+  .card-premium {
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-light);
+    transition: all 0.2s ease;
+  }
+
+  .card-premium:hover {
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-2px);
+  }
+
+  .shadow-smooth {
+    box-shadow: 0 2px 20px rgba(37, 99, 235, 0.08), 0 8px 16px rgba(220, 38, 38, 0.04);
   }
 
   .input-float-label {

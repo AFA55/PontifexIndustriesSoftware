@@ -1,22 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { ArrowLeft, Save, FileText, Mail, Plus, X, DollarSign, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  ChevronDown,
-  ChevronUp,
-  Plus,
-  X,
-  Save,
-  FileText,
-  Mail,
-  ArrowLeft,
-  Settings,
-  DollarSign
-} from 'lucide-react';
 
-// Types
+// ==================== TYPES ====================
 interface ProjectInfo {
   date: string;
   contractor: string;
@@ -31,11 +20,7 @@ interface CoreDrillingItem {
   id: string;
   description: string;
   quantity: number;
-  length: number;
-  width: number;
   depth: number;
-  lengthInterval: number;
-  widthInterval: number;
   complexity: number;
 }
 
@@ -44,7 +29,6 @@ interface WallSawingItem {
   description: string;
   quantity: number;
   length: number;
-  width: number;
   depth: number;
   complexity: number;
 }
@@ -72,7 +56,6 @@ interface SlabSawingItem {
   description: string;
   quantity: number;
   length: number;
-  width: number;
   depth: number;
   complexity: number;
 }
@@ -95,16 +78,13 @@ interface AdditionalCosts {
   outsideLaborerHours: number;
   overtimePremium: number;
   slurryDisposal: number;
-  avettaFee: number;
-  isnFee: number;
   materials: number;
   equipmentRentals: number;
-  trucking: number;
-  dumpFees: number;
   adjustments: number;
 }
 
-export default function CreateEstimate() {
+export default function ModernEstimateBuilder() {
+  // State
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>({
     date: new Date().toISOString().split('T')[0],
     contractor: '',
@@ -133,54 +113,30 @@ export default function CreateEstimate() {
     outsideLaborerHours: 0,
     overtimePremium: 0,
     slurryDisposal: 0,
-    avettaFee: 0,
-    isnFee: 0,
     materials: 0,
     equipmentRentals: 0,
-    trucking: 0,
-    dumpFees: 0,
     adjustments: 0,
   });
 
-  // Section expansion states
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    projectInfo: true,
-    coreDrilling: false,
-    wallSawing: false,
-    handHeldChainSaw: false,
-    handSaw: false,
-    slabSawing: false,
-    labor: false,
-    additionalCosts: false,
-  });
+  const [expandedSection, setExpandedSection] = useState<string | null>('projectInfo');
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  // Calculation functions
+  // ==================== CALCULATIONS ====================
   const calculateCoreDrillingCost = (item: CoreDrillingItem): number => {
-    const totalHoles = item.quantity;
-    const footagePerHole = item.depth / 12; // Convert inches to feet
-    const totalFootage = totalHoles * footagePerHole;
-
-    // Base cost calculation
-    const laborHours = (totalFootage * 0.15); // Approximate labor hours per foot
+    const footagePerHole = item.depth / 12;
+    const totalFootage = item.quantity * footagePerHole;
+    const laborHours = totalFootage * 0.15;
     const laborCost = laborHours * projectInfo.techLaborRate;
-    const diamondCost = totalFootage * 2.5; // $2.50 per foot diamond wear
+    const diamondCost = totalFootage * 2.5;
     const baseCost = laborCost + diamondCost;
-
-    // Apply complexity adjustment
     return baseCost * (1 + item.complexity / 100);
   };
 
   const calculateWallSawingCost = (item: WallSawingItem): number => {
-    const totalArea = item.quantity * item.length * item.depth / 144; // Convert to sq ft
-    const laborHours = totalArea * 0.25;
+    const totalLinearFeet = item.quantity * item.length;
+    const laborHours = totalLinearFeet * 0.25;
     const laborCost = laborHours * projectInfo.techLaborRate;
-    const diamondCost = (item.length * item.quantity) * 3.5;
+    const diamondCost = totalLinearFeet * 3.5;
     const baseCost = laborCost + diamondCost;
-
     return baseCost * (1 + item.complexity / 100);
   };
 
@@ -189,7 +145,6 @@ export default function CreateEstimate() {
     const laborHours = totalLinearFeet * 0.2;
     const laborCost = laborHours * projectInfo.techLaborRate;
     const baseCost = laborCost + (totalLinearFeet * 4.0);
-
     return baseCost * (1 + item.complexity / 100);
   };
 
@@ -198,7 +153,6 @@ export default function CreateEstimate() {
     const laborHours = totalLinearFeet * 0.18;
     const laborCost = laborHours * projectInfo.techLaborRate;
     const baseCost = laborCost + (totalLinearFeet * 3.0);
-
     return baseCost * (1 + item.complexity / 100);
   };
 
@@ -207,7 +161,6 @@ export default function CreateEstimate() {
     const laborHours = totalLinearFeet * 0.12;
     const laborCost = laborHours * projectInfo.techLaborRate;
     const baseCost = laborCost + (totalLinearFeet * 2.0);
-
     return baseCost * (1 + item.complexity / 100);
   };
 
@@ -216,7 +169,6 @@ export default function CreateEstimate() {
     return baseCost * (1 + item.complexity / 100);
   };
 
-  // Total calculations
   const coreDrillingTotal = coreDrillingItems.reduce((sum, item) => sum + calculateCoreDrillingCost(item), 0);
   const wallSawingTotal = wallSawingItems.reduce((sum, item) => sum + calculateWallSawingCost(item), 0);
   const handHeldChainSawTotal = handHeldChainSawItems.reduce((sum, item) => sum + calculateHandHeldChainSawCost(item), 0);
@@ -225,301 +177,272 @@ export default function CreateEstimate() {
   const laborTotal = laborItems.reduce((sum, item) => sum + calculateLaborCost(item), 0);
 
   const servicesSubtotal = coreDrillingTotal + wallSawingTotal + handHeldChainSawTotal + handSawTotal + slabSawingTotal + laborTotal;
-
-  // Additional costs calculations
-  const shopFees = servicesSubtotal * 0.15; // 15% shop fee
-  const mileageCost = additionalCosts.mileageDistance * additionalCosts.mileageTrips * projectInfo.mileageRate * 2; // Round trip
+  const shopFees = servicesSubtotal * 0.15;
+  const mileageCost = additionalCosts.mileageDistance * additionalCosts.mileageTrips * projectInfo.mileageRate * 2;
   const travelCost = (additionalCosts.techTravelHours * projectInfo.techLaborRate) + (additionalCosts.traineeTravelHours * projectInfo.laborerRate);
-  const equipmentCost = additionalCosts.equipmentManNights * 150; // $150 per man/night
+  const equipmentCost = additionalCosts.equipmentManNights * 150;
   const outsideLaborCost = additionalCosts.outsideLaborerHours * additionalCosts.outsideLaborerRate;
 
   const additionalCostsTotal = shopFees + mileageCost + travelCost + equipmentCost +
     additionalCosts.perDiems + outsideLaborCost + additionalCosts.slurryDisposal +
-    additionalCosts.avettaFee + additionalCosts.isnFee + additionalCosts.materials +
-    additionalCosts.equipmentRentals + additionalCosts.trucking + additionalCosts.dumpFees +
-    additionalCosts.adjustments;
+    additionalCosts.materials + additionalCosts.equipmentRentals + additionalCosts.adjustments;
 
   const grandTotal = servicesSubtotal + additionalCostsTotal;
 
+  const completionPercentage = Math.round(
+    ((projectInfo.contractor !== '' && projectInfo.jobName !== '' ? 25 : 0) +
+     (coreDrillingItems.length + wallSawingItems.length + handHeldChainSawItems.length + handSawItems.length + slabSawingItems.length + laborItems.length > 0 ? 50 : 0) +
+     (grandTotal > 0 ? 25 : 0))
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden">
+      {/* Animated Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300 rounded-full opacity-10 blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-red-300 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-200 rounded-full opacity-5 blur-3xl animate-pulse delay-2000"></div>
+      </div>
+
       {/* Header */}
-      <div className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 border-b border-white/20 shadow-sm">
+      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-lg">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link
-                href="/dashboard/admin"
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
-              >
+              <Link href="/dashboard/admin" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-gray-700 hover:text-blue-600 border border-gray-200">
                 <ArrowLeft className="w-5 h-5" />
-                <span className="font-medium">Back to Admin</span>
+                <span className="font-semibold hidden sm:inline">Back to Admin</span>
               </Link>
-              <div className="h-6 w-px bg-gray-300" />
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Create New Estimate
-              </h1>
+              <div className="h-8 w-px bg-gray-300" />
+              <div>
+                <h1 className="text-2xl font-bold gradient-text">Create New Estimate</h1>
+                <p className="text-sm text-gray-600 font-medium">Professional concrete cutting estimates</p>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors font-medium">
-                <Save className="w-4 h-4" />
-                Save Draft
-              </button>
+            <button className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border-2 border-gray-300 rounded-xl transition-all font-semibold text-gray-700 shadow-sm hover:shadow-md">
+              <Save className="w-4 h-4" />
+              <span className="hidden sm:inline">Save Draft</span>
+            </button>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-gray-700">Estimate Progress</span>
+              <span className="text-sm font-bold gradient-text">{completionPercentage}%</span>
+            </div>
+            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
+              <motion.div
+                className="h-full gradient-bg-brand"
+                initial={{ width: 0 }}
+                animate={{ width: `${completionPercentage}%` }}
+                transition={{ duration: 0.5 }}
+              />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-6 py-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Form Column */}
-          <div className="lg:col-span-2 space-y-4">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
 
-            {/* Project Info Section */}
-            <CollapsibleSection
-              title="📋 Project Information"
-              isExpanded={expandedSections.projectInfo}
-              onToggle={() => toggleSection('projectInfo')}
+            {/* Project Info Card */}
+            <ServiceSection
+              title="Project Information"
+              icon="📋"
+              gradient="from-slate-500 to-slate-600"
+              isExpanded={expandedSection === 'projectInfo'}
+              onClick={() => setExpandedSection(expandedSection === 'projectInfo' ? null : 'projectInfo')}
               itemCount={0}
+              totalCost={0}
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={projectInfo.date}
-                    onChange={(e) => setProjectInfo({ ...projectInfo, date: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
+                <InputField
+                  label="Date"
+                  type="date"
+                  value={projectInfo.date}
+                  onChange={(v) => setProjectInfo({ ...projectInfo, date: v })}
+                />
+                <InputField
+                  label="Contractor Name"
+                  value={projectInfo.contractor}
+                  onChange={(v) => setProjectInfo({ ...projectInfo, contractor: v })}
+                  placeholder="Enter contractor name"
+                  required
+                />
+                <InputField
+                  label="Contact/Phone"
+                  type="tel"
+                  value={projectInfo.contactPhone}
+                  onChange={(v) => setProjectInfo({ ...projectInfo, contactPhone: v })}
+                  placeholder="(555) 123-4567"
+                />
+                <InputField
+                  label="Job Name"
+                  value={projectInfo.jobName}
+                  onChange={(v) => setProjectInfo({ ...projectInfo, jobName: v })}
+                  placeholder="Downtown Plaza Renovation"
+                  required
+                />
+                <InputField
+                  label="Tech Labor Rate ($/hr)"
+                  type="number"
+                  value={projectInfo.techLaborRate.toString()}
+                  onChange={(v) => setProjectInfo({ ...projectInfo, techLaborRate: parseFloat(v) || 0 })}
+                />
+                <InputField
+                  label="Laborer Rate ($/hr)"
+                  type="number"
+                  value={projectInfo.laborerRate.toString()}
+                  onChange={(v) => setProjectInfo({ ...projectInfo, laborerRate: parseFloat(v) || 0 })}
+                />
+                <InputField
+                  label="Mileage Rate ($/mile)"
+                  type="number"
+                  step="0.01"
+                  value={projectInfo.mileageRate.toString()}
+                  onChange={(v) => setProjectInfo({ ...projectInfo, mileageRate: parseFloat(v) || 0 })}
+                />
+              </div>
+            </ServiceSection>
+
+            {/* Core Drilling */}
+            <ServiceSection
+              title="Core/Diamond Drilling"
+              icon="⚙️"
+              gradient="from-blue-500 to-blue-600"
+              isExpanded={expandedSection === 'coreDrilling'}
+              onClick={() => setExpandedSection(expandedSection === 'coreDrilling' ? null : 'coreDrilling')}
+              itemCount={coreDrillingItems.length}
+              totalCost={coreDrillingTotal}
+            >
+              <ItemList
+                items={coreDrillingItems}
+                setItems={setCoreDrillingItems}
+                calculateCost={calculateCoreDrillingCost}
+                addItemTemplate={() => ({ id: Date.now().toString(), description: '', quantity: 1, depth: 0, complexity: 0 })}
+                renderFields={(item, updateItem) => (
+                  <>
+                    <InputField label="Quantity" type="number" value={item.quantity.toString()} onChange={(v) => updateItem({ quantity: parseFloat(v) || 0 })} />
+                    <InputField label="Depth (inches)" type="number" value={item.depth.toString()} onChange={(v) => updateItem({ depth: parseFloat(v) || 0 })} />
+                    <ComplexitySlider value={item.complexity} onChange={(v) => updateItem({ complexity: v })} />
+                  </>
+                )}
+                color="blue"
+                addButtonText="Add Core Drilling Item"
+              />
+            </ServiceSection>
+
+            {/* Wall Sawing */}
+            <ServiceSection
+              title="Wall Sawing"
+              icon="🧱"
+              gradient="from-orange-500 to-red-600"
+              isExpanded={expandedSection === 'wallSawing'}
+              onClick={() => setExpandedSection(expandedSection === 'wallSawing' ? null : 'wallSawing')}
+              itemCount={wallSawingItems.length}
+              totalCost={wallSawingTotal}
+            >
+              <ItemList
+                items={wallSawingItems}
+                setItems={setWallSawingItems}
+                calculateCost={calculateWallSawingCost}
+                addItemTemplate={() => ({ id: Date.now().toString(), description: '', quantity: 1, length: 0, depth: 0, complexity: 0 })}
+                renderFields={(item, updateItem) => (
+                  <>
+                    <InputField label="Quantity" type="number" value={item.quantity.toString()} onChange={(v) => updateItem({ quantity: parseFloat(v) || 0 })} />
+                    <InputField label="Length (ft)" type="number" value={item.length.toString()} onChange={(v) => updateItem({ length: parseFloat(v) || 0 })} />
+                    <InputField label="Depth (in)" type="number" value={item.depth.toString()} onChange={(v) => updateItem({ depth: parseFloat(v) || 0 })} />
+                    <ComplexitySlider value={item.complexity} onChange={(v) => updateItem({ complexity: v })} />
+                  </>
+                )}
+                color="red"
+                addButtonText="Add Wall Sawing Item"
+              />
+            </ServiceSection>
+
+            {/* Additional Costs */}
+            <ServiceSection
+              title="Additional Costs"
+              icon="💰"
+              gradient="from-green-500 to-emerald-600"
+              isExpanded={expandedSection === 'additionalCosts'}
+              onClick={() => setExpandedSection(expandedSection === 'additionalCosts' ? null : 'additionalCosts')}
+              itemCount={0}
+              totalCost={additionalCostsTotal}
+            >
+              <div className="space-y-4">
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                  <h4 className="font-semibold text-gray-800 mb-2">Auto-Calculated Costs</h4>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Shop Fees (15%)</span>
+                    <span className="font-semibold text-blue-600">${shopFees.toFixed(2)}</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contractor Name</label>
-                  <input
-                    type="text"
-                    value={projectInfo.contractor}
-                    onChange={(e) => setProjectInfo({ ...projectInfo, contractor: e.target.value })}
-                    placeholder="Enter contractor name"
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contact/Phone</label>
-                  <input
-                    type="text"
-                    value={projectInfo.contactPhone}
-                    onChange={(e) => setProjectInfo({ ...projectInfo, contactPhone: e.target.value })}
-                    placeholder="Enter contact info"
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Name</label>
-                  <input
-                    type="text"
-                    value={projectInfo.jobName}
-                    onChange={(e) => setProjectInfo({ ...projectInfo, jobName: e.target.value })}
-                    placeholder="Enter job name"
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tech Labor Rate ($/hr)</label>
-                  <input
-                    type="number"
-                    value={projectInfo.techLaborRate}
-                    onChange={(e) => setProjectInfo({ ...projectInfo, techLaborRate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Laborer Rate ($/hr)</label>
-                  <input
-                    type="number"
-                    value={projectInfo.laborerRate}
-                    onChange={(e) => setProjectInfo({ ...projectInfo, laborerRate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mileage Rate ($/mile)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={projectInfo.mileageRate}
-                    onChange={(e) => setProjectInfo({ ...projectInfo, mileageRate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InputField label="Mileage Distance (miles)" type="number" value={additionalCosts.mileageDistance.toString()} onChange={(v) => setAdditionalCosts({ ...additionalCosts, mileageDistance: parseFloat(v) || 0 })} />
+                  <InputField label="Number of Trips" type="number" value={additionalCosts.mileageTrips.toString()} onChange={(v) => setAdditionalCosts({ ...additionalCosts, mileageTrips: parseFloat(v) || 0 })} />
+                  <InputField label="Tech Travel Hours" type="number" value={additionalCosts.techTravelHours.toString()} onChange={(v) => setAdditionalCosts({ ...additionalCosts, techTravelHours: parseFloat(v) || 0 })} />
+                  <InputField label="Equipment (man/nights)" type="number" value={additionalCosts.equipmentManNights.toString()} onChange={(v) => setAdditionalCosts({ ...additionalCosts, equipmentManNights: parseFloat(v) || 0 })} />
+                  <InputField label="Per Diems ($)" type="number" value={additionalCosts.perDiems.toString()} onChange={(v) => setAdditionalCosts({ ...additionalCosts, perDiems: parseFloat(v) || 0 })} />
+                  <InputField label="Materials ($)" type="number" value={additionalCosts.materials.toString()} onChange={(v) => setAdditionalCosts({ ...additionalCosts, materials: parseFloat(v) || 0 })} />
+                  <InputField label="Equipment Rentals ($)" type="number" value={additionalCosts.equipmentRentals.toString()} onChange={(v) => setAdditionalCosts({ ...additionalCosts, equipmentRentals: parseFloat(v) || 0 })} />
+                  <InputField label="Adjustments (+/-)" type="number" value={additionalCosts.adjustments.toString()} onChange={(v) => setAdditionalCosts({ ...additionalCosts, adjustments: parseFloat(v) || 0 })} />
                 </div>
               </div>
-            </CollapsibleSection>
-
-            {/* Core Drilling Section */}
-            <CoreDrillingSection
-              items={coreDrillingItems}
-              setItems={setCoreDrillingItems}
-              isExpanded={expandedSections.coreDrilling}
-              onToggle={() => toggleSection('coreDrilling')}
-              calculateCost={calculateCoreDrillingCost}
-            />
-
-            {/* Wall Sawing Section */}
-            <WallSawingSection
-              items={wallSawingItems}
-              setItems={setWallSawingItems}
-              isExpanded={expandedSections.wallSawing}
-              onToggle={() => toggleSection('wallSawing')}
-              calculateCost={calculateWallSawingCost}
-            />
-
-            {/* Hand Held Chain Saw Section */}
-            <HandHeldChainSawSection
-              items={handHeldChainSawItems}
-              setItems={setHandHeldChainSawItems}
-              isExpanded={expandedSections.handHeldChainSaw}
-              onToggle={() => toggleSection('handHeldChainSaw')}
-              calculateCost={calculateHandHeldChainSawCost}
-            />
-
-            {/* Hand Saw Section */}
-            <HandSawSection
-              items={handSawItems}
-              setItems={setHandSawItems}
-              isExpanded={expandedSections.handSaw}
-              onToggle={() => toggleSection('handSaw')}
-              calculateCost={calculateHandSawCost}
-            />
-
-            {/* Slab Sawing Section */}
-            <SlabSawingSection
-              items={slabSawingItems}
-              setItems={setSlabSawingItems}
-              isExpanded={expandedSections.slabSawing}
-              onToggle={() => toggleSection('slabSawing')}
-              calculateCost={calculateSlabSawingCost}
-            />
-
-            {/* Labor Section */}
-            <LaborSection
-              items={laborItems}
-              setItems={setLaborItems}
-              isExpanded={expandedSections.labor}
-              onToggle={() => toggleSection('labor')}
-              calculateCost={calculateLaborCost}
-            />
-
-            {/* Additional Costs Section */}
-            <AdditionalCostsSection
-              costs={additionalCosts}
-              setCosts={setAdditionalCosts}
-              isExpanded={expandedSections.additionalCosts}
-              onToggle={() => toggleSection('additionalCosts')}
-              shopFees={shopFees}
-              mileageCost={mileageCost}
-              travelCost={travelCost}
-              equipmentCost={equipmentCost}
-              outsideLaborCost={outsideLaborCost}
-            />
+            </ServiceSection>
 
           </div>
 
           {/* Sticky Sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24">
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-green-600" />
+            <div className="sticky top-32">
+              <div className="bg-white rounded-3xl shadow-xl p-6 border-2 border-gray-200">
+                <h3 className="text-xl font-bold gradient-text mb-6 flex items-center gap-2 pb-3 border-b-2 border-gray-100">
+                  <Calculator className="w-6 h-6 text-blue-600" />
                   Estimate Summary
                 </h3>
 
-                {/* Services Subtotals */}
-                <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Services</h4>
-                  {coreDrillingTotal > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Core Drilling</span>
-                      <span className="font-semibold text-gray-800">${coreDrillingTotal.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {wallSawingTotal > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Wall Sawing</span>
-                      <span className="font-semibold text-gray-800">${wallSawingTotal.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {handHeldChainSawTotal > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Hand Held Chain Saw</span>
-                      <span className="font-semibold text-gray-800">${handHeldChainSawTotal.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {handSawTotal > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Hand Saw</span>
-                      <span className="font-semibold text-gray-800">${handSawTotal.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {slabSawingTotal > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Slab Sawing</span>
-                      <span className="font-semibold text-gray-800">${slabSawingTotal.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {laborTotal > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Labor</span>
-                      <span className="font-semibold text-gray-800">${laborTotal.toFixed(2)}</span>
-                    </div>
-                  )}
-                </div>
+                {/* Services Breakdown */}
+                {(coreDrillingTotal > 0 || wallSawingTotal > 0 || handHeldChainSawTotal > 0 || handSawTotal > 0 || slabSawingTotal > 0 || laborTotal > 0) && (
+                  <div className="space-y-2 mb-4 pb-4 border-b-2 border-gray-100">
+                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Services</h4>
+                    {coreDrillingTotal > 0 && <CostRow label="Core Drilling" amount={coreDrillingTotal} />}
+                    {wallSawingTotal > 0 && <CostRow label="Wall Sawing" amount={wallSawingTotal} />}
+                    {handHeldChainSawTotal > 0 && <CostRow label="Chain Saw" amount={handHeldChainSawTotal} />}
+                    {handSawTotal > 0 && <CostRow label="Hand Saw" amount={handSawTotal} />}
+                    {slabSawingTotal > 0 && <CostRow label="Slab Sawing" amount={slabSawingTotal} />}
+                    {laborTotal > 0 && <CostRow label="Labor" amount={laborTotal} />}
+                  </div>
+                )}
 
                 {/* Additional Costs */}
-                <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Additional Costs</h4>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Shop Fees (15%)</span>
-                    <span className="font-semibold text-gray-800">${shopFees.toFixed(2)}</span>
-                  </div>
-                  {mileageCost > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Mileage</span>
-                      <span className="font-semibold text-gray-800">${mileageCost.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {travelCost > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Travel</span>
-                      <span className="font-semibold text-gray-800">${travelCost.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {equipmentCost > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Equipment</span>
-                      <span className="font-semibold text-gray-800">${equipmentCost.toFixed(2)}</span>
-                    </div>
-                  )}
+                <div className="space-y-2 mb-6 pb-4 border-b-2 border-gray-100">
+                  <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Additional Costs</h4>
+                  <CostRow label="Shop Fees (15%)" amount={shopFees} />
+                  {mileageCost > 0 && <CostRow label="Mileage" amount={mileageCost} />}
+                  {travelCost > 0 && <CostRow label="Travel" amount={travelCost} />}
+                  {equipmentCost > 0 && <CostRow label="Equipment" amount={equipmentCost} />}
                 </div>
 
                 {/* Grand Total */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 mb-6">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold text-gray-800">GRAND TOTAL</span>
-                    <span className="text-2xl font-bold text-blue-600">${grandTotal.toFixed(2)}</span>
-                  </div>
+                <div className="bg-gradient-to-br from-blue-600 to-red-600 rounded-2xl p-6 text-white mb-6 shadow-lg">
+                  <p className="text-sm font-bold opacity-90 mb-1 tracking-wide">GRAND TOTAL</p>
+                  <p className="text-5xl font-bold tracking-tight">${grandTotal.toFixed(2)}</p>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
-                    <FileText className="w-4 h-4" />
+                  <button className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
+                    <FileText className="w-5 h-5" />
                     Generate PDF
                   </button>
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
-                    <Mail className="w-4 h-4" />
+                  <button className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-white hover:bg-gray-50 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5">
+                    <Mail className="w-5 h-5" />
                     Email to Client
-                  </button>
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
-                    <Save className="w-4 h-4" />
-                    Save & Continue
                   </button>
                 </div>
               </div>
@@ -531,618 +454,198 @@ export default function CreateEstimate() {
   );
 }
 
-// Collapsible Section Component
-interface CollapsibleSectionProps {
+// ==================== COMPONENTS ====================
+
+interface InputFieldProps {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  step?: string;
+}
+
+function InputField({ label, type = 'text', value, onChange, placeholder, required, step }: InputFieldProps) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">{label} {required && <span className="text-red-500">*</span>}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        step={step}
+        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-gray-800 placeholder-gray-400"
+        required={required}
+      />
+    </div>
+  );
+}
+
+interface ServiceSectionProps {
   title: string;
+  icon: string;
+  gradient: string;
   isExpanded: boolean;
-  onToggle: () => void;
-  itemCount?: number;
+  onClick: () => void;
+  itemCount: number;
+  totalCost: number;
   children: React.ReactNode;
 }
 
-function CollapsibleSection({ title, isExpanded, onToggle, itemCount, children }: CollapsibleSectionProps) {
+function ServiceSection({ title, icon, gradient, isExpanded, onClick, itemCount, totalCost, children }: ServiceSectionProps) {
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="card-premium overflow-hidden"
+    >
       <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
+        onClick={onClick}
+        className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-colors"
       >
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-gray-800">{title}</h2>
-          {itemCount !== undefined && itemCount > 0 && (
-            <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
-              {itemCount} {itemCount === 1 ? 'item' : 'items'}
-            </span>
-          )}
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 bg-gradient-to-br ${gradient} rounded-xl flex items-center justify-center text-2xl shadow-lg`}>
+            {icon}
+          </div>
+          <div className="text-left">
+            <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+            {itemCount > 0 && (
+              <p className="text-sm text-gray-500">{itemCount} item{itemCount !== 1 ? 's' : ''}</p>
+            )}
+          </div>
         </div>
-        {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+        <div className="flex items-center gap-4">
+          {totalCost > 0 && (
+            <span className="text-xl font-bold gradient-text">${totalCost.toFixed(2)}</span>
+          )}
+          <motion.div
+            animate={{ rotate: isExpanded ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </motion.div>
+        </div>
       </button>
+
       <AnimatePresence>
         {isExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.3 }}
             className="overflow-hidden"
           >
-            <div className="p-5 pt-0 border-t border-gray-100">
+            <div className="p-6 pt-0 border-t border-gray-100">
               {children}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+    </motion.div>
+  );
+}
+
+interface ItemListProps<T extends { id: string; description: string; complexity: number }> {
+  items: T[];
+  setItems: (items: T[]) => void;
+  calculateCost: (item: T) => number;
+  addItemTemplate: () => T;
+  renderFields: (item: T, updateItem: (updates: Partial<T>) => void) => React.ReactNode;
+  color: string;
+  addButtonText: string;
+}
+
+function ItemList<T extends { id: string; description: string; complexity: number }>({
+  items,
+  setItems,
+  calculateCost,
+  addItemTemplate,
+  renderFields,
+  color,
+  addButtonText
+}: ItemListProps<T>) {
+  const addItem = () => setItems([...items, addItemTemplate()]);
+  const removeItem = (id: string) => setItems(items.filter(item => item.id !== id));
+  const updateItem = (id: string, updates: Partial<T>) => {
+    setItems(items.map(item => item.id === id ? { ...item, ...updates } : item));
+  };
+
+  const colorClasses = {
+    blue: 'bg-blue-50 border-blue-200 text-blue-600',
+    red: 'bg-red-50 border-red-200 text-red-600',
+    green: 'bg-green-50 border-green-200 text-green-600',
+  }[color] || 'bg-gray-50 border-gray-200 text-gray-600';
+
+  return (
+    <div className="space-y-4">
+      {items.map((item, index) => (
+        <div key={item.id} className={`${colorClasses} rounded-xl p-4 border-2`}>
+          <div className="flex items-start justify-between mb-3">
+            <h4 className="font-semibold text-gray-800">Item {index + 1}</h4>
+            <button
+              onClick={() => removeItem(item.id)}
+              className="p-1 hover:bg-red-100 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4 text-red-500" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={item.description}
+              onChange={(e) => updateItem(item.id, { description: e.target.value } as Partial<T>)}
+              placeholder="Description"
+              className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
+            />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {renderFields(item, (updates) => updateItem(item.id, updates))}
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+              <span className="text-sm font-medium text-gray-600">Item Cost:</span>
+              <span className="text-lg font-bold gradient-text">${calculateCost(item).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+      <button
+        onClick={addItem}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-gray-50 border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-xl font-medium text-gray-700 transition-all hover:shadow-md"
+      >
+        <Plus className="w-5 h-5" />
+        {addButtonText}
+      </button>
     </div>
   );
 }
 
-// Core Drilling Section Component
-interface CoreDrillingSectionProps {
-  items: CoreDrillingItem[];
-  setItems: (items: CoreDrillingItem[]) => void;
-  isExpanded: boolean;
-  onToggle: () => void;
-  calculateCost: (item: CoreDrillingItem) => number;
-}
-
-function CoreDrillingSection({ items, setItems, isExpanded, onToggle, calculateCost }: CoreDrillingSectionProps) {
-  const addItem = () => {
-    const newItem: CoreDrillingItem = {
-      id: Date.now().toString(),
-      description: '',
-      quantity: 1,
-      length: 0,
-      width: 0,
-      depth: 0,
-      lengthInterval: 0,
-      widthInterval: 0,
-      complexity: 0,
-    };
-    setItems([...items, newItem]);
-  };
-
-  const removeItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id));
-  };
-
-  const updateItem = (id: string, updates: Partial<CoreDrillingItem>) => {
-    setItems(items.map(item => item.id === id ? { ...item, ...updates } : item));
-  };
-
+function ComplexitySlider({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   return (
-    <CollapsibleSection
-      title="⚙️ Core/Diamond Drilling"
-      isExpanded={isExpanded}
-      onToggle={onToggle}
-      itemCount={items.length}
-    >
-      <div className="space-y-4">
-        {items.map((item, index) => (
-          <div key={item.id} className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl p-4 border border-gray-200">
-            <div className="flex items-start justify-between mb-3">
-              <h4 className="font-semibold text-gray-700">Item {index + 1}</h4>
-              <button
-                onClick={() => removeItem(item.id)}
-                className="text-red-500 hover:text-red-700 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={item.description}
-                onChange={(e) => updateItem(item.id, { description: e.target.value })}
-                placeholder="Description (e.g., Elevator shaft cores)"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
-              />
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-                  <input
-                    type="number"
-                    value={item.quantity}
-                    onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Depth (inches)</label>
-                  <input
-                    type="number"
-                    value={item.depth}
-                    onChange={(e) => updateItem(item.id, { depth: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
-                  />
-                </div>
-                <div className="col-span-2 md:col-span-1">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Complexity</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={item.complexity}
-                      onChange={(e) => updateItem(item.id, { complexity: parseFloat(e.target.value) })}
-                      className="flex-1"
-                    />
-                    <span className="text-sm font-semibold text-blue-600 w-12">+{item.complexity}%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <span className="text-sm font-medium text-gray-600">Item Cost:</span>
-                <span className="text-lg font-bold text-blue-600">${calculateCost(item).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        <button
-          onClick={addItem}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl font-medium transition-colors border-2 border-dashed border-blue-300"
-        >
-          <Plus className="w-5 h-5" />
-          Add Core Drilling Item
-        </button>
-      </div>
-    </CollapsibleSection>
+    <div className="col-span-2 md:col-span-2">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Complexity: +{value}%
+      </label>
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+      />
+    </div>
   );
 }
 
-// Wall Sawing Section (similar structure)
-interface WallSawingSectionProps {
-  items: WallSawingItem[];
-  setItems: (items: WallSawingItem[]) => void;
-  isExpanded: boolean;
-  onToggle: () => void;
-  calculateCost: (item: WallSawingItem) => number;
-}
-
-function WallSawingSection({ items, setItems, isExpanded, onToggle, calculateCost }: WallSawingSectionProps) {
-  const addItem = () => {
-    const newItem: WallSawingItem = {
-      id: Date.now().toString(),
-      description: '',
-      quantity: 1,
-      length: 0,
-      width: 0,
-      depth: 0,
-      complexity: 0,
-    };
-    setItems([...items, newItem]);
-  };
-
-  const removeItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id));
-  };
-
-  const updateItem = (id: string, updates: Partial<WallSawingItem>) => {
-    setItems(items.map(item => item.id === id ? { ...item, ...updates } : item));
-  };
-
+function CostRow({ label, amount }: { label: string; amount: number }) {
   return (
-    <CollapsibleSection
-      title="🧱 Wall Sawing"
-      isExpanded={isExpanded}
-      onToggle={onToggle}
-      itemCount={items.length}
-    >
-      <div className="space-y-4">
-        {items.map((item, index) => (
-          <div key={item.id} className="bg-gradient-to-br from-gray-50 to-red-50 rounded-xl p-4 border border-gray-200">
-            <div className="flex items-start justify-between mb-3">
-              <h4 className="font-semibold text-gray-700">Item {index + 1}</h4>
-              <button
-                onClick={() => removeItem(item.id)}
-                className="text-red-500 hover:text-red-700 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={item.description}
-                onChange={(e) => updateItem(item.id, { description: e.target.value })}
-                placeholder="Description (e.g., Wall opening for door)"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
-              />
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-                  <input
-                    type="number"
-                    value={item.quantity}
-                    onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Length (ft)</label>
-                  <input
-                    type="number"
-                    value={item.length}
-                    onChange={(e) => updateItem(item.id, { length: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Depth (in)</label>
-                  <input
-                    type="number"
-                    value={item.depth}
-                    onChange={(e) => updateItem(item.id, { depth: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Complexity</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={item.complexity}
-                      onChange={(e) => updateItem(item.id, { complexity: parseFloat(e.target.value) })}
-                      className="flex-1"
-                    />
-                    <span className="text-sm font-semibold text-red-600 w-12">+{item.complexity}%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <span className="text-sm font-medium text-gray-600">Item Cost:</span>
-                <span className="text-lg font-bold text-red-600">${calculateCost(item).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        <button
-          onClick={addItem}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-medium transition-colors border-2 border-dashed border-red-300"
-        >
-          <Plus className="w-5 h-5" />
-          Add Wall Sawing Item
-        </button>
-      </div>
-    </CollapsibleSection>
-  );
-}
-
-// Simplified versions for other sections (following same pattern)
-function HandHeldChainSawSection({ items, setItems, isExpanded, onToggle, calculateCost }: any) {
-  const addItem = () => {
-    setItems([...items, { id: Date.now().toString(), description: '', quantity: 1, length: 0, depth: 0, complexity: 0 }]);
-  };
-
-  return (
-    <CollapsibleSection title="✋ Hand Held Chain Saw" isExpanded={isExpanded} onToggle={onToggle} itemCount={items.length}>
-      <div className="space-y-4">
-        {items.map((item: HandHeldChainSawItem, index: number) => (
-          <div key={item.id} className="bg-gradient-to-br from-gray-50 to-green-50 rounded-xl p-4 border border-gray-200">
-            <div className="flex justify-between mb-3">
-              <h4 className="font-semibold text-gray-700">Item {index + 1}</h4>
-              <button onClick={() => setItems(items.filter((i: HandHeldChainSawItem) => i.id !== item.id))} className="text-red-500 hover:text-red-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={item.description}
-                onChange={(e) => setItems(items.map((i: HandHeldChainSawItem) => i.id === item.id ? { ...i, description: e.target.value } : i))}
-                placeholder="Description"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm"
-              />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-                  <input type="number" value={item.quantity} onChange={(e) => setItems(items.map((i: HandHeldChainSawItem) => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Length (ft)</label>
-                  <input type="number" value={item.length} onChange={(e) => setItems(items.map((i: HandHeldChainSawItem) => i.id === item.id ? { ...i, length: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Depth (in)</label>
-                  <input type="number" value={item.depth} onChange={(e) => setItems(items.map((i: HandHeldChainSawItem) => i.id === item.id ? { ...i, depth: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Complexity</label>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min="0" max="100" value={item.complexity} onChange={(e) => setItems(items.map((i: HandHeldChainSawItem) => i.id === item.id ? { ...i, complexity: parseFloat(e.target.value) } : i))} className="flex-1" />
-                    <span className="text-sm font-semibold text-green-600 w-12">+{item.complexity}%</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <span className="text-sm font-medium text-gray-600">Item Cost:</span>
-                <span className="text-lg font-bold text-green-600">${calculateCost(item).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-        <button onClick={addItem} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl font-medium transition-colors border-2 border-dashed border-green-300">
-          <Plus className="w-5 h-5" />
-          Add Chain Saw Item
-        </button>
-      </div>
-    </CollapsibleSection>
-  );
-}
-
-function HandSawSection({ items, setItems, isExpanded, onToggle, calculateCost }: any) {
-  const addItem = () => {
-    setItems([...items, { id: Date.now().toString(), description: '', quantity: 1, length: 0, depth: 0, complexity: 0 }]);
-  };
-
-  return (
-    <CollapsibleSection title="🪚 Hand Saw" isExpanded={isExpanded} onToggle={onToggle} itemCount={items.length}>
-      <div className="space-y-4">
-        {items.map((item: HandSawItem, index: number) => (
-          <div key={item.id} className="bg-gradient-to-br from-gray-50 to-yellow-50 rounded-xl p-4 border border-gray-200">
-            <div className="flex justify-between mb-3">
-              <h4 className="font-semibold text-gray-700">Item {index + 1}</h4>
-              <button onClick={() => setItems(items.filter((i: HandSawItem) => i.id !== item.id))} className="text-red-500 hover:text-red-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={item.description}
-                onChange={(e) => setItems(items.map((i: HandSawItem) => i.id === item.id ? { ...i, description: e.target.value } : i))}
-                placeholder="Description"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
-              />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-                  <input type="number" value={item.quantity} onChange={(e) => setItems(items.map((i: HandSawItem) => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Length (ft)</label>
-                  <input type="number" value={item.length} onChange={(e) => setItems(items.map((i: HandSawItem) => i.id === item.id ? { ...i, length: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Depth (in)</label>
-                  <input type="number" value={item.depth} onChange={(e) => setItems(items.map((i: HandSawItem) => i.id === item.id ? { ...i, depth: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Complexity</label>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min="0" max="100" value={item.complexity} onChange={(e) => setItems(items.map((i: HandSawItem) => i.id === item.id ? { ...i, complexity: parseFloat(e.target.value) } : i))} className="flex-1" />
-                    <span className="text-sm font-semibold text-yellow-600 w-12">+{item.complexity}%</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <span className="text-sm font-medium text-gray-600">Item Cost:</span>
-                <span className="text-lg font-bold text-yellow-600">${calculateCost(item).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-        <button onClick={addItem} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-50 hover:bg-yellow-100 text-yellow-600 rounded-xl font-medium transition-colors border-2 border-dashed border-yellow-300">
-          <Plus className="w-5 h-5" />
-          Add Hand Saw Item
-        </button>
-      </div>
-    </CollapsibleSection>
-  );
-}
-
-function SlabSawingSection({ items, setItems, isExpanded, onToggle, calculateCost }: any) {
-  const addItem = () => {
-    setItems([...items, { id: Date.now().toString(), description: '', quantity: 1, length: 0, width: 0, depth: 0, complexity: 0 }]);
-  };
-
-  return (
-    <CollapsibleSection title="📐 Slab Sawing" isExpanded={isExpanded} onToggle={onToggle} itemCount={items.length}>
-      <div className="space-y-4">
-        {items.map((item: SlabSawingItem, index: number) => (
-          <div key={item.id} className="bg-gradient-to-br from-gray-50 to-purple-50 rounded-xl p-4 border border-gray-200">
-            <div className="flex justify-between mb-3">
-              <h4 className="font-semibold text-gray-700">Item {index + 1}</h4>
-              <button onClick={() => setItems(items.filter((i: SlabSawingItem) => i.id !== item.id))} className="text-red-500 hover:text-red-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={item.description}
-                onChange={(e) => setItems(items.map((i: SlabSawingItem) => i.id === item.id ? { ...i, description: e.target.value } : i))}
-                placeholder="Description"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
-              />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-                  <input type="number" value={item.quantity} onChange={(e) => setItems(items.map((i: SlabSawingItem) => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Length (ft)</label>
-                  <input type="number" value={item.length} onChange={(e) => setItems(items.map((i: SlabSawingItem) => i.id === item.id ? { ...i, length: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Depth (in)</label>
-                  <input type="number" value={item.depth} onChange={(e) => setItems(items.map((i: SlabSawingItem) => i.id === item.id ? { ...i, depth: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Complexity</label>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min="0" max="100" value={item.complexity} onChange={(e) => setItems(items.map((i: SlabSawingItem) => i.id === item.id ? { ...i, complexity: parseFloat(e.target.value) } : i))} className="flex-1" />
-                    <span className="text-sm font-semibold text-purple-600 w-12">+{item.complexity}%</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <span className="text-sm font-medium text-gray-600">Item Cost:</span>
-                <span className="text-lg font-bold text-purple-600">${calculateCost(item).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-        <button onClick={addItem} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-xl font-medium transition-colors border-2 border-dashed border-purple-300">
-          <Plus className="w-5 h-5" />
-          Add Slab Sawing Item
-        </button>
-      </div>
-    </CollapsibleSection>
-  );
-}
-
-function LaborSection({ items, setItems, isExpanded, onToggle, calculateCost }: any) {
-  const addItem = () => {
-    setItems([...items, { id: Date.now().toString(), description: '', hours: 0, complexity: 0 }]);
-  };
-
-  return (
-    <CollapsibleSection title="👷 Standalone Labor" isExpanded={isExpanded} onToggle={onToggle} itemCount={items.length}>
-      <div className="space-y-4">
-        {items.map((item: LaborItem, index: number) => (
-          <div key={item.id} className="bg-gradient-to-br from-gray-50 to-orange-50 rounded-xl p-4 border border-gray-200">
-            <div className="flex justify-between mb-3">
-              <h4 className="font-semibold text-gray-700">Item {index + 1}</h4>
-              <button onClick={() => setItems(items.filter((i: LaborItem) => i.id !== item.id))} className="text-red-500 hover:text-red-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={item.description}
-                onChange={(e) => setItems(items.map((i: LaborItem) => i.id === item.id ? { ...i, description: e.target.value } : i))}
-                placeholder="Description"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Hours</label>
-                  <input type="number" value={item.hours} onChange={(e) => setItems(items.map((i: LaborItem) => i.id === item.id ? { ...i, hours: parseFloat(e.target.value) || 0 } : i))} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Complexity</label>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min="0" max="100" value={item.complexity} onChange={(e) => setItems(items.map((i: LaborItem) => i.id === item.id ? { ...i, complexity: parseFloat(e.target.value) } : i))} className="flex-1" />
-                    <span className="text-sm font-semibold text-orange-600 w-12">+{item.complexity}%</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <span className="text-sm font-medium text-gray-600">Item Cost:</span>
-                <span className="text-lg font-bold text-orange-600">${calculateCost(item).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-        <button onClick={addItem} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl font-medium transition-colors border-2 border-dashed border-orange-300">
-          <Plus className="w-5 h-5" />
-          Add Labor Item
-        </button>
-      </div>
-    </CollapsibleSection>
-  );
-}
-
-function AdditionalCostsSection({ costs, setCosts, isExpanded, onToggle, shopFees, mileageCost, travelCost, equipmentCost, outsideLaborCost }: any) {
-  return (
-    <CollapsibleSection title="💰 Additional Costs" isExpanded={isExpanded} onToggle={onToggle}>
-      <div className="space-y-4">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-          <h4 className="font-semibold text-gray-700 mb-2">Auto-Calculated Costs</h4>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Shop Fees (15%)</span>
-              <span className="font-semibold text-gray-800">${shopFees.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mileage Distance (miles)</label>
-            <input
-              type="number"
-              value={costs.mileageDistance}
-              onChange={(e) => setCosts({ ...costs, mileageDistance: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Number of Trips</label>
-            <input
-              type="number"
-              value={costs.mileageTrips}
-              onChange={(e) => setCosts({ ...costs, mileageTrips: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tech Travel Hours</label>
-            <input
-              type="number"
-              value={costs.techTravelHours}
-              onChange={(e) => setCosts({ ...costs, techTravelHours: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Equipment (man/nights)</label>
-            <input
-              type="number"
-              value={costs.equipmentManNights}
-              onChange={(e) => setCosts({ ...costs, equipmentManNights: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Per Diems ($)</label>
-            <input
-              type="number"
-              value={costs.perDiems}
-              onChange={(e) => setCosts({ ...costs, perDiems: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Materials ($)</label>
-            <input
-              type="number"
-              value={costs.materials}
-              onChange={(e) => setCosts({ ...costs, materials: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Rentals ($)</label>
-            <input
-              type="number"
-              value={costs.equipmentRentals}
-              onChange={(e) => setCosts({ ...costs, equipmentRentals: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Adjustments (+/-)</label>
-            <input
-              type="number"
-              value={costs.adjustments}
-              onChange={(e) => setCosts({ ...costs, adjustments: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
-          </div>
-        </div>
-      </div>
-    </CollapsibleSection>
+    <div className="flex justify-between items-center py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors">
+      <span className="text-gray-700 font-medium text-sm">{label}</span>
+      <span className="font-bold text-gray-900 text-base">${amount.toFixed(2)}</span>
+    </div>
   );
 }

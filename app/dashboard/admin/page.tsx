@@ -2,9 +2,16 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { LogOut } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function AdminDashboard() {
   const router = useRouter();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   const adminModules = [
     {
@@ -12,8 +19,8 @@ export default function AdminDashboard() {
       description: 'Build professional estimates for concrete cutting services',
       icon: '📝',
       href: '/dashboard/admin/create-estimate',
-      bgColor: 'bg-indigo-600',
-      iconBg: 'bg-indigo-500',
+      bgColor: 'from-blue-500 to-blue-600',
+      iconBg: 'bg-blue-500',
       features: ['Multi-service quotes', 'Real-time calculations', 'PDF generation', 'Email to clients'],
       status: 'active'
     },
@@ -22,8 +29,8 @@ export default function AdminDashboard() {
       description: 'See all active jobs at a glance with color-coded status',
       icon: '📊',
       href: '/dashboard/admin/project-status-board',
-      bgColor: 'bg-blue-600',
-      iconBg: 'bg-blue-500',
+      bgColor: 'from-red-500 to-red-600',
+      iconBg: 'bg-red-500',
       features: ['Live job monitoring', 'Color-coded status', 'Timeline tracking', 'Crew management'],
       status: 'active'
     },
@@ -32,8 +39,8 @@ export default function AdminDashboard() {
       description: 'Calendar view of scheduled projects and planning',
       icon: '📅',
       href: '/dashboard/admin/upcoming-projects',
-      bgColor: 'bg-green-600',
-      iconBg: 'bg-green-500',
+      bgColor: 'from-indigo-500 to-indigo-600',
+      iconBg: 'bg-indigo-500',
       features: ['Calendar view', 'Project scheduling', 'Resource planning', 'Timeline preview'],
       status: 'active'
     },
@@ -42,8 +49,8 @@ export default function AdminDashboard() {
       description: 'Manage equipment, vehicles, and personnel assignments',
       icon: '🔧',
       href: '/dashboard/admin/resources',
-      bgColor: 'bg-slate-600',
-      iconBg: 'bg-slate-500',
+      bgColor: 'from-gray-500 to-gray-600',
+      iconBg: 'bg-gray-500',
       features: ['Equipment tracking', 'Staff scheduling', 'Resource allocation', 'Maintenance logs'],
       status: 'coming-soon'
     },
@@ -52,8 +59,8 @@ export default function AdminDashboard() {
       description: 'Track project costs, revenue, and profitability',
       icon: '💰',
       href: '/dashboard/admin/financials',
-      bgColor: 'bg-red-600',
-      iconBg: 'bg-red-500',
+      bgColor: 'from-green-500 to-emerald-600',
+      iconBg: 'bg-green-500',
       features: ['Cost tracking', 'Revenue reports', 'Profit margins', 'Invoice management'],
       status: 'coming-soon'
     },
@@ -62,8 +69,8 @@ export default function AdminDashboard() {
       description: 'Manage client relationships and project history',
       icon: '👥',
       href: '/dashboard/admin/clients',
-      bgColor: 'bg-blue-700',
-      iconBg: 'bg-blue-600',
+      bgColor: 'from-cyan-500 to-blue-600',
+      iconBg: 'bg-cyan-500',
       features: ['Client database', 'Project history', 'Contact management', 'Communications log'],
       status: 'coming-soon'
     },
@@ -72,8 +79,8 @@ export default function AdminDashboard() {
       description: 'Comprehensive business analytics and reporting',
       icon: '📈',
       href: '/dashboard/admin/analytics',
-      bgColor: 'bg-slate-700',
-      iconBg: 'bg-slate-600',
+      bgColor: 'from-purple-500 to-purple-600',
+      iconBg: 'bg-purple-500',
       features: ['Performance metrics', 'Trend analysis', 'Custom reports', 'Data exports'],
       status: 'coming-soon'
     },
@@ -82,8 +89,8 @@ export default function AdminDashboard() {
       description: 'Track safety incidents, training, and compliance',
       icon: '🛡️',
       href: '/dashboard/admin/safety',
-      bgColor: 'bg-red-700',
-      iconBg: 'bg-red-600',
+      bgColor: 'from-orange-500 to-red-600',
+      iconBg: 'bg-orange-500',
       features: ['Incident reporting', 'Training records', 'Compliance tracking', 'Safety scores'],
       status: 'coming-soon'
     }
@@ -97,40 +104,61 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden">
+      {/* Animated Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300 rounded-full opacity-10 blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-red-300 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-200 rounded-full opacity-5 blur-3xl animate-pulse delay-2000"></div>
+      </div>
+
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="container mx-auto px-4 py-6">
+      <div className="bg-white border-b border-gray-200 shadow-lg sticky top-0 z-50">
+        <div className="container mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-900 to-red-800 bg-clip-text text-transparent flex items-center gap-3">
-                <span className="text-4xl">🏢</span>
-                Admin Dashboard
-              </h1>
-              <p className="text-gray-600 mt-1">Pontifex Industries Command Center</p>
-            </div>
             <div className="flex items-center gap-4">
-              <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-all">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 gradient-bg-brand rounded-2xl flex items-center justify-center shadow-lg">
+                <span className="text-2xl">🏢</span>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold gradient-text">
+                  Admin Dashboard
+                </h1>
+                <p className="text-sm text-gray-500 font-medium">Pontifex Industries Command Center</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button className="p-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all group">
+                <svg className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
               </button>
               <Link
                 href="/dashboard"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
+                className="px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
               >
-                Operator View
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                <span>Operator View</span>
               </Link>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all font-semibold shadow-sm flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {quickStats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+            <div key={index} className="card-premium p-6 hover-lift">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-gray-500">{stat.label}</span>
                 <span className={`text-sm font-semibold flex items-center gap-1 ${
@@ -143,7 +171,7 @@ export default function AdminDashboard() {
                   {stat.change}
                 </span>
               </div>
-              <div className="text-2xl font-bold text-gray-800">{stat.value}</div>
+              <div className="text-3xl font-bold gradient-text">{stat.value}</div>
             </div>
           ))}
         </div>
@@ -153,10 +181,10 @@ export default function AdminDashboard() {
           {adminModules.map((module, index) => (
             <div
               key={index}
-              className={`relative bg-white rounded-xl border-2 transition-all duration-300 ${
+              className={`relative card-premium transition-all duration-300 ${
                 module.status === 'active'
-                  ? 'border-gray-200 hover:border-blue-400 hover:shadow-xl cursor-pointer transform hover:scale-105'
-                  : 'border-gray-100 opacity-60 cursor-not-allowed'
+                  ? 'hover-lift cursor-pointer'
+                  : 'opacity-60 cursor-not-allowed'
               }`}
               onClick={() => module.status === 'active' && router.push(module.href)}
             >
@@ -169,7 +197,7 @@ export default function AdminDashboard() {
                 )}
 
                 {/* Icon */}
-                <div className={`w-16 h-16 ${module.iconBg} bg-opacity-10 rounded-xl flex items-center justify-center mb-4`}>
+                <div className={`w-16 h-16 bg-gradient-to-br ${module.bgColor} rounded-2xl flex items-center justify-center mb-4 shadow-lg`}>
                   <span className="text-3xl">{module.icon}</span>
                 </div>
 
@@ -181,7 +209,7 @@ export default function AdminDashboard() {
                 <div className="space-y-1 mb-4">
                   {module.features.map((feature, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-gray-500 text-xs">
-                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                      <div className="w-1.5 h-1.5 rounded-full gradient-bg-brand"></div>
                       {feature}
                     </div>
                   ))}
@@ -189,7 +217,7 @@ export default function AdminDashboard() {
 
                 {/* Action Button */}
                 {module.status === 'active' && (
-                  <button className={`w-full px-4 py-2 ${module.bgColor} text-white rounded-lg hover:opacity-90 transition-all font-medium mt-4`}>
+                  <button className="w-full px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg">
                     Open Module →
                   </button>
                 )}
@@ -199,38 +227,38 @@ export default function AdminDashboard() {
         </div>
 
         {/* Recent Activity */}
-        <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Activity</h2>
+        <div className="mt-8 card-premium p-6">
+          <h2 className="text-xl font-bold gradient-text mb-6">Recent Activity</h2>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-transparent rounded-xl border border-green-100 hover-lift">
               <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                 <div>
-                  <p className="font-medium text-gray-800">Job #2024-001 started</p>
-                  <p className="text-sm text-gray-500">Downtown Plaza Core Drilling</p>
+                  <p className="font-semibold text-gray-800">Job #2024-001 started</p>
+                  <p className="text-sm text-gray-600">Downtown Plaza Core Drilling</p>
                 </div>
               </div>
-              <span className="text-sm text-gray-500">10 mins ago</span>
+              <span className="text-sm font-medium text-gray-500">10 mins ago</span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-yellow-50 to-transparent rounded-xl border border-yellow-100 hover-lift">
               <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
                 <div>
-                  <p className="font-medium text-gray-800">Equipment issue reported</p>
-                  <p className="text-sm text-gray-500">Slab Saw #1 - Minor repair needed</p>
+                  <p className="font-semibold text-gray-800">Equipment issue reported</p>
+                  <p className="text-sm text-gray-600">Slab Saw #1 - Minor repair needed</p>
                 </div>
               </div>
-              <span className="text-sm text-gray-500">25 mins ago</span>
+              <span className="text-sm font-medium text-gray-500">25 mins ago</span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-transparent rounded-xl border border-blue-100 hover-lift">
               <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
                 <div>
-                  <p className="font-medium text-gray-800">New job scheduled</p>
-                  <p className="text-sm text-gray-500">Bridge Deck Repair - Tomorrow 6:00 AM</p>
+                  <p className="font-semibold text-gray-800">New job scheduled</p>
+                  <p className="text-sm text-gray-600">Bridge Deck Repair - Tomorrow 6:00 AM</p>
                 </div>
               </div>
-              <span className="text-sm text-gray-500">1 hour ago</span>
+              <span className="text-sm font-medium text-gray-500">1 hour ago</span>
             </div>
           </div>
         </div>
