@@ -2,18 +2,22 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import { getEquipmentByQR, updateEquipmentStatus, type Equipment } from '../../../../lib/supabase-equipment';
 
 export default function QRScanPage() {
+  const router = useRouter();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedEquipment, setScannedEquipment] = useState<Equipment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manualQR, setManualQR] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [assigneeName, setAssigneeName] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  // Current operator (in a real app, this would come from auth)
+  const currentUser = { name: 'Demo Operator', role: 'operator' };
 
   useEffect(() => {
     return () => {
@@ -128,133 +132,157 @@ export default function QRScanPage() {
     }
   };
 
-  const handleStatusUpdate = async (newStatus: Equipment['status']) => {
+  const handleAssignToMe = async () => {
     if (!scannedEquipment) return;
 
     try {
-      console.log(`🔄 Updating equipment ${scannedEquipment.id} to status: ${newStatus}`);
+      console.log(`🔄 Assigning equipment ${scannedEquipment.id} to ${currentUser.name}`);
       setIsLoading(true);
-      
-      const assignedTo = newStatus === 'assigned' ? assigneeName.trim() : undefined;
-      const updatedEquipment = await updateEquipmentStatus(scannedEquipment.id, newStatus, assignedTo);
-      
+      setError(null);
+
+      const updatedEquipment = await updateEquipmentStatus(scannedEquipment.id, 'assigned', currentUser.name);
+
       setScannedEquipment(updatedEquipment);
-      setAssigneeName('');
-      console.log('✅ Status updated successfully');
-      
+      console.log('✅ Equipment assigned successfully');
+
     } catch (err: any) {
-      console.error('💥 Error updating status:', err);
-      setError(`Error updating status: ${err.message}`);
+      console.error('💥 Error assigning equipment:', err);
+      setError(`Error assigning equipment: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleUnassign = async () => {
+    if (!scannedEquipment) return;
+
+    try {
+      console.log(`🔄 Unassigning equipment ${scannedEquipment.id}`);
+      setIsLoading(true);
+      setError(null);
+
+      const updatedEquipment = await updateEquipmentStatus(scannedEquipment.id, 'available', '');
+
+      setScannedEquipment(updatedEquipment);
+      console.log('✅ Equipment unassigned successfully');
+
+    } catch (err: any) {
+      console.error('💥 Error unassigning equipment:', err);
+      setError(`Error unassigning equipment: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMaintenanceRequest = () => {
+    if (!scannedEquipment) return;
+    router.push(`/dashboard/tools/maintenance-request?equipment=${scannedEquipment.id}`);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'available': return 'text-green-400 bg-green-500/20';
-      case 'assigned': return 'text-blue-400 bg-blue-500/20';
-      case 'maintenance': return 'text-orange-400 bg-orange-500/20';
-      default: return 'text-gray-400 bg-gray-500/20';
+      case 'available': return 'text-green-700 bg-green-100 border border-green-300';
+      case 'assigned': return 'text-blue-700 bg-blue-100 border border-blue-300';
+      case 'maintenance': return 'text-orange-700 bg-orange-100 border border-orange-300';
+      default: return 'text-gray-700 bg-gray-100 border border-gray-300';
     }
   };
 
   const getActionButtons = () => {
     if (!scannedEquipment) return null;
 
-    switch (scannedEquipment.status) {
-      case 'available':
-        return (
-          <div className="space-y-4">
-            <div>
-              <input
-                type="text"
-                placeholder="Enter assignee name"
-                value={assigneeName}
-                onChange={(e) => setAssigneeName(e.target.value)}
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-              />
-            </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => handleStatusUpdate('assigned')}
-                disabled={!assigneeName.trim() || isLoading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-colors min-h-[48px] flex items-center justify-center"
-              >
-                {isLoading ? 'Assigning...' : 'Assign Equipment'}
-              </button>
-              <button
-                onClick={() => handleStatusUpdate('maintenance')}
-                disabled={isLoading}
-                className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-800 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-colors min-h-[48px] flex items-center justify-center"
-              >
-                {isLoading ? 'Updating...' : 'Send to Maintenance'}
-              </button>
-            </div>
-          </div>
-        );
+    const isAssignedToMe = scannedEquipment.assigned_to === currentUser.name;
+    const isAssignedToOther = scannedEquipment.status === 'assigned' && !isAssignedToMe;
 
-      case 'assigned':
-        return (
-          <div className="flex space-x-3">
-            <button
-              onClick={() => handleStatusUpdate('available')}
-              disabled={isLoading}
-              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-colors min-h-[48px] flex items-center justify-center"
-            >
-              {isLoading ? 'Returning...' : 'Return Equipment'}
-            </button>
-            <button
-              onClick={() => handleStatusUpdate('maintenance')}
-              disabled={isLoading}
-              className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-800 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-colors min-h-[48px] flex items-center justify-center"
-            >
-              {isLoading ? 'Updating...' : 'Send to Maintenance'}
-            </button>
-          </div>
-        );
-
-      case 'maintenance':
-        return (
+    return (
+      <div className="space-y-3">
+        {/* Assign/Unassign Button */}
+        {scannedEquipment.status === 'available' && (
           <button
-            onClick={() => handleStatusUpdate('available')}
+            onClick={handleAssignToMe}
             disabled={isLoading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-colors min-h-[48px] flex items-center justify-center"
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 min-h-[56px] flex items-center justify-center space-x-2"
           >
-            {isLoading ? 'Updating...' : 'Mark as Available'}
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            <span>{isLoading ? 'Assigning...' : 'Assign to Me'}</span>
           </button>
-        );
+        )}
 
-      default:
-        return null;
-    }
+        {isAssignedToMe && (
+          <button
+            onClick={handleUnassign}
+            disabled={isLoading}
+            className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 disabled:from-gray-400 disabled:to-gray-500 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 min-h-[56px] flex items-center justify-center space-x-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+            </svg>
+            <span>{isLoading ? 'Unassigning...' : 'Unassign from Me'}</span>
+          </button>
+        )}
+
+        {isAssignedToOther && (
+          <button
+            disabled
+            className="w-full bg-gray-200 border-2 border-gray-300 text-gray-500 font-bold py-4 px-6 rounded-xl cursor-not-allowed min-h-[56px] flex items-center justify-center space-x-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span>Not Available (Assigned to {scannedEquipment.assigned_to})</span>
+          </button>
+        )}
+
+        {/* Always show Maintenance Request button */}
+        <button
+          onClick={handleMaintenanceRequest}
+          disabled={isLoading}
+          className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 min-h-[56px] flex items-center justify-center space-x-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>Request Maintenance</span>
+        </button>
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-blue-950">
-      <div className="container mx-auto px-6 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-cyan-300 rounded-full opacity-10 blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-300 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
+      <div className="container mx-auto px-6 py-8 relative">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
             <Link
               href="/dashboard/tools"
-              className="group p-3 backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 text-white hover:bg-white/10 transition-all duration-300 hover:scale-105"
+              className="group p-3 bg-white/70 backdrop-blur-xl rounded-xl border border-gray-200 text-gray-700 hover:bg-white transition-all duration-300 hover:scale-105 shadow-sm"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
             <div>
-              <h1 className="text-4xl font-bold text-white mb-2">QR Scanner</h1>
-              <p className="text-blue-200">Scan equipment QR codes to manage assignments</p>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                QR Scanner
+              </h1>
+              <p className="text-gray-600 font-medium mt-1">Scan equipment QR codes to manage assignments</p>
             </div>
           </div>
         </div>
 
         <div className="max-w-2xl mx-auto">
           {/* Camera Section */}
-          <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-6 mb-6">
-            <div className="aspect-square bg-black rounded-xl overflow-hidden mb-6 relative">
+          <div className="bg-white/80 backdrop-blur-lg rounded-2xl border border-gray-200 p-6 mb-6 shadow-lg">
+            <div className="aspect-square bg-gray-900 rounded-xl overflow-hidden mb-6 relative border-2 border-gray-300">
               <video
                 ref={videoRef}
                 autoPlay
@@ -263,28 +291,28 @@ export default function QRScanPage() {
                 className="w-full h-full object-cover"
                 style={{ display: isScanning ? 'block' : 'none' }}
               />
-              
+
               {!isScanning && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-white/10 rounded-xl flex items-center justify-center">
-                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12h-4.01M12 12v4m6-7h-2V4h-5.01M7 7h.01" />
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-cyan-50 to-blue-50">
+                  <div className="text-center">
+                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12h-4.01M12 12v4m6-7h-2V4h-5.01M7 7h.01" />
                       </svg>
                     </div>
-                    <p className="text-lg">Camera ready</p>
-                    <p className="text-blue-200">Tap start to scan QR codes</p>
+                    <p className="text-lg font-bold text-gray-800">Camera Ready</p>
+                    <p className="text-gray-600 font-medium">Tap start to scan QR codes</p>
                   </div>
                 </div>
               )}
 
               {isScanning && (
                 <div className="absolute inset-0 pointer-events-none">
-                  <div className="absolute inset-4 border-2 border-white/50 rounded-lg"></div>
-                  <div className="absolute top-4 left-4 w-6 h-6 border-t-4 border-l-4 border-blue-400 rounded-tl-lg"></div>
-                  <div className="absolute top-4 right-4 w-6 h-6 border-t-4 border-r-4 border-blue-400 rounded-tr-lg"></div>
-                  <div className="absolute bottom-4 left-4 w-6 h-6 border-b-4 border-l-4 border-blue-400 rounded-bl-lg"></div>
-                  <div className="absolute bottom-4 right-4 w-6 h-6 border-b-4 border-r-4 border-blue-400 rounded-br-lg"></div>
+                  <div className="absolute inset-4 border-2 border-cyan-400 rounded-lg shadow-lg"></div>
+                  <div className="absolute top-4 left-4 w-6 h-6 border-t-4 border-l-4 border-cyan-500 rounded-tl-lg"></div>
+                  <div className="absolute top-4 right-4 w-6 h-6 border-t-4 border-r-4 border-cyan-500 rounded-tr-lg"></div>
+                  <div className="absolute bottom-4 left-4 w-6 h-6 border-b-4 border-l-4 border-cyan-500 rounded-bl-lg"></div>
+                  <div className="absolute bottom-4 right-4 w-6 h-6 border-b-4 border-r-4 border-cyan-500 rounded-br-lg"></div>
                 </div>
               )}
             </div>
@@ -315,20 +343,20 @@ export default function QRScanPage() {
             </div>
 
             {/* Manual QR Entry */}
-            <div className="border-t border-white/20 pt-6">
-              <h3 className="text-white font-medium mb-3">Manual QR Entry</h3>
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-gray-800 font-bold mb-3">Manual QR Entry</h3>
               <form onSubmit={handleManualQRSubmit} className="flex space-x-3">
                 <input
                   type="text"
                   placeholder="Enter QR code manually"
                   value={manualQR}
                   onChange={(e) => setManualQR(e.target.value)}
-                  className="flex-1 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                  className="flex-1 px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
                 />
                 <button
                   type="submit"
                   disabled={!manualQR.trim() || isLoading}
-                  className="bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-colors min-h-[48px] flex items-center justify-center"
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl min-h-[48px] flex items-center justify-center"
                 >
                   {isLoading ? 'Looking up...' : 'Lookup'}
                 </button>
@@ -338,16 +366,16 @@ export default function QRScanPage() {
 
           {/* Error Display */}
           {error && (
-            <div className="backdrop-blur-xl bg-red-500/10 rounded-2xl border border-red-500/20 p-6 mb-6">
+            <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 mb-6 shadow-lg">
               <div className="flex items-center space-x-3">
-                <svg className="w-6 h-6 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-red-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-red-200">{error}</p>
+                <p className="text-red-800 font-medium">{error}</p>
               </div>
               <button
                 onClick={() => setError(null)}
-                className="mt-3 text-red-300 hover:text-red-200 text-sm"
+                className="mt-3 text-red-600 hover:text-red-700 text-sm font-semibold"
               >
                 Dismiss
               </button>
@@ -356,9 +384,9 @@ export default function QRScanPage() {
 
           {/* Equipment Details */}
           {scannedEquipment && (
-            <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-6">
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl border border-gray-200 p-6 shadow-lg">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Equipment Found</h2>
+                <h2 className="text-2xl font-bold text-gray-800">Equipment Found</h2>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(scannedEquipment.status)}`}>
                   {scannedEquipment.status.toUpperCase()}
                 </span>
@@ -366,50 +394,50 @@ export default function QRScanPage() {
 
               <div className="space-y-4 mb-6">
                 <div>
-                  <label className="text-blue-200 text-sm font-medium">Name</label>
-                  <p className="text-white text-lg font-medium">{scannedEquipment.name}</p>
+                  <label className="text-gray-600 text-sm font-semibold">Name</label>
+                  <p className="text-gray-800 text-lg font-bold">{scannedEquipment.name}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   {scannedEquipment.brand && (
                     <div>
-                      <label className="text-blue-200 text-sm font-medium">Brand</label>
-                      <p className="text-white">{scannedEquipment.brand}</p>
+                      <label className="text-gray-600 text-sm font-semibold">Brand</label>
+                      <p className="text-gray-800 font-medium">{scannedEquipment.brand}</p>
                     </div>
                   )}
                   {scannedEquipment.model && (
                     <div>
-                      <label className="text-blue-200 text-sm font-medium">Model</label>
-                      <p className="text-white">{scannedEquipment.model}</p>
+                      <label className="text-gray-600 text-sm font-semibold">Model</label>
+                      <p className="text-gray-800 font-medium">{scannedEquipment.model}</p>
                     </div>
                   )}
                 </div>
 
                 {scannedEquipment.serial_number && (
                   <div>
-                    <label className="text-blue-200 text-sm font-medium">Serial Number</label>
-                    <p className="text-white font-mono">{scannedEquipment.serial_number}</p>
+                    <label className="text-gray-600 text-sm font-semibold">Serial Number</label>
+                    <p className="text-gray-800 font-mono font-medium">{scannedEquipment.serial_number}</p>
                   </div>
                 )}
 
                 {scannedEquipment.assigned_to && (
                   <div>
-                    <label className="text-blue-200 text-sm font-medium">Assigned To</label>
-                    <p className="text-white">{scannedEquipment.assigned_to}</p>
+                    <label className="text-gray-600 text-sm font-semibold">Assigned To</label>
+                    <p className="text-gray-800 font-medium">{scannedEquipment.assigned_to}</p>
                   </div>
                 )}
 
                 {scannedEquipment.location && (
                   <div>
-                    <label className="text-blue-200 text-sm font-medium">Location</label>
-                    <p className="text-white">{scannedEquipment.location}</p>
+                    <label className="text-gray-600 text-sm font-semibold">Location</label>
+                    <p className="text-gray-800 font-medium">{scannedEquipment.location}</p>
                   </div>
                 )}
 
                 {scannedEquipment.notes && (
                   <div>
-                    <label className="text-blue-200 text-sm font-medium">Notes</label>
-                    <p className="text-white">{scannedEquipment.notes}</p>
+                    <label className="text-gray-600 text-sm font-semibold">Notes</label>
+                    <p className="text-gray-800 font-medium">{scannedEquipment.notes}</p>
                   </div>
                 )}
               </div>
@@ -423,7 +451,7 @@ export default function QRScanPage() {
                     setScannedEquipment(null);
                     setError(null);
                   }}
-                  className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-6 rounded-xl transition-colors min-h-[48px] flex items-center justify-center"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 text-gray-800 font-bold py-3 px-6 rounded-xl transition-all shadow-md hover:shadow-lg min-h-[48px] flex items-center justify-center"
                 >
                   Scan Another
                 </button>

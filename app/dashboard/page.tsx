@@ -53,6 +53,8 @@ function PontifexLogo({ className = "h-8" }: { className?: string }) {
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isClockedIn, setIsClockedIn] = useState(true); // Track if user is clocked in
+  const [clockOutSuccess, setClockOutSuccess] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -83,6 +85,24 @@ export default function Dashboard() {
     console.log('🚪 Logging out user...');
     logout();
     router.push('/login');
+  };
+
+  const handleMarkDayFinished = () => {
+    console.log('⏰ Marking day as finished (Clock Out)...');
+    // TODO: In production, this would record clock-out time to database
+    const clockOutTime = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    console.log(`Clock out time: ${clockOutTime}`);
+
+    setIsClockedIn(false);
+    setClockOutSuccess(true);
+
+    // Hide success message after 5 seconds
+    setTimeout(() => {
+      setClockOutSuccess(false);
+    }, 5000);
   };
 
   if (loading) {
@@ -170,6 +190,55 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Clock Out Success Message */}
+        {clockOutSuccess && (
+          <div className="max-w-5xl mx-auto mb-6 animate-fade-in">
+            <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-6 shadow-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-gray-800 font-bold text-lg">Day Marked as Finished!</h3>
+                  <p className="text-gray-600 font-medium">You've been clocked out successfully. Have a great rest of your day!</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mark Day as Finished Button */}
+        {isClockedIn && (
+          <div className="max-w-5xl mx-auto mb-10 animate-fade-in">
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800">Ready to End Your Day?</h3>
+                    <p className="text-gray-600 font-medium">Clock out when you've finished all your work</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleMarkDayFinished}
+                  className="group flex items-center space-x-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Mark Day as Finished</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Ultra Modern Card Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
 
@@ -207,7 +276,7 @@ export default function Dashboard() {
 
           {/* Tools & Equipment - Premium Blue Card */}
           <Link
-            href="/dashboard/tools/my-equipment"
+            href="/dashboard/tools"
             className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-blue-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] animate-fade-in-up delay-100"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
@@ -239,7 +308,10 @@ export default function Dashboard() {
           </Link>
 
           {/* View Timecard - Premium Indigo Card */}
-          <button className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-indigo-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] text-left animate-fade-in-up delay-200">
+          <Link
+            href="/dashboard/timecard"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-indigo-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] text-left animate-fade-in-up delay-200"
+          >
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
             <div className="relative bg-white rounded-[22px] p-6 group-hover:bg-transparent transition-colors duration-500">
               <div className="flex items-start justify-between mb-4">
@@ -249,7 +321,7 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <span className="px-3 py-1 bg-indigo-100 group-hover:bg-white/20 text-indigo-600 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300">
-                  40.5 HRS
+                  45.0 HRS
                 </span>
               </div>
               <h3 className="text-2xl font-bold text-gray-800 group-hover:text-white mb-2 transition-colors duration-300">
@@ -265,36 +337,39 @@ export default function Dashboard() {
                 </svg>
               </div>
             </div>
-          </button>
+          </Link>
 
-          {/* Request Time Off - Premium Gray Card */}
-          <button className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-gray-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] text-left animate-fade-in-up delay-300">
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-400 to-gray-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+          {/* Request Time Off - Premium Purple Card */}
+          <Link
+            href="/dashboard/request-time-off"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-purple-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] text-left animate-fade-in-up delay-300"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
             <div className="relative bg-white rounded-[22px] p-6 group-hover:bg-transparent transition-colors duration-500">
               <div className="flex items-start justify-between mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-gray-500 to-gray-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transform group-hover:rotate-6 transition-all duration-300">
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transform group-hover:rotate-6 transition-all duration-300">
                   <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <span className="px-3 py-1 bg-gray-100 group-hover:bg-white/20 text-gray-600 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300">
-                  2 DAYS
+                <span className="px-3 py-1 bg-purple-100 group-hover:bg-white/20 text-purple-600 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300">
+                  AVAILABLE
                 </span>
               </div>
               <h3 className="text-2xl font-bold text-gray-800 group-hover:text-white mb-2 transition-colors duration-300">
                 Request Time Off
               </h3>
               <p className="text-gray-600 group-hover:text-white/90 font-medium transition-colors duration-300">
-                Submit vacation requests
+                Submit vacation and PTO requests
               </p>
-              <div className="mt-4 flex items-center text-gray-600 group-hover:text-white font-semibold transition-colors duration-300">
+              <div className="mt-4 flex items-center text-purple-600 group-hover:text-white font-semibold transition-colors duration-300">
                 <span>Request Leave</span>
                 <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </div>
             </div>
-          </button>
+          </Link>
         </div>
 
         {/* Quick Actions Bar */}
