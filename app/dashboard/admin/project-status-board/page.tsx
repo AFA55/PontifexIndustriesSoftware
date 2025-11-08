@@ -143,15 +143,88 @@ const mockJobs = [
   }
 ];
 
-type StatusFilter = 'all' | 'on-track' | 'needs-attention' | 'behind';
+// Mock data for upcoming jobs
+const mockUpcomingJobs = [
+  {
+    id: '5',
+    jobNumber: 'JOB-2024-005',
+    clientName: 'Riverside Properties',
+    projectName: 'Commercial Building Foundation',
+    location: '555 River St, Downtown',
+    scheduledDate: '2024-11-09',
+    scheduledTime: '7:00 AM',
+    estimatedDuration: '10 hours',
+    jobTypes: ['CORE DRILLING', 'SAWING'],
+    crew: ['John Smith', 'Mike Johnson'],
+    operator: 'John Smith',
+    salesman: 'CAMERON AMOS',
+    priority: 'high',
+    requiredDocuments: ['JSA Form (Job Safety Analysis)', 'Silica Dust/Exposure Control Plan'],
+    notes: 'Large commercial project - requires early start',
+    equipment: [
+      { name: 'Core Drill #2', type: 'Core Drill' },
+      { name: 'Truck #7', type: 'Vehicle' },
+      { name: 'Diamond Bit Set', type: 'Accessory' }
+    ]
+  },
+  {
+    id: '6',
+    jobNumber: 'JOB-2024-006',
+    clientName: 'Tech Campus LLC',
+    projectName: 'Data Center Wall Penetrations',
+    location: '888 Tech Parkway',
+    scheduledDate: '2024-11-09',
+    scheduledTime: '9:00 AM',
+    estimatedDuration: '6 hours',
+    jobTypes: ['CORE DRILLING'],
+    crew: ['Bob Williams'],
+    operator: 'Bob Williams',
+    salesman: 'DAVID CHEN',
+    priority: 'medium',
+    requiredDocuments: ['JSA Form (Job Safety Analysis)', 'Silica Dust/Exposure Control Plan', 'Security Clearance'],
+    notes: 'Requires security clearance - confirmed for tomorrow',
+    equipment: [
+      { name: 'Core Drill #4', type: 'Core Drill' },
+      { name: 'Truck #4', type: 'Vehicle' }
+    ]
+  },
+  {
+    id: '7',
+    jobNumber: 'JOB-2024-007',
+    clientName: 'City Infrastructure',
+    projectName: 'Subway Station Expansion',
+    location: 'Metro Line 3 - Station 12',
+    scheduledDate: '2024-11-10',
+    scheduledTime: '6:00 AM',
+    estimatedDuration: '12 hours',
+    jobTypes: ['WALL SAWING', 'CORE DRILLING'],
+    crew: ['Steve Miller', 'Dave Brown', 'Jim Wilson', 'Jack Anderson'],
+    operator: 'Steve Miller',
+    salesman: 'SARAH MARTINEZ',
+    priority: 'urgent',
+    requiredDocuments: ['JSA Form (Job Safety Analysis)', 'Silica Dust/Exposure Control Plan', 'Confined Space Entry Permit'],
+    notes: 'Night shift starting Sunday - all hands on deck',
+    equipment: [
+      { name: 'Wall Saw #1', type: 'Wall Saw' },
+      { name: 'Core Drill #5', type: 'Core Drill' },
+      { name: 'Truck #8', type: 'Vehicle' },
+      { name: 'Truck #9', type: 'Vehicle' }
+    ]
+  }
+];
+
+type StatusFilter = 'all' | 'on-track' | 'needs-attention' | 'behind' | 'upcoming';
 type ViewMode = 'grid' | 'list' | 'timeline';
 
 export default function ProjectStatusBoard() {
   const [jobs, setJobs] = useState(mockJobs);
+  const [upcomingJobs, setUpcomingJobs] = useState(mockUpcomingJobs);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [selectedJob, setSelectedJob] = useState<typeof mockJobs[0] | null>(null);
+  const [selectedUpcomingJob, setSelectedUpcomingJob] = useState<typeof mockUpcomingJobs[0] | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showUpcomingJobModal, setShowUpcomingJobModal] = useState(false);
   const [showEquipmentModal, setShowEquipmentModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -187,14 +260,23 @@ export default function ProjectStatusBoard() {
   }, []);
 
   // Filter jobs based on status and search
-  const filteredJobs = jobs.filter(job => {
-    const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
-    const matchesSearch = searchQuery === '' ||
-      job.jobNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.projectName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
+  // Filter active jobs or show upcoming jobs based on filter
+  const filteredJobs = statusFilter === 'upcoming'
+    ? upcomingJobs.filter(job => {
+        const matchesSearch = searchQuery === '' ||
+          job.jobNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          job.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          job.projectName.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesSearch;
+      })
+    : jobs.filter(job => {
+        const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+        const matchesSearch = searchQuery === '' ||
+          job.jobNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          job.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          job.projectName.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesStatus && matchesSearch;
+      });
 
   // Get counts for status badges
   const statusCounts = {
@@ -559,6 +641,19 @@ export default function ProjectStatusBoard() {
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-red-400 rounded-full"></span>
                   Behind ({statusCounts['behind']})
+                </span>
+              </button>
+              <button
+                onClick={() => setStatusFilter('upcoming')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  statusFilter === 'upcoming'
+                    ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
+                  Upcoming ({upcomingJobs.length})
                 </span>
               </button>
             </div>
@@ -1093,17 +1188,15 @@ export default function ProjectStatusBoard() {
       {/* Equipment Modal */}
       {showEquipmentModal && selectedJob && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200">
+            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-red-50">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                    <svg className="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                    </svg>
+                  <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
+                    <span className="text-3xl">🛠️</span>
                     Equipment Assignment
                   </h2>
-                  <p className="text-gray-600 mt-1">{selectedJob.projectName} • {selectedJob.jobNumber}</p>
+                  <p className="text-gray-600 mt-1 font-medium">{selectedJob.projectName} • {selectedJob.jobNumber}</p>
                 </div>
                 <button
                   onClick={() => setShowEquipmentModal(false)}
@@ -1119,27 +1212,27 @@ export default function ProjectStatusBoard() {
             <div className="p-6">
               {/* Equipment Summary */}
               <div className="grid grid-cols-4 gap-4 mb-6">
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600">{selectedJob.equipment.length}</div>
-                  <div className="text-sm text-blue-800">Total Equipment</div>
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 text-center border-2 border-blue-200 shadow-sm">
+                  <div className="text-3xl font-bold text-blue-600">{selectedJob.equipment.length}</div>
+                  <div className="text-sm text-blue-800 font-medium mt-1">Total Equipment</div>
                 </div>
-                <div className="bg-green-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-600">
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 text-center border-2 border-green-200 shadow-sm">
+                  <div className="text-3xl font-bold text-green-600">
                     {selectedJob.equipment.filter(eq => eq.status === 'In Use').length}
                   </div>
-                  <div className="text-sm text-green-800">In Use</div>
+                  <div className="text-sm text-green-800 font-medium mt-1">In Use</div>
                 </div>
-                <div className="bg-yellow-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-yellow-600">
+                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-5 text-center border-2 border-yellow-200 shadow-sm">
+                  <div className="text-3xl font-bold text-yellow-600">
                     {selectedJob.equipment.filter(eq => eq.status === 'Standby').length}
                   </div>
-                  <div className="text-sm text-yellow-800">Standby</div>
+                  <div className="text-sm text-yellow-800 font-medium mt-1">Standby</div>
                 </div>
-                <div className="bg-red-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-red-600">
+                <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-5 text-center border-2 border-red-200 shadow-sm">
+                  <div className="text-3xl font-bold text-red-600">
                     {selectedJob.equipment.filter(eq => eq.status === 'Maintenance').length}
                   </div>
-                  <div className="text-sm text-red-800">Maintenance</div>
+                  <div className="text-sm text-red-800 font-medium mt-1">Maintenance</div>
                 </div>
               </div>
 
@@ -1242,16 +1335,16 @@ export default function ProjectStatusBoard() {
                 <div>
                   <h3 className="font-semibold text-gray-800 mb-3">Quick Actions</h3>
                   <div className="space-y-3">
-                    <button className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                    <button className="w-full px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg text-sm font-bold">
                       Request Additional Equipment
                     </button>
-                    <button className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium">
+                    <button className="w-full px-5 py-3 bg-gradient-to-r from-orange-600 to-yellow-600 text-white rounded-xl hover:from-orange-700 hover:to-yellow-700 transition-all shadow-md hover:shadow-lg text-sm font-bold">
                       Report Equipment Issue
                     </button>
-                    <button className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                    <button className="w-full px-5 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg text-sm font-bold">
                       Update Equipment Status
                     </button>
-                    <button className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium">
+                    <button className="w-full px-5 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all shadow-md hover:shadow-lg text-sm font-bold">
                       Print Equipment Report
                     </button>
                   </div>
@@ -1259,11 +1352,11 @@ export default function ProjectStatusBoard() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 bg-gray-50">
+            <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-orange-50 to-red-50">
               <div className="flex justify-end">
                 <button
                   onClick={() => setShowEquipmentModal(false)}
-                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                  className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all shadow-md hover:shadow-lg font-bold"
                 >
                   Close
                 </button>
