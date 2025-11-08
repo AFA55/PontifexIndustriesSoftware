@@ -729,10 +729,12 @@ export default function ProjectStatusBoard() {
                     <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                       job.status === 'on-track' ? 'bg-green-100 text-green-700' :
                       job.status === 'needs-attention' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-red-100 text-red-700'
+                      job.status === 'behind' ? 'bg-red-100 text-red-700' :
+                      'bg-purple-100 text-purple-700'
                     }`}>
                       {job.status === 'on-track' ? 'On Track' :
-                       job.status === 'needs-attention' ? 'Needs Attention' : 'Behind'}
+                       job.status === 'needs-attention' ? 'Needs Attention' :
+                       job.status === 'behind' ? 'Behind' : 'Scheduled'}
                     </div>
                   </div>
 
@@ -745,51 +747,79 @@ export default function ProjectStatusBoard() {
                     {job.location}
                   </div>
 
-                  {/* Progress Bar */}
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs font-medium text-gray-600">Progress</span>
-                      <span className="text-xs font-bold text-gray-800">{job.progress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${getStatusColor(job.status)}`}
-                        style={{ width: `${job.progress}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Timeline Phases */}
-                  <div className="mb-4 space-y-2">
-                    <div className="text-xs font-medium text-gray-600 mb-2">Timeline</div>
-                    <div className="flex gap-1">
-                      {job.timeline.phases.map((phase, index) => (
+                  {/* Progress Bar - Only for active jobs */}
+                  {job.progress !== undefined && (
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-medium text-gray-600">Progress</span>
+                        <span className="text-xs font-bold text-gray-800">{job.progress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                         <div
-                          key={index}
-                          className={`flex-1 h-6 rounded flex items-center justify-center text-xs font-medium ${
-                            phase.status === 'completed' ? 'bg-green-100 text-green-700' :
-                            phase.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                            'bg-gray-100 text-gray-400'
-                          }`}
-                          title={`${phase.name} (${phase.duration}h)`}
-                        >
-                          {phase.name.substring(0, 3)}
-                        </div>
-                      ))}
+                          className={`h-full rounded-full transition-all duration-500 ${getStatusColor(job.status)}`}
+                          style={{ width: `${job.progress}%` }}
+                        ></div>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Timeline Phases - Only show for active jobs */}
+                  {job.timeline?.phases && (
+                    <div className="mb-4 space-y-2">
+                      <div className="text-xs font-medium text-gray-600 mb-2">Timeline</div>
+                      <div className="flex gap-1">
+                        {job.timeline.phases.map((phase, index) => (
+                          <div
+                            key={index}
+                            className={`flex-1 h-6 rounded flex items-center justify-center text-xs font-medium ${
+                              phase.status === 'completed' ? 'bg-green-100 text-green-700' :
+                              phase.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-400'
+                            }`}
+                            title={`${phase.name} (${phase.duration}h)`}
+                          >
+                            {phase.name.substring(0, 3)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show scheduled info for upcoming jobs */}
+                  {job.scheduledDate && (
+                    <div className="mb-4 bg-purple-50 rounded-lg p-3 border-2 border-purple-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-xs font-bold text-purple-900">Scheduled</span>
+                      </div>
+                      <div className="text-sm font-medium text-purple-800">
+                        {job.scheduledDate} at {job.scheduledTime}
+                      </div>
+                      <div className="text-xs text-purple-600 mt-1">
+                        Est. Duration: {job.estimatedDuration}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Job Info Grid */}
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div>
-                      <div className="text-xs text-gray-500">Time</div>
+                      <div className="text-xs text-gray-500">
+                        {job.scheduledTime ? 'Scheduled' : 'Time'}
+                      </div>
                       <div className="text-sm font-medium text-gray-800">
-                        {job.startTime} - {job.estimatedEnd}
+                        {job.scheduledTime || `${job.startTime} - ${job.estimatedEnd}`}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500">Current Phase</div>
-                      <div className="text-sm font-medium text-gray-800">{job.phase}</div>
+                      <div className="text-xs text-gray-500">
+                        {job.phase ? 'Current Phase' : 'Duration'}
+                      </div>
+                      <div className="text-sm font-medium text-gray-800">
+                        {job.phase || job.estimatedDuration}
+                      </div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500">Operator</div>
@@ -903,9 +933,12 @@ export default function ProjectStatusBoard() {
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
                       job.status === 'on-track' ? 'bg-green-100' :
                       job.status === 'needs-attention' ? 'bg-yellow-100' :
-                      'bg-red-100'
+                      job.status === 'behind' ? 'bg-red-100' :
+                      'bg-purple-100'
                     }`}>
-                      <div className={`w-4 h-4 rounded-full ${getStatusColor(job.status)}`}></div>
+                      <div className={`w-4 h-4 rounded-full ${
+                        job.status ? getStatusColor(job.status) : 'bg-purple-500'
+                      }`}></div>
                     </div>
 
                     {/* Timeline Content */}
@@ -916,40 +949,65 @@ export default function ProjectStatusBoard() {
                           <p className="text-sm text-gray-600">{job.clientName} • {job.location}</p>
                         </div>
                         <div className="text-sm text-gray-500">
-                          {job.startTime} - {job.estimatedEnd}
+                          {job.scheduledDate ? `Scheduled: ${job.scheduledDate}` : `${job.startTime} - ${job.estimatedEnd}`}
                         </div>
                       </div>
 
-                      {/* Progress Timeline */}
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <div className="flex gap-2 mb-3">
-                          {job.timeline.phases.map((phase, index) => (
-                            <div
-                              key={index}
-                              className="flex-1"
-                            >
-                              <div className="text-xs font-medium text-gray-600 mb-1">{phase.name}</div>
-                              <div className={`h-8 rounded-lg flex items-center justify-center text-xs font-medium ${
-                                phase.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                phase.status === 'in-progress' ? 'bg-blue-100 text-blue-700 animate-pulse' :
-                                'bg-gray-200 text-gray-400'
-                              }`}>
-                                {phase.duration}h
+                      {/* Progress Timeline - Only for active jobs */}
+                      {job.timeline?.phases ? (
+                        <div className="bg-gray-50 rounded-xl p-4">
+                          <div className="flex gap-2 mb-3">
+                            {job.timeline.phases.map((phase, index) => (
+                              <div
+                                key={index}
+                                className="flex-1"
+                              >
+                                <div className="text-xs font-medium text-gray-600 mb-1">{phase.name}</div>
+                                <div className={`h-8 rounded-lg flex items-center justify-center text-xs font-medium ${
+                                  phase.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                  phase.status === 'in-progress' ? 'bg-blue-100 text-blue-700 animate-pulse' :
+                                  'bg-gray-200 text-gray-400'
+                                }`}>
+                                  {phase.duration}h
+                                </div>
                               </div>
+                            ))}
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <div className="text-sm">
+                              <span className="text-gray-500">Operator:</span>
+                              <span className="font-medium text-gray-800 ml-1">{job.operator}</span>
                             </div>
-                          ))}
+                            <div className="text-sm">
+                              <span className="text-gray-500">Progress:</span>
+                              <span className="font-bold text-gray-800 ml-1">{job.progress}%</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <div className="text-sm">
+                      ) : (
+                        /* Show scheduled info for upcoming jobs */
+                        <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span className="text-sm font-bold text-purple-900">Scheduled</span>
+                            </div>
+                            <span className="text-xs text-purple-600 font-medium">Upcoming</span>
+                          </div>
+                          <div className="text-sm font-bold text-purple-800 mb-1">
+                            {job.scheduledDate} at {job.scheduledTime}
+                          </div>
+                          <div className="text-xs text-purple-600">
+                            Est. Duration: {job.estimatedDuration}
+                          </div>
+                          <div className="mt-2 text-sm">
                             <span className="text-gray-500">Operator:</span>
                             <span className="font-medium text-gray-800 ml-1">{job.operator}</span>
                           </div>
-                          <div className="text-sm">
-                            <span className="text-gray-500">Progress:</span>
-                            <span className="font-bold text-gray-800 ml-1">{job.progress}%</span>
-                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Notes */}
                       {job.notes && (
