@@ -17,6 +17,9 @@ interface MaintenanceRequest {
   description: string;
   requestedBy: string;
   dateRequested: string;
+  location?: string;
+  contactOnSite?: string;
+  contactPhone?: string;
 }
 
 export default function MaintenanceRequestPage() {
@@ -32,6 +35,9 @@ export default function MaintenanceRequestPage() {
   const [priority, setPriority] = useState<PriorityLevel>('medium');
   const [description, setDescription] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [location, setLocation] = useState('');
+  const [contactOnSite, setContactOnSite] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
 
   // Scanning state
   const [isScanning, setIsScanning] = useState(false);
@@ -193,6 +199,9 @@ export default function MaintenanceRequestPage() {
         description: description.trim(),
         requestedBy: currentUser?.name || 'Unknown',
         dateRequested: new Date().toISOString(),
+        location: location.trim() || undefined,
+        contactOnSite: contactOnSite.trim() || undefined,
+        contactPhone: contactPhone.trim() || undefined,
       };
 
       // TODO: Save to database
@@ -210,6 +219,9 @@ export default function MaintenanceRequestPage() {
         setPriority('medium');
         setDescription('');
         setSearchTerm('');
+        setLocation('');
+        setContactOnSite('');
+        setContactPhone('');
         setSuccess(false);
       }, 3000);
 
@@ -310,6 +322,27 @@ export default function MaintenanceRequestPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Global input text color fix */}
+      <style jsx global>{`
+        input[type="text"],
+        input[type="tel"],
+        textarea,
+        select,
+        option {
+          color: #111827 !important;
+        }
+        input::placeholder,
+        textarea::placeholder {
+          color: #9ca3af !important;
+        }
+        /* Ensure disabled inputs are also visible */
+        input:disabled,
+        select:disabled {
+          color: #6b7280 !important;
+          background-color: #f3f4f6 !important;
+        }
+      `}</style>
+
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-orange-300 rounded-full opacity-10 blur-3xl animate-pulse"></div>
@@ -496,6 +529,51 @@ export default function MaintenanceRequestPage() {
                     </button>
                   ))
                 )}
+              </div>
+            </div>
+
+            {/* Location Information */}
+            <div className="mb-8">
+              <label className="text-gray-800 font-bold text-lg mb-4 block">
+                Location Information
+              </label>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-gray-700 font-semibold text-sm mb-2 block">
+                    Job Site / Location
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter job site or location..."
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-700 font-semibold text-sm mb-2 block">
+                    Contact on Site
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter contact person name..."
+                    value={contactOnSite}
+                    onChange={(e) => setContactOnSite(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-700 font-semibold text-sm mb-2 block">
+                    Contact Phone
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="Enter contact phone number..."
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all shadow-sm"
+                  />
+                </div>
               </div>
             </div>
 

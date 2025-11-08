@@ -15,6 +15,16 @@ export default function AdminDashboard() {
 
   const adminModules = [
     {
+      title: 'Dispatch & Scheduling',
+      description: 'Create and manage job orders for operators',
+      icon: '🚚',
+      href: '/dashboard/admin/dispatch-scheduling',
+      bgColor: 'from-orange-500 to-red-600',
+      iconBg: 'bg-orange-500',
+      features: ['Create job orders', 'Assign operators', 'Schedule jobs', 'Equipment tracking'],
+      status: 'active'
+    },
+    {
       title: 'Create Estimate',
       description: 'Build professional estimates for concrete cutting services',
       icon: '📝',

@@ -11,19 +11,28 @@ const mockJobs = [
     clientName: 'ABC Construction',
     projectName: 'Downtown Plaza Core Drilling',
     location: '123 Main St, Downtown',
+    address: '123 Main St, Downtown',
     status: 'on-track',
+    priority: 'high',
     progress: 75,
+    startDate: '2024-11-08',
+    endDate: '2024-11-08',
     startTime: '7:00 AM',
     estimatedEnd: '3:00 PM',
+    estimatedHours: '8',
+    jobTypes: ['CORE DRILLING'],
+    contactOnSite: 'James',
+    contactPhone: '678-447-2756',
     crew: ['John Smith', 'Mike Johnson'],
     operator: 'John Smith',
+    salesman: 'CAMERON AMOS',
     equipment: [
       { name: 'Core Drill #3', type: 'Core Drill', status: 'In Use', hours: 6.2, operator: 'John Smith', condition: 'Good' },
       { name: 'Truck #5', type: 'Vehicle', status: 'In Use', hours: 6.0, operator: 'Mike Johnson', condition: 'Excellent' },
       { name: 'Diamond Bit Set', type: 'Accessory', status: 'In Use', hours: 6.2, operator: 'John Smith', condition: 'Good' }
     ],
+    requiredDocuments: ['JSA Form (Job Safety Analysis)', 'Silica Dust/Exposure Control Plan'],
     phase: 'Core Drilling',
-    priority: 'high',
     lastUpdate: '10 mins ago',
     notes: 'Making good progress on level 2',
     timeline: {
@@ -221,6 +230,24 @@ export default function ProjectStatusBoard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-slate-100">
+      {/* Global input text color fix */}
+      <style jsx global>{`
+        input[type="text"],
+        input[type="tel"],
+        input[type="date"],
+        input[type="time"],
+        input[type="number"],
+        textarea,
+        select,
+        option {
+          color: #111827 !important;
+        }
+        input::placeholder,
+        textarea::placeholder {
+          color: #9ca3af !important;
+        }
+      `}</style>
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="container mx-auto px-4 py-4">
