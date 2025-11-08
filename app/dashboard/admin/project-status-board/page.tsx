@@ -1001,7 +1001,7 @@ export default function ProjectStatusBoard() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Location:</span>
-                      <span className="font-medium">{selectedJob.location}</span>
+                      <span className="font-medium text-gray-800">{selectedJob.location}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Status:</span>
@@ -1016,11 +1016,11 @@ export default function ProjectStatusBoard() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Priority:</span>
-                      <span className="font-medium capitalize">{selectedJob.priority}</span>
+                      <span className="font-medium capitalize text-gray-800">{selectedJob.priority}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Progress:</span>
-                      <span className="font-bold">{selectedJob.progress}%</span>
+                      <span className="font-bold text-gray-800">{selectedJob.progress}%</span>
                     </div>
                   </div>
                 </div>
@@ -1030,19 +1030,19 @@ export default function ProjectStatusBoard() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Operator:</span>
-                      <span className="font-medium">{selectedJob.operator}</span>
+                      <span className="font-medium text-gray-800">{selectedJob.operator}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Crew Members:</span>
-                      <span className="font-medium">{selectedJob.crew.length}</span>
+                      <span className="font-medium text-gray-800">{selectedJob.crew.length}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Equipment:</span>
-                      <span className="font-medium">{selectedJob.equipment.length} units</span>
+                      <span className="font-medium text-gray-800">{selectedJob.equipment.length} units</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Current Phase:</span>
-                      <span className="font-medium">{selectedJob.phase}</span>
+                      <span className="font-medium text-gray-800">{selectedJob.phase}</span>
                     </div>
                   </div>
                 </div>
