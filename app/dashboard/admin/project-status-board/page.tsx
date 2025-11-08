@@ -257,8 +257,8 @@ export default function ProjectStatusBoard() {
       !notifications.find(n => n.jobId === job.id)
     );
 
-    const newNotifications = urgentJobs.map(job => ({
-      id: `notif-${job.id}-${Date.now()}`,
+    const newNotifications = urgentJobs.map((job, index) => ({
+      id: `notif-${job.id}-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
       message: `${job.projectName} needs immediate attention!`,
       type: job.status === 'behind' ? 'behind' : 'urgent',
       jobId: job.id
@@ -267,7 +267,7 @@ export default function ProjectStatusBoard() {
     if (newNotifications.length > 0) {
       setNotifications(prev => [...prev, ...newNotifications]);
     }
-  }, [jobs]);
+  }, [jobs, notifications]);
 
   const handleUpdateJob = () => {
     if (!selectedJob) return;
@@ -335,7 +335,7 @@ export default function ProjectStatusBoard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Global input text color fix */}
       <style jsx global>{`
         input[type="text"],
@@ -354,25 +354,31 @@ export default function ProjectStatusBoard() {
         }
       `}</style>
 
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-orange-300 rounded-full opacity-10 blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-red-300 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+      <div className="relative">
+        <div className="container mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-4">
               <Link
                 href="/dashboard/admin"
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="group p-3 bg-white/70 backdrop-blur-xl rounded-xl border border-gray-200 text-gray-700 hover:bg-white transition-all duration-300 hover:scale-105 shadow-sm"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </Link>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-900 to-red-800 bg-clip-text text-transparent flex items-center gap-2">
-                  <span className="text-3xl">📊</span>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
+                  <span className="text-5xl">📊</span>
                   Project Status Board
                 </h1>
-                <p className="text-sm text-gray-500">
+                <p className="text-gray-600 font-medium mt-1">
                   Live monitoring of all active jobs • {currentTime.toLocaleDateString('en-US', {
                     weekday: 'short',
                     month: 'short',
@@ -387,28 +393,28 @@ export default function ProjectStatusBoard() {
             </div>
 
             {/* Quick Stats */}
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-800">{jobs.length}</div>
-                <div className="text-xs text-gray-500">Active Jobs</div>
+            <div className="flex items-center gap-4">
+              <div className="text-center bg-white/70 backdrop-blur-xl rounded-xl border border-gray-200 px-6 py-3 shadow-sm">
+                <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">{jobs.length}</div>
+                <div className="text-xs text-gray-600 font-medium">Active Jobs</div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
+              <div className="text-center bg-white/70 backdrop-blur-xl rounded-xl border border-green-200 px-6 py-3 shadow-sm">
+                <div className="text-3xl font-bold text-green-600">
                   {statusCounts['on-track']}
                 </div>
-                <div className="text-xs text-gray-500">On Track</div>
+                <div className="text-xs text-gray-600 font-medium">On Track</div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-600">
+              <div className="text-center bg-white/70 backdrop-blur-xl rounded-xl border border-yellow-200 px-6 py-3 shadow-sm">
+                <div className="text-3xl font-bold text-yellow-600">
                   {statusCounts['needs-attention']}
                 </div>
-                <div className="text-xs text-gray-500">Need Attention</div>
+                <div className="text-xs text-gray-600 font-medium">Need Attention</div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">
+              <div className="text-center bg-white/70 backdrop-blur-xl rounded-xl border border-red-200 px-6 py-3 shadow-sm">
+                <div className="text-3xl font-bold text-red-600">
                   {statusCounts['behind']}
                 </div>
-                <div className="text-xs text-gray-500">Behind</div>
+                <div className="text-xs text-gray-600 font-medium">Behind</div>
               </div>
             </div>
           </div>
@@ -446,14 +452,14 @@ export default function ProjectStatusBoard() {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-6 py-6 relative">
         {/* Quick Actions Bar */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl border border-gray-200 p-6 mb-6 shadow-xl">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowAnalyticsModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md font-medium flex items-center gap-2"
+                className="px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl hover:from-orange-700 hover:to-red-700 transition-all shadow-lg hover:shadow-xl hover:scale-105 font-bold flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -462,7 +468,7 @@ export default function ProjectStatusBoard() {
               </button>
               <Link
                 href="/dashboard/admin/dispatch-scheduling"
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all shadow-md font-medium flex items-center gap-2"
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all shadow-lg hover:shadow-xl hover:scale-105 font-bold flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -471,13 +477,13 @@ export default function ProjectStatusBoard() {
               </Link>
             </div>
             <div className="flex gap-2">
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Refresh">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button className="p-3 bg-white hover:bg-gray-50 rounded-xl transition-all shadow-sm hover:shadow-md hover:scale-105" title="Refresh">
+                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Print All">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button className="p-3 bg-white hover:bg-gray-50 rounded-xl transition-all shadow-sm hover:shadow-md hover:scale-105" title="Print All">
+                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                 </svg>
               </button>
@@ -486,7 +492,7 @@ export default function ProjectStatusBoard() {
         </div>
 
         {/* Control Bar */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl border border-gray-200 p-6 mb-6 shadow-xl">
           <div className="flex items-center justify-between gap-4">
             {/* Search */}
             <div className="flex-1 max-w-md">
