@@ -2797,6 +2797,18 @@ video {
 .accent-blue-600 {
   accent-color: #2563eb;
 }
+.accent-orange-600 {
+  accent-color: #ea580c;
+}
+.accent-red-600 {
+  accent-color: #dc2626;
+}
+.accent-purple-600 {
+  accent-color: #9333ea;
+}
+.accent-green-600 {
+  accent-color: #16a34a;
+}
 .opacity-0 {
   opacity: 0;
 }
@@ -3452,6 +3464,11 @@ input, button, select, textarea {
 .hover\:from-orange-200:hover {
   --tw-gradient-from: #fed7aa var(--tw-gradient-from-position);
   --tw-gradient-to: rgb(254 215 170 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.hover\:from-cyan-600:hover {
+  --tw-gradient-from: #0891b2 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(8 145 178 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
 .hover\:to-blue-200:hover {

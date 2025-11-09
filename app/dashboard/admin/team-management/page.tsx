@@ -134,6 +134,39 @@ export default function TeamManagementPage() {
     return matchesRole && matchesStatus;
   });
 
+  // Handle permission changes
+  const handlePermissionChange = (module: string, action: string, value: boolean) => {
+    if (!selectedMember) return;
+
+    setSelectedMember({
+      ...selectedMember,
+      permissions: {
+        ...selectedMember.permissions,
+        [module]: {
+          ...selectedMember.permissions[module as keyof typeof selectedMember.permissions],
+          [action]: value
+        }
+      }
+    });
+  };
+
+  // Set operator-only permissions
+  const setOperatorOnlyPermissions = () => {
+    if (!selectedMember) return;
+
+    setSelectedMember({
+      ...selectedMember,
+      role: 'Operator',
+      permissions: {
+        dispatch: { view: false, create: false, edit: false, delete: false },
+        projects: { view: false, create: false, edit: false, delete: false },
+        team: { view: false, create: false, edit: false, delete: false },
+        estimates: { view: false, create: false, edit: false, delete: false },
+        analytics: { view: false, create: false, edit: false, delete: false },
+      }
+    });
+  };
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'Admin': return 'bg-red-100 text-red-700 border-red-200';
@@ -571,7 +604,8 @@ export default function TeamManagementPage() {
                           <input
                             type="checkbox"
                             checked={selectedMember.permissions.dispatch[action as keyof typeof selectedMember.permissions.dispatch]}
-                            className="w-5 h-5 rounded border-2 border-orange-300"
+                            onChange={(e) => handlePermissionChange('dispatch', action, e.target.checked)}
+                            className="w-5 h-5 rounded border-2 border-orange-300 accent-orange-600"
                           />
                           <span className="text-sm font-medium text-gray-700 capitalize">{action}</span>
                         </label>
@@ -593,7 +627,8 @@ export default function TeamManagementPage() {
                           <input
                             type="checkbox"
                             checked={selectedMember.permissions.projects[action as keyof typeof selectedMember.permissions.projects]}
-                            className="w-5 h-5 rounded border-2 border-red-300"
+                            onChange={(e) => handlePermissionChange('projects', action, e.target.checked)}
+                            className="w-5 h-5 rounded border-2 border-red-300 accent-red-600"
                           />
                           <span className="text-sm font-medium text-gray-700 capitalize">{action}</span>
                         </label>
@@ -615,7 +650,8 @@ export default function TeamManagementPage() {
                           <input
                             type="checkbox"
                             checked={selectedMember.permissions.team[action as keyof typeof selectedMember.permissions.team]}
-                            className="w-5 h-5 rounded border-2 border-blue-300"
+                            onChange={(e) => handlePermissionChange('team', action, e.target.checked)}
+                            className="w-5 h-5 rounded border-2 border-blue-300 accent-blue-600"
                           />
                           <span className="text-sm font-medium text-gray-700 capitalize">{action}</span>
                         </label>
@@ -637,7 +673,8 @@ export default function TeamManagementPage() {
                           <input
                             type="checkbox"
                             checked={selectedMember.permissions.estimates[action as keyof typeof selectedMember.permissions.estimates]}
-                            className="w-5 h-5 rounded border-2 border-purple-300"
+                            onChange={(e) => handlePermissionChange('estimates', action, e.target.checked)}
+                            className="w-5 h-5 rounded border-2 border-purple-300 accent-purple-600"
                           />
                           <span className="text-sm font-medium text-gray-700 capitalize">{action}</span>
                         </label>
@@ -659,13 +696,31 @@ export default function TeamManagementPage() {
                           <input
                             type="checkbox"
                             checked={selectedMember.permissions.analytics[action as keyof typeof selectedMember.permissions.analytics]}
-                            className="w-5 h-5 rounded border-2 border-green-300"
+                            onChange={(e) => handlePermissionChange('analytics', action, e.target.checked)}
+                            className="w-5 h-5 rounded border-2 border-green-300 accent-green-600"
                           />
                           <span className="text-sm font-medium text-gray-700 capitalize">{action}</span>
                         </label>
                       ))}
                     </div>
                   </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="pt-4 border-t-2 border-gray-200">
+                  <p className="text-sm font-semibold text-gray-600 mb-3">QUICK PRESETS</p>
+                  <button
+                    onClick={setOperatorOnlyPermissions}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-bold flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Set as Operator Dashboard Only
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    This will remove all admin access and set user to only see the operator dashboard
+                  </p>
                 </div>
 
                 <div className="flex gap-3 pt-6">
