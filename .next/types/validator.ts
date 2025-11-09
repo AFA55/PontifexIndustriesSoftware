@@ -48,6 +48,12 @@ type LayoutConfig<Route extends LayoutRoutes = LayoutRoutes> = {
   handler satisfies AppPageConfig<"/dashboard/admin/create-estimate">
 }
 
+// Validate ../../app/dashboard/admin/dispatch-scheduling/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/admin/dispatch-scheduling/page.js")
+  handler satisfies AppPageConfig<"/dashboard/admin/dispatch-scheduling">
+}
+
 // Validate ../../app/dashboard/admin/page.tsx
 {
   const handler = {} as typeof import("../../app/dashboard/admin/page.js")
@@ -58,6 +64,12 @@ type LayoutConfig<Route extends LayoutRoutes = LayoutRoutes> = {
 {
   const handler = {} as typeof import("../../app/dashboard/admin/project-status-board/page.js")
   handler satisfies AppPageConfig<"/dashboard/admin/project-status-board">
+}
+
+// Validate ../../app/dashboard/admin/team-management/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/admin/team-management/page.js")
+  handler satisfies AppPageConfig<"/dashboard/admin/team-management">
 }
 
 // Validate ../../app/dashboard/admin/upcoming-projects/page.tsx
@@ -102,6 +114,18 @@ type LayoutConfig<Route extends LayoutRoutes = LayoutRoutes> = {
   handler satisfies AppPageConfig<"/dashboard">
 }
 
+// Validate ../../app/dashboard/request-time-off/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/request-time-off/page.js")
+  handler satisfies AppPageConfig<"/dashboard/request-time-off">
+}
+
+// Validate ../../app/dashboard/timecard/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/timecard/page.js")
+  handler satisfies AppPageConfig<"/dashboard/timecard">
+}
+
 // Validate ../../app/dashboard/tools/add-equipment/page.tsx
 {
   const handler = {} as typeof import("../../app/dashboard/tools/add-equipment/page.js")
@@ -112,6 +136,18 @@ type LayoutConfig<Route extends LayoutRoutes = LayoutRoutes> = {
 {
   const handler = {} as typeof import("../../app/dashboard/tools/debug/page.js")
   handler satisfies AppPageConfig<"/dashboard/tools/debug">
+}
+
+// Validate ../../app/dashboard/tools/jsa-form/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/tools/jsa-form/page.js")
+  handler satisfies AppPageConfig<"/dashboard/tools/jsa-form">
+}
+
+// Validate ../../app/dashboard/tools/maintenance-request/page.tsx
+{
+  const handler = {} as typeof import("../../app/dashboard/tools/maintenance-request/page.js")
+  handler satisfies AppPageConfig<"/dashboard/tools/maintenance-request">
 }
 
 // Validate ../../app/dashboard/tools/my-equipment/page.tsx

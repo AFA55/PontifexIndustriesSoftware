@@ -192,9 +192,7 @@ const jobTypeConfig: { [key: string]: {
     description: 'CORE DRILLING',
     fields: [
       { name: 'locations', label: 'Drilling Locations', placeholder: 'Select locations', type: 'multiselect', options: coreDrillingLocations },
-      { name: 'quantity', label: 'Number of Holes', placeholder: 'e.g., 6' },
-      { name: 'diameter', label: 'Hole Diameter (inches)', placeholder: 'e.g., 4"' },
-      { name: 'depth', label: 'Depth (inches)', placeholder: 'e.g., 12"' }
+      { name: 'holes', label: 'Hole Configurations', placeholder: 'Add holes', type: 'core-drilling-holes' }
     ]
   },
   'WALL CUTTING': {
@@ -202,16 +200,14 @@ const jobTypeConfig: { [key: string]: {
     fields: [
       { name: 'material', label: 'Material', placeholder: 'Select material', type: 'select', options: wallSawingMaterials },
       { name: 'materialOther', label: 'Other Material (if selected)', placeholder: 'Specify material...', type: 'conditional', condition: 'material', conditionValue: 'Other' },
-      { name: 'quantity', label: 'Number of Cuts', placeholder: 'e.g., 2' },
-      { name: 'depth', label: 'Wall Thickness (inches)', placeholder: 'e.g., 8"' }
+      { name: 'cuts', label: 'Cut Specifications', placeholder: 'Add cuts', type: 'wall-cutting-cuts' }
     ]
   },
   'SLAB SAWING': {
     description: 'SLAB SAWING - CUTTING CONCRETE FLOORS/SLABS',
     fields: [
       { name: 'material', label: 'Material', placeholder: 'Select material', type: 'select', options: slabSawingMaterials },
-      { name: 'linearFeet', label: 'Linear Feet', placeholder: 'e.g., 100' },
-      { name: 'thickness', label: 'Slab Thickness (inches)', placeholder: 'e.g., 6"' }
+      { name: 'cuts', label: 'Cut Specifications', placeholder: 'Add cuts', type: 'slab-sawing-cuts' }
     ]
   },
   'HAND SAWING': {
@@ -221,14 +217,13 @@ const jobTypeConfig: { [key: string]: {
       { name: 'material', label: 'Material', placeholder: 'Select material', type: 'select', options: handSawingMaterials },
       { name: 'materialOther', label: 'Other Material (if selected)', placeholder: 'Specify material...', type: 'conditional', condition: 'material', conditionValue: 'Other' },
       { name: 'locations', label: 'Location Type', placeholder: 'Select location', type: 'multiselect', options: handSawingLocations },
-      { name: 'linearFeet', label: 'Linear Feet', placeholder: 'e.g., 50' },
-      { name: 'thickness', label: 'Depth of Cut (inches)', placeholder: 'e.g., 3"' }
+      { name: 'cuts', label: 'Cut Specifications', placeholder: 'Add cuts', type: 'hand-sawing-cuts' }
     ]
   },
   'WIRE SAWING': {
     description: 'WIRE SAWING - CUTTING LARGE STRUCTURES',
     fields: [
-      { name: 'quantity', label: 'Number of Cuts', placeholder: 'e.g., 1' }
+      { name: 'cuts', label: 'Cut Specifications', placeholder: 'Add cuts', type: 'wire-sawing-cuts' }
     ]
   },
   'CONCRETE DEMOLITION': {
@@ -305,9 +300,44 @@ export default function DispatchScheduling() {
             if (value && key !== 'locations') { // Skip locations as it's already in description
               const field = config.fields.find(f => f.name === key);
               if (field) {
-                if (Array.isArray(value)) {
+                // Handle structured arrays (holes, cuts, areas)
+                if (key === 'holes' && Array.isArray(value)) {
+                  value.forEach((hole: any, idx: number) => {
+                    if (hole.quantity || hole.diameter || hole.depth) {
+                      desc += `${hole.quantity || '?'} holes @ ${hole.diameter || '?'}" diameter x ${hole.depth || '?'}" deep\n`;
+                    }
+                  });
+                } else if (key === 'cuts' && Array.isArray(value)) {
+                  if (jobType === 'WALL CUTTING') {
+                    value.forEach((cut: any, idx: number) => {
+                      if (cut.quantity || cut.dimensions || cut.thickness) {
+                        desc += `${cut.quantity || '?'} cuts @ ${cut.dimensions || '?'} x ${cut.thickness || '?'}" thick\n`;
+                      }
+                    });
+                  } else if (jobType === 'SLAB SAWING' || jobType === 'HAND SAWING') {
+                    value.forEach((cut: any, idx: number) => {
+                      if (cut.linearFeet || cut.thickness) {
+                        desc += `${cut.linearFeet || '?'} LF x ${cut.thickness || '?'}" ${jobType === 'SLAB SAWING' ? 'thick' : 'deep'}\n`;
+                      }
+                    });
+                  } else if (jobType === 'WIRE SAWING') {
+                    value.forEach((cut: any, idx: number) => {
+                      if (cut.description) {
+                        desc += `${cut.description}\n`;
+                      }
+                    });
+                  }
+                } else if (key === 'areas' && Array.isArray(value)) {
+                  value.forEach((area: any, idx: number) => {
+                    if (area.areaVolume || area.thickness || area.material) {
+                      desc += `Area ${idx + 1}: ${area.areaVolume || '?'} @ ${area.thickness || '?'}" - ${area.material || '?'}${area.materialOther ? ` (${area.materialOther})` : ''}\n`;
+                    }
+                  });
+                } else if (Array.isArray(value) && typeof value[0] === 'string') {
+                  // Simple string arrays (methods, locations, etc.)
                   desc += `${field.label}: ${value.join(', ')}\n`;
-                } else {
+                } else if (!Array.isArray(value)) {
+                  // Simple values
                   desc += `${field.label}: ${value}\n`;
                 }
               }
@@ -731,6 +761,278 @@ export default function DispatchScheduling() {
                                     <option key={option} value={option}>{option}</option>
                                   ))}
                                 </select>
+                              ) : field.type === 'core-drilling-holes' ? (
+                                /* Core drilling holes */
+                                <div className="space-y-4">
+                                  {((formData.jobTypeDetails[jobType]?.holes as any[]) || []).map((hole, idx) => (
+                                    <div key={idx} className="border-2 border-orange-200 rounded-xl p-4 bg-orange-50/50">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <h4 className="font-bold text-orange-800">Hole Set {idx + 1}</h4>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const currentHoles = formData.jobTypeDetails[jobType]?.holes || [];
+                                            const newHoles = (currentHoles as any[]).filter((_, i) => i !== idx);
+                                            handleJobTypeDetailChange(jobType, 'holes', newHoles);
+                                          }}
+                                          className="p-1 hover:bg-orange-200 rounded-lg transition-colors"
+                                        >
+                                          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                      <div className="grid md:grid-cols-3 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-semibold text-gray-700 mb-1">Number of Holes</label>
+                                          <input
+                                            type="text"
+                                            value={hole.quantity || ''}
+                                            onChange={(e) => {
+                                              const currentHoles = [...((formData.jobTypeDetails[jobType]?.holes || []) as any[])];
+                                              currentHoles[idx] = { ...currentHoles[idx], quantity: e.target.value };
+                                              handleJobTypeDetailChange(jobType, 'holes', currentHoles);
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                            placeholder="e.g., 6"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-semibold text-gray-700 mb-1">Diameter (inches)</label>
+                                          <input
+                                            type="text"
+                                            value={hole.diameter || ''}
+                                            onChange={(e) => {
+                                              const currentHoles = [...((formData.jobTypeDetails[jobType]?.holes || []) as any[])];
+                                              currentHoles[idx] = { ...currentHoles[idx], diameter: e.target.value };
+                                              handleJobTypeDetailChange(jobType, 'holes', currentHoles);
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                            placeholder="e.g., 4&quot;"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-semibold text-gray-700 mb-1">Depth (inches)</label>
+                                          <input
+                                            type="text"
+                                            value={hole.depth || ''}
+                                            onChange={(e) => {
+                                              const currentHoles = [...((formData.jobTypeDetails[jobType]?.holes || []) as any[])];
+                                              currentHoles[idx] = { ...currentHoles[idx], depth: e.target.value };
+                                              handleJobTypeDetailChange(jobType, 'holes', currentHoles);
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                            placeholder="e.g., 12&quot;"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentHoles = formData.jobTypeDetails[jobType]?.holes || [];
+                                      const newHoles = [...(currentHoles as any[]), { quantity: '', diameter: '', depth: '' }];
+                                      handleJobTypeDetailChange(jobType, 'holes', newHoles);
+                                    }}
+                                    className="w-full py-3 bg-gradient-to-r from-orange-100 to-orange-200 hover:from-orange-200 hover:to-orange-300 border-2 border-orange-300 text-orange-800 rounded-xl font-bold transition-all"
+                                  >
+                                    + Add Another Hole Configuration
+                                  </button>
+                                </div>
+                              ) : field.type === 'wall-cutting-cuts' ? (
+                                /* Wall cutting cuts */
+                                <div className="space-y-4">
+                                  {((formData.jobTypeDetails[jobType]?.cuts as any[]) || []).map((cut, idx) => (
+                                    <div key={idx} className="border-2 border-orange-200 rounded-xl p-4 bg-orange-50/50">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <h4 className="font-bold text-orange-800">Cut Set {idx + 1}</h4>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const currentCuts = formData.jobTypeDetails[jobType]?.cuts || [];
+                                            const newCuts = (currentCuts as any[]).filter((_, i) => i !== idx);
+                                            handleJobTypeDetailChange(jobType, 'cuts', newCuts);
+                                          }}
+                                          className="p-1 hover:bg-orange-200 rounded-lg transition-colors"
+                                        >
+                                          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                      <div className="grid md:grid-cols-3 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-semibold text-gray-700 mb-1">Number of Cuts</label>
+                                          <input
+                                            type="text"
+                                            value={cut.quantity || ''}
+                                            onChange={(e) => {
+                                              const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                              currentCuts[idx] = { ...currentCuts[idx], quantity: e.target.value };
+                                              handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                            placeholder="e.g., 2"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-semibold text-gray-700 mb-1">Dimensions</label>
+                                          <input
+                                            type="text"
+                                            value={cut.dimensions || ''}
+                                            onChange={(e) => {
+                                              const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                              currentCuts[idx] = { ...currentCuts[idx], dimensions: e.target.value };
+                                              handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                            placeholder="e.g., 3&apos;x4&apos;"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-semibold text-gray-700 mb-1">Wall Thickness (inches)</label>
+                                          <input
+                                            type="text"
+                                            value={cut.thickness || ''}
+                                            onChange={(e) => {
+                                              const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                              currentCuts[idx] = { ...currentCuts[idx], thickness: e.target.value };
+                                              handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                            placeholder="e.g., 8&quot;"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentCuts = formData.jobTypeDetails[jobType]?.cuts || [];
+                                      const newCuts = [...(currentCuts as any[]), { quantity: '', dimensions: '', thickness: '' }];
+                                      handleJobTypeDetailChange(jobType, 'cuts', newCuts);
+                                    }}
+                                    className="w-full py-3 bg-gradient-to-r from-orange-100 to-orange-200 hover:from-orange-200 hover:to-orange-300 border-2 border-orange-300 text-orange-800 rounded-xl font-bold transition-all"
+                                  >
+                                    + Add Another Cut Configuration
+                                  </button>
+                                </div>
+                              ) : field.type === 'slab-sawing-cuts' || field.type === 'hand-sawing-cuts' ? (
+                                /* Slab sawing and hand sawing cuts */
+                                <div className="space-y-4">
+                                  {((formData.jobTypeDetails[jobType]?.cuts as any[]) || []).map((cut, idx) => (
+                                    <div key={idx} className="border-2 border-orange-200 rounded-xl p-4 bg-orange-50/50">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <h4 className="font-bold text-orange-800">Cut Set {idx + 1}</h4>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const currentCuts = formData.jobTypeDetails[jobType]?.cuts || [];
+                                            const newCuts = (currentCuts as any[]).filter((_, i) => i !== idx);
+                                            handleJobTypeDetailChange(jobType, 'cuts', newCuts);
+                                          }}
+                                          className="p-1 hover:bg-orange-200 rounded-lg transition-colors"
+                                        >
+                                          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                      <div className="grid md:grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-semibold text-gray-700 mb-1">Linear Feet</label>
+                                          <input
+                                            type="text"
+                                            value={cut.linearFeet || ''}
+                                            onChange={(e) => {
+                                              const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                              currentCuts[idx] = { ...currentCuts[idx], linearFeet: e.target.value };
+                                              handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                            placeholder="e.g., 100"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-semibold text-gray-700 mb-1">{field.type === 'slab-sawing-cuts' ? 'Thickness (inches)' : 'Depth of Cut (inches)'}</label>
+                                          <input
+                                            type="text"
+                                            value={cut.thickness || ''}
+                                            onChange={(e) => {
+                                              const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                              currentCuts[idx] = { ...currentCuts[idx], thickness: e.target.value };
+                                              handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                            placeholder="e.g., 6&quot;"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentCuts = formData.jobTypeDetails[jobType]?.cuts || [];
+                                      const newCuts = [...(currentCuts as any[]), { linearFeet: '', thickness: '' }];
+                                      handleJobTypeDetailChange(jobType, 'cuts', newCuts);
+                                    }}
+                                    className="w-full py-3 bg-gradient-to-r from-orange-100 to-orange-200 hover:from-orange-200 hover:to-orange-300 border-2 border-orange-300 text-orange-800 rounded-xl font-bold transition-all"
+                                  >
+                                    + Add Another Cut Configuration
+                                  </button>
+                                </div>
+                              ) : field.type === 'wire-sawing-cuts' ? (
+                                /* Wire sawing cuts */
+                                <div className="space-y-4">
+                                  {((formData.jobTypeDetails[jobType]?.cuts as any[]) || []).map((cut, idx) => (
+                                    <div key={idx} className="border-2 border-orange-200 rounded-xl p-4 bg-orange-50/50">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <h4 className="font-bold text-orange-800">Cut {idx + 1}</h4>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const currentCuts = formData.jobTypeDetails[jobType]?.cuts || [];
+                                            const newCuts = (currentCuts as any[]).filter((_, i) => i !== idx);
+                                            handleJobTypeDetailChange(jobType, 'cuts', newCuts);
+                                          }}
+                                          className="p-1 hover:bg-orange-200 rounded-lg transition-colors"
+                                        >
+                                          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Cut Description/Dimensions</label>
+                                        <input
+                                          type="text"
+                                          value={cut.description || ''}
+                                          onChange={(e) => {
+                                            const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                            currentCuts[idx] = { ...currentCuts[idx], description: e.target.value };
+                                            handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                          }}
+                                          className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                          placeholder="e.g., Beam section 10&apos;x12&apos;"
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentCuts = formData.jobTypeDetails[jobType]?.cuts || [];
+                                      const newCuts = [...(currentCuts as any[]), { description: '' }];
+                                      handleJobTypeDetailChange(jobType, 'cuts', newCuts);
+                                    }}
+                                    className="w-full py-3 bg-gradient-to-r from-orange-100 to-orange-200 hover:from-orange-200 hover:to-orange-300 border-2 border-orange-300 text-orange-800 rounded-xl font-bold transition-all"
+                                  >
+                                    + Add Another Cut
+                                  </button>
+                                </div>
                               ) : field.type === 'demolition-areas' ? (
                                 /* Demolition areas special field */
                                 <div className="space-y-4">
@@ -868,10 +1170,53 @@ export default function DispatchScheduling() {
                                   if (!value || key === 'locations') return null;
                                   const field = config.fields.find(f => f.name === key);
                                   if (!field) return null;
-                                  if (Array.isArray(value)) {
+
+                                  // Handle structured arrays (holes, cuts, areas)
+                                  if (key === 'holes' && Array.isArray(value)) {
+                                    return value.map((hole: any, idx: number) => {
+                                      if (hole.quantity || hole.diameter || hole.depth) {
+                                        return `${hole.quantity || '?'} holes @ ${hole.diameter || '?'}" diameter x ${hole.depth || '?'}" deep\n`;
+                                      }
+                                      return '';
+                                    }).join('');
+                                  } else if (key === 'cuts' && Array.isArray(value)) {
+                                    if (jobType === 'WALL CUTTING') {
+                                      return value.map((cut: any, idx: number) => {
+                                        if (cut.quantity || cut.dimensions || cut.thickness) {
+                                          return `${cut.quantity || '?'} cuts @ ${cut.dimensions || '?'} x ${cut.thickness || '?'}" thick\n`;
+                                        }
+                                        return '';
+                                      }).join('');
+                                    } else if (jobType === 'SLAB SAWING' || jobType === 'HAND SAWING') {
+                                      return value.map((cut: any, idx: number) => {
+                                        if (cut.linearFeet || cut.thickness) {
+                                          return `${cut.linearFeet || '?'} LF x ${cut.thickness || '?'}" ${jobType === 'SLAB SAWING' ? 'thick' : 'deep'}\n`;
+                                        }
+                                        return '';
+                                      }).join('');
+                                    } else if (jobType === 'WIRE SAWING') {
+                                      return value.map((cut: any, idx: number) => {
+                                        if (cut.description) {
+                                          return `${cut.description}\n`;
+                                        }
+                                        return '';
+                                      }).join('');
+                                    }
+                                  } else if (key === 'areas' && Array.isArray(value)) {
+                                    return value.map((area: any, idx: number) => {
+                                      if (area.areaVolume || area.thickness || area.material) {
+                                        return `Area ${idx + 1}: ${area.areaVolume || '?'} @ ${area.thickness || '?'}" - ${area.material || '?'}${area.materialOther ? ` (${area.materialOther})` : ''}\n`;
+                                      }
+                                      return '';
+                                    }).join('');
+                                  } else if (Array.isArray(value) && typeof value[0] === 'string') {
+                                    // Simple string arrays (methods, locations, etc.)
                                     return `${field.label}: ${value.join(', ')}\n`;
+                                  } else if (!Array.isArray(value)) {
+                                    // Simple values
+                                    return `${field.label}: ${value}\n`;
                                   }
-                                  return `${field.label}: ${value}\n`;
+                                  return '';
                                 }).join('')}
                               </>
                             )}
