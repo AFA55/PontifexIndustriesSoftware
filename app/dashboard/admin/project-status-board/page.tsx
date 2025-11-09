@@ -458,10 +458,10 @@ export default function ProjectStatusBoard() {
               <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
                   <span className="text-5xl">📊</span>
-                  Project Status Board
+                  Project Board
                 </h1>
                 <p className="text-gray-600 font-medium mt-1">
-                  Live monitoring of all active jobs • {currentTime.toLocaleDateString('en-US', {
+                  Current and upcoming jobs • {currentTime.toLocaleDateString('en-US', {
                     weekday: 'short',
                     month: 'short',
                     day: 'numeric'

@@ -35,23 +35,13 @@ export default function AdminDashboard() {
       status: 'active'
     },
     {
-      title: 'Active Project Status Board',
-      description: 'See all active jobs at a glance with color-coded status',
+      title: 'Project Board',
+      description: 'View current and upcoming jobs with color-coded status',
       icon: '📊',
       href: '/dashboard/admin/project-status-board',
       bgColor: 'from-red-500 to-red-600',
       iconBg: 'bg-red-500',
-      features: ['Live job monitoring', 'Color-coded status', 'Timeline tracking', 'Crew management'],
-      status: 'active'
-    },
-    {
-      title: 'Upcoming Projects Board',
-      description: 'Calendar view of scheduled projects and planning',
-      icon: '📅',
-      href: '/dashboard/admin/upcoming-projects',
-      bgColor: 'from-indigo-500 to-indigo-600',
-      iconBg: 'bg-indigo-500',
-      features: ['Calendar view', 'Project scheduling', 'Resource planning', 'Timeline preview'],
+      features: ['Live job monitoring', 'Upcoming jobs view', 'Analytics dashboard', 'Timeline tracking'],
       status: 'active'
     },
     {
