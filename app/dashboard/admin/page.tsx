@@ -1,15 +1,50 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { getCurrentUser, logout, isAdmin } from '@/lib/auth';
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  useEffect(() => {
+    console.log('🔍 Checking admin access...');
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+      console.log('❌ No authenticated user found, redirecting to login...');
+      router.push('/login');
+      return;
+    }
+
+    if (currentUser.role !== 'admin') {
+      console.log('🚫 User is not admin, redirecting to operator dashboard...');
+      router.push('/dashboard');
+      return;
+    }
+
+    console.log('✅ Admin access granted');
+    setLoading(false);
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const handleLogout = () => {
+    console.log('🚪 Admin logging out...');
+    logout();
     router.push('/login');
   };
 

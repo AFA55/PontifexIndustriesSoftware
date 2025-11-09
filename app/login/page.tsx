@@ -31,13 +31,21 @@ export default function LoginPage() {
     console.log('🚀 Starting login process...');
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await checkCredentials(data.email, data.password);
-      
-      if (result.success) {
-        console.log('✅ Login successful, redirecting to dashboard...');
-        router.push('/dashboard');
+
+      if (result.success && result.user) {
+        console.log('✅ Login successful, redirecting based on role...');
+
+        // Redirect based on user role
+        if (result.user.role === 'admin') {
+          console.log('🔑 Admin user, redirecting to admin dashboard...');
+          router.push('/dashboard/admin');
+        } else {
+          console.log('👤 Operator user, redirecting to operator dashboard...');
+          router.push('/dashboard');
+        }
       } else {
         console.log('❌ Login failed:', result.error);
         setError(result.error || 'Login failed');

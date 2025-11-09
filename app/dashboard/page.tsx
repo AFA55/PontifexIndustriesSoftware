@@ -72,7 +72,7 @@ export default function Dashboard() {
     // Redirect based on role
     if (currentUser.role === 'admin') {
       console.log('🔑 Admin user, redirecting to admin dashboard...');
-      router.push('/admin');
+      router.push('/dashboard/admin');
       return;
     }
 

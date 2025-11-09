@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import AdminProtection from '@/components/AdminProtection';
 
 interface JobOrderForm {
   // Basic Info
@@ -479,7 +480,8 @@ export default function DispatchScheduling() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <AdminProtection>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Global input text color fix */}
       <style jsx global>{`
         input[type="text"],
@@ -1735,5 +1737,6 @@ export default function DispatchScheduling() {
         )}
       </div>
     </div>
+    </AdminProtection>
   );
 }
