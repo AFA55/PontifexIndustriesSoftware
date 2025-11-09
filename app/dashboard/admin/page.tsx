@@ -29,10 +29,10 @@ export default function AdminDashboard() {
       description: 'Build professional estimates for concrete cutting services',
       icon: '📝',
       href: '/dashboard/admin/create-estimate',
-      bgColor: 'from-blue-500 to-blue-600',
-      iconBg: 'bg-blue-500',
+      bgColor: 'from-gray-500 to-gray-600',
+      iconBg: 'bg-gray-500',
       features: ['Multi-service quotes', 'Real-time calculations', 'PDF generation', 'Email to clients'],
-      status: 'active'
+      status: 'coming-soon'
     },
     {
       title: 'Project Board',
@@ -42,6 +42,16 @@ export default function AdminDashboard() {
       bgColor: 'from-red-500 to-red-600',
       iconBg: 'bg-red-500',
       features: ['Live job monitoring', 'Upcoming jobs view', 'Analytics dashboard', 'Timeline tracking'],
+      status: 'active'
+    },
+    {
+      title: 'Team Management',
+      description: 'Create accounts and manage team member access permissions',
+      icon: '👥',
+      href: '/dashboard/admin/team-management',
+      bgColor: 'from-blue-500 to-blue-600',
+      iconBg: 'bg-blue-500',
+      features: ['Create user accounts', 'Role-based access', 'Permission settings', 'Team directory'],
       status: 'active'
     },
     {
@@ -62,16 +72,6 @@ export default function AdminDashboard() {
       bgColor: 'from-green-500 to-emerald-600',
       iconBg: 'bg-green-500',
       features: ['Cost tracking', 'Revenue reports', 'Profit margins', 'Invoice management'],
-      status: 'coming-soon'
-    },
-    {
-      title: 'Client Management',
-      description: 'Manage client relationships and project history',
-      icon: '👥',
-      href: '/dashboard/admin/clients',
-      bgColor: 'from-cyan-500 to-blue-600',
-      iconBg: 'bg-cyan-500',
-      features: ['Client database', 'Project history', 'Contact management', 'Communications log'],
       status: 'coming-soon'
     },
     {
