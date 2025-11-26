@@ -68,61 +68,28 @@ export default function AccessRequestsPage() {
   const handleApprove = async (request: AccessRequest, role: 'admin' | 'operator') => {
     setProcessing(true);
     try {
-      // 1. Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: request.email,
-        password: request.password_hash,
+      // Call API route to approve request and create user
+      const response = await fetch(`/api/access-requests/${request.id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          role: role,
+          reviewedBy: user?.id,
+        }),
       });
 
-      if (authError) {
-        alert(`Error creating auth user: ${authError.message}`);
-        setProcessing(false);
-        return;
-      }
+      const result = await response.json();
 
-      if (!authData.user) {
-        alert('Failed to create user');
-        setProcessing(false);
-        return;
-      }
-
-      // 2. Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: authData.user.id,
-          email: request.email,
-          full_name: request.full_name,
-          role: role,
-          phone: '',
-          active: true
-        }]);
-
-      if (profileError) {
-        alert(`Error creating profile: ${profileError.message}`);
-        setProcessing(false);
-        return;
-      }
-
-      // 3. Update access request
-      const { error: updateError } = await supabase
-        .from('access_requests')
-        .update({
-          status: 'approved',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-          assigned_role: role
-        })
-        .eq('id', request.id);
-
-      if (updateError) {
-        alert(`Error updating request: ${updateError.message}`);
+      if (!response.ok) {
+        alert(`Error: ${result.error || 'Failed to approve request'}`);
         setProcessing(false);
         return;
       }
 
       // Success!
-      alert(`✅ Access approved! ${request.full_name} can now login as ${role}.`);
+      alert(`✅ ${result.message}\n\n${result.data.passwordResetSent ? 'A password reset email has been sent to the user.' : 'Note: Password reset email could not be sent. User may need to use "Forgot Password" flow.'}`);
       setShowApprovalModal(false);
       setSelectedRequest(null);
       fetchRequests();
@@ -142,19 +109,27 @@ export default function AccessRequestsPage() {
 
     setProcessing(true);
     try {
-      const { error } = await supabase
-        .from('access_requests')
-        .update({
-          status: 'denied',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-          denial_reason: denialReason
-        })
-        .eq('id', request.id);
+      // Call API route to deny request
+      const response = await fetch(`/api/access-requests/${request.id}/deny`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          denialReason: denialReason,
+          reviewedBy: user?.id,
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      alert('❌ Access request denied');
+      if (!response.ok) {
+        alert(`Error: ${result.error || 'Failed to deny request'}`);
+        setProcessing(false);
+        return;
+      }
+
+      alert(`❌ ${result.message}`);
       setShowApprovalModal(false);
       setSelectedRequest(null);
       setDenialReason('');

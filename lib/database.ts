@@ -110,6 +110,22 @@ export interface Blade {
   updated_at?: string;
 }
 
+export interface AccessRequest {
+  id?: string;
+  full_name: string;
+  email: string;
+  password_hash?: string;
+  date_of_birth: string;
+  position: string;
+  status: 'pending' | 'approved' | 'denied';
+  reviewed_by?: string;
+  reviewed_at?: string;
+  assigned_role?: 'admin' | 'operator';
+  denial_reason?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // =====================================================
 // USER/PROFILE FUNCTIONS
 // =====================================================
@@ -562,4 +578,52 @@ export function subscribeToEquipment(callback: (payload: any) => void) {
     .channel('equipment-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'equipment' }, callback)
     .subscribe();
+}
+
+// =====================================================
+// ACCESS REQUEST FUNCTIONS
+// =====================================================
+
+export async function getAllAccessRequests(): Promise<AccessRequest[]> {
+  const { data, error } = await supabase
+    .from('access_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching access requests:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+export async function getAccessRequestsByStatus(status: AccessRequest['status']): Promise<AccessRequest[]> {
+  const { data, error } = await supabase
+    .from('access_requests')
+    .select('*')
+    .eq('status', status)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching access requests by status:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+export async function getAccessRequestById(id: string): Promise<AccessRequest | null> {
+  const { data, error } = await supabase
+    .from('access_requests')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching access request:', error);
+    return null;
+  }
+
+  return data;
 }

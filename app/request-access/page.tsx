@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
 export default function RequestAccessPage() {
   const router = useRouter();
@@ -52,33 +51,30 @@ export default function RequestAccessPage() {
     }
 
     try {
-      // Insert access request
-      const { data, error: insertError } = await supabase
-        .from('access_requests')
-        .insert([
-          {
-            full_name: formData.fullName,
-            email: formData.email.toLowerCase(),
-            password_hash: formData.password, // In production, hash this on the backend
-            date_of_birth: formData.dateOfBirth,
-            position: formData.position,
-            status: 'pending'
-          }
-        ])
-        .select()
-        .single();
+      // Call API route to create access request with secure password hashing
+      const response = await fetch('/api/access-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          dateOfBirth: formData.dateOfBirth,
+          position: formData.position,
+        }),
+      });
 
-      if (insertError) {
-        if (insertError.code === '23505') { // Unique constraint violation
-          setError('An access request with this email already exists');
-        } else {
-          setError(insertError.message);
-        }
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || 'Failed to submit access request');
         setLoading(false);
         return;
       }
 
-      console.log('Access request created:', data);
+      console.log('Access request created:', result.data);
       setSuccess(true);
 
       // Redirect after 3 seconds
