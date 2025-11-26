@@ -15,7 +15,9 @@ export default function RequestAccessPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    dateOfBirth: '',
+    birthMonth: '',
+    birthDay: '',
+    birthYear: '',
     position: ''
   });
 
@@ -37,8 +39,18 @@ export default function RequestAccessPage() {
       return;
     }
 
+    // Validate date of birth fields
+    if (!formData.birthMonth || !formData.birthDay || !formData.birthYear) {
+      setError('Please select your complete date of birth');
+      setLoading(false);
+      return;
+    }
+
+    // Create date string in YYYY-MM-DD format
+    const dateOfBirth = `${formData.birthYear}-${formData.birthMonth.padStart(2, '0')}-${formData.birthDay.padStart(2, '0')}`;
+
     // Calculate age (must be 18+)
-    const birthDate = new Date(formData.dateOfBirth);
+    const birthDate = new Date(dateOfBirth);
     const today = new Date();
     const age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -61,7 +73,7 @@ export default function RequestAccessPage() {
           fullName: formData.fullName,
           email: formData.email,
           password: formData.password,
-          dateOfBirth: formData.dateOfBirth,
+          dateOfBirth: `${formData.birthYear}-${formData.birthMonth.padStart(2, '0')}-${formData.birthDay.padStart(2, '0')}`,
           position: formData.position,
         }),
       });
@@ -202,14 +214,55 @@ export default function RequestAccessPage() {
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Date of Birth <span className="text-red-600">*</span>
             </label>
-            <input
-              type="date"
-              required
-              value={formData.dateOfBirth}
-              onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-800"
-              max={new Date().toISOString().split('T')[0]}
-            />
+            <div className="grid grid-cols-3 gap-3">
+              {/* Month */}
+              <select
+                required
+                value={formData.birthMonth}
+                onChange={(e) => setFormData({ ...formData, birthMonth: e.target.value })}
+                className="px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-800"
+              >
+                <option value="">Month</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+
+              {/* Day */}
+              <select
+                required
+                value={formData.birthDay}
+                onChange={(e) => setFormData({ ...formData, birthDay: e.target.value })}
+                className="px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-800"
+              >
+                <option value="">Day</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                  <option key={day} value={day}>{day}</option>
+                ))}
+              </select>
+
+              {/* Year */}
+              <select
+                required
+                value={formData.birthYear}
+                onChange={(e) => setFormData({ ...formData, birthYear: e.target.value })}
+                className="px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-800"
+              >
+                <option value="">Year</option>
+                {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i - 18).map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
             <p className="text-xs text-gray-500 mt-1">You must be at least 18 years old</p>
           </div>
 
