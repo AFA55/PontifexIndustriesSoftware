@@ -35,6 +35,7 @@ const mockJobs = [
     phase: 'Core Drilling',
     lastUpdate: '10 mins ago',
     notes: 'Making good progress on level 2',
+    jobQuote: 8500, // Admin only
     timeline: {
       totalHours: 8,
       elapsed: 6,
@@ -66,6 +67,7 @@ const mockJobs = [
     priority: 'medium',
     lastUpdate: '25 mins ago',
     notes: 'Equipment issue resolved, back on track',
+    jobQuote: 5200, // Admin only
     timeline: {
       totalHours: 9,
       elapsed: 5,
@@ -98,6 +100,7 @@ const mockJobs = [
     phase: 'Preparation',
     priority: 'urgent',
     lastUpdate: '5 mins ago',
+    jobQuote: 12000, // Admin only
     notes: 'Weather delay - crew arrived late',
     timeline: {
       totalHours: 10,
@@ -725,6 +728,18 @@ export default function ProjectStatusBoard() {
                       </div>
                       <h3 className="font-bold text-gray-800 text-lg">{job.projectName}</h3>
                       <p className="text-sm text-gray-600">{job.clientName}</p>
+                      {/* Admin Only - Job Quote */}
+                      {job.jobQuote && (
+                        <div className="mt-2 bg-gradient-to-r from-green-100 to-emerald-100 border-2 border-green-300 rounded-lg px-3 py-1.5 inline-flex items-center gap-2">
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="text-sm font-bold text-green-800">
+                            ${job.jobQuote.toLocaleString()}
+                          </span>
+                          <span className="text-xs text-green-600 font-semibold">QUOTE</span>
+                        </div>
+                      )}
                     </div>
                     <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                       job.status === 'on-track' ? 'bg-green-100 text-green-700' :

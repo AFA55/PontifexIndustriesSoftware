@@ -5,10 +5,56 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { getCurrentUser, logout, isAdmin } from '@/lib/auth';
+import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
+
+// Pontifex Industries Logo Component
+function PontifexLogo({ className = "h-8" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 250 60"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* P Letter with Geometric Design */}
+      <g>
+        {/* Outer P Shape */}
+        <path
+          d="M20 15L35 5L50 15L50 35L35 45L20 35L20 25L35 25L35 35L42 30L42 20L35 15L28 20L28 30L20 25V15Z"
+          fill="url(#pontifex-gradient)"
+        />
+        {/* Inner geometric elements */}
+        <path
+          d="M25 20L30 17L35 20L35 25L30 28L25 25V20Z"
+          fill="currentColor"
+          opacity="0.3"
+        />
+      </g>
+
+      {/* PONTIFEX Text */}
+      <g fill="currentColor">
+        <text x="65" y="25" className="text-lg font-bold" style={{fontSize: '18px', fontFamily: 'Inter, sans-serif'}}>
+          PONTIFEX
+        </text>
+        <text x="65" y="45" className="text-sm" style={{fontSize: '12px', fontFamily: 'Inter, sans-serif', opacity: '0.8'}}>
+          INDUSTRIES
+        </text>
+      </g>
+
+      <defs>
+        <linearGradient id="pontifex-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#dc2626" />
+          <stop offset="0.5" stopColor="#2563eb" />
+          <stop offset="1" stopColor="#1e40af" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,6 +74,7 @@ export default function AdminDashboard() {
     }
 
     console.log('✅ Admin access granted');
+    setUser(currentUser);
     setLoading(false);
   }, [router]);
 
@@ -35,8 +82,8 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading admin dashboard...</p>
+          <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     );
@@ -90,6 +137,16 @@ export default function AdminDashboard() {
       status: 'active'
     },
     {
+      title: 'Access Requests',
+      description: 'Review and approve user access requests',
+      icon: '🔐',
+      href: '/dashboard/admin/access-requests',
+      bgColor: 'from-cyan-500 to-blue-600',
+      iconBg: 'bg-cyan-500',
+      features: ['Pending requests', 'Approve/Deny access', 'Role assignment', 'Request history'],
+      status: 'active'
+    },
+    {
       title: 'Resource Management',
       description: 'Manage equipment, vehicles, and personnel assignments',
       icon: '🔧',
@@ -116,8 +173,8 @@ export default function AdminDashboard() {
       href: '/dashboard/admin/analytics',
       bgColor: 'from-purple-500 to-purple-600',
       iconBg: 'bg-purple-500',
-      features: ['Performance metrics', 'Trend analysis', 'Custom reports', 'Data exports'],
-      status: 'coming-soon'
+      features: ['Project P&L tracking', 'Operator performance', 'Financial KPIs', 'Production metrics'],
+      status: 'active'
     },
     {
       title: 'Safety & Compliance',
@@ -128,6 +185,16 @@ export default function AdminDashboard() {
       iconBg: 'bg-orange-500',
       features: ['Incident reporting', 'Training records', 'Compliance tracking', 'Safety scores'],
       status: 'coming-soon'
+    },
+    {
+      title: 'Tools & Equipment',
+      description: 'View all equipment across operators and manage inventory',
+      icon: '⚙️',
+      href: '/dashboard/admin/all-equipment',
+      bgColor: 'from-purple-500 to-pink-600',
+      iconBg: 'bg-purple-500',
+      features: ['View all equipment', 'Search by operator', 'Equipment status', 'Assignment tracking'],
+      status: 'active'
     }
   ];
 
@@ -139,35 +206,36 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden">
-      {/* Animated Background */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300 rounded-full opacity-10 blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-red-300 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-200 rounded-full opacity-5 blur-3xl animate-pulse delay-2000"></div>
       </div>
 
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-lg sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-5">
+      {/* Modern Glass Morphism Header */}
+      <div className="backdrop-blur-xl bg-white/70 border-b border-white/20 sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 gradient-bg-brand rounded-2xl flex items-center justify-center shadow-lg">
-                <span className="text-2xl">🏢</span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold gradient-text">
-                  Admin Dashboard
-                </h1>
-                <p className="text-sm text-gray-500 font-medium">Pontifex Industries Command Center</p>
-              </div>
+            {/* Pontifex Logo with Animation */}
+            <div className="transform hover:scale-105 transition-transform duration-200">
+              <PontifexLogo className="h-10 text-foreground" />
             </div>
-            <div className="flex items-center gap-3">
-              <button className="p-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all group">
-                <svg className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-              </button>
+
+            {/* Modern Profile Section */}
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
+                  {user?.name?.charAt(0) || 'A'}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-gray-800">{user?.name || 'Admin'}</p>
+                  <p className="text-xs text-gray-500 capitalize">Administrator</p>
+                </div>
+              </div>
+
+              {/* Operator View Button */}
               <Link
                 href="/dashboard"
                 className="px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
@@ -177,127 +245,197 @@ export default function AdminDashboard() {
                 </svg>
                 <span>Operator View</span>
               </Link>
+
+              {/* Premium Logout Button */}
               <button
                 onClick={handleLogout}
-                className="px-4 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all font-semibold shadow-sm flex items-center gap-2"
+                className="group flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
-                <LogOut className="w-4 h-4" />
-                <span>Logout</span>
+                <svg className="w-4 h-4 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span className="font-medium">Logout</span>
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="container mx-auto px-4 py-6 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {quickStats.map((stat, index) => (
-            <div key={index} className="card-premium p-6 hover-lift">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-500">{stat.label}</span>
-                <span className={`text-sm font-semibold flex items-center gap-1 ${
-                  stat.trend === 'up' ? 'text-green-600' :
-                  stat.trend === 'down' ? 'text-red-600' :
-                  'text-gray-500'
-                }`}>
-                  {stat.trend === 'up' && '↑'}
-                  {stat.trend === 'down' && '↓'}
-                  {stat.change}
-                </span>
+      <div className="container mx-auto px-4 py-8 relative">
+        {/* Modern Animated Greeting */}
+        <div className="text-center mb-10 animate-fade-in">
+          <div className="inline-block">
+            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-orange-600 via-red-600 to-blue-600 bg-clip-text text-transparent mb-3 animate-gradient">
+              Welcome back, {user?.name?.split(' ')[0] || 'Admin'}!
+            </h1>
+            <p className="text-gray-600 text-lg font-light">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
+
+          {/* Quick Stats Bar */}
+          <div className="flex justify-center gap-8 mt-6">
+            {quickStats.map((stat, index) => (
+              <div key={index} className="text-center">
+                <p className="text-3xl font-bold text-blue-600">{stat.value}</p>
+                <p className="text-sm text-gray-500">{stat.label}</p>
               </div>
-              <div className="text-3xl font-bold gradient-text">{stat.value}</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {/* Admin Modules Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {adminModules.map((module, index) => (
-            <div
-              key={index}
-              className={`relative card-premium transition-all duration-300 ${
-                module.status === 'active'
-                  ? 'hover-lift cursor-pointer'
-                  : 'opacity-60 cursor-not-allowed'
-              }`}
-              onClick={() => module.status === 'active' && router.push(module.href)}
-            >
-              <div className="p-6">
-                {/* Status Badge */}
-                {module.status === 'coming-soon' && (
-                  <div className="absolute top-4 right-4 px-3 py-1 bg-gray-100 rounded-full text-xs font-semibold text-gray-500">
-                    Coming Soon
-                  </div>
-                )}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">
+          {adminModules.map((module, index) => {
+            const isActive = module.status === 'active';
 
-                {/* Icon */}
-                <div className={`w-16 h-16 bg-gradient-to-br ${module.bgColor} rounded-2xl flex items-center justify-center mb-4 shadow-lg`}>
-                  <span className="text-3xl">{module.icon}</span>
-                </div>
-
-                {/* Title & Description */}
-                <h3 className="text-xl font-bold text-gray-800 mb-2">{module.title}</h3>
-                <p className="text-gray-600 text-sm mb-4">{module.description}</p>
-
-                {/* Features */}
-                <div className="space-y-1 mb-4">
-                  {module.features.map((feature, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-gray-500 text-xs">
-                      <div className="w-1.5 h-1.5 rounded-full gradient-bg-brand"></div>
-                      {feature}
+            const cardContent = (
+              <>
+                <div className={`absolute inset-0 bg-gradient-to-br ${module.bgColor} opacity-0 ${isActive ? 'group-hover:opacity-100' : ''} transition-opacity duration-500 rounded-3xl`}></div>
+                <div className={`relative bg-white rounded-[22px] p-6 ${isActive ? 'group-hover:bg-transparent' : ''} transition-colors duration-500`}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`w-14 h-14 bg-gradient-to-br ${module.bgColor} rounded-2xl flex items-center justify-center shadow-lg ${isActive ? 'group-hover:shadow-xl transform group-hover:rotate-6' : ''} transition-all duration-300`}>
+                      <span className="text-3xl">{module.icon}</span>
                     </div>
-                  ))}
+                    <span className={`px-3 py-1 ${
+                      module.status === 'coming-soon'
+                        ? 'bg-gray-100 text-gray-600'
+                        : `${module.iconBg.replace('bg-', 'bg-')}/10 text-${module.iconBg.split('-')[1]}-600`
+                    } ${isActive ? 'group-hover:bg-white/20 group-hover:text-white' : ''} text-xs font-bold rounded-full transition-all duration-300`}>
+                      {module.status === 'coming-soon' ? 'COMING SOON' : 'ACTIVE'}
+                    </span>
+                  </div>
+                  <h3 className={`text-2xl font-bold text-gray-800 ${isActive ? 'group-hover:text-white' : ''} mb-2 transition-colors duration-300`}>
+                    {module.title}
+                  </h3>
+                  <p className={`text-gray-600 ${isActive ? 'group-hover:text-white/90' : ''} font-medium transition-colors duration-300 mb-4`}>
+                    {module.description}
+                  </p>
+                  {isActive && (
+                    <div className={`flex items-center ${
+                      module.bgColor === 'from-orange-500 to-red-600' ? 'text-orange-600' :
+                      module.bgColor === 'from-red-500 to-red-600' ? 'text-red-600' :
+                      module.bgColor === 'from-blue-500 to-blue-600' ? 'text-blue-600' :
+                      module.bgColor === 'from-green-500 to-emerald-600' ? 'text-green-600' :
+                      module.bgColor === 'from-purple-500 to-purple-600' ? 'text-purple-600' :
+                      'text-gray-600'
+                    } group-hover:text-white font-semibold transition-colors duration-300`}>
+                      <span>Open Module</span>
+                      <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
+              </>
+            );
 
-                {/* Action Button */}
-                {module.status === 'active' && (
-                  <button className="w-full px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg">
-                    Open Module →
-                  </button>
-                )}
+            return isActive ? (
+              <Link
+                key={index}
+                href={module.href}
+                className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white ${
+                  module.bgColor === 'from-orange-500 to-red-600' ? 'to-red-50' :
+                  module.bgColor === 'from-gray-500 to-gray-600' ? 'to-gray-50' :
+                  module.bgColor === 'from-red-500 to-red-600' ? 'to-red-50' :
+                  module.bgColor === 'from-blue-500 to-blue-600' ? 'to-blue-50' :
+                  module.bgColor === 'from-green-500 to-emerald-600' ? 'to-green-50' :
+                  module.bgColor === 'from-purple-500 to-purple-600' ? 'to-purple-50' :
+                  'to-gray-50'
+                } p-1 shadow-xl hover:shadow-2xl hover:scale-[1.02] cursor-pointer animate-fade-in-up transition-all duration-500`}
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                {cardContent}
+              </Link>
+            ) : (
+              <div
+                key={index}
+                className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white ${
+                  module.bgColor === 'from-orange-500 to-red-600' ? 'to-red-50' :
+                  module.bgColor === 'from-gray-500 to-gray-600' ? 'to-gray-50' :
+                  module.bgColor === 'from-red-500 to-red-600' ? 'to-red-50' :
+                  module.bgColor === 'from-blue-500 to-blue-600' ? 'to-blue-50' :
+                  module.bgColor === 'from-green-500 to-emerald-600' ? 'to-green-50' :
+                  module.bgColor === 'from-purple-500 to-purple-600' ? 'to-purple-50' :
+                  'to-gray-50'
+                } p-1 shadow-xl opacity-60 cursor-not-allowed animate-fade-in-up transition-all duration-500`}
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                {cardContent}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* Recent Activity */}
-        <div className="mt-8 card-premium p-6">
-          <h2 className="text-xl font-bold gradient-text mb-6">Recent Activity</h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-transparent rounded-xl border border-green-100 hover-lift">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <div>
-                  <p className="font-semibold text-gray-800">Job #2024-001 started</p>
-                  <p className="text-sm text-gray-600">Downtown Plaza Core Drilling</p>
-                </div>
-              </div>
-              <span className="text-sm font-medium text-gray-500">10 mins ago</span>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-yellow-50 to-transparent rounded-xl border border-yellow-100 hover-lift">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
-                <div>
-                  <p className="font-semibold text-gray-800">Equipment issue reported</p>
-                  <p className="text-sm text-gray-600">Slab Saw #1 - Minor repair needed</p>
-                </div>
-              </div>
-              <span className="text-sm font-medium text-gray-500">25 mins ago</span>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-transparent rounded-xl border border-blue-100 hover-lift">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-                <div>
-                  <p className="font-semibold text-gray-800">New job scheduled</p>
-                  <p className="text-sm text-gray-600">Bridge Deck Repair - Tomorrow 6:00 AM</p>
-                </div>
-              </div>
-              <span className="text-sm font-medium text-gray-500">1 hour ago</span>
-            </div>
-          </div>
-        </div>
       </div>
+
+      {/* Add custom animations */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes fade-in-up {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out;
+        }
+
+        .animate-fade-in-up {
+          animation: fade-in-up 0.8s ease-out forwards;
+          opacity: 0;
+        }
+
+        .delay-100 {
+          animation-delay: 100ms;
+        }
+
+        .delay-200 {
+          animation-delay: 200ms;
+        }
+
+        .delay-300 {
+          animation-delay: 300ms;
+        }
+
+        .delay-1000 {
+          animation-delay: 1s;
+        }
+
+        .delay-2000 {
+          animation-delay: 2s;
+        }
+
+        @keyframes gradient {
+          0%, 100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+        }
+
+        .animate-gradient {
+          background-size: 200% 200%;
+          animation: gradient 3s ease infinite;
+        }
+      `}</style>
     </div>
   );
 }

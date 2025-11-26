@@ -66,6 +66,9 @@ interface JobOrderForm {
   customerJobNumber: string;
   contactOnSite: string;
   contactPhone: string;
+
+  // Financial - Admin Only
+  jobQuote?: number; // Price quoted for the job (admin only)
 }
 
 const jobTypes = [
@@ -272,7 +275,8 @@ export default function DispatchScheduling() {
     po: '',
     customerJobNumber: '',
     contactOnSite: '',
-    contactPhone: ''
+    contactPhone: '',
+    jobQuote: undefined // Admin only field
   });
 
   // Generate description based on selected job types and their details
@@ -1628,6 +1632,52 @@ export default function DispatchScheduling() {
                     placeholder="Optional"
                   />
                 </div>
+              </div>
+            </div>
+            )}
+
+            {/* Job Quote/Price - Admin Only - Only show if basic info is complete */}
+            {isBasicInfoComplete && (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-3xl shadow-xl border-2 border-green-200 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    Job Quote / Price
+                    <span className="text-xs bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full font-bold">
+                      👑 ADMIN ONLY
+                    </span>
+                  </h2>
+                  <p className="text-sm text-gray-600">This information is only visible to administrators</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl p-6 border-2 border-green-300">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Project Quote Amount
+                </label>
+                <div className="relative">
+                  <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-600 text-2xl font-bold">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.jobQuote || ''}
+                    onChange={(e) => handleInputChange('jobQuote', e.target.value ? parseFloat(e.target.value) : undefined)}
+                    className="w-full pl-12 pr-6 py-4 text-2xl font-bold bg-white border-2 border-gray-300 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                    placeholder="0.00"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-3 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Enter the total quoted price for this project. This will help track profitability and performance metrics.
+                </p>
               </div>
             </div>
             )}

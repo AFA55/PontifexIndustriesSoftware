@@ -186,7 +186,7 @@ export default function LoginPage() {
             transition={{ delay: 0.8 }}
             className="text-center"
           >
-            <Link href="/request-login" className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors">
+            <Link href="/request-access" className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors">
               Need access? Request Login
             </Link>
           </motion.div>

@@ -56,7 +56,7 @@ export default function ToolsPage() {
         </div>
 
         {/* Main Action Cards Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8 mb-12">
           {/* Scan Equipment - Primary Action */}
           <Link
             href="/dashboard/tools/scan"
@@ -169,6 +169,33 @@ export default function ToolsPage() {
               </div>
             </div>
           </Link>
+
+          {/* Manage Blades */}
+          <Link
+            href="/dashboard/tools/manage-blades"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-purple-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] animate-fade-in-up delay-400"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+            <div className="relative bg-white rounded-[22px] p-8 group-hover:bg-transparent transition-colors duration-500">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:shadow-xl transform group-hover:rotate-6 transition-all duration-300">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+              </div>
+
+              <h3 className="text-3xl font-bold text-gray-800 mb-3 group-hover:text-white transition-colors">Manage Blades</h3>
+              <p className="text-gray-600 group-hover:text-white/90 leading-relaxed text-lg mb-6 font-medium transition-colors">
+                Track blade usage, lifecycle, and schedule replacements
+              </p>
+
+              <div className="flex items-center text-purple-600 group-hover:text-white text-sm font-bold tracking-wide transition-colors">
+                <span>MANAGE BLADES</span>
+                <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </div>
+            </div>
+          </Link>
         </div>
 
         {/* Quick Stats */}
@@ -267,6 +294,14 @@ export default function ToolsPage() {
 
         .delay-200 {
           animation-delay: 200ms;
+        }
+
+        .delay-300 {
+          animation-delay: 300ms;
+        }
+
+        .delay-400 {
+          animation-delay: 400ms;
         }
 
         .delay-1000 {
