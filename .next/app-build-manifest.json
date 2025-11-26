@@ -6,80 +6,35 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/page": [
+    "/dashboard/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
+      "static/chunks/app/dashboard/admin/page.js"
     ],
     "/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/login/page.js"
     ],
-    "/dashboard/page": [
+    "/request-access/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/page.js"
+      "static/chunks/app/request-access/page.js"
     ],
-    "/admin/page": [
+    "/api/access-requests/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/page.js"
+      "static/chunks/app/api/access-requests/route.js"
     ],
-    "/dashboard/admin/page": [
+    "/dashboard/admin/access-requests/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/admin/page.js"
+      "static/chunks/app/dashboard/admin/access-requests/page.js"
     ],
-    "/dashboard/admin/dispatch-scheduling/page": [
+    "/api/access-requests/list/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/admin/dispatch-scheduling/page.js"
-    ],
-    "/dashboard/job-schedule/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/job-schedule/page.js"
-    ],
-    "/dashboard/admin/project-status-board/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/admin/project-status-board/page.js"
-    ],
-    "/dashboard/admin/upcoming-projects/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/admin/upcoming-projects/page.js"
-    ],
-    "/dashboard/admin/create-estimate/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/admin/create-estimate/page.js"
-    ],
-    "/dashboard/tools/jsa-form/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/tools/jsa-form/page.js"
-    ],
-    "/dashboard/tools/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/tools/page.js"
-    ],
-    "/dashboard/job-schedule/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/job-schedule/[id]/page.js"
-    ],
-    "/dashboard/job-schedule/[id]/work-performed/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/job-schedule/[id]/work-performed/page.js"
-    ],
-    "/dashboard/admin/team-management/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/admin/team-management/page.js"
+      "static/chunks/app/api/access-requests/list/route.js"
     ]
   }
 }

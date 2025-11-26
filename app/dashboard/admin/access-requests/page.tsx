@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 
 interface AccessRequest {
@@ -27,9 +26,10 @@ export default function AccessRequestsPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'denied'>('pending');
   const [selectedRequest, setSelectedRequest] = useState<AccessRequest | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'operator'>('operator');
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'operator' | 'apprentice'>('operator');
   const [denialReason, setDenialReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -42,21 +42,16 @@ export default function AccessRequestsPage() {
     try {
       console.log('🔍 Fetching access requests...');
 
-      const { data, error } = await supabase
-        .from('access_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Use API route to fetch requests (bypasses RLS issues)
+      const response = await fetch('/api/access-requests/list');
+      const result = await response.json();
 
-      if (error) {
-        console.error('❌ Supabase error:', error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
-        throw error;
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch requests');
       }
 
-      console.log('✅ Fetched requests:', data);
-      setRequests(data || []);
+      console.log('✅ Fetched requests:', result.data);
+      setRequests(result.data || []);
     } catch (error: any) {
       console.error('❌ Error fetching requests:', error);
       alert(`Error loading access requests: ${error.message || 'Unknown error'}. Please check the console for details.`);
@@ -89,7 +84,7 @@ export default function AccessRequestsPage() {
       }
 
       // Success!
-      alert(`✅ ${result.message}\n\n${result.data.passwordResetSent ? 'A password reset email has been sent to the user.' : 'Note: Password reset email could not be sent. User may need to use "Forgot Password" flow.'}`);
+      alert(`Success: ${result.message}\n\n${result.data.passwordResetSent ? 'A password reset email has been sent to the user.' : 'Note: Password reset email could not be sent. User may need to use "Forgot Password" flow.'}`);
       setShowApprovalModal(false);
       setSelectedRequest(null);
       fetchRequests();
@@ -129,7 +124,7 @@ export default function AccessRequestsPage() {
         return;
       }
 
-      alert(`❌ ${result.message}`);
+      alert(`Denied: ${result.message}`);
       setShowApprovalModal(false);
       setSelectedRequest(null);
       setDenialReason('');
@@ -177,7 +172,7 @@ export default function AccessRequestsPage() {
 
           {user?.role === 'admin' && (
             <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg">
-              👑 ADMIN
+              ADMIN
             </div>
           )}
         </div>
@@ -371,7 +366,17 @@ export default function AccessRequestsPage() {
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Select Role (for approval)
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => setSelectedRole('apprentice')}
+                    className={`p-4 rounded-xl border-2 font-semibold transition-all ${
+                      selectedRole === 'apprentice'
+                        ? 'border-green-500 bg-green-50 text-green-700'
+                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    Apprentice
+                  </button>
                   <button
                     onClick={() => setSelectedRole('operator')}
                     className={`p-4 rounded-xl border-2 font-semibold transition-all ${
@@ -380,7 +385,7 @@ export default function AccessRequestsPage() {
                         : 'border-gray-300 text-gray-600 hover:border-gray-400'
                     }`}
                   >
-                    👷 Operator
+                    Operator
                   </button>
                   <button
                     onClick={() => setSelectedRole('admin')}
@@ -390,10 +395,48 @@ export default function AccessRequestsPage() {
                         : 'border-gray-300 text-gray-600 hover:border-gray-400'
                     }`}
                   >
-                    👑 Admin
+                    Admin
                   </button>
                 </div>
               </div>
+
+              {/* Admin Permissions */}
+              {selectedRole === 'admin' && (
+                <div className="mb-6 p-4 bg-purple-50 border-2 border-purple-200 rounded-xl">
+                  <label className="block text-sm font-semibold text-purple-900 mb-3">
+                    Select Admin Permissions
+                  </label>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'dispatch', label: 'Dispatch Scheduling' },
+                      { id: 'project-board', label: 'Project Status Board' },
+                      { id: 'analytics', label: 'Analytics' },
+                      { id: 'equipment', label: 'All Equipment' },
+                      { id: 'access-requests', label: 'Access Requests' },
+                      { id: 'team', label: 'Team Management' },
+                    ].map((perm) => (
+                      <label key={perm.id} className="flex items-center gap-3 p-2 hover:bg-purple-100 rounded-lg cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={adminPermissions.includes(perm.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAdminPermissions([...adminPermissions, perm.id]);
+                            } else {
+                              setAdminPermissions(adminPermissions.filter(p => p !== perm.id));
+                            }
+                          }}
+                          className="w-5 h-5 accent-purple-600"
+                        />
+                        <span className="text-gray-700 font-medium">{perm.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-purple-700 mt-3">
+                    Select which modules this admin can access
+                  </p>
+                </div>
+              )}
 
               {/* Denial Reason */}
               <div className="mb-6">

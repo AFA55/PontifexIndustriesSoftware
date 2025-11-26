@@ -1,7 +1,6 @@
 {
-  "/dashboard/admin/create-estimate/page": "app/dashboard/admin/create-estimate/page.js",
-  "/dashboard/admin/project-status-board/page": "app/dashboard/admin/project-status-board/page.js",
-  "/dashboard/admin/team-management/page": "app/dashboard/admin/team-management/page.js",
+  "/api/access-requests/list/route": "app/api/access-requests/list/route.js",
   "/login/page": "app/login/page.js",
-  "/dashboard/admin/dispatch-scheduling/page": "app/dashboard/admin/dispatch-scheduling/page.js"
+  "/request-access/page": "app/request-access/page.js",
+  "/dashboard/admin/access-requests/page": "app/dashboard/admin/access-requests/page.js"
 }

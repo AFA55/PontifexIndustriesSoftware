@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       .from('access_requests')
       .select('id, status')
       .eq('email', email.toLowerCase())
-      .single();
+      .maybeSingle();
 
     if (existingRequest) {
       if (existingRequest.status === 'pending') {
@@ -72,13 +72,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if user already exists in auth
-    const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers();
-    const userExists = existingUser.users.some(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    );
+    // Check if user already exists in profiles (more efficient than listing all auth users)
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .maybeSingle();
 
-    if (userExists) {
+    if (existingProfile) {
       return NextResponse.json(
         { error: 'An account with this email already exists. Please try logging in.' },
         { status: 409 }
