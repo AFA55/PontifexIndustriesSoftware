@@ -15,6 +15,7 @@ interface JobOrderForm {
   // Location
   location: string;
   address: string;
+  estimatedDriveTime: string; // Estimated drive time to location
 
   // Status & Priority
   status: 'scheduled' | 'in-route' | 'in-progress' | 'completed';
@@ -261,6 +262,7 @@ export default function DispatchScheduling() {
     jobTypes: [],
     location: '',
     address: '',
+    estimatedDriveTime: '',
     status: 'scheduled',
     priority: 'medium',
     startDate: new Date().toISOString().split('T')[0],
@@ -1250,6 +1252,19 @@ export default function DispatchScheduling() {
                     onChange={(e) => handleInputChange('address', e.target.value)}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
                     placeholder="e.g., 1199 PRINCE AVE, ATHENS, GA"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Estimated Drive Time
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.estimatedDriveTime}
+                    onChange={(e) => handleInputChange('estimatedDriveTime', e.target.value)}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                    placeholder="e.g., 45 mins, 1.5 hours"
                   />
                 </div>
               </div>
