@@ -362,7 +362,7 @@ export default function DispatchScheduling() {
   };
 
   // Check if basic info is complete
-  const isBasicInfoComplete = formData.title && formData.customer && formData.jobTypes.length > 0 && formData.priority;
+  const isBasicInfoComplete = formData.jobTypes.length > 0 && formData.priority;
 
   const handleInputChange = (field: keyof JobOrderForm, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -584,40 +584,8 @@ export default function DispatchScheduling() {
                 Basic Information
               </h2>
 
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid md:grid-cols-1 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Job Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.title}
-                    onChange={(e) => handleInputChange('title', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none transition-colors text-gray-900 font-medium"
-                    placeholder="e.g., PIEDMONT ATH."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Customer Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.customer}
-                    onChange={(e) => handleInputChange('customer', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none transition-colors text-gray-900 font-medium"
-                    placeholder="e.g., WHITEHAWK (CAM)"
-                    list="customer-names"
-                  />
-                  <datalist id="customer-names">
-                    {/* Customers will be populated here from database later */}
-                  </datalist>
-                </div>
-
-                <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Job Type(s) * <span className="text-gray-500 text-xs">(Select all that apply)</span>
                   </label>
@@ -1575,6 +1543,38 @@ export default function DispatchScheduling() {
               </h2>
 
               <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Job Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.title}
+                    onChange={(e) => handleInputChange('title', e.target.value)}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors text-gray-900 font-medium"
+                    placeholder="e.g., PIEDMONT ATH."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Customer Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.customer}
+                    onChange={(e) => handleInputChange('customer', e.target.value)}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors text-gray-900 font-medium"
+                    placeholder="e.g., WHITEHAWK (CAM)"
+                    list="customer-names"
+                  />
+                  <datalist id="customer-names">
+                    {/* Customers will be populated here from database later */}
+                  </datalist>
+                </div>
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Contact On Site *
