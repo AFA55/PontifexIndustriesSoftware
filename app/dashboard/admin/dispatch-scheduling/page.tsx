@@ -9,6 +9,7 @@ interface JobOrderForm {
   // Basic Info
   title: string;
   customer: string;
+  companyName: string; // Company name
   jobTypes: string[]; // Changed to array for multiple job types
 
   // Location
@@ -60,12 +61,13 @@ interface JobOrderForm {
   equipment: string[];
   requiredDocuments: string[]; // Array of document names that are required
 
-  // Job Site Info - Now includes contact on site
+  // Job Site Info - Now includes contact on site and GC
   jobSiteNumber: string;
   po: string;
   customerJobNumber: string;
   contactOnSite: string;
   contactPhone: string;
+  jobSiteGC: string; // General Contractor
 
   // Financial - Admin Only
   jobQuote?: number; // Price quoted for the job (admin only)
@@ -255,6 +257,7 @@ export default function DispatchScheduling() {
   const [formData, setFormData] = useState<JobOrderForm>({
     title: '',
     customer: '',
+    companyName: '',
     jobTypes: [],
     location: '',
     address: '',
@@ -276,6 +279,7 @@ export default function DispatchScheduling() {
     customerJobNumber: '',
     contactOnSite: '',
     contactPhone: '',
+    jobSiteGC: '',
     jobQuote: undefined // Admin only field
   });
 
@@ -583,7 +587,7 @@ export default function DispatchScheduling() {
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Job Title / Customer Name *
+                    Job Title *
                   </label>
                   <input
                     type="text"
@@ -591,7 +595,7 @@ export default function DispatchScheduling() {
                     value={formData.title}
                     onChange={(e) => handleInputChange('title', e.target.value)}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none transition-colors text-gray-900 font-medium"
-                    placeholder="e.g., WHITEHAWK (CAM) / PIEDMONT ATH."
+                    placeholder="e.g., PIEDMONT ATH."
                   />
                 </div>
 
@@ -606,7 +610,11 @@ export default function DispatchScheduling() {
                     onChange={(e) => handleInputChange('customer', e.target.value)}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none transition-colors text-gray-900 font-medium"
                     placeholder="e.g., WHITEHAWK (CAM)"
+                    list="customer-names"
                   />
+                  <datalist id="customer-names">
+                    {/* Customers will be populated here from database later */}
+                  </datalist>
                 </div>
 
                 <div className="md:col-span-2">
@@ -1632,6 +1640,32 @@ export default function DispatchScheduling() {
                     placeholder="Optional"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.companyName}
+                    onChange={(e) => handleInputChange('companyName', e.target.value)}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
+                    placeholder="e.g., ABC Construction"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Job Site GC (General Contractor)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.jobSiteGC}
+                    onChange={(e) => handleInputChange('jobSiteGC', e.target.value)}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
+                    placeholder="e.g., XYZ Contractors"
+                  />
+                </div>
               </div>
             </div>
             )}
@@ -1649,7 +1683,7 @@ export default function DispatchScheduling() {
                   <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                     Job Quote / Price
                     <span className="text-xs bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full font-bold">
-                      👑 ADMIN ONLY
+                      ADMIN ONLY
                     </span>
                   </h2>
                   <p className="text-sm text-gray-600">This information is only visible to administrators</p>

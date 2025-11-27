@@ -1,6 +1,7 @@
 {
-  "/api/access-requests/list/route": "app/api/access-requests/list/route.js",
   "/login/page": "app/login/page.js",
   "/request-access/page": "app/request-access/page.js",
-  "/dashboard/admin/access-requests/page": "app/dashboard/admin/access-requests/page.js"
+  "/dashboard/admin/access-requests/page": "app/dashboard/admin/access-requests/page.js",
+  "/dashboard/admin/page": "app/dashboard/admin/page.js",
+  "/dashboard/admin/dispatch-scheduling/page": "app/dashboard/admin/dispatch-scheduling/page.js"
 }
