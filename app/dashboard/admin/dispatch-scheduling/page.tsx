@@ -15,7 +15,8 @@ interface JobOrderForm {
   // Location
   location: string;
   address: string;
-  estimatedDriveTime: string; // Estimated drive time to location
+  estimatedDriveHours: number;
+  estimatedDriveMinutes: number;
 
   // Status & Priority
   status: 'scheduled' | 'in-route' | 'in-progress' | 'completed';
@@ -262,7 +263,8 @@ export default function DispatchScheduling() {
     jobTypes: [],
     location: '',
     address: '',
-    estimatedDriveTime: '',
+    estimatedDriveHours: 0,
+    estimatedDriveMinutes: 0,
     status: 'scheduled',
     priority: 'medium',
     startDate: new Date().toISOString().split('T')[0],
@@ -1259,13 +1261,35 @@ export default function DispatchScheduling() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Estimated Drive Time
                   </label>
-                  <input
-                    type="text"
-                    value={formData.estimatedDriveTime}
-                    onChange={(e) => handleInputChange('estimatedDriveTime', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
-                    placeholder="e.g., 45 mins, 1.5 hours"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Hours</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="24"
+                        value={formData.estimatedDriveHours}
+                        onChange={(e) => handleInputChange('estimatedDriveHours', parseInt(e.target.value) || 0)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-green-500 focus:outline-none transition-colors text-center font-semibold text-lg"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Minutes</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={formData.estimatedDriveMinutes}
+                        onChange={(e) => handleInputChange('estimatedDriveMinutes', parseInt(e.target.value) || 0)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-green-500 focus:outline-none transition-colors text-center font-semibold text-lg"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Total: {formData.estimatedDriveHours}h {formData.estimatedDriveMinutes}m
+                  </p>
                 </div>
               </div>
             </div>
