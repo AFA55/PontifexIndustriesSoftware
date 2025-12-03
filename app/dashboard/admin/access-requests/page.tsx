@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getCurrentUser, type User } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 
 interface AccessRequest {
   id: string;
@@ -20,7 +20,8 @@ interface AccessRequest {
 }
 
 export default function AccessRequestsPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'denied'>('pending');
@@ -32,8 +33,22 @@ export default function AccessRequestsPage() {
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
+    const initUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        // Get user role from profiles
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (profile) {
+          setUserRole(profile.role);
+        }
+      }
+    };
+    initUser();
     fetchRequests();
   }, []);
 
@@ -60,7 +75,7 @@ export default function AccessRequestsPage() {
     }
   };
 
-  const handleApprove = async (request: AccessRequest, role: 'admin' | 'operator') => {
+  const handleApprove = async (request: AccessRequest, role: 'admin' | 'operator' | 'apprentice') => {
     setProcessing(true);
     try {
       // Call API route to approve request and create user
@@ -71,7 +86,7 @@ export default function AccessRequestsPage() {
         },
         body: JSON.stringify({
           role: role,
-          reviewedBy: user?.id,
+          reviewedBy: userId,
         }),
       });
 
@@ -112,7 +127,7 @@ export default function AccessRequestsPage() {
         },
         body: JSON.stringify({
           denialReason: denialReason,
-          reviewedBy: user?.id,
+          reviewedBy: userId,
         }),
       });
 
@@ -170,7 +185,7 @@ export default function AccessRequestsPage() {
             </div>
           </div>
 
-          {user?.role === 'admin' && (
+          {userRole === 'admin' && (
             <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg">
               ADMIN
             </div>

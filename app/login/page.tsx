@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { checkCredentials } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -33,22 +33,47 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const result = await checkCredentials(data.email, data.password);
+      // Call our custom login API that bypasses RLS
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+        }),
+      });
 
-      if (result.success && result.user) {
-        console.log('✅ Login successful, redirecting based on role...');
+      const result = await response.json();
 
-        // Redirect based on user role
-        if (result.user.role === 'admin') {
-          console.log('🔑 Admin user, redirecting to admin dashboard...');
-          router.push('/dashboard/admin');
-        } else {
-          console.log('👤 Operator user, redirecting to operator dashboard...');
-          router.push('/dashboard');
-        }
-      } else {
+      if (!response.ok || !result.success) {
         console.log('❌ Login failed:', result.error);
         setError(result.error || 'Login failed');
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Login successful!');
+      console.log('👤 User:', result.user);
+
+      // Set the session in the client
+      if (result.session) {
+        await supabase.auth.setSession({
+          access_token: result.session.access_token,
+          refresh_token: result.session.refresh_token,
+        });
+      }
+
+      // Redirect based on user role
+      if (result.user.role === 'admin') {
+        console.log('🔑 Admin user, redirecting to admin dashboard...');
+        router.push('/dashboard/admin');
+      } else if (result.user.role === 'operator' || result.user.role === 'apprentice') {
+        console.log('👤 Operator/Apprentice user, redirecting to operator dashboard...');
+        router.push('/dashboard');
+      } else {
+        setError('Invalid user role');
       }
     } catch (err: any) {
       console.error('💥 Unexpected login error:', err);

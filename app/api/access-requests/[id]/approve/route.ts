@@ -9,17 +9,17 @@ import bcrypt from 'bcryptjs';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { role, reviewedBy } = body;
 
     // Validation
-    if (!role || !['admin', 'operator'].includes(role)) {
+    if (!role || !['admin', 'operator', 'apprentice'].includes(role)) {
       return NextResponse.json(
-        { error: 'Invalid role. Must be "admin" or "operator"' },
+        { error: 'Invalid role. Must be "admin", "operator", or "apprentice"' },
         { status: 400 }
       );
     }
@@ -63,52 +63,94 @@ export async function POST(
     // OR better: use a password reset flow
     // For now, let's generate a random password and mark the account for password reset
 
-    const temporaryPassword = generateSecurePassword();
+    // Step 1: Check if user already exists in Supabase Auth
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users.find(u => u.email === accessRequest.email);
 
-    // Step 1: Create user in Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: accessRequest.email,
-      password: temporaryPassword,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: {
-        full_name: accessRequest.full_name,
-        position: accessRequest.position,
-        date_of_birth: accessRequest.date_of_birth,
-      },
-    });
+    let userId: string;
 
-    if (authError || !authData.user) {
-      console.error('Error creating auth user:', authError);
-      return NextResponse.json(
-        { error: `Failed to create user account: ${authError?.message}` },
-        { status: 500 }
-      );
+    if (existingUser) {
+      // User already exists in Auth, just use their ID
+      console.log(`User ${accessRequest.email} already exists in Auth, using existing account`);
+      userId = existingUser.id;
+    } else {
+      // Create new user in Supabase Auth
+      const temporaryPassword = generateSecurePassword();
+
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: accessRequest.email,
+        password: temporaryPassword,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          full_name: accessRequest.full_name,
+          position: accessRequest.position,
+          date_of_birth: accessRequest.date_of_birth,
+        },
+      });
+
+      if (authError || !authData.user) {
+        console.error('Error creating auth user:', authError);
+        return NextResponse.json(
+          { error: `Failed to create user account: ${authError?.message}` },
+          { status: 500 }
+        );
+      }
+
+      userId = authData.user.id;
     }
 
-    // Step 2: Create profile
-    const { error: profileError } = await supabaseAdmin
+    // Step 2: Check if profile already exists, if not create it
+    const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
-      .insert([
-        {
-          id: authData.user.id,
-          email: accessRequest.email,
-          full_name: accessRequest.full_name,
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (existingProfile) {
+      // Profile exists, update it with the new role
+      const { error: updateProfileError } = await supabaseAdmin
+        .from('profiles')
+        .update({
           role: role,
-          phone: '',
           active: true,
-        },
-      ]);
+        })
+        .eq('id', userId);
 
-    if (profileError) {
-      console.error('Error creating profile:', profileError);
+      if (updateProfileError) {
+        console.error('Error updating profile:', updateProfileError);
+        return NextResponse.json(
+          { error: `Failed to update user profile: ${updateProfileError.message}` },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Create new profile
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            email: accessRequest.email,
+            full_name: accessRequest.full_name,
+            role: role,
+            phone: '',
+            active: true,
+          },
+        ]);
 
-      // Rollback: Delete the auth user if profile creation fails
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
 
-      return NextResponse.json(
-        { error: `Failed to create user profile: ${profileError.message}` },
-        { status: 500 }
-      );
+        // Rollback: Delete the auth user if profile creation fails (only if we just created it)
+        if (!existingUser) {
+          await supabaseAdmin.auth.admin.deleteUser(userId);
+        }
+
+        return NextResponse.json(
+          { error: `Failed to create user profile: ${profileError.message}` },
+          { status: 500 }
+        );
+      }
     }
 
     // Step 3: Update access request status
@@ -142,12 +184,15 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-        message: `Access approved! User ${accessRequest.full_name} has been created as ${role}.`,
+        message: existingProfile
+          ? `Access approved! User ${accessRequest.full_name} role updated to ${role}.`
+          : `Access approved! User ${accessRequest.full_name} has been created as ${role}.`,
         data: {
-          userId: authData.user.id,
+          userId: userId,
           email: accessRequest.email,
           role: role,
           passwordResetSent: !resetError,
+          wasExistingUser: !!existingUser,
         },
       },
       { status: 200 }

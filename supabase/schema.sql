@@ -181,6 +181,36 @@ CREATE TABLE public.job_updates (
   metadata JSONB -- For flexible data like photo URLs, measurements, etc.
 );
 
+-- Customer job titles (for autocomplete suggestions)
+CREATE TABLE public.customer_job_titles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  usage_count INTEGER DEFAULT 1,
+  last_used_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT unique_customer_job_title UNIQUE (LOWER(title))
+);
+
+-- Company names (for autocomplete suggestions)
+CREATE TABLE public.company_names (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  usage_count INTEGER DEFAULT 1,
+  last_used_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT unique_company_name UNIQUE (LOWER(name))
+);
+
+-- General contractors (for autocomplete suggestions)
+CREATE TABLE public.general_contractors (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  usage_count INTEGER DEFAULT 1,
+  last_used_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT unique_gc_name UNIQUE (LOWER(name))
+);
+
 -- =====================================================
 -- 4. BLADES & BITS TRACKING
 -- =====================================================
@@ -289,15 +319,63 @@ CREATE TABLE public.operator_performance (
 -- 6. DOCUMENTS & SAFETY FORMS
 -- =====================================================
 
-CREATE TABLE public.required_documents (
+-- Enhanced job documents table
+CREATE TABLE public.job_documents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  job_id UUID REFERENCES public.jobs(id) ON DELETE CASCADE,
-  document_type TEXT NOT NULL,
-  completed BOOLEAN DEFAULT false,
+  job_id UUID REFERENCES public.jobs(id) ON DELETE CASCADE NOT NULL,
+  document_template_id TEXT NOT NULL, -- References document ID from document-types.ts
+  document_name TEXT NOT NULL,
+  document_category TEXT NOT NULL CHECK (document_category IN ('safety', 'compliance', 'operational', 'quality', 'administrative')),
+
+  -- Completion tracking
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'not_applicable')),
   completed_by UUID REFERENCES public.profiles(id),
   completed_at TIMESTAMPTZ,
-  file_url TEXT,
+
+  -- Form data (stored as JSONB for flexibility)
+  form_data JSONB DEFAULT '{}',
+
+  -- Signatures
+  operator_signature_url TEXT,
+  operator_signature_date TIMESTAMPTZ,
+  supervisor_signature_url TEXT,
+  supervisor_signature_date TIMESTAMPTZ,
+  customer_signature_url TEXT,
+  customer_signature_date TIMESTAMPTZ,
+
+  -- Photos
+  photo_urls TEXT[], -- Array of photo URLs
+
+  -- File attachments
+  file_urls TEXT[], -- Array of file URLs
+
+  -- Notes and comments
   notes TEXT,
+  admin_notes TEXT, -- Admin-only notes
+
+  -- Metadata
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id)
+);
+
+-- Document history table for audit trail
+CREATE TABLE public.document_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  document_id UUID REFERENCES public.job_documents(id) ON DELETE CASCADE NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('created', 'updated', 'completed', 'reopened', 'status_changed')),
+  action_by UUID REFERENCES public.profiles(id) NOT NULL,
+  action_date TIMESTAMPTZ DEFAULT NOW(),
+  changes JSONB, -- Stores what changed
+  notes TEXT
+);
+
+-- Document comments table
+CREATE TABLE public.document_comments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  document_id UUID REFERENCES public.job_documents(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) NOT NULL,
+  comment TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -355,11 +433,16 @@ ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.job_type_details ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.job_status_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.job_updates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customer_job_titles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.company_names ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.general_contractors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.blades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.blade_usage_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.analytics_daily ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operator_performance ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.required_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.job_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.document_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.document_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- =====================================================
@@ -468,6 +551,60 @@ CREATE POLICY "Operators can view own performance"
   USING (operator_id = auth.uid());
 
 -- =====================================================
+-- JOB DOCUMENTS POLICIES
+-- =====================================================
+
+-- All authenticated users can view documents
+CREATE POLICY "All authenticated users can view job documents"
+  ON public.job_documents FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+-- Admins can insert documents
+CREATE POLICY "Admins can insert job documents"
+  ON public.job_documents FOR INSERT
+  WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+-- Admins and assigned operators can update documents
+CREATE POLICY "Admins and operators can update job documents"
+  ON public.job_documents FOR UPDATE
+  USING (
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
+    OR
+    auth.uid() IN (
+      SELECT UNNEST(technicians) FROM public.jobs WHERE id = job_id
+    )
+  );
+
+-- Admins can delete documents
+CREATE POLICY "Admins can delete job documents"
+  ON public.job_documents FOR DELETE
+  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+-- =====================================================
+-- DOCUMENT HISTORY POLICIES
+-- =====================================================
+
+CREATE POLICY "All authenticated users can view document history"
+  ON public.document_history FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "All authenticated users can insert document history"
+  ON public.document_history FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- =====================================================
+-- DOCUMENT COMMENTS POLICIES
+-- =====================================================
+
+CREATE POLICY "All authenticated users can view document comments"
+  ON public.document_comments FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "All authenticated users can insert document comments"
+  ON public.document_comments FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+-- =====================================================
 -- NOTIFICATIONS POLICIES
 -- =====================================================
 
@@ -478,6 +615,54 @@ CREATE POLICY "Users can view own notifications"
 CREATE POLICY "Users can update own notifications"
   ON public.notifications FOR UPDATE
   USING (user_id = auth.uid());
+
+-- =====================================================
+-- CUSTOMER JOB TITLES POLICIES
+-- =====================================================
+
+CREATE POLICY "All authenticated users can view customer job titles"
+  ON public.customer_job_titles FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Admins can insert customer job titles"
+  ON public.customer_job_titles FOR INSERT
+  WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+CREATE POLICY "Admins can update customer job titles"
+  ON public.customer_job_titles FOR UPDATE
+  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+-- =====================================================
+-- COMPANY NAMES POLICIES
+-- =====================================================
+
+CREATE POLICY "All authenticated users can view company names"
+  ON public.company_names FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Admins can insert company names"
+  ON public.company_names FOR INSERT
+  WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+CREATE POLICY "Admins can update company names"
+  ON public.company_names FOR UPDATE
+  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+-- =====================================================
+-- GENERAL CONTRACTORS POLICIES
+-- =====================================================
+
+CREATE POLICY "All authenticated users can view general contractors"
+  ON public.general_contractors FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Admins can insert general contractors"
+  ON public.general_contractors FOR INSERT
+  WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+CREATE POLICY "Admins can update general contractors"
+  ON public.general_contractors FOR UPDATE
+  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
 
 -- =====================================================
 -- FUNCTIONS & TRIGGERS

@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AdminProtection from '@/components/AdminProtection';
+import { supabase } from '@/lib/supabase';
+import { documentTemplates, documentCategories, type DocumentTemplate } from '@/lib/document-types';
 
 interface JobOrderForm {
   // Basic Info
@@ -102,31 +104,8 @@ const commonEquipment = [
   'Generator'
 ];
 
-const operators = [
-  'ANDRES GUERRERO-C',
-  'CARLOS MARTINEZ',
-  'MIGUEL RODRIGUEZ',
-  'JOSE HERNANDEZ',
-  'LUIS GARCIA',
-  'JUAN LOPEZ'
-];
-
-const salesmen = [
-  'CAMERON AMOS',
-  'SARAH JONES',
-  'MICHAEL SMITH',
-  'JENNIFER WILSON'
-];
-
-// Available documents that can be required for a job
-const availableDocuments = [
-  'JSA Form (Job Safety Analysis)',
-  'Silica Dust/Exposure Control Plan',
-  'Permit to Work',
-  'Hot Work Permit',
-  'Confined Space Entry Permit',
-  'Site-Specific Safety Plan'
-];
+// Operators and salesmen will be fetched from database
+// const operators and salesmen removed - now fetched dynamically
 
 // Available core drilling locations
 const coreDrillingLocations = [
@@ -256,6 +235,20 @@ export default function DispatchScheduling() {
   const [equipmentSearch, setEquipmentSearch] = useState('');
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState(false);
 
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdJobId, setCreatedJobId] = useState('');
+
+  // Team members from database
+  const [operators, setOperators] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [admins, setAdmins] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [loadingTeam, setLoadingTeam] = useState(true);
+
+  // Autocomplete suggestions
+  const [jobTitleSuggestions, setJobTitleSuggestions] = useState<string[]>([]);
+  const [companyNameSuggestions, setCompanyNameSuggestions] = useState<string[]>([]);
+  const [gcSuggestions, setGcSuggestions] = useState<string[]>([]);
+
   const [formData, setFormData] = useState<JobOrderForm>({
     title: '',
     customer: '',
@@ -286,6 +279,113 @@ export default function DispatchScheduling() {
     jobSiteGC: '',
     jobQuote: undefined // Admin only field
   });
+
+  // Fetch team members and autocomplete suggestions from database
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch operators (role = 'operator')
+        const { data: operatorData, error: operatorError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('role', 'operator')
+          .eq('active', true)
+          .order('full_name');
+
+        if (operatorError) {
+          console.error('Error fetching operators:', operatorError);
+        } else if (operatorData) {
+          setOperators(operatorData);
+        }
+
+        // Fetch admins (role = 'admin') for salesman field
+        const { data: adminData, error: adminError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('role', 'admin')
+          .eq('active', true)
+          .order('full_name');
+
+        if (adminError) {
+          console.error('Error fetching admins:', adminError);
+        } else if (adminData) {
+          setAdmins(adminData);
+        }
+
+        setLoadingTeam(false);
+
+        // Fetch customer job titles
+        const { data: titles } = await supabase
+          .from('customer_job_titles')
+          .select('title')
+          .order('usage_count', { ascending: false })
+          .limit(20);
+
+        if (titles) {
+          setJobTitleSuggestions(titles.map(t => t.title));
+        }
+
+        // Fetch company names
+        const { data: companies } = await supabase
+          .from('company_names')
+          .select('name')
+          .order('usage_count', { ascending: false })
+          .limit(20);
+
+        if (companies) {
+          setCompanyNameSuggestions(companies.map(c => c.name));
+        }
+
+        // Fetch general contractors
+        const { data: gcs } = await supabase
+          .from('general_contractors')
+          .select('name')
+          .order('usage_count', { ascending: false })
+          .limit(20);
+
+        if (gcs) {
+          setGcSuggestions(gcs.map(g => g.name));
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setLoadingTeam(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Function to save a new suggestion to the database
+  const saveSuggestion = async (table: string, field: string, value: string) => {
+    if (!value.trim()) return;
+
+    try {
+      // Check if it already exists
+      const { data: existing } = await supabase
+        .from(table)
+        .select('id, usage_count')
+        .ilike(field, value)
+        .single();
+
+      if (existing) {
+        // Update usage count and last used date
+        await supabase
+          .from(table)
+          .update({
+            usage_count: existing.usage_count + 1,
+            last_used_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+      } else {
+        // Insert new entry
+        await supabase
+          .from(table)
+          .insert({ [field]: value });
+      }
+    } catch (error) {
+      console.error(`Error saving ${table} suggestion:`, error);
+    }
+  };
 
   // Generate description based on selected job types and their details
   const generateDescription = () => {
@@ -457,15 +557,25 @@ export default function DispatchScheduling() {
     // In production, this would save to database
     console.log('Creating job order:', { ...formData, description: fullDescription, id: jobId });
 
-    alert(`Job Order #${jobId} created successfully!\n\nJob Types: ${formData.jobTypes.join(', ')}\nAssigned to: ${formData.technicians.join(', ')}`);
+    // Show success modal
+    setCreatedJobId(jobId);
+    setShowSuccessModal(true);
+
+    // Auto-redirect to dashboard after 3 seconds
+    setTimeout(() => {
+      router.push('/dashboard/admin');
+    }, 3000);
 
     // Reset form
     setFormData({
       title: '',
       customer: '',
+      companyName: '',
       jobTypes: [],
       location: '',
       address: '',
+      estimatedDriveHours: 0,
+      estimatedDriveMinutes: 0,
       status: 'scheduled',
       priority: 'medium',
       startDate: new Date().toISOString().split('T')[0],
@@ -483,7 +593,9 @@ export default function DispatchScheduling() {
       po: '',
       customerJobNumber: '',
       contactOnSite: '',
-      contactPhone: ''
+      contactPhone: '',
+      jobSiteGC: '',
+      jobQuote: undefined
     });
   };
 
@@ -515,6 +627,27 @@ export default function DispatchScheduling() {
         select:disabled {
           color: #6b7280 !important;
           background-color: #f3f4f6 !important;
+        }
+        /* Modal animations */
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+        .animate-slideUp {
+          animation: slideUp 0.3s ease-out;
         }
       `}</style>
 
@@ -1385,44 +1518,64 @@ export default function DispatchScheduling() {
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
                     Assign Operator/Technician(s) * <span className="text-gray-500 text-xs">(Select all that apply)</span>
                   </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {operators.map(op => (
-                      <button
-                        key={op}
-                        type="button"
-                        onClick={() => toggleOperator(op)}
-                        className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-200 border-2 ${
-                          formData.technicians.includes(op)
-                            ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white border-purple-600 shadow-lg'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 hover:border-gray-400'
-                        }`}
-                      >
-                        {op}
-                      </button>
-                    ))}
-                  </div>
-                  {formData.technicians.length > 0 && (
-                    <p className="text-sm text-green-600 mt-2 font-medium">
-                      Selected: {formData.technicians.join(', ')}
-                    </p>
+                  {loadingTeam ? (
+                    <div className="text-center py-8">
+                      <div className="inline-block w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                      <p className="text-sm text-gray-500 mt-2">Loading operators...</p>
+                    </div>
+                  ) : operators.length === 0 ? (
+                    <div className="text-center py-8 bg-yellow-50 rounded-xl border-2 border-yellow-200">
+                      <p className="text-sm text-yellow-700 font-medium">No operators found</p>
+                      <p className="text-xs text-yellow-600 mt-1">Please add operators with the "operator" role in the system</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {operators.map(op => (
+                          <button
+                            key={op.id}
+                            type="button"
+                            onClick={() => toggleOperator(op.id)}
+                            className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-200 border-2 ${
+                              formData.technicians.includes(op.id)
+                                ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white border-purple-600 shadow-lg'
+                                : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 hover:border-gray-400'
+                            }`}
+                          >
+                            {op.full_name}
+                          </button>
+                        ))}
+                      </div>
+                      {formData.technicians.length > 0 && (
+                        <p className="text-sm text-green-600 mt-2 font-medium">
+                          Selected: {formData.technicians.map(id => operators.find(o => o.id === id)?.full_name).filter(Boolean).join(', ')}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Salesman *
+                    Salesman/Admin *
                   </label>
-                  <select
-                    required
-                    value={formData.salesman}
-                    onChange={(e) => handleInputChange('salesman', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors"
-                  >
-                    <option value="">Select salesman...</option>
-                    {salesmen.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  {loadingTeam ? (
+                    <div className="text-center py-4">
+                      <div className="inline-block w-6 h-6 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                    </div>
+                  ) : (
+                    <select
+                      required
+                      value={formData.salesman}
+                      onChange={(e) => handleInputChange('salesman', e.target.value)}
+                      className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors"
+                    >
+                      <option value="">Select salesman/admin...</option>
+                      {admins.map(admin => (
+                        <option key={admin.id} value={admin.full_name}>{admin.full_name}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
             </div>
@@ -1578,22 +1731,29 @@ export default function DispatchScheduling() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
                 </div>
-                Jobsite Information
+                Job Information
               </h2>
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Job Title *
+                    Customer Job Title *
                   </label>
                   <input
                     type="text"
                     required
                     value={formData.title}
                     onChange={(e) => handleInputChange('title', e.target.value)}
+                    onBlur={(e) => saveSuggestion('customer_job_titles', 'title', e.target.value)}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors text-gray-900 font-medium"
                     placeholder="e.g., PIEDMONT ATH."
+                    list="job-title-suggestions"
                   />
+                  <datalist id="job-title-suggestions">
+                    {jobTitleSuggestions.map((suggestion, idx) => (
+                      <option key={idx} value={suggestion} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
@@ -1643,19 +1803,6 @@ export default function DispatchScheduling() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Job Site Number
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.jobSiteNumber}
-                    onChange={(e) => handleInputChange('jobSiteNumber', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
-                    placeholder="Optional"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     PO Number
                   </label>
                   <input
@@ -1669,14 +1816,14 @@ export default function DispatchScheduling() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Customer Job Number
+                    Customer Phone Number
                   </label>
                   <input
-                    type="text"
+                    type="tel"
                     value={formData.customerJobNumber}
                     onChange={(e) => handleInputChange('customerJobNumber', e.target.value)}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
-                    placeholder="Optional"
+                    placeholder="Enter customer phone..."
                   />
                 </div>
 
@@ -1688,9 +1835,16 @@ export default function DispatchScheduling() {
                     type="text"
                     value={formData.companyName}
                     onChange={(e) => handleInputChange('companyName', e.target.value)}
+                    onBlur={(e) => saveSuggestion('company_names', 'name', e.target.value)}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
                     placeholder="e.g., ABC Construction"
+                    list="company-name-suggestions"
                   />
+                  <datalist id="company-name-suggestions">
+                    {companyNameSuggestions.map((suggestion, idx) => (
+                      <option key={idx} value={suggestion} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
@@ -1701,9 +1855,16 @@ export default function DispatchScheduling() {
                     type="text"
                     value={formData.jobSiteGC}
                     onChange={(e) => handleInputChange('jobSiteGC', e.target.value)}
+                    onBlur={(e) => saveSuggestion('general_contractors', 'name', e.target.value)}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
                     placeholder="e.g., XYZ Contractors"
+                    list="gc-suggestions"
                   />
+                  <datalist id="gc-suggestions">
+                    {gcSuggestions.map((suggestion, idx) => (
+                      <option key={idx} value={suggestion} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
             </div>
@@ -1767,45 +1928,69 @@ export default function DispatchScheduling() {
                 Required Documents
               </h2>
 
-              <p className="text-sm text-gray-600 mb-4">
-                Select all documents that must be completed for this job. Operators and team members will be required to fill these out.
+              <p className="text-sm text-gray-600 mb-6">
+                Select all documents that must be completed for this job. Operators will be required to fill these out. Documents are organized by category.
               </p>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                {availableDocuments.map(doc => (
-                  <button
-                    key={doc}
-                    type="button"
-                    onClick={() => toggleDocument(doc)}
-                    className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
-                      formData.requiredDocuments.includes(doc)
-                        ? 'bg-emerald-50 border-emerald-400 shadow-lg shadow-emerald-200'
-                        : 'bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                        formData.requiredDocuments.includes(doc)
-                          ? 'bg-emerald-500 border-emerald-500'
-                          : 'bg-white border-gray-300'
-                      }`}>
-                        {formData.requiredDocuments.includes(doc) && (
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className={`font-bold text-sm ${
-                          formData.requiredDocuments.includes(doc) ? 'text-emerald-800' : 'text-gray-800'
-                        }`}>
-                          {doc}
-                        </h4>
-                      </div>
+              {/* Document Categories */}
+              {documentCategories.map(category => {
+                const categoryDocs = documentTemplates.filter(doc => doc.category === category.id);
+
+                return (
+                  <div key={category.id} className="mb-6">
+                    <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full bg-${category.color}-500`}></div>
+                      {category.name}
+                    </h3>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {categoryDocs.map(doc => (
+                        <button
+                          key={doc.id}
+                          type="button"
+                          onClick={() => toggleDocument(doc.id)}
+                          className={`p-3 rounded-xl border-2 transition-all duration-200 text-left ${
+                            formData.requiredDocuments.includes(doc.id)
+                              ? 'bg-emerald-50 border-emerald-400 shadow-md'
+                              : 'bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                              formData.requiredDocuments.includes(doc.id)
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'bg-white border-gray-300'
+                            }`}>
+                              {formData.requiredDocuments.includes(doc.id) && (
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <h4 className={`font-semibold text-xs ${
+                                formData.requiredDocuments.includes(doc.id) ? 'text-emerald-800' : 'text-gray-800'
+                              }`}>
+                                {doc.name}
+                              </h4>
+                              <p className="text-xs text-gray-500 mt-0.5">{doc.description}</p>
+                              {doc.requiresSignature && (
+                                <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                  Signature Required
+                                </span>
+                              )}
+                              {doc.requiresPhoto && (
+                                <span className="inline-block mt-1 ml-1 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                                  Photo Required
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                );
+              })}
 
               {formData.requiredDocuments.length > 0 && (
                 <div className="mt-4 p-4 bg-emerald-50 rounded-xl border-2 border-emerald-200">
@@ -1813,9 +1998,10 @@ export default function DispatchScheduling() {
                     {formData.requiredDocuments.length} document(s) required:
                   </p>
                   <ul className="text-sm text-emerald-700 space-y-1">
-                    {formData.requiredDocuments.map(doc => (
-                      <li key={doc}>• {doc}</li>
-                    ))}
+                    {formData.requiredDocuments.map(docId => {
+                      const doc = documentTemplates.find(t => t.id === docId);
+                      return doc ? <li key={docId}>• {doc.name}</li> : null;
+                    })}
                   </ul>
                 </div>
               )}
@@ -1859,6 +2045,77 @@ export default function DispatchScheduling() {
           </div>
         )}
       </div>
+
+      {/* Modern Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4 animate-slideUp">
+            {/* Success Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center animate-bounce">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Success Message */}
+            <h2 className="text-3xl font-bold text-center text-gray-800 mb-3">
+              Job Created Successfully!
+            </h2>
+
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-4 mb-6 border-2 border-green-200">
+              <p className="text-center text-sm text-gray-600 mb-2">Job Order Number</p>
+              <p className="text-center text-3xl font-bold text-green-600">
+                #{createdJobId}
+              </p>
+            </div>
+
+            <div className="space-y-2 mb-6">
+              <div className="flex items-center gap-2 text-gray-700">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm">Job ticket created</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-700">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm">Operators assigned</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-700">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm">Documents assigned</span>
+              </div>
+            </div>
+
+            <p className="text-center text-sm text-gray-500 mb-6">
+              Redirecting to dashboard in 3 seconds...
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => router.push('/dashboard/admin')}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+              >
+                Go to Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setActiveTab('create');
+                }}
+                className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all duration-300"
+              >
+                Create Another
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </AdminProtection>
   );
