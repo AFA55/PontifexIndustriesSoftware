@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { sendEmail, generateApprovalEmail } from '@/lib/email';
 import bcrypt from 'bcryptjs';
 
 export async function POST(
@@ -181,6 +182,24 @@ export async function POST(
       // Non-critical error, user account is still created
     }
 
+    // Step 5: Send approval confirmation email with login button
+    const approvalEmailHtml = generateApprovalEmail(
+      accessRequest.full_name,
+      accessRequest.email,
+      role
+    );
+
+    const emailSent = await sendEmail({
+      to: accessRequest.email,
+      subject: 'Access Approved - Pontifex Industries 🎉',
+      html: approvalEmailHtml,
+    });
+
+    if (!emailSent) {
+      console.warn('Could not send approval confirmation email');
+      // Non-critical error, user account is still created
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -192,6 +211,7 @@ export async function POST(
           email: accessRequest.email,
           role: role,
           passwordResetSent: !resetError,
+          approvalEmailSent: emailSent,
           wasExistingUser: !!existingUser,
         },
       },

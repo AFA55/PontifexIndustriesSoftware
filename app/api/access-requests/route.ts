@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { sendEmail, generateAccessRequestReceivedEmail } from '@/lib/email';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
     const { fullName, email, password, dateOfBirth, position } = body;
 
     // Validation
-    if (!fullName || !email || !password || !dateOfBirth || !position) {
+    if (!fullName || !email || !password || !dateOfBirth) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
           email: email.toLowerCase(),
           password_hash: passwordHash,
           date_of_birth: dateOfBirth,
-          position: position,
+          position: position || 'Not specified', // Default if not provided
           status: 'pending',
         },
       ])
@@ -114,6 +115,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Send confirmation email to the user
+    const confirmationEmailHtml = generateAccessRequestReceivedEmail(
+      fullName,
+      email
+    );
+
+    const emailSent = await sendEmail({
+      to: email,
+      subject: 'Access Request Received - Pontifex Industries',
+      html: confirmationEmailHtml,
+    });
+
+    if (!emailSent) {
+      console.warn('⚠️ Could not send confirmation email to user');
+      // Non-critical - still return success since request was created
+    } else {
+      console.log('✅ Confirmation email sent to:', email);
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -122,6 +142,7 @@ export async function POST(request: NextRequest) {
           id: data.id,
           email: data.email,
           status: data.status,
+          confirmationEmailSent: emailSent,
         },
       },
       { status: 201 }
