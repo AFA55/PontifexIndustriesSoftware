@@ -3,9 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { Wrench, Disc, Truck, Shield, Package, Layers } from 'lucide-react';
+import { OperatorSelect } from '@/components/ui/OperatorSelect';
 
-type EquipmentType = 'tool' | 'blade' | 'vehicle' | 'safety' | 'other';
+type EquipmentType = 'tool' | 'blade' | 'bit' | 'vehicle' | 'safety' | 'other';
 type EquipmentStatus = 'available' | 'in_use' | 'maintenance' | 'retired';
+type BladeType = 'wall_saw' | 'slab_saw' | 'flush_cut' | 'handsaw';
 
 interface Equipment {
   id: string;
@@ -22,6 +25,10 @@ interface Equipment {
   totalUsage?: number;
   purchaseDate: string;
   notes?: string;
+  // Blade/Bit specific fields
+  bladeType?: BladeType;
+  bitSize?: string; // For core drill bits (e.g., "1", "2", "4", "6")
+  qrCode?: string; // Optional QR code for tracking multiple items of same type
 }
 
 export default function AllEquipmentPage() {
@@ -52,6 +59,9 @@ export default function AllEquipmentPage() {
     location: string;
     purchaseDate: string;
     notes: string;
+    bladeType?: BladeType;
+    bitSize?: string;
+    qrCode?: string;
   }
 
   const [newEquipmentForm, setNewEquipmentForm] = useState<NewEquipmentForm>({
@@ -64,123 +74,63 @@ export default function AllEquipmentPage() {
     assignedTo: '',
     location: '',
     purchaseDate: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
+    bladeType: undefined,
+    bitSize: undefined,
+    qrCode: ''
   });
 
-  // Mock data - in production, this would come from database
-  const [equipment, setEquipment] = useState<Equipment[]>([
-    {
-      id: '1',
-      name: 'Wall Saw - Husqvarna 24"',
-      type: 'blade',
-      brand: 'Husqvarna',
-      model: 'WS-440',
-      serialNumber: 'HV-WS-001',
-      status: 'in_use',
-      assignedTo: 'ANDRES GUERRERO-C',
-      assignedToRole: 'operator',
-      location: 'Job Site: Downtown Plaza',
-      lastUsed: '2024-11-16',
-      totalUsage: 2450,
-      purchaseDate: '2024-01-15'
-    },
-    {
-      id: '2',
-      name: 'Core Drill - Hilti 4"',
-      type: 'blade',
-      brand: 'Hilti',
-      model: 'DD130',
-      serialNumber: 'HI-CD-002',
-      status: 'in_use',
-      assignedTo: 'CARLOS MARTINEZ',
-      assignedToRole: 'operator',
-      location: 'Job Site: Harbor Construction',
-      lastUsed: '2024-11-15',
-      totalUsage: 840,
-      purchaseDate: '2024-02-10'
-    },
-    {
-      id: '3',
-      name: 'Hand Saw - Stihl 20"',
-      type: 'blade',
-      brand: 'Stihl',
-      model: 'TS420',
-      serialNumber: 'ST-HS-003',
-      status: 'maintenance',
-      location: 'Maintenance Bay',
-      lastUsed: '2024-11-10',
-      totalUsage: 3100,
-      purchaseDate: '2023-11-20',
-      notes: 'Scheduled maintenance - blade replacement needed'
-    },
-    {
-      id: '4',
-      name: 'Concrete Saw',
-      type: 'tool',
-      brand: 'DeWalt',
-      model: 'DCS450B',
-      serialNumber: 'DW-CS-004',
-      status: 'available',
-      location: 'Tool Shed A',
-      purchaseDate: '2024-03-01'
-    },
-    {
-      id: '5',
-      name: 'Angle Grinder',
-      type: 'tool',
-      brand: 'Makita',
-      model: '9557PBX1',
-      serialNumber: 'MK-AG-005',
-      status: 'in_use',
-      assignedTo: 'MIKE JOHNSON',
-      assignedToRole: 'operator',
-      location: 'Job Site: Riverside Building',
-      lastUsed: '2024-11-16',
-      purchaseDate: '2024-01-05'
-    },
-    {
-      id: '6',
-      name: 'Safety Harness Set',
-      type: 'safety',
-      brand: 'Miller',
-      model: 'T7500',
-      serialNumber: 'ML-SH-006',
-      status: 'in_use',
-      assignedTo: 'ANDRES GUERRERO-C',
-      assignedToRole: 'operator',
-      location: 'Job Site: Downtown Plaza',
-      purchaseDate: '2023-12-15'
-    },
-    {
-      id: '7',
-      name: 'Work Truck',
-      type: 'vehicle',
-      brand: 'Ford',
-      model: 'F-150',
-      serialNumber: 'FORD-F150-007',
-      status: 'in_use',
-      assignedTo: 'CARLOS MARTINEZ',
-      assignedToRole: 'operator',
-      location: 'Job Site: Harbor Construction',
-      purchaseDate: '2023-06-01'
-    },
-    {
-      id: '8',
-      name: 'Chainsaw 15"',
-      type: 'blade',
-      brand: 'Stihl',
-      model: 'MS 500i',
-      serialNumber: 'ST-CS-008',
-      status: 'available',
-      location: 'Tool Shed B',
-      lastUsed: '2024-11-12',
-      totalUsage: 1200,
-      purchaseDate: '2024-04-20'
+  // Equipment data - will be populated from database
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch equipment from database via API route (bypasses RLS issues)
+  const fetchEquipment = async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch('/api/equipment');
+
+      if (!response.ok) {
+        console.error('Error fetching equipment:', await response.text());
+        return;
+      }
+
+      const data = await response.json();
+
+      // Map database fields to component interface
+      const mappedEquipment: Equipment[] = (data || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        brand: item.brand,
+        model: item.model,
+        serialNumber: item.serial_number,
+        status: item.status,
+        assignedTo: item.assigned_to,
+        location: item.location,
+        lastUsed: item.last_used,
+        totalUsage: item.total_usage_linear_feet,
+        purchaseDate: item.purchase_date,
+        notes: item.notes,
+        qrCode: item.qr_code
+      }));
+
+      setEquipment(mappedEquipment);
+    } catch (error) {
+      console.error('Error in fetchEquipment:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  // Fetch equipment on mount
+  useEffect(() => {
+    fetchEquipment();
+  }, []);
 
   // Get unique operators for filter
-  const operators = Array.from(new Set(equipment.filter(e => e.assignedTo).map(e => e.assignedTo)));
+  const operators = Array.from(new Set(equipment.filter(e => e.assignedTo).map(e => e.assignedTo).filter((o): o is string => o !== undefined)));
 
   const filteredEquipment = equipment.filter(item => {
     const searchMatch = searchQuery === '' ||
@@ -215,7 +165,9 @@ export default function AllEquipmentPage() {
       case 'tool':
         return { icon: '🔨', label: 'Tool', color: 'text-orange-600' };
       case 'blade':
-        return { icon: '⚙️', label: 'Blade/Bit', color: 'text-purple-600' };
+        return { icon: '⚙️', label: 'Blade', color: 'text-green-600' };
+      case 'bit':
+        return { icon: '🔩', label: 'Bit', color: 'text-teal-600' };
       case 'vehicle':
         return { icon: '🚚', label: 'Vehicle', color: 'text-blue-600' };
       case 'safety':
@@ -269,6 +221,18 @@ export default function AllEquipmentPage() {
       return;
     }
 
+    // Validate blade type for blade equipment
+    if (newEquipmentForm.type === 'blade' && !newEquipmentForm.bladeType) {
+      alert('Please select a blade type');
+      return;
+    }
+
+    // Validate bit size for bit equipment
+    if (newEquipmentForm.type === 'bit' && !newEquipmentForm.bitSize) {
+      alert('Please enter a bit size');
+      return;
+    }
+
     const newEquipment: Equipment = {
       id: Date.now().toString(),
       name: newEquipmentForm.name,
@@ -281,7 +245,11 @@ export default function AllEquipmentPage() {
       assignedToRole: newEquipmentForm.assignedTo ? 'operator' : undefined,
       location: newEquipmentForm.location || undefined,
       purchaseDate: newEquipmentForm.purchaseDate,
-      notes: newEquipmentForm.notes || undefined
+      notes: newEquipmentForm.notes || undefined,
+      bladeType: newEquipmentForm.bladeType || undefined,
+      bitSize: newEquipmentForm.bitSize || undefined,
+      qrCode: newEquipmentForm.qrCode || undefined,
+      totalUsage: 0 // Initialize usage tracking
     };
 
     setEquipment(prev => [...prev, newEquipment]);
@@ -297,7 +265,10 @@ export default function AllEquipmentPage() {
       assignedTo: '',
       location: '',
       purchaseDate: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      bladeType: undefined,
+      bitSize: undefined,
+      qrCode: ''
     });
     setShowAddModal(false);
   };
@@ -344,11 +315,19 @@ export default function AllEquipmentPage() {
               <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                 All Tools & Equipment
               </h1>
-              <p className="text-gray-600 font-medium mt-1">Company-wide equipment inventory and assignments</p>
+              <p className="text-gray-600 font-medium mt-1">Vehicles, tools, and safety equipment (Blades/bits managed in Inventory)</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
+            {(user?.role === 'admin' || user?.role === 'inventory_manager') && (
+              <Link href="/dashboard/inventory">
+                <button className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Inventory Management
+                </button>
+              </Link>
+            )}
             {user?.role === 'admin' && (
               <button
                 onClick={() => setShowAddModal(true)}
@@ -429,10 +408,10 @@ export default function AllEquipmentPage() {
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-white/80 backdrop-blur-lg rounded-2xl border border-gray-200 p-6 mb-6 shadow-lg">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-100 p-6 mb-8 transition-all hover:shadow-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Search Bar */}
-            <div className="lg:col-span-2">
+            <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Search Equipment</label>
               <div className="relative">
                 <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -450,35 +429,96 @@ export default function AllEquipmentPage() {
 
             {/* Filter by Operator */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Operator</label>
-              <select
+              <label className="block text-sm font-bold text-gray-700 mb-2">Filter by Operator</label>
+              <OperatorSelect
                 value={selectedOperator}
-                onChange={(e) => setSelectedOperator(e.target.value)}
-                className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl font-medium focus:border-blue-500 focus:outline-none"
-              >
-                <option value="all">All Operators</option>
-                {operators.map(op => (
-                  <option key={op} value={op}>{op}</option>
-                ))}
-                <option value="unassigned">Unassigned</option>
-              </select>
+                onChange={setSelectedOperator}
+                operators={operators}
+              />
             </div>
 
             {/* Filter by Type */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Equipment Type</label>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as EquipmentType | 'all')}
-                className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl font-medium focus:border-blue-500 focus:outline-none"
-              >
-                <option value="all">All Types</option>
-                <option value="tool">Tools</option>
-                <option value="blade">Blades/Bits</option>
-                <option value="vehicle">Vehicles</option>
-                <option value="safety">Safety Equipment</option>
-                <option value="other">Other</option>
-              </select>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-bold text-gray-700 mb-3">Equipment Type</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setFilterType('all')}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+                    filterType === 'all'
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:shadow-xl'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-md'
+                  }`}
+                >
+                  <Layers className="w-4 h-4" />
+                  All Types
+                </button>
+                <button
+                  onClick={() => setFilterType('tool')}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+                    filterType === 'tool'
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-lg hover:shadow-xl'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-md'
+                  }`}
+                >
+                  <Wrench className="w-4 h-4" />
+                  Tools
+                </button>
+                <button
+                  onClick={() => setFilterType('blade')}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+                    filterType === 'blade'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:shadow-xl'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-md'
+                  }`}
+                >
+                  <Disc className="w-4 h-4" />
+                  Blades
+                </button>
+                <button
+                  onClick={() => setFilterType('bit')}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+                    filterType === 'bit'
+                      ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg hover:shadow-xl'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-md'
+                  }`}
+                >
+                  <Disc className="w-4 h-4" />
+                  Bits
+                </button>
+                <button
+                  onClick={() => setFilterType('vehicle')}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+                    filterType === 'vehicle'
+                      ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg hover:shadow-xl'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-md'
+                  }`}
+                >
+                  <Truck className="w-4 h-4" />
+                  Vehicles
+                </button>
+                <button
+                  onClick={() => setFilterType('safety')}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+                    filterType === 'safety'
+                      ? 'bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg hover:shadow-xl'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-md'
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                  Safety
+                </button>
+                <button
+                  onClick={() => setFilterType('other')}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+                    filterType === 'other'
+                      ? 'bg-gradient-to-r from-gray-500 to-slate-600 text-white shadow-lg hover:shadow-xl'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-md'
+                  }`}
+                >
+                  <Package className="w-4 h-4" />
+                  Other
+                </button>
+              </div>
             </div>
           </div>
 
@@ -638,12 +678,43 @@ export default function AllEquipmentPage() {
                     </div>
                   )}
 
-                  {/* Usage Stats (for blades) */}
-                  {item.type === 'blade' && item.totalUsage !== undefined && (
+                  {/* Blade Specifications */}
+                  {item.type === 'blade' && item.bladeType && (
+                    <div className="bg-green-50 rounded-xl p-3 mb-4 border border-green-200">
+                      <p className="text-xs font-semibold text-green-700 uppercase mb-2">Blade Type</p>
+                      <div className="flex items-center gap-2">
+                        <Disc className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-bold text-green-900">
+                          {item.bladeType === 'wall_saw' && 'Wall Saw Blade'}
+                          {item.bladeType === 'slab_saw' && 'Slab Saw Blade'}
+                          {item.bladeType === 'flush_cut' && 'Flush Cut Blade'}
+                          {item.bladeType === 'handsaw' && 'Handsaw Blade'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bit Specifications */}
+                  {item.type === 'bit' && item.bitSize && (
+                    <div className="bg-teal-50 rounded-xl p-3 mb-4 border border-teal-200">
+                      <p className="text-xs font-semibold text-teal-700 uppercase mb-2">Bit Size</p>
+                      <div className="flex items-center gap-2">
+                        <Disc className="w-4 h-4 text-teal-600" />
+                        <span className="text-sm font-bold text-teal-900">
+                          {item.bitSize}" Core Drill Bit
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Usage Stats (for blades and bits) */}
+                  {(item.type === 'blade' || item.type === 'bit') && item.totalUsage !== undefined && (
                     <div className="bg-purple-50 rounded-xl p-3 mb-4 border border-purple-200">
                       <p className="text-xs font-semibold text-purple-700 uppercase mb-1">Total Usage</p>
                       <p className="text-2xl font-bold text-purple-900">{item.totalUsage.toLocaleString()}</p>
-                      <p className="text-xs text-purple-600">Linear feet / inches</p>
+                      <p className="text-xs text-purple-600">
+                        {item.type === 'blade' ? 'Linear feet cut' : 'Inches drilled'}
+                      </p>
                     </div>
                   )}
 
@@ -714,7 +785,7 @@ export default function AllEquipmentPage() {
                   <select
                     value={newAssignedTo}
                     onChange={(e) => setNewAssignedTo(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
+                    className="w-full px-4 py-3 rounded-xl font-medium bg-white/80 backdrop-blur-sm border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900 cursor-pointer"
                   >
                     <option value="">Unassigned</option>
                     {operators.map(op => (
@@ -771,102 +842,186 @@ export default function AllEquipmentPage() {
                 <div className="space-y-4">
                   {/* Equipment Name */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
                       Equipment Name <span className="text-red-600">*</span>
                     </label>
                     <input
                       type="text"
                       value={newEquipmentForm.name}
                       onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
-                      placeholder="e.g., Wall Saw - Husqvarna 24 inch"
+                      className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900"
+                      placeholder="e.g., Wall Saw Blade 24 inch"
                     />
                   </div>
 
                   {/* Equipment Type */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Equipment Type
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Equipment Type <span className="text-red-600">*</span>
                     </label>
                     <select
                       value={newEquipmentForm.type}
-                      onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, type: e.target.value as EquipmentType }))}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
+                      onChange={(e) => setNewEquipmentForm(prev => ({
+                        ...prev,
+                        type: e.target.value as EquipmentType,
+                        bladeType: undefined, // Clear blade type when type changes
+                        bitSize: undefined // Clear bit size when type changes
+                      }))}
+                      className="w-full px-4 py-3 rounded-xl font-medium bg-white/80 backdrop-blur-sm border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900 cursor-pointer"
                     >
-                      <option value="tool">Tool</option>
-                      <option value="blade">Blade/Bit</option>
-                      <option value="vehicle">Vehicle</option>
-                      <option value="safety">Safety Equipment</option>
-                      <option value="other">Other</option>
+                      <option value="tool">🔨 Tool</option>
+                      <option value="blade">⚙️ Blade</option>
+                      <option value="bit">🔩 Bit (Core Drill)</option>
+                      <option value="vehicle">🚚 Vehicle</option>
+                      <option value="safety">🛡️ Safety Equipment</option>
+                      <option value="other">📦 Other</option>
                     </select>
                   </div>
 
                   {/* Brand & Model */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
                         Brand
                       </label>
                       <input
                         type="text"
                         value={newEquipmentForm.brand}
                         onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, brand: e.target.value }))}
-                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
+                        className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900"
                         placeholder="e.g., Husqvarna"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
                         Model
                       </label>
                       <input
                         type="text"
                         value={newEquipmentForm.model}
                         onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, model: e.target.value }))}
-                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
-                        placeholder="e.g., WS-440"
+                        className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900"
+                        placeholder="e.g., Elite-Cut S50"
                       />
                     </div>
                   </div>
 
                   {/* Serial Number */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
                       Serial Number <span className="text-red-600">*</span>
                     </label>
                     <input
                       type="text"
                       value={newEquipmentForm.serialNumber}
                       onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, serialNumber: e.target.value }))}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
-                      placeholder="e.g., HV-WS-001"
+                      className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900"
+                      placeholder="e.g., WS-24-001"
                     />
                   </div>
+
+                  {/* QR Code - Optional for tracking multiple items */}
+                  {(newEquipmentForm.type === 'blade' || newEquipmentForm.type === 'bit') && (
+                    <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        QR Code (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={newEquipmentForm.qrCode}
+                        onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, qrCode: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-blue-200 hover:border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900"
+                        placeholder="Scan or enter QR code"
+                      />
+                      <p className="text-xs text-blue-700 mt-2 flex items-start gap-1">
+                        <span>💡</span>
+                        <span>Optional: If you have multiple blades/bits of the same type, add a QR code for tracking. Operators can scan this to identify which specific item they're using.</span>
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Blade Type - Only shown when Blade is selected */}
+                  {newEquipmentForm.type === 'blade' && (
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Disc className="w-5 h-5 text-green-600" />
+                        <h4 className="text-sm font-bold text-green-900">Blade Type Specification</h4>
+                      </div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Blade Type <span className="text-red-600">*</span>
+                      </label>
+                      <select
+                        value={newEquipmentForm.bladeType || ''}
+                        onChange={(e) => setNewEquipmentForm(prev => ({
+                          ...prev,
+                          bladeType: e.target.value as BladeType || undefined
+                        }))}
+                        className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-green-200 hover:border-green-300 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900 cursor-pointer"
+                      >
+                        <option value="">Select blade type...</option>
+                        <option value="wall_saw">⚙️ Wall Saw Blade</option>
+                        <option value="slab_saw">⚙️ Slab Saw Blade</option>
+                        <option value="flush_cut">⚙️ Flush Cut Blade</option>
+                        <option value="handsaw">⚙️ Handsaw Blade</option>
+                      </select>
+                      <p className="text-xs text-green-700 mt-2 flex items-center gap-1">
+                        <span>💡</span>
+                        <span>This will be tracked for usage analytics and maintenance scheduling</span>
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Bit Size - Only shown when Bit is selected */}
+                  {newEquipmentForm.type === 'bit' && (
+                    <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border-2 border-teal-300 rounded-xl p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Disc className="w-5 h-5 text-teal-600" />
+                        <h4 className="text-sm font-bold text-teal-900">Bit Size Specification</h4>
+                      </div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Bit Size (inches) <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newEquipmentForm.bitSize || ''}
+                        onChange={(e) => setNewEquipmentForm(prev => ({
+                          ...prev,
+                          bitSize: e.target.value || undefined
+                        }))}
+                        className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-teal-200 hover:border-teal-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900"
+                        placeholder="e.g., 1, 2, 4, 6, 8, 10..."
+                      />
+                      <p className="text-xs text-teal-700 mt-2 flex items-center gap-1">
+                        <span>💡</span>
+                        <span>Core drill bits - enter diameter in inches for tracking</span>
+                      </p>
+                    </div>
+                  )}
 
                   {/* Status & Assignment */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
                         Initial Status
                       </label>
                       <select
                         value={newEquipmentForm.status}
                         onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, status: e.target.value as EquipmentStatus }))}
-                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
+                        className="w-full px-4 py-3 rounded-xl font-medium bg-white/80 backdrop-blur-sm border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900 cursor-pointer"
                       >
-                        <option value="available">Available</option>
-                        <option value="in_use">In Use</option>
-                        <option value="maintenance">Maintenance</option>
+                        <option value="available">✓ Available</option>
+                        <option value="in_use">🔧 In Use</option>
+                        <option value="maintenance">⚠️ Maintenance</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
                         Assign to Operator
                       </label>
                       <select
                         value={newEquipmentForm.assignedTo}
                         onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, assignedTo: e.target.value }))}
-                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
+                        className="w-full px-4 py-3 rounded-xl font-medium bg-white/80 backdrop-blur-sm border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900 cursor-pointer"
                       >
                         <option value="">Unassigned</option>
                         {operators.map(op => (
@@ -878,41 +1033,41 @@ export default function AllEquipmentPage() {
 
                   {/* Location */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
                       Location
                     </label>
                     <input
                       type="text"
                       value={newEquipmentForm.location}
                       onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, location: e.target.value }))}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
+                      className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900"
                       placeholder="e.g., Tool Shed A"
                     />
                   </div>
 
                   {/* Purchase Date */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
                       Purchase Date
                     </label>
                     <input
                       type="date"
                       value={newEquipmentForm.purchaseDate}
                       onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, purchaseDate: e.target.value }))}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
+                      className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900 cursor-pointer"
                     />
                   </div>
 
                   {/* Notes */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
                       Notes
                     </label>
                     <textarea
                       value={newEquipmentForm.notes}
                       onChange={(e) => setNewEquipmentForm(prev => ({ ...prev, notes: e.target.value }))}
                       rows={3}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none"
+                      className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900"
                       placeholder="Any additional information..."
                     />
                   </div>
