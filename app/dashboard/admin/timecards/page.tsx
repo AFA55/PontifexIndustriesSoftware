@@ -565,16 +565,7 @@ export default function AdminTimecardsPage() {
                     📍 {selectedTimecard.clock_in_latitude.toFixed(6)}, {selectedTimecard.clock_in_longitude.toFixed(6)}
                   </p>
 
-                  {/* Google Maps Static Image */}
-                  <img
-                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedTimecard.clock_in_latitude},${selectedTimecard.clock_in_longitude}&zoom=15&size=600x300&markers=color:blue%7C${selectedTimecard.clock_in_latitude},${selectedTimecard.clock_in_longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-                    alt="Clock in location map"
-                    className="w-full rounded-lg mb-3"
-                    onError={(e) => {
-                      // Fallback if Google Maps API key doesn't work
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  {/* Google Maps removed - will add back later */}
 
                   <a
                     href={getGoogleMapsLink(selectedTimecard.clock_in_latitude, selectedTimecard.clock_in_longitude)}
@@ -606,15 +597,7 @@ export default function AdminTimecardsPage() {
                     📍 {selectedTimecard.clock_out_latitude.toFixed(6)}, {selectedTimecard.clock_out_longitude.toFixed(6)}
                   </p>
 
-                  {/* Google Maps Static Image */}
-                  <img
-                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedTimecard.clock_out_latitude},${selectedTimecard.clock_out_longitude}&zoom=15&size=600x300&markers=color:red%7C${selectedTimecard.clock_out_latitude},${selectedTimecard.clock_out_longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-                    alt="Clock out location map"
-                    className="w-full rounded-lg mb-3"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  {/* Google Maps removed - will add back later */}
 
                   <a
                     href={getGoogleMapsLink(selectedTimecard.clock_out_latitude, selectedTimecard.clock_out_longitude)}

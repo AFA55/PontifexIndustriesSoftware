@@ -407,18 +407,14 @@ export default function OperatorsMonitoringPage() {
               {selectedOperator.latitude && selectedOperator.longitude && (
                 <div className="mb-6">
                   <h3 className="text-lg font-bold text-gray-800 mb-3">Current Location</h3>
-                  <div className="relative rounded-xl overflow-hidden shadow-lg">
-                    <img
-                      src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedOperator.latitude},${selectedOperator.longitude}&zoom=15&size=600x400&markers=color:blue%7C${selectedOperator.latitude},${selectedOperator.longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-                      alt="Current location map"
-                      className="w-full"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                      <p className="text-white font-medium text-sm">
+                  <div className="relative rounded-xl overflow-hidden shadow-lg bg-gray-100 p-6">
+                    {/* Google Maps removed - will add back later */}
+                    <div>
+                      <p className="text-gray-800 font-medium text-sm">
                         📍 {selectedOperator.latitude.toFixed(6)}, {selectedOperator.longitude.toFixed(6)}
                       </p>
                       {selectedOperator.accuracy && (
-                        <p className="text-white/80 text-xs mt-1">
+                        <p className="text-gray-600 text-xs mt-1">
                           Accuracy: ±{selectedOperator.accuracy.toFixed(0)}m
                         </p>
                       )}
