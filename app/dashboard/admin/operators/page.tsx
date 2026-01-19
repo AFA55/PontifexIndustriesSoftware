@@ -409,7 +409,7 @@ export default function OperatorsMonitoringPage() {
                   <h3 className="text-lg font-bold text-gray-800 mb-3">Current Location</h3>
                   <div className="relative rounded-xl overflow-hidden shadow-lg">
                     <img
-                      src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedOperator.latitude},${selectedOperator.longitude}&zoom=15&size=600x400&markers=color:blue%7C${selectedOperator.latitude},${selectedOperator.longitude}&key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8`}
+                      src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedOperator.latitude},${selectedOperator.longitude}&zoom=15&size=600x400&markers=color:blue%7C${selectedOperator.latitude},${selectedOperator.longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
                       alt="Current location map"
                       className="w-full"
                     />

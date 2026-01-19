@@ -567,7 +567,7 @@ export default function AdminTimecardsPage() {
 
                   {/* Google Maps Static Image */}
                   <img
-                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedTimecard.clock_in_latitude},${selectedTimecard.clock_in_longitude}&zoom=15&size=600x300&markers=color:blue%7C${selectedTimecard.clock_in_latitude},${selectedTimecard.clock_in_longitude}&key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8`}
+                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedTimecard.clock_in_latitude},${selectedTimecard.clock_in_longitude}&zoom=15&size=600x300&markers=color:blue%7C${selectedTimecard.clock_in_latitude},${selectedTimecard.clock_in_longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
                     alt="Clock in location map"
                     className="w-full rounded-lg mb-3"
                     onError={(e) => {
@@ -608,7 +608,7 @@ export default function AdminTimecardsPage() {
 
                   {/* Google Maps Static Image */}
                   <img
-                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedTimecard.clock_out_latitude},${selectedTimecard.clock_out_longitude}&zoom=15&size=600x300&markers=color:red%7C${selectedTimecard.clock_out_latitude},${selectedTimecard.clock_out_longitude}&key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8`}
+                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${selectedTimecard.clock_out_latitude},${selectedTimecard.clock_out_longitude}&zoom=15&size=600x300&markers=color:red%7C${selectedTimecard.clock_out_latitude},${selectedTimecard.clock_out_longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
                     alt="Clock out location map"
                     className="w-full rounded-lg mb-3"
                     onError={(e) => {
