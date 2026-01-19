@@ -1,384 +1,382 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, logout, type User } from '@/lib/auth';
+import { ArrowLeft, Clock, Calendar, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
-// Mock timecard data - In production, this would come from your database
 interface TimecardEntry {
   id: string;
   date: string;
-  clockIn: string;
-  clockOut: string | null;
-  regularHours: number;
-  overtimeHours: number;
+  clock_in_time: string;
+  clock_out_time: string | null;
+  total_hours: number | null;
+  is_approved: boolean;
+}
+
+interface WeekData {
+  weekStart: Date;
+  weekEnd: Date;
+  entries: TimecardEntry[];
   totalHours: number;
-  lunchDeducted: boolean; // Track if lunch was automatically deducted
+  overtimeHours: number;
 }
 
 export default function TimecardPage() {
-  const user = getCurrentUser();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [timecards, setTimecards] = useState<TimecardEntry[]>([]);
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(0); // 0 = current week, -1 = last week, etc.
+  const [weekData, setWeekData] = useState<WeekData | null>(null);
+  const router = useRouter();
 
-  // Mock data for demonstration
-  // Note: If total hours > 8, automatically deduct 45 mins (0.75 hours) for lunch
-  const [weeklyData, setWeeklyData] = useState<TimecardEntry[]>([
-    {
-      id: '1',
-      date: '2025-10-20',
-      clockIn: '07:00 AM',
-      clockOut: '05:15 PM', // 10.25 hours raw, -0.75 lunch = 9.5 hours
-      regularHours: 8,
-      overtimeHours: 1.5,
-      totalHours: 9.5,
-      lunchDeducted: true
-    },
-    {
-      id: '2',
-      date: '2025-10-21',
-      clockIn: '07:15 AM',
-      clockOut: '04:30 PM', // 9.25 hours raw, -0.75 lunch = 8.5 hours
-      regularHours: 8,
-      overtimeHours: 0.5,
-      totalHours: 8.5,
-      lunchDeducted: true
-    },
-    {
-      id: '3',
-      date: '2025-10-22',
-      clockIn: '07:00 AM',
-      clockOut: '05:45 PM', // 10.75 hours raw, -0.75 lunch = 10 hours
-      regularHours: 8,
-      overtimeHours: 2,
-      totalHours: 10,
-      lunchDeducted: true
-    },
-    {
-      id: '4',
-      date: '2025-10-23',
-      clockIn: '07:30 AM',
-      clockOut: '04:45 PM', // 9.25 hours raw, -0.75 lunch = 8.5 hours
-      regularHours: 8,
-      overtimeHours: 0.5,
-      totalHours: 8.5,
-      lunchDeducted: true
-    },
-    {
-      id: '5',
-      date: '2025-10-24',
-      clockIn: '07:00 AM',
-      clockOut: '03:30 PM', // 8.5 hours raw, -0.75 lunch = 7.75 hours (but let's make it > 8 for demo)
-      regularHours: 8,
-      overtimeHours: 0.5,
-      totalHours: 8.5,
-      lunchDeducted: true
-    },
-  ]);
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      router.push('/login');
+      return;
+    }
 
-  // Calculate totals
-  const totalRegularHours = weeklyData.reduce((sum, entry) => sum + entry.regularHours, 0);
-  const totalOvertimeHours = weeklyData.reduce((sum, entry) => sum + entry.overtimeHours, 0);
-  const totalHours = weeklyData.reduce((sum, entry) => sum + entry.totalHours, 0);
-  const daysWithLunchDeducted = weeklyData.filter(entry => entry.lunchDeducted).length;
-  const totalLunchDeducted = daysWithLunchDeducted * 0.75; // 45 mins = 0.75 hours
+    setUser(currentUser);
+    fetchTimecards();
+  }, [router, currentWeekOffset]);
 
-  const getDayName = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { weekday: 'long' });
+  const getWeekBounds = (offset: number) => {
+    const now = new Date();
+    // Get the Monday of the current week
+    const monday = new Date(now);
+    monday.setDate(monday.getDate() - monday.getDay() + 1 + (offset * 7));
+    monday.setHours(0, 0, 0, 0);
+
+    // Get the Sunday of the current week
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    return { monday, sunday };
   };
 
-  const getFormattedDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const fetchTimecards = async () => {
+    try {
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
+        localStorage.removeItem('supabase-user');
+        localStorage.removeItem('pontifex-user');
+        window.location.href = '/login';
+        return;
+      }
+
+      const { monday, sunday } = getWeekBounds(currentWeekOffset);
+
+      const url = `/api/timecard/history?startDate=${monday.toISOString().split('T')[0]}&endDate=${sunday.toISOString().split('T')[0]}&limit=100`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        const entries = result.data.timecards;
+        setTimecards(entries);
+
+        // Calculate week totals
+        const totalHours = entries.reduce((sum: number, entry: TimecardEntry) => {
+          return sum + (entry.total_hours || 0);
+        }, 0);
+
+        const overtimeHours = Math.max(0, totalHours - 40);
+
+        setWeekData({
+          weekStart: monday,
+          weekEnd: sunday,
+          entries,
+          totalHours,
+          overtimeHours,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching timecards:', error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const formatWeekRange = () => {
+    if (!weekData) return '';
+    const start = weekData.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const end = weekData.weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${start} - ${end}`;
+  };
+
+  const isCurrentWeek = () => currentWeekOffset === 0;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Loading timecards...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-300 rounded-full opacity-10 blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-300 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-md">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors shadow-md font-medium"
+              >
+                <ArrowLeft size={20} />
+                <span>Back</span>
+              </Link>
+              <h1 className="text-2xl font-bold text-gray-900">My Timecard</h1>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="bg-gray-100 px-4 py-2 rounded-xl">
+                <p className="text-sm font-bold text-gray-900">{user?.name}</p>
+                <p className="text-xs text-gray-600 capitalize font-medium">{user?.role}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="container mx-auto px-6 py-8 relative">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <Link
-              href="/dashboard"
-              className="group p-3 bg-white/70 backdrop-blur-xl rounded-xl border border-gray-200 text-gray-700 hover:bg-white transition-all duration-300 hover:scale-105 shadow-sm"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </Link>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent">
-                My Timecard
-              </h1>
-              <p className="text-gray-600 font-medium mt-1">Weekly hours and attendance tracking</p>
+      <div className="container mx-auto px-4 py-8">
+        {/* Week Navigation */}
+        <div className="mb-6 flex items-center justify-between bg-white rounded-2xl p-4 shadow-lg border border-gray-100">
+          <button
+            onClick={() => setCurrentWeekOffset(currentWeekOffset - 1)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors font-medium"
+          >
+            <ChevronLeft size={20} />
+            Previous Week
+          </button>
+
+          <div className="text-center">
+            <p className="text-lg font-bold text-gray-900">{formatWeekRange()}</p>
+            <p className="text-sm text-gray-500">
+              {isCurrentWeek() ? 'Current Week' : `${Math.abs(currentWeekOffset)} ${Math.abs(currentWeekOffset) === 1 ? 'week' : 'weeks'} ago`}
+            </p>
+          </div>
+
+          <button
+            onClick={() => setCurrentWeekOffset(currentWeekOffset + 1)}
+            disabled={isCurrentWeek()}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-colors font-medium ${
+              isCurrentWeek()
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+            }`}
+          >
+            Next Week
+            <ChevronRight size={20} />
+          </button>
+        </div>
+
+        {/* Weekly Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {/* Total Hours This Week */}
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <Clock className="text-blue-600" size={24} />
+              </div>
             </div>
+            <p className="text-3xl font-bold text-gray-800">
+              {weekData?.totalHours.toFixed(1) || '0.0'}
+            </p>
+            <p className="text-sm text-gray-500">Total Hours This Week</p>
+          </div>
+
+          {/* Regular Hours */}
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <CheckCircle className="text-green-600" size={24} />
+              </div>
+            </div>
+            <p className="text-3xl font-bold text-gray-800">
+              {Math.min(weekData?.totalHours || 0, 40).toFixed(1)}
+            </p>
+            <p className="text-sm text-gray-500">Regular Hours</p>
+          </div>
+
+          {/* Overtime Hours */}
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                <AlertTriangle className="text-orange-600" size={24} />
+              </div>
+            </div>
+            <p className="text-3xl font-bold text-gray-800">
+              {weekData?.overtimeHours.toFixed(1) || '0.0'}
+            </p>
+            <p className="text-sm text-gray-500">Overtime Hours</p>
+          </div>
+
+          {/* Days Worked */}
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <Calendar className="text-purple-600" size={24} />
+              </div>
+            </div>
+            <p className="text-3xl font-bold text-gray-800">
+              {weekData?.entries.length || 0}
+            </p>
+            <p className="text-sm text-gray-500">Days Worked</p>
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Total Hours Card */}
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl border border-gray-200 p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+        {/* Overtime Alert */}
+        {weekData && weekData.overtimeHours > 0 && (
+          <div className="mb-6 bg-orange-50 border-2 border-orange-200 rounded-2xl p-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-orange-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                <AlertTriangle className="text-orange-700" size={20} />
               </div>
-            </div>
-            <p className="text-gray-600 font-semibold text-sm mb-1">Total Hours</p>
-            <p className="text-4xl font-bold text-gray-800">{totalHours.toFixed(1)}</p>
-            <p className="text-gray-500 text-sm font-medium mt-2">This week</p>
-          </div>
-
-          {/* Regular Hours Card */}
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl border border-gray-200 p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-            <p className="text-gray-600 font-semibold text-sm mb-1">Regular Hours</p>
-            <p className="text-4xl font-bold text-gray-800">{totalRegularHours.toFixed(1)}</p>
-            <p className="text-gray-500 text-sm font-medium mt-2">Standard time</p>
-          </div>
-
-          {/* Overtime Hours Card */}
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl border border-gray-200 p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-            </div>
-            <p className="text-gray-600 font-semibold text-sm mb-1">Overtime Hours</p>
-            <p className="text-4xl font-bold text-gray-800">{totalOvertimeHours.toFixed(1)}</p>
-            <p className="text-gray-500 text-sm font-medium mt-2">Extra time</p>
-          </div>
-        </div>
-
-        {/* Weekly Schedule Table */}
-        <div className="bg-white/80 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
-          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
-            <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">Weekly Schedule</h2>
-                <p className="text-gray-600 font-medium mt-1">October 20 - October 24, 2025</p>
+                <p className="text-orange-800 font-bold text-lg mb-2">Overtime Detected</p>
+                <p className="text-orange-700 font-medium">
+                  You have worked <strong>{weekData.overtimeHours.toFixed(1)} overtime hours</strong> this week.
+                  Hours over 40 per week are considered overtime and may be paid at a different rate according to company policy.
+                </p>
               </div>
-              {daysWithLunchDeducted > 0 && (
-                <div className="bg-blue-100 border-2 border-blue-300 rounded-xl px-4 py-2">
-                  <p className="text-blue-800 font-bold text-sm">Lunch Deductions</p>
-                  <p className="text-blue-700 font-semibold text-xs mt-1">
-                    {daysWithLunchDeducted} day{daysWithLunchDeducted > 1 ? 's' : ''} × 45 min = {totalLunchDeducted.toFixed(2)} hrs
-                  </p>
-                </div>
-              )}
             </div>
           </div>
+        )}
 
-          {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                    Clock In
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                    Clock Out
-                  </th>
-                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
-                    Regular Hours
-                  </th>
-                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
-                    Overtime
-                  </th>
-                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {weeklyData.map((entry, index) => (
-                  <tr key={entry.id} className="hover:bg-indigo-50/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <p className="text-gray-800 font-bold">{getDayName(entry.date)}</p>
-                        <p className="text-gray-500 text-sm font-medium">{getFormattedDate(entry.date)}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-gray-800 font-semibold">{entry.clockIn}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                        <span className="text-gray-800 font-semibold">{entry.clockOut || 'In Progress'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-bold border border-green-300">
-                        {entry.regularHours.toFixed(1)} hrs
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className={`px-3 py-1 rounded-full text-sm font-bold border ${
-                        entry.overtimeHours > 0
-                          ? 'bg-orange-100 text-orange-700 border-orange-300'
-                          : 'bg-gray-100 text-gray-500 border-gray-300'
-                      }`}>
-                        {entry.overtimeHours.toFixed(1)} hrs
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <span className="text-gray-800 font-bold text-lg">{entry.totalHours.toFixed(1)} hrs</span>
-                        {entry.lunchDeducted && (
-                          <div className="group relative">
-                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 bg-gray-900 text-white text-xs rounded-lg py-2 px-3 z-10">
-                              45 min lunch deducted (worked &gt;8 hrs)
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </td>
+        {/* Timecard Entries Table */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-bold text-gray-800">Daily Entries</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {weekData?.entries.length || 0} {weekData?.entries.length === 1 ? 'entry' : 'entries'} this week
+            </p>
+          </div>
+
+          {!weekData || weekData.entries.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="text-gray-400" size={40} />
+              </div>
+              <p className="text-gray-600 text-lg font-medium">No entries this week</p>
+              <p className="text-gray-500 text-sm mt-2">
+                Clock in from the dashboard to start tracking your hours
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Clock In
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Clock Out
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Total Hours
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Status
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-indigo-50 border-t-2 border-indigo-300">
-                <tr>
-                  <td colSpan={3} className="px-6 py-4">
-                    <p className="text-gray-800 font-bold text-lg">Week Total</p>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="px-4 py-2 bg-green-500 text-white rounded-full text-sm font-bold shadow-md">
-                      {totalRegularHours.toFixed(1)} hrs
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm font-bold shadow-md">
-                      {totalOvertimeHours.toFixed(1)} hrs
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="text-gray-800 font-bold text-xl">{totalHours.toFixed(1)} hrs</span>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden p-4 space-y-4">
-            {weeklyData.map((entry) => (
-              <div key={entry.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="text-gray-800 font-bold">{getDayName(entry.date)}</p>
-                    <p className="text-gray-500 text-sm font-medium">{getFormattedDate(entry.date)}</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-gray-800 font-bold text-lg">{entry.totalHours.toFixed(1)} hrs</span>
-                    {entry.lunchDeducted && (
-                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="45 min lunch deducted">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="bg-white rounded-lg p-3 border border-gray-200">
-                    <p className="text-gray-600 text-xs font-semibold mb-1">Clock In</p>
-                    <p className="text-gray-800 font-bold">{entry.clockIn}</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 border border-gray-200">
-                    <p className="text-gray-600 text-xs font-semibold mb-1">Clock Out</p>
-                    <p className="text-gray-800 font-bold">{entry.clockOut || 'In Progress'}</p>
-                  </div>
-                </div>
-
-                <div className="flex space-x-2">
-                  <span className="flex-1 px-3 py-2 bg-green-100 text-green-700 rounded-lg text-xs font-bold text-center border border-green-300">
-                    Regular: {entry.regularHours.toFixed(1)} hrs
-                  </span>
-                  <span className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold text-center border ${
-                    entry.overtimeHours > 0
-                      ? 'bg-orange-100 text-orange-700 border-orange-300'
-                      : 'bg-gray-100 text-gray-500 border-gray-300'
-                  }`}>
-                    OT: {entry.overtimeHours.toFixed(1)} hrs
-                  </span>
-                </div>
-              </div>
-            ))}
-
-            {/* Mobile Totals */}
-            <div className="bg-indigo-50 rounded-xl p-4 border-2 border-indigo-300">
-              <p className="text-gray-800 font-bold text-lg mb-3">Week Total</p>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-center">
-                  <p className="text-gray-600 text-xs font-semibold mb-1">Total</p>
-                  <p className="text-gray-800 font-bold text-lg">{totalHours.toFixed(1)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-gray-600 text-xs font-semibold mb-1">Regular</p>
-                  <p className="text-green-700 font-bold text-lg">{totalRegularHours.toFixed(1)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-gray-600 text-xs font-semibold mb-1">Overtime</p>
-                  <p className="text-orange-700 font-bold text-lg">{totalOvertimeHours.toFixed(1)}</p>
-                </div>
-              </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {weekData.entries.map((entry) => (
+                    <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Calendar size={16} className="text-gray-400" />
+                          <span className="text-sm font-medium text-gray-800">
+                            {formatDate(entry.date)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-600">
+                          {formatTime(entry.clock_in_time)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {entry.clock_out_time ? (
+                          <span className="text-sm text-gray-600">
+                            {formatTime(entry.clock_out_time)}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                            Active
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {entry.total_hours !== null ? (
+                          <span className="text-sm font-semibold text-gray-800">
+                            {entry.total_hours.toFixed(2)} hrs
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {entry.is_approved ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <CheckCircle size={12} className="mr-1" />
+                            Approved
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <Clock size={12} className="mr-1" />
+                            Pending
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </div>
-
-        {/* Info Section */}
-        <div className="mt-8 bg-blue-50 rounded-2xl border-2 border-blue-300 p-6 shadow-lg">
-          <div className="flex items-start space-x-3">
-            <svg className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <h4 className="text-gray-800 font-bold mb-2">How Time Tracking Works</h4>
-              <ul className="text-gray-700 text-sm font-medium space-y-1">
-                <li>• Clock in automatically when you click "On Route" for a job</li>
-                <li>• Click "Mark Day as Finished" on the dashboard to clock out</li>
-                <li>• Regular hours: First 8 hours of your shift</li>
-                <li>• Overtime: Any hours worked beyond 8 hours in a day</li>
-                <li>• <strong className="text-blue-700">Automatic lunch deduction:</strong> 45 minutes deducted when working more than 8 hours</li>
-                <li>• Blue info icon (ℹ️) indicates days with automatic lunch deduction</li>
-                <li>• Your timecard updates automatically throughout the week</li>
-              </ul>
-            </div>
-          </div>
+          )}
         </div>
       </div>
-
-      <style jsx>{`
-        .delay-1000 {
-          animation-delay: 1s;
-        }
-      `}</style>
     </div>
   );
 }

@@ -65,6 +65,15 @@ export default function LoginPage() {
         });
       }
 
+      // Store user data in localStorage for dashboard access
+      localStorage.setItem('supabase-user', JSON.stringify({
+        id: result.user.id,
+        name: result.user.full_name,
+        email: result.user.email,
+        role: result.user.role,
+      }));
+      console.log('💾 User stored in localStorage');
+
       // Redirect based on user role
       if (result.user.role === 'admin') {
         console.log('🔑 Admin user, redirecting to admin dashboard...');
@@ -74,11 +83,12 @@ export default function LoginPage() {
         router.push('/dashboard');
       } else {
         setError('Invalid user role');
+        setLoading(false);
       }
+      // Keep loading state true during navigation - it will unmount anyway
     } catch (err: any) {
       console.error('💥 Unexpected login error:', err);
       setError('An unexpected error occurred');
-    } finally {
       setLoading(false);
     }
   };
@@ -171,9 +181,9 @@ export default function LoginPage() {
               <input type="checkbox" {...register('remember')} className="w-4 h-4 accent-blue-600 rounded" />
               <span>Remember me</span>
             </label>
-            <a href="#" className="text-blue-600 hover:text-blue-700 font-medium transition-colors">
+            <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium transition-colors">
               Forgot password?
-            </a>
+            </Link>
           </motion.div>
 
           {error && (

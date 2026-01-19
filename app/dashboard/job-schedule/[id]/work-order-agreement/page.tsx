@@ -1,0 +1,144 @@
+'use client';
+
+import { useRouter, useParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import WorkOrderContract from '@/components/WorkOrderContract';
+import { pdfGenerator } from '@/lib/pdf-generator';
+
+export default function WorkOrderAgreementPage() {
+  const router = useRouter();
+  const params = useParams();
+  const [jobData, setJobData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchJobData();
+  }, []);
+
+  const fetchJobData = async () => {
+    try {
+      const { data: job, error } = await supabase
+        .from('active_job_orders')
+        .select('*')
+        .eq('id', params.id)
+        .single();
+
+      if (error) throw error;
+
+      setJobData({
+        orderId: job.job_number,
+        date: job.job_date,
+        customer: job.customer_name,
+        jobLocation: job.location || job.address,
+        poNumber: job.po_number,
+        workDescription: job.job_description || job.scope_of_work || 'Core drilling and concrete cutting services',
+        scopeOfWork: job.scope_of_work_items || []
+      });
+    } catch (error) {
+      console.error('Error fetching job data:', error);
+      alert('Error loading job data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSign = async (signatureData: any) => {
+    try {
+      // Save the contract signature to database
+      const { error: updateError } = await supabase
+        .from('job_orders')
+        .update({
+          work_order_signed: true,
+          work_order_signature: signatureData.signature,
+          work_order_signer_name: signatureData.name,
+          work_order_signer_title: signatureData.title,
+          work_order_signed_at: signatureData.date,
+          cut_through_authorized: signatureData.cutThroughAuthorized || false,
+          cut_through_signature: signatureData.cutThroughSignature || null
+        })
+        .eq('id', params.id);
+
+      if (updateError) throw updateError;
+
+      // Generate PDF of signed contract
+      try {
+        const pdfResult = await pdfGenerator.generateWorkOrderContract(
+          {
+            ...jobData,
+            jobId: params.id
+          },
+          signatureData
+        );
+
+        if (pdfResult.success) {
+          console.log('PDF generated successfully:', pdfResult.url);
+        } else {
+          console.error('PDF generation failed:', pdfResult.error);
+          // Don't block navigation if PDF fails
+        }
+      } catch (pdfError) {
+        console.error('Error generating PDF:', pdfError);
+        // Don't block navigation if PDF fails
+      }
+
+      // Navigate to equipment checklist or next step
+      router.push(`/dashboard/job-schedule/${params.id}/equipment-checklist`);
+    } catch (error) {
+      console.error('Error saving signature:', error);
+      throw error;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading work order...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!jobData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">Error loading job data</p>
+          <button
+            onClick={() => router.back()}
+            className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 py-8 px-4">
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-6">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+        </div>
+
+        <WorkOrderContract
+          jobData={jobData}
+          mode="start"
+          onSign={handleSign}
+          onCancel={() => router.back()}
+        />
+      </div>
+    </div>
+  );
+}

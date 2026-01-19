@@ -125,7 +125,7 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
 
               <!-- Instructions -->
               <p style="margin: 0 0 32px; color: #475569; font-size: 15px; line-height: 1.6;">
-                You should receive a separate email to set your password. After setting your password, use the button below to access your account.
+                Your account is now active! Use the password you provided during registration to log in using the button below.
               </p>
 
               <!-- CTA Button -->

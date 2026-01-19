@@ -61,7 +61,7 @@ export default function QRScanPage() {
 
       // Start scanning
       reader.decodeFromVideoDevice(
-        undefined, // Use default camera
+        null, // Use default camera
         videoRef.current!,
         (result, error) => {
           if (result) {

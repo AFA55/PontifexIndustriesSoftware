@@ -42,11 +42,6 @@ export default function EquipmentDetailModal({
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-500">Type</label>
-              <p className="text-lg text-gray-800">{equipment.type}</p>
-            </div>
-
-            <div>
               <label className="text-sm font-medium text-gray-500">Brand</label>
               <p className="text-lg text-gray-800">{equipment.brand || 'N/A'}</p>
             </div>
@@ -67,7 +62,7 @@ export default function EquipmentDetailModal({
                 <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
                   equipment.status === 'available'
                     ? 'bg-green-100 text-green-700'
-                    : equipment.status === 'in-use'
+                    : equipment.status === 'assigned'
                     ? 'bg-blue-100 text-blue-700'
                     : equipment.status === 'maintenance'
                     ? 'bg-yellow-100 text-yellow-700'
@@ -96,29 +91,6 @@ export default function EquipmentDetailModal({
               <div className="col-span-2">
                 <label className="text-sm font-medium text-gray-500">Notes</label>
                 <p className="text-gray-700 mt-1">{equipment.notes}</p>
-              </div>
-            )}
-
-            <div>
-              <label className="text-sm font-medium text-gray-500">Hours Used</label>
-              <p className="text-lg text-gray-800">{equipment.hours_used || 0}</p>
-            </div>
-
-            {equipment.last_maintenance && (
-              <div>
-                <label className="text-sm font-medium text-gray-500">Last Maintenance</label>
-                <p className="text-lg text-gray-800">
-                  {new Date(equipment.last_maintenance).toLocaleDateString()}
-                </p>
-              </div>
-            )}
-
-            {equipment.next_maintenance && (
-              <div>
-                <label className="text-sm font-medium text-gray-500">Next Maintenance</label>
-                <p className="text-lg text-gray-800">
-                  {new Date(equipment.next_maintenance).toLocaleDateString()}
-                </p>
               </div>
             )}
           </div>

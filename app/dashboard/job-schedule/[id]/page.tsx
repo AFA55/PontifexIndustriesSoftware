@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { verifyShopLocation } from '@/lib/geolocation';
+import { supabase } from '@/lib/supabase';
 
 // Enhanced job data structure with real DSM-style information
 const jobDetails = {
@@ -94,11 +96,16 @@ export default function JobDetail() {
   const [loading, setLoading] = useState(true);
   const [jobStatus, setJobStatus] = useState<'scheduled' | 'in-route' | 'in-progress' | 'completed'>('scheduled');
   const [documentStatus, setDocumentStatus] = useState<{[key: string]: boolean}>({});
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [showEquipmentCheckModal, setShowEquipmentCheckModal] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<'scheduled' | 'in-route' | 'in-progress' | 'completed' | null>(null);
+  const [workflowStatus, setWorkflowStatus] = useState<any>(null);
   const router = useRouter();
   const params = useParams();
   const jobId = params.id as string;
 
-  const job = jobDetails[jobId as keyof typeof jobDetails];
+  const job = jobDetails[jobId as unknown as keyof typeof jobDetails];
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -124,11 +131,158 @@ export default function JobDetail() {
     };
 
     checkDocumentStatus();
+    fetchWorkflowStatus();
 
     // Listen for storage changes
     window.addEventListener('storage', checkDocumentStatus);
     return () => window.removeEventListener('storage', checkDocumentStatus);
   }, [router, params.id]);
+
+  // Fetch workflow status to determine button state
+  const fetchWorkflowStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/workflow?jobId=${job.id}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setWorkflowStatus(result.data);
+        }
+      }
+    } catch (error) {
+      console.log('Error fetching workflow status:', error);
+    }
+  };
+
+  // Send SMS to foreman
+  const sendForemanSMS = async (message: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          to: job.foremaneOffice,
+          message: message,
+        }),
+      });
+    } catch (error) {
+      console.error('Error sending SMS:', error);
+    }
+  };
+
+  // Update job status and operator status
+  const updateJobStatus = async (newStatus: 'scheduled' | 'in-route' | 'in-progress' | 'completed') => {
+    // Check if equipment checklist is needed for "in-route" status
+    if (newStatus === 'in-route' && jobStatus === 'scheduled') {
+      setPendingStatus(newStatus);
+      setShowEquipmentCheckModal(true);
+      return;
+    }
+
+    setStatusLoading(true);
+    setStatusMessage(null);
+
+    try {
+      // Map job status to operator status
+      let operatorStatus: string;
+      switch (newStatus) {
+        case 'in-route':
+          operatorStatus = 'en_route';
+          break;
+        case 'in-progress':
+          operatorStatus = 'in_progress';
+          break;
+        case 'completed':
+          operatorStatus = 'job_completed';
+          break;
+        default:
+          operatorStatus = 'clocked_in';
+      }
+
+      // Get location
+      const verification = await verifyShopLocation();
+
+      // Get session
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        setStatusMessage({
+          type: 'error',
+          text: 'Session expired. Please log in again.',
+        });
+        setStatusLoading(false);
+        return;
+      }
+
+      // Update operator status in database
+      const response = await fetch('/api/operator/status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          status: operatorStatus,
+          latitude: verification.location?.latitude,
+          longitude: verification.location?.longitude,
+          accuracy: verification.location?.accuracy,
+          jobId: job.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setStatusMessage({
+          type: 'error',
+          text: result.error || 'Failed to update status',
+        });
+        setStatusLoading(false);
+        return;
+      }
+
+      // Update local job status
+      setJobStatus(newStatus);
+      setStatusMessage({
+        type: 'success',
+        text: `Status updated to: ${newStatus.replace('-', ' ').toUpperCase()}`,
+      });
+
+      // Send SMS to foreman when going "in-route"
+      if (newStatus === 'in-route') {
+        const locationStr = verification.location
+          ? `Current location: ${verification.location.latitude.toFixed(6)}, ${verification.location.longitude.toFixed(6)}`
+          : 'Location unavailable';
+
+        const smsMessage = `This is ${user?.name} with B&D Concrete Cutting. Just wanted to let you know we are in route to ${job.address}. ${locationStr}`;
+        await sendForemanSMS(smsMessage);
+      }
+
+      // Hide message after 3 seconds
+      setTimeout(() => setStatusMessage(null), 3000);
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      setStatusMessage({
+        type: 'error',
+        text: error.message || 'An error occurred while updating status',
+      });
+    } finally {
+      setStatusLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -225,6 +379,36 @@ export default function JobDetail() {
       </div>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Status Message */}
+        {statusMessage && (
+          <div className={`${
+            statusMessage.type === 'success'
+              ? 'bg-green-50 border-green-300'
+              : 'bg-red-50 border-red-300'
+          } border-2 rounded-2xl p-6 shadow-lg animate-fade-in`}>
+            <div className="flex items-center space-x-3">
+              <div className={`w-12 h-12 ${
+                statusMessage.type === 'success' ? 'bg-green-200' : 'bg-red-200'
+              } rounded-full flex items-center justify-center`}>
+                {statusMessage.type === 'success' ? (
+                  <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <p className={`${
+                statusMessage.type === 'success' ? 'text-green-800' : 'text-red-800'
+              } font-bold text-lg`}>
+                {statusMessage.text}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Modern Status Section */}
         <div className="bg-white rounded-2xl shadow-xl border-2 border-blue-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Job Status</h2>
@@ -249,24 +433,35 @@ export default function JobDetail() {
                       alert('Please complete all required documents before marking job as "In Progress"');
                       return;
                     }
-                    setJobStatus(status.key as any);
+                    updateJobStatus(status.key as any);
                   }}
                 className={`relative p-4 rounded-xl border-2 transition-all duration-200 ${
                   isDisabled
                     ? 'bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed opacity-60'
+                    : statusLoading
+                    ? 'bg-gray-300 border-gray-400 text-gray-500 cursor-wait opacity-70'
                     : jobStatus === status.key
                     ? `${getStatusColor(status.key)} text-white shadow-lg scale-105`
                     : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
                 }`}
-                disabled={isDisabled}
+                disabled={isDisabled || statusLoading}
               >
                 <div className="flex flex-col items-center gap-2">
-                  <span className="text-2xl">{status.icon}</span>
-                  <span className="font-medium text-sm">{status.label}</span>
-                  {isDisabled && (
-                    <span className="text-xs text-red-500 font-medium">
-                      📋 Docs Required
-                    </span>
+                  {statusLoading ? (
+                    <>
+                      <div className="animate-spin w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full"></div>
+                      <span className="font-medium text-xs">Updating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl">{status.icon}</span>
+                      <span className="font-medium text-sm">{status.label}</span>
+                      {isDisabled && (
+                        <span className="text-xs text-red-500 font-medium">
+                          📋 Docs Required
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
                 {jobStatus === status.key && (
@@ -317,16 +512,16 @@ export default function JobDetail() {
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Job Type:</span>
-                      <span className="font-medium">{job.jobType}</span>
+                      <span className="text-gray-700 font-semibold">Job Type:</span>
+                      <span className="font-bold text-gray-900">{job.jobType}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Customer:</span>
-                      <span className="font-medium">{job.customer}</span>
+                      <span className="text-gray-700 font-semibold">Customer:</span>
+                      <span className="font-bold text-gray-900">{job.customer}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Location:</span>
-                      <span className="font-medium">{job.location}</span>
+                      <span className="text-gray-700 font-semibold">Location:</span>
+                      <span className="font-bold text-gray-900">{job.location}</span>
                     </div>
                   </div>
                 </div>
@@ -342,16 +537,16 @@ export default function JobDetail() {
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Arrival Time:</span>
-                      <span className="font-medium">{job.arrivalTime}</span>
+                      <span className="text-gray-700 font-semibold">Arrival Time:</span>
+                      <span className="font-bold text-gray-900">{job.arrivalTime}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Est. Hours:</span>
-                      <span className="font-medium">{job.estimatedHours}</span>
+                      <span className="text-gray-700 font-semibold">Est. Hours:</span>
+                      <span className="font-bold text-gray-900">{job.estimatedHours}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Technician:</span>
-                      <span className="font-medium">{job.technician}</span>
+                      <span className="text-gray-700 font-semibold">Technician:</span>
+                      <span className="font-bold text-gray-900">{job.technician}</span>
                     </div>
                   </div>
                 </div>
@@ -367,15 +562,15 @@ export default function JobDetail() {
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-gray-600">Foreman:</span>
-                      <p className="font-medium">{job.foreman}</p>
-                      <a href={`tel:${job.foremaneOffice}`} className="text-blue-600 hover:underline">
+                      <span className="text-gray-700 font-semibold">Foreman:</span>
+                      <p className="font-bold text-gray-900">{job.foreman}</p>
+                      <a href={`tel:${job.foremaneOffice}`} className="text-blue-600 hover:underline font-semibold">
                         📞 {job.foremaneOffice}
                       </a>
                     </div>
                     <div>
-                      <span className="text-gray-600">Salesman:</span>
-                      <p className="font-medium">{job.salesman}</p>
+                      <span className="text-gray-700 font-semibold">Salesman:</span>
+                      <p className="font-bold text-gray-900">{job.salesman}</p>
                     </div>
                   </div>
                 </div>
@@ -571,6 +766,54 @@ export default function JobDetail() {
           </div>
         </div>
       </div>
+
+      {/* Equipment Checklist Confirmation Modal */}
+      {showEquipmentCheckModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Equipment Checklist Confirmation</h2>
+            <p className="text-gray-700 mb-6">
+              Before heading to the job site, please confirm that you have reviewed the equipment checklist and have all necessary equipment:
+            </p>
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6">
+              <h3 className="font-bold text-blue-900 mb-2">Required Equipment:</h3>
+              <ul className="space-y-1">
+                {job?.equipment.map((item, idx) => (
+                  <li key={idx} className="flex items-center gap-2 text-blue-800">
+                    <span className="text-blue-600">✓</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-gray-800 font-semibold mb-6">
+              Have you verified that you have all the required equipment?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowEquipmentCheckModal(false);
+                  if (pendingStatus) {
+                    updateJobStatus(pendingStatus);
+                  }
+                }}
+                className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-colors"
+              >
+                ✅ Yes, I'm Ready
+              </button>
+              <button
+                onClick={() => {
+                  setShowEquipmentCheckModal(false);
+                  setPendingStatus(null);
+                }}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors"
+              >
+                ❌ No, I Need to Check
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

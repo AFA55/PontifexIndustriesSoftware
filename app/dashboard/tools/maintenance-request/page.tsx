@@ -12,7 +12,7 @@ type IssueCategory = 'mechanical' | 'electrical' | 'hydraulic' | 'safety' | 'oth
 interface MaintenanceRequest {
   equipmentId: string;
   equipmentName: string;
-  issueCategory: IssueCategory;
+  issueCategory: IssueCategory; 
   priority: PriorityLevel;
   description: string;
   requestedBy: string;
@@ -105,7 +105,7 @@ export default function MaintenanceRequestPage() {
 
       // Start scanning
       reader.decodeFromVideoDevice(
-        undefined, // Use default camera
+        null, // Use default camera
         videoRef.current!,
         (result, error) => {
           if (result) {
@@ -326,20 +326,12 @@ export default function MaintenanceRequestPage() {
       <style jsx global>{`
         input[type="text"],
         input[type="tel"],
-        textarea,
-        select,
-        option {
+        textarea {
           color: #111827 !important;
         }
         input::placeholder,
         textarea::placeholder {
           color: #9ca3af !important;
-        }
-        /* Ensure disabled inputs are also visible */
-        input:disabled,
-        select:disabled {
-          color: #6b7280 !important;
-          background-color: #f3f4f6 !important;
         }
       `}</style>
 

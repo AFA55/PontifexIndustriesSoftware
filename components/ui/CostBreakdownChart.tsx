@@ -78,7 +78,7 @@ export function CostBreakdownChart({ data, size = 200 }: CostBreakdownChartProps
       <ResponsiveContainer width="100%" height={size}>
         <PieChart>
           <Pie
-            data={filteredData}
+            data={filteredData as any}
             cx="50%"
             cy="50%"
             innerRadius={size * 0.25}

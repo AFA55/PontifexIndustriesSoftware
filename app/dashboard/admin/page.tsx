@@ -52,10 +52,19 @@ function PontifexLogo({ className = "h-8" }: { className?: string }) {
   );
 }
 
+interface QuickStats {
+  activeJobs: number;
+  crewsWorking: number;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<QuickStats>({
+    activeJobs: 0,
+    crewsWorking: 0,
+  });
 
   useEffect(() => {
     console.log('🔍 Checking admin access...');
@@ -76,7 +85,48 @@ export default function AdminDashboard() {
     console.log('✅ Admin access granted');
     setUser(currentUser);
     setLoading(false);
+    fetchDashboardStats();
   }, [router]);
+
+  const fetchDashboardStats = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
+        localStorage.removeItem('supabase-user');
+        localStorage.removeItem('pontifex-user');
+        window.location.href = '/login';
+        return;
+      }
+
+      // Fetch active jobs for today
+      const today = new Date().toISOString().split('T')[0];
+      const { data: jobs } = await supabase
+        .from('job_orders')
+        .select('id, status, scheduled_date')
+        .eq('scheduled_date', today)
+        .neq('status', 'completed')
+        .neq('status', 'cancelled');
+
+      // Fetch operators currently working (clocked in, en route, or in progress)
+      const { data: operators } = await supabase
+        .from('operator_status')
+        .select('id, status, user_id')
+        .in('status', ['clocked_in', 'en_route', 'in_progress']);
+
+      // Get unique operators (in case there are duplicates)
+      const uniqueOperators = operators ?
+        Array.from(new Set(operators.map(op => op.user_id))).length : 0;
+
+      setStats({
+        activeJobs: jobs?.length || 0,
+        crewsWorking: uniqueOperators,
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -107,14 +157,14 @@ export default function AdminDashboard() {
       status: 'active'
     },
     {
-      title: 'Create Estimate',
-      description: 'Build professional estimates for concrete cutting services',
-      icon: '📝',
-      href: '/dashboard/admin/create-estimate',
-      bgColor: 'from-gray-500 to-gray-600',
-      iconBg: 'bg-gray-500',
-      features: ['Multi-service quotes', 'Real-time calculations', 'PDF generation', 'Email to clients'],
-      status: 'coming-soon'
+      title: 'Schedule Board',
+      description: 'View operator schedules and send schedule notifications',
+      icon: '📅',
+      href: '/dashboard/admin/schedule-board',
+      bgColor: 'from-purple-500 to-indigo-600',
+      iconBg: 'bg-purple-500',
+      features: ['View all schedules', 'Send email notifications', 'Shop arrival times', 'Daily overview'],
+      status: 'active'
     },
     {
       title: 'Project Board',
@@ -147,26 +197,6 @@ export default function AdminDashboard() {
       status: 'active'
     },
     {
-      title: 'Resource Management',
-      description: 'Manage equipment, vehicles, and personnel assignments',
-      icon: '🔧',
-      href: '/dashboard/admin/resources',
-      bgColor: 'from-gray-500 to-gray-600',
-      iconBg: 'bg-gray-500',
-      features: ['Equipment tracking', 'Staff scheduling', 'Resource allocation', 'Maintenance logs'],
-      status: 'coming-soon'
-    },
-    {
-      title: 'Financial Overview',
-      description: 'Track project costs, revenue, and profitability',
-      icon: '💰',
-      href: '/dashboard/admin/financials',
-      bgColor: 'from-green-500 to-emerald-600',
-      iconBg: 'bg-green-500',
-      features: ['Cost tracking', 'Revenue reports', 'Profit margins', 'Invoice management'],
-      status: 'coming-soon'
-    },
-    {
       title: 'Analytics & Reports',
       description: 'Comprehensive business analytics and reporting',
       icon: '📈',
@@ -177,14 +207,44 @@ export default function AdminDashboard() {
       status: 'active'
     },
     {
-      title: 'Safety & Compliance',
-      description: 'Track safety incidents, training, and compliance',
-      icon: '🛡️',
-      href: '/dashboard/admin/safety',
-      bgColor: 'from-orange-500 to-red-600',
-      iconBg: 'bg-orange-500',
-      features: ['Incident reporting', 'Training records', 'Compliance tracking', 'Safety scores'],
-      status: 'coming-soon'
+      title: 'Equipment Performance',
+      description: 'Track equipment usage, production rates, and resource efficiency',
+      icon: '🔧',
+      href: '/dashboard/admin/equipment-performance',
+      bgColor: 'from-teal-500 to-cyan-600',
+      iconBg: 'bg-teal-500',
+      features: ['Production rates', 'Difficulty analysis', 'Resource tracking', 'Operator rankings'],
+      status: 'active'
+    },
+    {
+      title: 'Operator Profiles',
+      description: 'Manage operator skills, costs, and certifications',
+      icon: '👤',
+      href: '/dashboard/admin/operator-profiles',
+      bgColor: 'from-blue-500 to-indigo-600',
+      iconBg: 'bg-blue-500',
+      features: ['Set hourly rates', 'Track skills & certifications', 'Production analytics', 'Task qualifications'],
+      status: 'active'
+    },
+    {
+      title: 'Completed Jobs Archive',
+      description: 'View all signed jobs, documents, and customer feedback',
+      icon: '📋',
+      href: '/dashboard/admin/completed-jobs',
+      bgColor: 'from-green-500 to-emerald-600',
+      iconBg: 'bg-green-500',
+      features: ['View completed jobs', 'Access all documents', 'Customer ratings', 'PDF downloads'],
+      status: 'active'
+    },
+    {
+      title: 'Blade & Bit Management',
+      description: 'Track blade/bit stock levels and assign to operators',
+      icon: '🔪',
+      href: '/dashboard/inventory',
+      bgColor: 'from-indigo-500 to-purple-600',
+      iconBg: 'bg-indigo-500',
+      features: ['Stock tracking', 'QR code scanning', 'Assign to operators', 'Low stock alerts'],
+      status: 'active'
     },
     {
       title: 'Tools & Equipment',
@@ -198,47 +258,40 @@ export default function AdminDashboard() {
     }
   ];
 
-  const quickStats = [
-    { label: 'Active Jobs', value: '12', change: '+3', trend: 'up' },
-    { label: 'Crews Working', value: '8', change: '0', trend: 'neutral' },
-    { label: "Today's Revenue", value: '$45.2K', change: '+12%', trend: 'up' },
-    { label: 'Equipment Utilization', value: '87%', change: '+5%', trend: 'up' }
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300 rounded-full opacity-10 blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-red-300 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-200 rounded-full opacity-5 blur-3xl animate-pulse delay-2000"></div>
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full opacity-10 blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full opacity-5 blur-3xl animate-pulse delay-2000"></div>
       </div>
 
-      {/* Modern Glass Morphism Header */}
-      <div className="backdrop-blur-xl bg-white/70 border-b border-white/20 sticky top-0 z-50 shadow-sm">
+      {/* Modern Header with Professional Gradient */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             {/* Pontifex Logo with Animation */}
             <div className="transform hover:scale-105 transition-transform duration-200">
-              <PontifexLogo className="h-10 text-foreground" />
+              <PontifexLogo className="h-10 text-white" />
             </div>
 
             {/* Modern Profile Section */}
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
+              <div className="hidden sm:flex items-center gap-3 bg-white/10 backdrop-blur-lg px-4 py-2 rounded-xl border border-white/20">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white/30">
                   {user?.name?.charAt(0) || 'A'}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-800">{user?.name || 'Admin'}</p>
-                  <p className="text-xs text-gray-500 capitalize">Administrator</p>
+                  <p className="text-sm font-bold text-white">{user?.name || 'Admin'}</p>
+                  <p className="text-xs text-blue-200 capitalize font-medium">Super Admin</p>
                 </div>
               </div>
 
               {/* Operator View Button */}
               <Link
                 href="/dashboard"
-                className="px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+                className="px-4 py-2.5 bg-white/10 backdrop-blur-lg hover:bg-white/20 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg flex items-center gap-2 border border-white/20"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -249,12 +302,12 @@ export default function AdminDashboard() {
               {/* Premium Logout Button */}
               <button
                 onClick={handleLogout}
-                className="group flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                className="group flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-red-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
               >
                 <svg className="w-4 h-4 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                <span className="font-medium">Logout</span>
+                <span>Logout</span>
               </button>
             </div>
           </div>
@@ -265,22 +318,24 @@ export default function AdminDashboard() {
         {/* Modern Animated Greeting */}
         <div className="text-center mb-10 animate-fade-in">
           <div className="inline-block">
-            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-orange-600 via-red-600 to-blue-600 bg-clip-text text-transparent mb-3 animate-gradient">
-              Welcome back, {user?.name?.split(' ')[0] || 'Admin'}!
+            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
+              Welcome back, {user?.name?.split(' ')[0] || 'Super'}!
             </h1>
-            <p className="text-gray-600 text-lg font-light">
+            <p className="text-gray-700 text-lg font-medium">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
           </div>
 
-          {/* Quick Stats Bar */}
-          <div className="flex justify-center gap-8 mt-6">
-            {quickStats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <p className="text-3xl font-bold text-blue-600">{stat.value}</p>
-                <p className="text-sm text-gray-500">{stat.label}</p>
-              </div>
-            ))}
+          {/* Quick Stats Bar with Professional Gradients */}
+          <div className="flex justify-center gap-6 mt-8">
+            <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
+              <p className="text-4xl font-bold text-white drop-shadow-lg">{stats.activeJobs}</p>
+              <p className="text-sm text-white/90 font-semibold mt-1">Active Jobs</p>
+            </div>
+            <div className="bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
+              <p className="text-4xl font-bold text-white drop-shadow-lg">{stats.crewsWorking}</p>
+              <p className="text-sm text-white/90 font-semibold mt-1">Crews Working</p>
+            </div>
           </div>
         </div>
 

@@ -54,15 +54,15 @@ export async function POST(
       );
     }
 
-    // Generate a temporary password for the user (they already have the password they set)
-    // We'll use the hashed password from the request but need to create a new user
-    // Since Supabase Auth requires a plain password, we'll need to generate a random one
-    // and then the user can reset it, OR we can use their original password
-    // Problem: We have the hashed password, not the plain one
+    // Check if we have the user's original password
+    const userPassword = accessRequest.password_plain;
 
-    // Solution: Generate a secure random password and send it via email later,
-    // OR better: use a password reset flow
-    // For now, let's generate a random password and mark the account for password reset
+    if (!userPassword) {
+      return NextResponse.json(
+        { error: 'Password not found in access request. User may need to request access again.' },
+        { status: 400 }
+      );
+    }
 
     // Step 1: Check if user already exists in Supabase Auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
@@ -71,16 +71,28 @@ export async function POST(
     let userId: string;
 
     if (existingUser) {
-      // User already exists in Auth, just use their ID
-      console.log(`User ${accessRequest.email} already exists in Auth, using existing account`);
+      // User already exists in Auth, update their password to match what they entered
+      console.log(`User ${accessRequest.email} already exists in Auth, updating password`);
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        existingUser.id,
+        { password: userPassword }
+      );
+
+      if (updateError) {
+        console.error('Error updating user password:', updateError);
+        return NextResponse.json(
+          { error: `Failed to update user password: ${updateError.message}` },
+          { status: 500 }
+        );
+      }
+
       userId = existingUser.id;
     } else {
-      // Create new user in Supabase Auth
-      const temporaryPassword = generateSecurePassword();
-
+      // Create new user in Supabase Auth with their chosen password
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: accessRequest.email,
-        password: temporaryPassword,
+        password: userPassword, // Use the password they entered during registration
         email_confirm: true, // Auto-confirm email
         user_metadata: {
           full_name: accessRequest.full_name,
@@ -98,6 +110,7 @@ export async function POST(
       }
 
       userId = authData.user.id;
+      console.log(`✅ User created with their original password`);
     }
 
     // Step 2: Check if profile already exists, if not create it
@@ -108,11 +121,12 @@ export async function POST(
       .single();
 
     if (existingProfile) {
-      // Profile exists, update it with the new role
+      // Profile exists, update it with the new role and phone number
       const { error: updateProfileError } = await supabaseAdmin
         .from('profiles')
         .update({
           role: role,
+          phone_number: accessRequest.phone_number || existingProfile.phone_number,
           active: true,
         })
         .eq('id', userId);
@@ -135,6 +149,7 @@ export async function POST(
             full_name: accessRequest.full_name,
             role: role,
             phone: '',
+            phone_number: accessRequest.phone_number || '',
             active: true,
           },
         ]);
@@ -154,7 +169,7 @@ export async function POST(
       }
     }
 
-    // Step 3: Update access request status
+    // Step 3: Update access request status and CLEAR the plain password for security
     const { error: updateError } = await supabaseAdmin
       .from('access_requests')
       .update({
@@ -162,6 +177,7 @@ export async function POST(
         reviewed_by: reviewedBy,
         reviewed_at: new Date().toISOString(),
         assigned_role: role,
+        password_plain: null, // Clear the plain password for security
       })
       .eq('id', id);
 
@@ -171,18 +187,7 @@ export async function POST(
       // The request status update failing is not critical
     }
 
-    // Step 4: Send password reset email so user can set their own password
-    const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'recovery',
-      email: accessRequest.email,
-    });
-
-    if (resetError) {
-      console.warn('Could not send password reset email:', resetError);
-      // Non-critical error, user account is still created
-    }
-
-    // Step 5: Send approval confirmation email with login button
+    // Step 4: Send approval confirmation email with login button
     const approvalEmailHtml = generateApprovalEmail(
       accessRequest.full_name,
       accessRequest.email,
@@ -204,15 +209,15 @@ export async function POST(
       {
         success: true,
         message: existingProfile
-          ? `Access approved! User ${accessRequest.full_name} role updated to ${role}.`
-          : `Access approved! User ${accessRequest.full_name} has been created as ${role}.`,
+          ? `Access approved! User ${accessRequest.full_name} role updated to ${role}. They can now log in with their password.`
+          : `Access approved! User ${accessRequest.full_name} has been created as ${role}. They can now log in with their password.`,
         data: {
           userId: userId,
           email: accessRequest.email,
           role: role,
-          passwordResetSent: !resetError,
           approvalEmailSent: emailSent,
           wasExistingUser: !!existingUser,
+          canLoginNow: true,
         },
       },
       { status: 200 }
@@ -224,17 +229,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
-
-/**
- * Generate a secure random password
- */
-function generateSecurePassword(length: number = 16): string {
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    const randomIndex = Math.floor(Math.random() * charset.length);
-    password += charset[randomIndex];
-  }
-  return password;
 }

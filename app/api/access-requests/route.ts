@@ -11,10 +11,10 @@ import bcrypt from 'bcryptjs';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, email, password, dateOfBirth, position } = body;
+    const { fullName, email, phoneNumber, password, dateOfBirth, position } = body;
 
     // Validation
-    if (!fullName || !email || !password || !dateOfBirth) {
+    if (!fullName || !email || !phoneNumber || !password || !dateOfBirth) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -92,13 +92,17 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
     // Insert access request
+    // NOTE: We store BOTH the hash (for security) and plain password (temporary, for account creation)
+    // The plain password will be cleared after account approval
     const { data, error } = await supabaseAdmin
       .from('access_requests')
       .insert([
         {
           full_name: fullName,
           email: email.toLowerCase(),
+          phone_number: phoneNumber,
           password_hash: passwordHash,
+          password_plain: password, // Store temporarily for account creation
           date_of_birth: dateOfBirth,
           position: position || 'Not specified', // Default if not provided
           status: 'pending',

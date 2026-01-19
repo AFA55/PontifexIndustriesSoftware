@@ -13,12 +13,12 @@ export default function RequestAccessPage() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    phoneNumber: '',
     password: '',
     confirmPassword: '',
     birthMonth: '',
     birthDay: '',
-    birthYear: '',
-    position: ''
+    birthYear: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,9 +72,9 @@ export default function RequestAccessPage() {
         body: JSON.stringify({
           fullName: formData.fullName,
           email: formData.email,
+          phoneNumber: formData.phoneNumber,
           password: formData.password,
           dateOfBirth: `${formData.birthYear}-${formData.birthMonth.padStart(2, '0')}-${formData.birthDay.padStart(2, '0')}`,
-          position: formData.position,
         }),
       });
 
@@ -176,6 +176,22 @@ export default function RequestAccessPage() {
             />
           </div>
 
+          {/* Phone Number */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Phone Number <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="tel"
+              required
+              value={formData.phoneNumber}
+              onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-800"
+              placeholder="(xxx) xxx-xxxx"
+            />
+            <p className="text-xs text-gray-500 mt-1">Your contact phone number</p>
+          </div>
+
           {/* Password */}
           <div className="grid md:grid-cols-2 gap-4">
             <div>
@@ -264,21 +280,6 @@ export default function RequestAccessPage() {
               </select>
             </div>
             <p className="text-xs text-gray-500 mt-1">You must be at least 18 years old</p>
-          </div>
-
-          {/* Position */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Position/Role <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.position}
-              onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-800"
-              placeholder="e.g., Concrete Cutting Operator, Foreman, etc."
-            />
           </div>
 
           {/* Submit Button */}

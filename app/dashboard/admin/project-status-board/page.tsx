@@ -2,230 +2,199 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
-// Mock data for active jobs - will be replaced with actual data
-const mockJobs = [
-  {
-    id: '1',
-    jobNumber: 'JOB-2024-001',
-    clientName: 'ABC Construction',
-    projectName: 'Downtown Plaza Core Drilling',
-    location: '123 Main St, Downtown',
-    address: '123 Main St, Downtown',
-    status: 'on-track',
-    priority: 'high',
-    progress: 75,
-    startDate: '2024-11-08',
-    endDate: '2024-11-08',
-    startTime: '7:00 AM',
-    estimatedEnd: '3:00 PM',
-    estimatedHours: '8',
-    jobTypes: ['CORE DRILLING'],
-    contactOnSite: 'James',
-    contactPhone: '678-447-2756',
-    crew: ['John Smith', 'Mike Johnson'],
-    operator: 'John Smith',
-    salesman: 'CAMERON AMOS',
-    equipment: [
-      { name: 'Core Drill #3', type: 'Core Drill', status: 'In Use', hours: 6.2, operator: 'John Smith', condition: 'Good' },
-      { name: 'Truck #5', type: 'Vehicle', status: 'In Use', hours: 6.0, operator: 'Mike Johnson', condition: 'Excellent' },
-      { name: 'Diamond Bit Set', type: 'Accessory', status: 'In Use', hours: 6.2, operator: 'John Smith', condition: 'Good' }
-    ],
-    requiredDocuments: ['JSA Form (Job Safety Analysis)', 'Silica Dust/Exposure Control Plan'],
-    phase: 'Core Drilling',
-    lastUpdate: '10 mins ago',
-    notes: 'Making good progress on level 2',
-    jobQuote: 8500, // Admin only
-    timeline: {
-      totalHours: 8,
-      elapsed: 6,
-      phases: [
-        { name: 'Setup', status: 'completed', duration: 1 },
-        { name: 'Core Drilling', status: 'in-progress', duration: 5 },
-        { name: 'Cleanup', status: 'pending', duration: 2 }
-      ]
-    }
-  },
-  {
-    id: '2',
-    jobNumber: 'JOB-2024-002',
-    clientName: 'XYZ Contractors',
-    projectName: 'Parking Structure Sawing',
-    location: '456 Oak Ave',
-    status: 'needs-attention',
-    progress: 45,
-    startTime: '8:00 AM',
-    estimatedEnd: '5:00 PM',
-    crew: ['Bob Williams', 'Tom Davis'],
-    operator: 'Bob Williams',
-    equipment: [
-      { name: 'Slab Saw #1', type: 'Slab Saw', status: 'Maintenance', hours: 4.5, operator: 'Bob Williams', condition: 'Needs Attention' },
-      { name: 'Truck #2', type: 'Vehicle', status: 'In Use', hours: 5.0, operator: 'Tom Davis', condition: 'Good' },
-      { name: 'Diamond Blade 14"', type: 'Accessory', status: 'In Use', hours: 4.5, operator: 'Bob Williams', condition: 'Fair' }
-    ],
-    phase: 'Sawing',
-    priority: 'medium',
-    lastUpdate: '25 mins ago',
-    notes: 'Equipment issue resolved, back on track',
-    jobQuote: 5200, // Admin only
-    timeline: {
-      totalHours: 9,
-      elapsed: 5,
-      phases: [
-        { name: 'Setup', status: 'completed', duration: 2 },
-        { name: 'Marking', status: 'completed', duration: 1 },
-        { name: 'Sawing', status: 'in-progress', duration: 4 },
-        { name: 'Cleanup', status: 'pending', duration: 2 }
-      ]
-    }
-  },
-  {
-    id: '3',
-    jobNumber: 'JOB-2024-003',
-    clientName: 'Metro Development',
-    projectName: 'Bridge Deck Repair',
-    location: '789 Bridge Rd',
-    status: 'behind',
-    progress: 20,
-    startTime: '6:00 AM',
-    estimatedEnd: '4:00 PM',
-    crew: ['Steve Miller', 'Dave Brown', 'Jim Wilson'],
-    operator: 'Steve Miller',
-    equipment: [
-      { name: 'Wall Saw #2', type: 'Wall Saw', status: 'In Use', hours: 2.8, operator: 'Steve Miller', condition: 'Good' },
-      { name: 'Core Drill #1', type: 'Core Drill', status: 'Standby', hours: 0, operator: 'Dave Brown', condition: 'Excellent' },
-      { name: 'Truck #3', type: 'Vehicle', status: 'In Use', hours: 3.0, operator: 'Jim Wilson', condition: 'Good' },
-      { name: 'Wire Saw Kit', type: 'Accessory', status: 'Standby', hours: 0, operator: 'Steve Miller', condition: 'Excellent' }
-    ],
-    phase: 'Preparation',
-    priority: 'urgent',
-    lastUpdate: '5 mins ago',
-    jobQuote: 12000, // Admin only
-    notes: 'Weather delay - crew arrived late',
-    timeline: {
-      totalHours: 10,
-      elapsed: 3,
-      phases: [
-        { name: 'Site Prep', status: 'in-progress', duration: 3 },
-        { name: 'Demolition', status: 'pending', duration: 4 },
-        { name: 'Installation', status: 'pending', duration: 2 },
-        { name: 'Cleanup', status: 'pending', duration: 1 }
-      ]
-    }
-  },
-  {
-    id: '4',
-    jobNumber: 'JOB-2024-004',
-    clientName: 'Industrial Corp',
-    projectName: 'Factory Floor Cutting',
-    location: '321 Industrial Blvd',
-    status: 'on-track',
-    progress: 90,
-    startTime: '7:30 AM',
-    estimatedEnd: '2:00 PM',
-    crew: ['Jack Anderson', 'Bill Thomas'],
-    operator: 'Jack Anderson',
-    equipment: [
-      { name: 'Slab Saw #3', type: 'Slab Saw', status: 'In Use', hours: 5.2, operator: 'Jack Anderson', condition: 'Excellent' },
-      { name: 'Truck #6', type: 'Vehicle', status: 'In Use', hours: 5.5, operator: 'Bill Thomas', condition: 'Good' },
-      { name: 'Diamond Blade 18"', type: 'Accessory', status: 'In Use', hours: 5.2, operator: 'Jack Anderson', condition: 'Good' }
-    ],
-    phase: 'Final Cleanup',
-    priority: 'low',
-    lastUpdate: '1 hour ago',
-    notes: 'Ahead of schedule, finishing up',
-    timeline: {
-      totalHours: 6.5,
-      elapsed: 5.5,
-      phases: [
-        { name: 'Setup', status: 'completed', duration: 1 },
-        { name: 'Cutting', status: 'completed', duration: 4 },
-        { name: 'Cleanup', status: 'in-progress', duration: 1.5 }
-      ]
-    }
-  }
-];
+// Job Order interface matching database schema
+interface JobOrder {
+  id: string;
+  job_number: string;
+  title: string;
+  customer_name: string;
+  customer_contact: string | null;
+  job_type: string;
+  location: string;
+  address: string;
+  description: string | null;
+  assigned_to: string | null;
+  operator_name: string | null;
+  foreman_name: string | null;
+  foreman_phone: string | null;
+  salesman_name: string | null;
+  status: 'scheduled' | 'assigned' | 'in_route' | 'in_progress' | 'completed' | 'cancelled';
+  priority: string;
+  scheduled_date: string;
+  arrival_time: string | null;
+  estimated_hours: number | null;
+  required_documents: string[];
+  equipment_needed: string[];
+  special_equipment: string | null;
+  route_started_at: string | null;
+  work_started_at: string | null;
+  work_completed_at: string | null;
+  drive_time: number | null;
+  production_time: number | null;
+  total_time: number | null;
+  created_at: string;
+  updated_at: string;
+}
 
-// Mock data for upcoming jobs
-const mockUpcomingJobs = [
-  {
-    id: '5',
-    jobNumber: 'JOB-2024-005',
-    clientName: 'Riverside Properties',
-    projectName: 'Commercial Building Foundation',
-    location: '555 River St, Downtown',
-    scheduledDate: '2024-11-09',
-    scheduledTime: '7:00 AM',
-    estimatedDuration: '10 hours',
-    jobTypes: ['CORE DRILLING', 'SAWING'],
-    crew: ['John Smith', 'Mike Johnson'],
-    operator: 'John Smith',
-    salesman: 'CAMERON AMOS',
-    priority: 'high',
-    requiredDocuments: ['JSA Form (Job Safety Analysis)', 'Silica Dust/Exposure Control Plan'],
-    notes: 'Large commercial project - requires early start',
-    equipment: [
-      { name: 'Core Drill #2', type: 'Core Drill' },
-      { name: 'Truck #7', type: 'Vehicle' },
-      { name: 'Diamond Bit Set', type: 'Accessory' }
-    ]
-  },
-  {
-    id: '6',
-    jobNumber: 'JOB-2024-006',
-    clientName: 'Tech Campus LLC',
-    projectName: 'Data Center Wall Penetrations',
-    location: '888 Tech Parkway',
-    scheduledDate: '2024-11-09',
-    scheduledTime: '9:00 AM',
-    estimatedDuration: '6 hours',
-    jobTypes: ['CORE DRILLING'],
-    crew: ['Bob Williams'],
-    operator: 'Bob Williams',
-    salesman: 'DAVID CHEN',
-    priority: 'medium',
-    requiredDocuments: ['JSA Form (Job Safety Analysis)', 'Silica Dust/Exposure Control Plan', 'Security Clearance'],
-    notes: 'Requires security clearance - confirmed for tomorrow',
-    equipment: [
-      { name: 'Core Drill #4', type: 'Core Drill' },
-      { name: 'Truck #4', type: 'Vehicle' }
-    ]
-  },
-  {
-    id: '7',
-    jobNumber: 'JOB-2024-007',
-    clientName: 'City Infrastructure',
-    projectName: 'Subway Station Expansion',
-    location: 'Metro Line 3 - Station 12',
-    scheduledDate: '2024-11-10',
-    scheduledTime: '6:00 AM',
-    estimatedDuration: '12 hours',
-    jobTypes: ['WALL SAWING', 'CORE DRILLING'],
-    crew: ['Steve Miller', 'Dave Brown', 'Jim Wilson', 'Jack Anderson'],
-    operator: 'Steve Miller',
-    salesman: 'SARAH MARTINEZ',
-    priority: 'urgent',
-    requiredDocuments: ['JSA Form (Job Safety Analysis)', 'Silica Dust/Exposure Control Plan', 'Confined Space Entry Permit'],
-    notes: 'Night shift starting Sunday - all hands on deck',
-    equipment: [
-      { name: 'Wall Saw #1', type: 'Wall Saw' },
-      { name: 'Core Drill #5', type: 'Core Drill' },
-      { name: 'Truck #8', type: 'Vehicle' },
-      { name: 'Truck #9', type: 'Vehicle' }
-    ]
+// Transformed job interface for UI
+interface UIJob {
+  id: string;
+  jobNumber: string;
+  clientName: string;
+  projectName: string;
+  location: string;
+  address: string;
+  status: 'on-track' | 'needs-attention' | 'behind';
+  priority: string;
+  progress: number;
+  startDate: string;
+  startTime: string;
+  estimatedEnd: string;
+  estimatedHours: string;
+  jobTypes: string[];
+  contactOnSite: string;
+  contactPhone: string;
+  crew: string[];
+  operator: string;
+  salesman: string;
+  equipment: Array<{name: string; type: string; status?: string; hours?: number; operator?: string; condition?: string}>;
+  requiredDocuments: string[];
+  phase: string;
+  lastUpdate: string;
+  notes: string;
+  jobQuote: number;
+  timeline: {
+    totalHours: number;
+    elapsed: number;
+    phases: Array<{name: string; status: string; duration: number}>;
+  };
+  // For upcoming jobs
+  scheduledDate?: string;
+  scheduledTime?: string;
+  estimatedDuration?: string;
+}
+
+// Function to transform database job to UI job
+function transformJobToUI(job: JobOrder): UIJob {
+  // Calculate progress based on status
+  let progress = 0;
+  let uiStatus: 'on-track' | 'needs-attention' | 'behind' = 'on-track';
+  let phase = 'Scheduled';
+
+  if (job.status === 'assigned') {
+    progress = 10;
+    phase = 'Assigned';
+  } else if (job.status === 'in_route') {
+    progress = 30;
+    phase = 'In Route';
+  } else if (job.status === 'in_progress') {
+    progress = 60;
+    phase = 'In Progress';
+
+    // Check if behind schedule based on time
+    if (job.estimated_hours && job.production_time) {
+      const estimatedMinutes = job.estimated_hours * 60;
+      if (job.production_time > estimatedMinutes * 1.2) {
+        uiStatus = 'behind';
+      }
+    }
+  } else if (job.status === 'completed') {
+    progress = 100;
+    phase = 'Completed';
   }
-];
+
+  // Calculate elapsed time
+  let elapsed = 0;
+  if (job.drive_time) elapsed += job.drive_time / 60;
+  if (job.production_time) elapsed += job.production_time / 60;
+
+  // Calculate estimated end time
+  let estimatedEnd = 'TBD';
+  if (job.arrival_time && job.estimated_hours) {
+    const [hours, minutes] = job.arrival_time.split(':').map(Number);
+    const endHour = hours + job.estimated_hours;
+    const isPM = endHour >= 12;
+    const displayHour = endHour > 12 ? endHour - 12 : endHour;
+    estimatedEnd = `${displayHour}:${minutes.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
+  }
+
+  // Transform equipment from array of strings to array of objects
+  const equipment = (job.equipment_needed || []).map(item => ({
+    name: item,
+    type: item.includes('Drill') ? 'Core Drill' : item.includes('Saw') ? 'Saw' : item.includes('Truck') ? 'Vehicle' : 'Accessory',
+    status: job.status === 'in_progress' ? 'In Use' : 'Standby',
+    hours: elapsed,
+    operator: job.operator_name || 'Unassigned',
+    condition: 'Good'
+  }));
+
+  return {
+    id: job.id,
+    jobNumber: job.job_number,
+    clientName: job.customer_name,
+    projectName: job.customer_name, // Show contractor/customer name instead of title
+    location: job.location,
+    address: job.address,
+    status: uiStatus,
+    priority: job.priority,
+    progress,
+    startDate: job.scheduled_date,
+    startTime: job.arrival_time || 'TBD',
+    estimatedEnd,
+    estimatedHours: job.estimated_hours?.toString() || '0',
+    jobTypes: [job.job_type],
+    contactOnSite: job.foreman_name || 'N/A',
+    contactPhone: job.foreman_phone || 'N/A',
+    crew: job.operator_name ? [job.operator_name] : [],
+    operator: job.operator_name || 'Unassigned',
+    salesman: job.salesman_name || 'N/A',
+    equipment,
+    requiredDocuments: job.required_documents || [],
+    phase,
+    lastUpdate: new Date(job.updated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    notes: job.description || 'No notes',
+    jobQuote: 0, // Quote info not in job_orders table yet
+    timeline: {
+      totalHours: job.estimated_hours || 8,
+      elapsed,
+      phases: [
+        {
+          name: 'In Route',
+          status: job.route_started_at ? 'completed' : 'pending',
+          duration: 0.5
+        },
+        {
+          name: 'In Progress',
+          status: job.work_started_at ? (job.work_completed_at ? 'completed' : 'in-progress') : 'pending',
+          duration: job.estimated_hours || 8
+        },
+        {
+          name: 'Complete',
+          status: job.work_completed_at ? 'completed' : 'pending',
+          duration: 0
+        }
+      ]
+    },
+    // For upcoming jobs
+    scheduledDate: job.scheduled_date,
+    scheduledTime: job.arrival_time || undefined,
+    estimatedDuration: job.estimated_hours ? `${job.estimated_hours} hours` : undefined
+  };
+}
 
 type StatusFilter = 'all' | 'on-track' | 'needs-attention' | 'behind' | 'upcoming';
 type ViewMode = 'grid' | 'list' | 'timeline';
 
 export default function ProjectStatusBoard() {
-  const [jobs, setJobs] = useState(mockJobs);
-  const [upcomingJobs, setUpcomingJobs] = useState(mockUpcomingJobs);
+  const [jobs, setJobs] = useState<UIJob[]>([]);
+  const [upcomingJobs, setUpcomingJobs] = useState<UIJob[]>([]);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [selectedJob, setSelectedJob] = useState<typeof mockJobs[0] | null>(null);
-  const [selectedUpcomingJob, setSelectedUpcomingJob] = useState<typeof mockUpcomingJobs[0] | null>(null);
+  const [selectedJob, setSelectedJob] = useState<UIJob | null>(null);
+  const [selectedUpcomingJob, setSelectedUpcomingJob] = useState<UIJob | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showUpcomingJobModal, setShowUpcomingJobModal] = useState(false);
   const [showEquipmentModal, setShowEquipmentModal] = useState(false);
@@ -243,7 +212,7 @@ export default function ProjectStatusBoard() {
   const [communicationType, setCommunicationType] = useState<'call' | 'message'>('message');
 
   // Update form state
-  const [updateStatus, setUpdateStatus] = useState('');
+  const [updateStatus, setUpdateStatus] = useState<'on-track' | 'needs-attention' | 'behind' | ''>('');
   const [updateProgress, setUpdateProgress] = useState(0);
   const [updateNotes, setUpdateNotes] = useState('');
 
@@ -253,6 +222,82 @@ export default function ProjectStatusBoard() {
 
   // Notification state
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: string, jobId: string}>>([]);
+
+  // Fetch jobs from API
+  const fetchJobs = async () => {
+    try {
+      setLoading(true);
+
+      // Get Supabase session token
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
+        // Clear localStorage and redirect to login
+        localStorage.removeItem('supabase-user');
+        localStorage.removeItem('pontifex-user');
+        window.location.href = '/login';
+        return;
+      }
+
+      const response = await fetch('/api/admin/job-orders', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch job orders');
+        setLoading(false);
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data?.jobOrders) {
+        const allJobs = result.data.jobOrders;
+
+        // Separate today's/active jobs from upcoming jobs
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const activeJobsList: UIJob[] = [];
+        const upcomingJobsList: UIJob[] = [];
+
+        allJobs.forEach((job: JobOrder) => {
+          // Skip completed and cancelled jobs
+          if (job.status === 'completed' || job.status === 'cancelled') {
+            return;
+          }
+
+          const jobDate = new Date(job.scheduled_date);
+          jobDate.setHours(0, 0, 0, 0);
+
+          const transformedJob = transformJobToUI(job);
+
+          // Jobs scheduled for today or earlier, or currently in progress
+          if (jobDate <= today || job.status === 'in_route' || job.status === 'in_progress') {
+            activeJobsList.push(transformedJob);
+          } else {
+            // Future jobs
+            upcomingJobsList.push(transformedJob);
+          }
+        });
+
+        setJobs(activeJobsList);
+        setUpcomingJobs(upcomingJobsList);
+      }
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch jobs on mount
+  useEffect(() => {
+    fetchJobs();
+  }, []);
 
   // Update current time every minute
   useEffect(() => {
@@ -287,6 +332,25 @@ export default function ProjectStatusBoard() {
     'on-track': jobs.filter(j => j.status === 'on-track').length,
     'needs-attention': jobs.filter(j => j.status === 'needs-attention').length,
     'behind': jobs.filter(j => j.status === 'behind').length
+  };
+
+  // Convert database status to display text
+  const getStatusDisplayText = (dbStatus: string) => {
+    switch (dbStatus) {
+      case 'scheduled':
+      case 'assigned':
+        return 'Scheduled';
+      case 'in_route':
+        return 'In Route';
+      case 'in_progress':
+        return 'In Progress';
+      case 'completed':
+        return 'Complete';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Scheduled';
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -330,7 +394,7 @@ export default function ProjectStatusBoard() {
     }
   };
 
-  const handleJobClick = (job: typeof mockJobs[0]) => {
+  const handleJobClick = (job: UIJob) => {
     setSelectedJob(job);
     setShowDetailModal(true);
   };
@@ -359,9 +423,10 @@ export default function ProjectStatusBoard() {
 
     const updatedJobs = jobs.map(job => {
       if (job.id === selectedJob.id) {
+        const newStatus = updateStatus && updateStatus.length > 0 ? updateStatus : job.status;
         return {
           ...job,
-          status: updateStatus || job.status,
+          status: newStatus as 'on-track' | 'needs-attention' | 'behind',
           progress: updateProgress || job.progress,
           notes: updateNotes || job.notes,
           lastUpdate: 'Just now'
@@ -388,19 +453,19 @@ export default function ProjectStatusBoard() {
     }
   };
 
-  const handleCallOperator = (job: typeof mockJobs[0]) => {
+  const handleCallOperator = (job: UIJob) => {
     setSelectedJob(job);
     setCommunicationType('call');
     setShowCommunicationModal(true);
   };
 
-  const handleSendMessage = (job: typeof mockJobs[0]) => {
+  const handleSendMessage = (job: UIJob) => {
     setSelectedJob(job);
     setCommunicationType('message');
     setShowCommunicationModal(true);
   };
 
-  const handleExportJob = (job: typeof mockJobs[0]) => {
+  const handleExportJob = (job: UIJob) => {
     const jobData = JSON.stringify(job, null, 2);
     const blob = new Blob([jobData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -411,7 +476,7 @@ export default function ProjectStatusBoard() {
     URL.revokeObjectURL(url);
   };
 
-  const handlePrintJob = (job: typeof mockJobs[0]) => {
+  const handlePrintJob = (job: UIJob) => {
     window.print();
   };
 
@@ -461,7 +526,7 @@ export default function ProjectStatusBoard() {
               <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
                   <span className="text-5xl">📊</span>
-                  Project Board
+                  Active Project Board
                 </h1>
                 <p className="text-gray-600 font-medium mt-1">
                   Current and upcoming jobs • {currentTime.toLocaleDateString('en-US', {
@@ -1134,90 +1199,90 @@ export default function ProjectStatusBoard() {
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
                 <button
                   onClick={() => handleCallOperator(selectedJob)}
-                  className="p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
+                  className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all shadow-md hover:shadow-lg"
                 >
-                  <svg className="w-6 h-6 text-blue-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-white mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                   </svg>
-                  <div className="text-xs font-medium text-blue-900">Call Operator</div>
+                  <div className="text-xs font-medium text-white">Call Operator</div>
                 </button>
                 <button
                   onClick={() => handleSendMessage(selectedJob)}
-                  className="p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200"
+                  className="p-4 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl transition-all shadow-md hover:shadow-lg"
                 >
-                  <svg className="w-6 h-6 text-green-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-white mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
-                  <div className="text-xs font-medium text-green-900">Send Message</div>
+                  <div className="text-xs font-medium text-white">Send Message</div>
                 </button>
                 <button
                   onClick={() => {
                     setShowDetailModal(false);
                     setShowUpdateModal(true);
                   }}
-                  className="p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200"
+                  className="p-4 bg-gradient-to-br from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 rounded-xl transition-all shadow-md hover:shadow-lg"
                 >
-                  <svg className="w-6 h-6 text-orange-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-white mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  <div className="text-xs font-medium text-orange-900">Update Job</div>
+                  <div className="text-xs font-medium text-white">Update Job</div>
                 </button>
                 <button
                   onClick={() => {
                     setShowDetailModal(false);
                     setShowDocumentsModal(true);
                   }}
-                  className="p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200"
+                  className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 rounded-xl transition-all shadow-md hover:shadow-lg"
                 >
-                  <svg className="w-6 h-6 text-purple-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-white mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <div className="text-xs font-medium text-purple-900">Documents</div>
+                  <div className="text-xs font-medium text-white">Documents</div>
                 </button>
                 <button
                   onClick={() => {
                     setShowDetailModal(false);
                     setShowPhotosModal(true);
                   }}
-                  className="p-4 bg-pink-50 rounded-lg hover:bg-pink-100 transition-colors border border-pink-200"
+                  className="p-4 bg-gradient-to-br from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 rounded-xl transition-all shadow-md hover:shadow-lg"
                 >
-                  <svg className="w-6 h-6 text-pink-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-white mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <div className="text-xs font-medium text-pink-900">Photos</div>
+                  <div className="text-xs font-medium text-white">Photos</div>
                 </button>
                 <button
                   onClick={() => {
                     setShowDetailModal(false);
                     setShowTimeTrackingModal(true);
                   }}
-                  className="p-4 bg-cyan-50 rounded-lg hover:bg-cyan-100 transition-colors border border-cyan-200"
+                  className="p-4 bg-gradient-to-br from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 rounded-xl transition-all shadow-md hover:shadow-lg"
                 >
-                  <svg className="w-6 h-6 text-cyan-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-white mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <div className="text-xs font-medium text-cyan-900">Time Clock</div>
+                  <div className="text-xs font-medium text-white">Time Clock</div>
                 </button>
                 <button
                   onClick={() => {
                     setShowDetailModal(false);
                     setShowHistoryModal(true);
                   }}
-                  className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-200"
+                  className="p-4 bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 rounded-xl transition-all shadow-md hover:shadow-lg"
                 >
-                  <svg className="w-6 h-6 text-indigo-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-white mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <div className="text-xs font-medium text-indigo-900">History</div>
+                  <div className="text-xs font-medium text-white">History</div>
                 </button>
                 <button
                   onClick={() => setShowEquipmentModal(true)}
-                  className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"
+                  className="p-4 bg-gradient-to-br from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 rounded-xl transition-all shadow-md hover:shadow-lg"
                 >
-                  <svg className="w-6 h-6 text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-white mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                   </svg>
-                  <div className="text-xs font-medium text-gray-700">Equipment</div>
+                  <div className="text-xs font-medium text-white">Equipment</div>
                 </button>
               </div>
 
@@ -1521,7 +1586,7 @@ export default function ProjectStatusBoard() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Job Status</label>
                 <select
                   value={updateStatus || selectedJob.status}
-                  onChange={(e) => setUpdateStatus(e.target.value)}
+                  onChange={(e) => setUpdateStatus(e.target.value as 'on-track' | 'needs-attention' | 'behind')}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
                 >
                   <option value="on-track">On Track</option>

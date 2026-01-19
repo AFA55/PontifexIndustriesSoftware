@@ -257,7 +257,10 @@ export default function ManageBladesPage() {
       size: '',
       serialNumber: '',
       purchaseDate: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      assignmentType: 'unassigned',
+      assignedOperator: '',
+      assignedEquipmentId: ''
     });
     setShowAddModal(false);
   };

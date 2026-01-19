@@ -27,10 +27,12 @@ export default function AccessRequestsPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'denied'>('pending');
   const [selectedRequest, setSelectedRequest] = useState<AccessRequest | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<'admin' | 'operator' | 'apprentice'>('operator');
   const [denialReason, setDenialReason] = useState('');
   const [processing, setProcessing] = useState(false);
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
+  const [editActiveStatus, setEditActiveStatus] = useState(true);
 
   useEffect(() => {
     const initUser = async () => {
@@ -146,6 +148,73 @@ export default function AccessRequestsPage() {
       fetchRequests();
     } catch (error: any) {
       console.error('Error denying request:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRemove = async (request: AccessRequest) => {
+    setProcessing(true);
+    try {
+      console.log(`🗑️ Removing request: ${request.id}`);
+
+      // Call API route to delete request
+      const response = await fetch(`/api/access-requests/${request.id}/delete`, {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(`Error: ${result.error || 'Failed to remove request'}`);
+        setProcessing(false);
+        return;
+      }
+
+      console.log('✅ Request removed successfully');
+      fetchRequests();
+    } catch (error: any) {
+      console.error('Error removing request:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleEditUser = async () => {
+    if (!selectedRequest) return;
+
+    setProcessing(true);
+    try {
+      console.log(`✏️ Updating user: ${selectedRequest.email}`);
+
+      // Call API route to update user profile
+      const response = await fetch(`/api/access-requests/${selectedRequest.id}/update-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          role: selectedRole,
+          active: editActiveStatus,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(`Error: ${result.error || 'Failed to update user'}`);
+        setProcessing(false);
+        return;
+      }
+
+      alert(`Success: User ${selectedRequest.full_name} has been updated!`);
+      setShowEditModal(false);
+      setSelectedRequest(null);
+      fetchRequests();
+    } catch (error: any) {
+      console.error('Error updating user:', error);
       alert(`Error: ${error.message}`);
     } finally {
       setProcessing(false);
@@ -291,10 +360,27 @@ export default function AccessRequestsPage() {
             filteredRequests.map((request) => (
               <div
                 key={request.id}
-                className="bg-white rounded-2xl border-2 border-gray-200 p-6 shadow-lg hover:shadow-xl transition-all"
+                className={`bg-white rounded-2xl border-2 border-gray-200 p-6 shadow-lg hover:shadow-xl transition-all ${
+                  request.status !== 'pending' ? 'cursor-pointer hover:border-blue-400' : ''
+                }`}
+                onClick={() => {
+                  if (request.status === 'approved' || request.status === 'denied') {
+                    setSelectedRequest(request);
+                    setSelectedRole(request.assigned_role as any || 'operator');
+                    setEditActiveStatus(true);
+                    setShowEditModal(true);
+                  }
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
+                    {request.status !== 'pending' && (
+                      <div className="mb-3">
+                        <span className="text-xs text-blue-600 font-semibold bg-blue-50 px-3 py-1 rounded-full">
+                          Click to edit user
+                        </span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3 mb-3">
                       <h3 className="text-xl font-bold text-gray-800">{request.full_name}</h3>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -338,29 +424,41 @@ export default function AccessRequestsPage() {
                     )}
                   </div>
 
-                  {request.status === 'pending' && (
-                    <div className="flex gap-3 ml-4">
-                      <button
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          setSelectedRole('operator');
-                          setShowApprovalModal(true);
-                        }}
-                        className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          setShowApprovalModal(true);
-                        }}
-                        className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-semibold hover:from-red-600 hover:to-red-700 transition-all shadow-lg hover:shadow-xl"
-                      >
-                        Deny
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex gap-3 ml-4" onClick={(e) => e.stopPropagation()}>
+                    {request.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSelectedRequest(request);
+                            setSelectedRole('operator');
+                            setShowApprovalModal(true);
+                          }}
+                          className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedRequest(request);
+                            setShowApprovalModal(true);
+                          }}
+                          className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-semibold hover:from-red-600 hover:to-red-700 transition-all shadow-lg hover:shadow-xl"
+                        >
+                          Deny
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleRemove(request)}
+                      disabled={processing}
+                      className="px-6 py-3 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-xl font-semibold hover:from-gray-800 hover:to-gray-900 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Remove
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -483,16 +581,130 @@ export default function AccessRequestsPage() {
                 <button
                   onClick={() => handleDeny(selectedRequest)}
                   disabled={processing || !denialReason.trim()}
-                  className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-all disabled:opacity-50"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-semibold hover:from-red-600 hover:to-red-700 transition-all disabled:opacity-50 shadow-lg"
                 >
                   {processing ? 'Processing...' : 'Deny'}
                 </button>
                 <button
                   onClick={() => handleApprove(selectedRequest, selectedRole)}
                   disabled={processing}
-                  className="flex-1 px-6 py-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-all disabled:opacity-50"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 shadow-lg"
                 >
                   {processing ? 'Processing...' : `Approve as ${selectedRole}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit User Modal */}
+        {showEditModal && selectedRequest && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Edit User</h3>
+              <p className="text-gray-600 mb-6">
+                <strong>{selectedRequest.full_name}</strong> ({selectedRequest.email})
+              </p>
+
+              {/* Role Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  User Role
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => setSelectedRole('apprentice')}
+                    className={`p-4 rounded-xl border-2 font-semibold transition-all ${
+                      selectedRole === 'apprentice'
+                        ? 'border-green-500 bg-green-50 text-green-700'
+                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    Apprentice
+                  </button>
+                  <button
+                    onClick={() => setSelectedRole('operator')}
+                    className={`p-4 rounded-xl border-2 font-semibold transition-all ${
+                      selectedRole === 'operator'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    Operator
+                  </button>
+                  <button
+                    onClick={() => setSelectedRole('admin')}
+                    className={`p-4 rounded-xl border-2 font-semibold transition-all ${
+                      selectedRole === 'admin'
+                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    Admin
+                  </button>
+                </div>
+              </div>
+
+              {/* Active Status Toggle */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Account Status
+                </label>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setEditActiveStatus(true)}
+                    className={`flex-1 p-4 rounded-xl border-2 font-semibold transition-all ${
+                      editActiveStatus
+                        ? 'border-green-500 bg-green-50 text-green-700'
+                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Active
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setEditActiveStatus(false)}
+                    className={`flex-1 p-4 rounded-xl border-2 font-semibold transition-all ${
+                      !editActiveStatus
+                        ? 'border-red-500 bg-red-50 text-red-700'
+                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Inactive
+                    </div>
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Inactive users cannot log in to the system
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setSelectedRequest(null);
+                  }}
+                  disabled={processing}
+                  className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditUser}
+                  disabled={processing}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 shadow-lg"
+                >
+                  {processing ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>

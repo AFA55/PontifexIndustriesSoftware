@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
+import { verifyShopLocation } from '@/lib/geolocation';
+import { supabase } from '@/lib/supabase';
 
 // Pontifex Industries Logo Component
 function PontifexLogo({ className = "h-8" }: { className?: string }) {
@@ -50,11 +52,26 @@ function PontifexLogo({ className = "h-8" }: { className?: string }) {
   );
 }
 
+interface Timecard {
+  id: string;
+  clockInTime: string;
+  currentHours: number;
+}
+
+type OperatorStatus = 'clocked_in' | 'en_route' | 'in_progress' | 'job_completed' | 'clocked_out';
+
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isClockedIn, setIsClockedIn] = useState(true); // Track if user is clocked in
-  const [clockOutSuccess, setClockOutSuccess] = useState(false);
+  const [isClockedIn, setIsClockedIn] = useState(false);
+  const [currentTimecard, setCurrentTimecard] = useState<Timecard | null>(null);
+  const [currentHours, setCurrentHours] = useState(0);
+  const [clockLoading, setClockLoading] = useState(false);
+  const [clockMessage, setClockMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<OperatorStatus>('clocked_out');
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [activeJobsCount, setActiveJobsCount] = useState(0);
+  const [weeklyHours, setWeeklyHours] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -78,8 +95,228 @@ export default function Dashboard() {
 
     // For operator or default, stay on this dashboard
     setUser(currentUser);
+    checkClockStatus();
+    fetchActiveJobs();
+    fetchWeeklyHours();
     setLoading(false);
+
+    // Refresh active jobs count every 30 seconds to stay in sync with admin changes
+    const refreshInterval = setInterval(() => {
+      fetchActiveJobs();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(refreshInterval);
   }, [router]);
+
+  // Fetch weekly hours
+  const fetchWeeklyHours = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Get current week bounds (Monday to Sunday)
+      const now = new Date();
+      const monday = new Date(now);
+      monday.setDate(monday.getDate() - monday.getDay() + 1);
+      monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      const response = await fetch(
+        `/api/timecard/history?startDate=${monday.toISOString().split('T')[0]}&endDate=${sunday.toISOString().split('T')[0]}&limit=100`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        }
+      );
+      const result = await response.json();
+
+      if (result.success) {
+        const totalHours = result.data.timecards.reduce((sum: number, entry: any) => {
+          return sum + (entry.total_hours || 0);
+        }, 0);
+        setWeeklyHours(totalHours);
+      }
+    } catch (error) {
+      console.error('Error fetching weekly hours:', error);
+    }
+  };
+
+  // Check if user is currently clocked in
+  const checkClockStatus = async () => {
+    try {
+      // Get Supabase session token
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
+        localStorage.removeItem('supabase-user');
+        localStorage.removeItem('pontifex-user');
+        window.location.href = '/login';
+        return;
+      }
+
+      const response = await fetch('/api/timecard/current', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      const result = await response.json();
+
+      if (result.success && result.isClockedIn) {
+        setIsClockedIn(true);
+        setCurrentTimecard(result.data);
+        setCurrentHours(result.data.currentHours);
+        // Fetch current status
+        fetchCurrentStatus();
+      } else {
+        setIsClockedIn(false);
+        setCurrentTimecard(null);
+        setCurrentStatus('clocked_out');
+      }
+    } catch (error) {
+      console.error('Error checking clock status:', error);
+    }
+  };
+
+  // Fetch current operator status
+  const fetchCurrentStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/operator/status', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setCurrentStatus(result.data.status);
+      }
+    } catch (error) {
+      console.error('Error fetching status:', error);
+    }
+  };
+
+  // Fetch active jobs count
+  const fetchActiveJobs = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/job-orders', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date().toISOString().split('T')[0];
+
+        // Count only active jobs scheduled for TODAY (not completed/cancelled)
+        const activeCount = result.data.filter((job: any) => {
+          const jobDate = job.scheduled_date ? new Date(job.scheduled_date).toISOString().split('T')[0] : null;
+          return (
+            jobDate === today && // Only jobs scheduled for today
+            job.status !== 'completed' &&
+            job.status !== 'cancelled'
+          );
+        }).length;
+        setActiveJobsCount(activeCount);
+      }
+    } catch (error) {
+      console.error('Error fetching active jobs:', error);
+    }
+  };
+
+  // Update operator status
+  const updateStatus = async (newStatus: OperatorStatus) => {
+    setStatusLoading(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setClockMessage({
+          type: 'error',
+          text: 'Session expired. Please log in again.',
+        });
+        setStatusLoading(false);
+        return;
+      }
+
+      // Get current location
+      const verification = await verifyShopLocation();
+
+      const response = await fetch('/api/operator/status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          latitude: verification.location?.latitude,
+          longitude: verification.location?.longitude,
+          accuracy: verification.location?.accuracy,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setClockMessage({
+          type: 'error',
+          text: result.error || 'Failed to update status',
+        });
+        setStatusLoading(false);
+        return;
+      }
+
+      setCurrentStatus(newStatus);
+      setClockMessage({
+        type: 'success',
+        text: result.message,
+      });
+
+      // If clocking out, also update the clock status
+      if (newStatus === 'clocked_out') {
+        setIsClockedIn(false);
+        setCurrentTimecard(null);
+        setCurrentHours(0);
+      }
+
+      setTimeout(() => setClockMessage(null), 3000);
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      setClockMessage({
+        type: 'error',
+        text: error.message || 'An error occurred while updating status',
+      });
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+  // Update current hours every minute when clocked in
+  useEffect(() => {
+    if (!isClockedIn || !currentTimecard) return;
+
+    const interval = setInterval(() => {
+      const clockInTime = new Date(currentTimecard.clockInTime);
+      const now = new Date();
+      const hours = (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+      setCurrentHours(parseFloat(hours.toFixed(2)));
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [isClockedIn, currentTimecard]);
 
   const handleLogout = () => {
     console.log('🚪 Logging out user...');
@@ -87,22 +324,183 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  const handleMarkDayFinished = () => {
-    console.log('⏰ Marking day as finished (Clock Out)...');
-    // TODO: In production, this would record clock-out time to database
-    const clockOutTime = new Date().toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    console.log(`Clock out time: ${clockOutTime}`);
+  const handleClockIn = async () => {
+    setClockLoading(true);
+    setClockMessage(null);
 
-    setIsClockedIn(false);
-    setClockOutSuccess(true);
+    try {
+      console.log('📍 Getting location for clock in...');
 
-    // Hide success message after 5 seconds
-    setTimeout(() => {
-      setClockOutSuccess(false);
-    }, 5000);
+      // Get Supabase session token
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        setClockMessage({
+          type: 'error',
+          text: 'Session expired. Please log in again.',
+        });
+        setClockLoading(false);
+        return;
+      }
+
+      // Verify location
+      const verification = await verifyShopLocation();
+
+      if (!verification.verified) {
+        setClockMessage({
+          type: 'error',
+          text: verification.error || 'Location verification failed',
+        });
+        setClockLoading(false);
+        return;
+      }
+
+      console.log('✅ Location verified:', verification.distanceFormatted, 'from shop');
+
+      // Call clock-in API with auth token
+      const response = await fetch('/api/timecard/clock-in', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          latitude: verification.location.latitude,
+          longitude: verification.location.longitude,
+          accuracy: verification.location.accuracy,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setClockMessage({
+          type: 'error',
+          text: result.error || 'Failed to clock in',
+        });
+        setClockLoading(false);
+        return;
+      }
+
+      console.log('✅ Clocked in successfully');
+      setIsClockedIn(true);
+      setCurrentTimecard({
+        id: result.data.id,
+        clockInTime: result.data.clockInTime,
+        currentHours: 0,
+      });
+      setCurrentStatus('clocked_in');
+      setClockMessage({
+        type: 'success',
+        text: result.message,
+      });
+
+      // Create initial status entry
+      await fetch('/api/operator/status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          status: 'clocked_in',
+          latitude: verification.location.latitude,
+          longitude: verification.location.longitude,
+          accuracy: verification.location.accuracy,
+        }),
+      });
+
+      // Hide success message after 5 seconds
+      setTimeout(() => setClockMessage(null), 5000);
+    } catch (error: any) {
+      console.error('Error clocking in:', error);
+      setClockMessage({
+        type: 'error',
+        text: error.message || 'An error occurred while clocking in',
+      });
+    } finally {
+      setClockLoading(false);
+    }
+  };
+
+  const handleClockOut = async () => {
+    setClockLoading(true);
+    setClockMessage(null);
+
+    try {
+      console.log('📍 Getting location for clock out...');
+
+      // Get Supabase session token
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        setClockMessage({
+          type: 'error',
+          text: 'Session expired. Please log in again.',
+        });
+        setClockLoading(false);
+        return;
+      }
+
+      // Verify location
+      const verification = await verifyShopLocation();
+
+      if (!verification.verified) {
+        setClockMessage({
+          type: 'error',
+          text: verification.error || 'Location verification failed',
+        });
+        setClockLoading(false);
+        return;
+      }
+
+      console.log('✅ Location verified:', verification.distanceFormatted, 'from shop');
+
+      // Call clock-out API with auth token
+      const response = await fetch('/api/timecard/clock-out', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          latitude: verification.location.latitude,
+          longitude: verification.location.longitude,
+          accuracy: verification.location.accuracy,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setClockMessage({
+          type: 'error',
+          text: result.error || 'Failed to clock out',
+        });
+        setClockLoading(false);
+        return;
+      }
+
+      console.log('✅ Clocked out successfully. Total hours:', result.data.totalHours);
+      setIsClockedIn(false);
+      setCurrentTimecard(null);
+      setCurrentHours(0);
+      setClockMessage({
+        type: 'success',
+        text: `${result.message} Total hours: ${result.data.totalHours}`,
+      });
+
+      // Hide success message after 5 seconds
+      setTimeout(() => setClockMessage(null), 5000);
+    } catch (error: any) {
+      console.error('Error clocking out:', error);
+      setClockMessage({
+        type: 'error',
+        text: error.message || 'An error occurred while clocking out',
+      });
+    } finally {
+      setClockLoading(false);
+    }
   };
 
   if (loading) {
@@ -117,44 +515,44 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300 rounded-full opacity-10 blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-red-300 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-200 rounded-full opacity-5 blur-3xl animate-pulse delay-2000"></div>
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full opacity-10 blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full opacity-5 blur-3xl animate-pulse delay-2000"></div>
       </div>
 
-      {/* Modern Glass Morphism Header */}
-      <div className="backdrop-blur-xl bg-white/70 border-b border-white/20 sticky top-0 z-50 shadow-sm">
+      {/* Modern Header with Professional Gradient */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             {/* Pontifex Logo with Animation */}
             <div className="transform hover:scale-105 transition-transform duration-200">
-              <PontifexLogo className="h-10 text-foreground" />
+              <PontifexLogo className="h-10 text-white" />
             </div>
 
             {/* Modern Profile Section */}
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
+              <div className="hidden sm:flex items-center gap-3 bg-white/10 backdrop-blur-lg px-4 py-2 rounded-xl border border-white/20">
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white/30">
                   {user?.name?.charAt(0) || 'D'}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-800">{user?.name || 'Demo Operator'}</p>
-                  <p className="text-xs text-gray-500 capitalize">{user?.role || 'Operator'}</p>
+                  <p className="text-sm font-bold text-white">{user?.name || 'Demo Operator'}</p>
+                  <p className="text-xs text-blue-200 capitalize font-medium">{user?.role || 'Operator'}</p>
                 </div>
               </div>
 
               {/* Premium Logout Button */}
               <button
                 onClick={handleLogout}
-                className="group flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                className="group flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-red-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
               >
                 <svg className="w-4 h-4 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                <span className="font-medium">Logout</span>
+                <span>Logout</span>
               </button>
             </div>
           </div>
@@ -165,79 +563,127 @@ export default function Dashboard() {
         {/* Modern Animated Greeting */}
         <div className="text-center mb-10 animate-fade-in">
           <div className="inline-block">
-            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-red-600 bg-clip-text text-transparent mb-3 animate-gradient">
+            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
               Welcome back, {user?.name?.split(' ')[0] || 'Demo'}!
             </h1>
-            <p className="text-gray-600 text-lg font-light">
+            <p className="text-gray-700 text-lg font-medium">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
           </div>
 
-          {/* Quick Stats Bar */}
-          <div className="flex justify-center gap-8 mt-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-blue-600">4</p>
-              <p className="text-sm text-gray-500">Active Jobs</p>
+          {/* Quick Stats Bar with Professional Gradients */}
+          <div className="flex justify-center gap-6 mt-8">
+            <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
+              <p className="text-4xl font-bold text-white drop-shadow-lg">{activeJobsCount}</p>
+              <p className="text-sm text-white/90 font-semibold mt-1">Active Jobs</p>
             </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-green-600">8.5</p>
-              <p className="text-sm text-gray-500">Hours Today</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-indigo-600">92%</p>
-              <p className="text-sm text-gray-500">Efficiency</p>
+            <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
+              <p className="text-4xl font-bold text-white drop-shadow-lg">{currentHours.toFixed(1)}</p>
+              <p className="text-sm text-white/90 font-semibold mt-1">Hours Today</p>
             </div>
           </div>
         </div>
 
-        {/* Clock Out Success Message */}
-        {clockOutSuccess && (
+        {/* Clock Message */}
+        {clockMessage && (
           <div className="max-w-5xl mx-auto mb-6 animate-fade-in">
-            <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-6 shadow-lg">
+            <div className={`${
+              clockMessage.type === 'success'
+                ? 'bg-green-50 border-green-300'
+                : 'bg-red-50 border-red-300'
+            } border-2 rounded-2xl p-6 shadow-lg`}>
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
+                <div className={`w-12 h-12 ${
+                  clockMessage.type === 'success' ? 'bg-green-200' : 'bg-red-200'
+                } rounded-full flex items-center justify-center`}>
+                  {clockMessage.type === 'success' ? (
+                    <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-gray-800 font-bold text-lg">Day Marked as Finished!</h3>
-                  <p className="text-gray-600 font-medium">You've been clocked out successfully. Have a great rest of your day!</p>
+                  <p className={`${
+                    clockMessage.type === 'success' ? 'text-green-800' : 'text-red-800'
+                  } font-bold text-lg`}>
+                    {clockMessage.type === 'success' ? 'Success!' : 'Error'}
+                  </p>
+                  <p className={`${
+                    clockMessage.type === 'success' ? 'text-green-700' : 'text-red-700'
+                  } font-medium`}>
+                    {clockMessage.text}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Mark Day as Finished Button */}
-        {isClockedIn && (
-          <div className="max-w-5xl mx-auto mb-10 animate-fade-in">
-            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-800">Ready to End Your Day?</h3>
-                    <p className="text-gray-600 font-medium">Clock out when you've finished all your work</p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleMarkDayFinished}
-                  className="group flex items-center space-x-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        {/* Clock In/Out Button */}
+        <div className="max-w-5xl mx-auto mb-10 animate-fade-in">
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-white/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-5">
+                <div className={`w-20 h-20 bg-gradient-to-br ${
+                  isClockedIn
+                    ? 'from-rose-500 via-red-500 to-pink-600'
+                    : 'from-emerald-500 via-green-500 to-teal-600'
+                } rounded-3xl flex items-center justify-center shadow-2xl ring-4 ring-white`}>
+                  <svg className="w-10 h-10 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>Mark Day as Finished</span>
-                </button>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                    {isClockedIn ? 'Ready to Clock Out?' : 'Start Your Day'}
+                  </h3>
+                  <p className="text-gray-700 font-semibold text-base">
+                    {isClockedIn
+                      ? `You've been working for ${currentHours.toFixed(1)} hours`
+                      : 'Clock in when you arrive at the shop'
+                    }
+                  </p>
+                  {isClockedIn && currentTimecard && (
+                    <p className="text-sm text-gray-600 mt-1.5 font-medium">
+                      Clocked in at {new Date(currentTimecard.clockInTime).toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
               </div>
+              <button
+                onClick={isClockedIn ? handleClockOut : handleClockIn}
+                disabled={clockLoading}
+                className={`group flex items-center space-x-3 ${
+                  isClockedIn
+                    ? 'bg-gradient-to-r from-rose-600 via-red-600 to-pink-600 hover:from-rose-700 hover:via-red-700 hover:to-pink-700'
+                    : 'bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700'
+                } text-white font-bold py-5 px-10 rounded-2xl transition-all duration-300 hover:scale-105 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
+              >
+                {clockLoading ? (
+                  <>
+                    <div className="animate-spin w-6 h-6 border-3 border-white border-t-transparent rounded-full"></div>
+                    <span className="text-lg">Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {isClockedIn ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      )}
+                    </svg>
+                    <span className="text-lg">{isClockedIn ? 'Clock Out' : 'Clock In'}</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Ultra Modern Card Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
@@ -245,30 +691,30 @@ export default function Dashboard() {
           {/* Job Schedule - Premium Red Card */}
           <Link
             href="/dashboard/job-schedule"
-            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] animate-fade-in-up"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.03] animate-fade-in-up"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-red-400 to-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white rounded-[22px] p-6 group-hover:bg-transparent transition-colors duration-500">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transform group-hover:rotate-6 transition-all duration-300">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-red-100 group-hover:ring-white/30">
+                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <span className="px-3 py-1 bg-red-100 group-hover:bg-white/20 text-red-600 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300">
-                  4 ACTIVE
+                <span className="px-4 py-2 bg-gradient-to-r from-red-100 to-rose-100 group-hover:bg-white/20 text-red-700 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 shadow-md">
+                  {activeJobsCount} ACTIVE
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
                 Job Schedule
               </h3>
-              <p className="text-gray-600 group-hover:text-white/90 font-medium transition-colors duration-300">
+              <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
                 View today's assignments and routes
               </p>
-              <div className="mt-4 flex items-center text-red-600 group-hover:text-white font-semibold transition-colors duration-300">
+              <div className="mt-5 flex items-center text-red-600 group-hover:text-white font-bold transition-colors duration-300">
                 <span>Open Schedule</span>
                 <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </div>
             </div>
@@ -277,31 +723,31 @@ export default function Dashboard() {
           {/* Tools & Equipment - Premium Blue Card */}
           <Link
             href="/dashboard/tools"
-            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-blue-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] animate-fade-in-up delay-100"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-blue-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.03] animate-fade-in-up delay-100"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white rounded-[22px] p-6 group-hover:bg-transparent transition-colors duration-500">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transform group-hover:rotate-6 transition-all duration-300">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-blue-100 group-hover:ring-white/30">
+                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </div>
-                <span className="px-3 py-1 bg-blue-100 group-hover:bg-white/20 text-blue-600 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300">
+                <span className="px-4 py-2 bg-gradient-to-r from-blue-100 to-cyan-100 group-hover:bg-white/20 text-blue-700 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 shadow-md">
                   READY
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
                 Tools & Equipment
               </h3>
-              <p className="text-gray-600 group-hover:text-white/90 font-medium transition-colors duration-300">
+              <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
                 Manage and track your equipment
               </p>
-              <div className="mt-4 flex items-center text-blue-600 group-hover:text-white font-semibold transition-colors duration-300">
+              <div className="mt-5 flex items-center text-blue-600 group-hover:text-white font-bold transition-colors duration-300">
                 <span>Manage Tools</span>
                 <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </div>
             </div>
@@ -310,30 +756,30 @@ export default function Dashboard() {
           {/* View Timecard - Premium Indigo Card */}
           <Link
             href="/dashboard/timecard"
-            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-indigo-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] text-left animate-fade-in-up delay-200"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-indigo-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.03] text-left animate-fade-in-up delay-200"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white rounded-[22px] p-6 group-hover:bg-transparent transition-colors duration-500">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transform group-hover:rotate-6 transition-all duration-300">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-indigo-100 group-hover:ring-white/30">
+                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <span className="px-3 py-1 bg-indigo-100 group-hover:bg-white/20 text-indigo-600 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300">
-                  45.0 HRS
+                <span className="px-4 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 group-hover:bg-white/20 text-indigo-700 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 shadow-md">
+                  {weeklyHours.toFixed(1)} HRS
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
                 View Timecard
               </h3>
-              <p className="text-gray-600 group-hover:text-white/90 font-medium transition-colors duration-300">
+              <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
                 Check hours and attendance
               </p>
-              <div className="mt-4 flex items-center text-indigo-600 group-hover:text-white font-semibold transition-colors duration-300">
+              <div className="mt-5 flex items-center text-indigo-600 group-hover:text-white font-bold transition-colors duration-300">
                 <span>View Hours</span>
                 <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </div>
             </div>
@@ -342,30 +788,30 @@ export default function Dashboard() {
           {/* Request Time Off - Premium Purple Card */}
           <Link
             href="/dashboard/request-time-off"
-            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-purple-50 p-1 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] text-left animate-fade-in-up delay-300"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-purple-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.03] text-left animate-fade-in-up delay-300"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white rounded-[22px] p-6 group-hover:bg-transparent transition-colors duration-500">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transform group-hover:rotate-6 transition-all duration-300">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-purple-100 group-hover:ring-white/30">
+                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <span className="px-3 py-1 bg-purple-100 group-hover:bg-white/20 text-purple-600 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300">
+                <span className="px-4 py-2 bg-gradient-to-r from-purple-100 to-fuchsia-100 group-hover:bg-white/20 text-purple-700 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 shadow-md">
                   AVAILABLE
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
                 Request Time Off
               </h3>
-              <p className="text-gray-600 group-hover:text-white/90 font-medium transition-colors duration-300">
+              <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
                 Submit vacation and PTO requests
               </p>
-              <div className="mt-4 flex items-center text-purple-600 group-hover:text-white font-semibold transition-colors duration-300">
+              <div className="mt-5 flex items-center text-purple-600 group-hover:text-white font-bold transition-colors duration-300">
                 <span>Request Leave</span>
                 <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </div>
             </div>
@@ -374,30 +820,38 @@ export default function Dashboard() {
 
         {/* Quick Actions Bar */}
         <div className="mt-10 max-w-5xl mx-auto">
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-4 shadow-lg border border-gray-100">
-            <p className="text-sm font-semibold text-gray-500 mb-3">QUICK ACTIONS</p>
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border-2 border-white/50">
+            <p className="text-sm font-bold text-gray-600 mb-4 uppercase tracking-wide">QUICK ACTIONS</p>
             <div className="flex gap-3 overflow-x-auto pb-2">
-              <button className="flex items-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-xl font-medium whitespace-nowrap transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <button
+                onClick={isClockedIn ? handleClockOut : handleClockIn}
+                disabled={clockLoading}
+                className={`flex items-center gap-2 px-5 py-3 ${
+                  isClockedIn
+                    ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white'
+                    : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white'
+                } rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
-                Clock In
+                {isClockedIn ? 'Clock Out' : 'Clock In'}
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded-xl font-medium whitespace-nowrap transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              <button className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 Notifications
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-xl font-medium whitespace-nowrap transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              <button className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-500 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 Reports
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-xl font-medium whitespace-nowrap transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              <button className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
                 Messages
               </button>
