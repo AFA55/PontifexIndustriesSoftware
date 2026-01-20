@@ -163,7 +163,7 @@ export default function ComparisonTable() {
           ))}
         </div>
 
-        {/* Bottom Stats */}
+        {/* Bottom Impact Stats */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -172,16 +172,16 @@ export default function ComparisonTable() {
           className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-8 text-center"
         >
           <div className="p-6 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10">
-            <div className="text-3xl font-bold text-red-400 mb-2">-40%</div>
-            <div className="text-gray-400 text-sm">Less time on paperwork</div>
+            <div className="text-3xl font-bold text-blue-400 mb-2">15+ hrs</div>
+            <div className="text-gray-400 text-sm">Saved per crew weekly</div>
           </div>
           <div className="p-6 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10">
-            <div className="text-3xl font-bold text-green-400 mb-2">+25%</div>
-            <div className="text-gray-400 text-sm">More jobs completed</div>
+            <div className="text-3xl font-bold text-green-400 mb-2">$2.4k</div>
+            <div className="text-gray-400 text-sm">Monthly admin cost savings</div>
           </div>
           <div className="p-6 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10">
-            <div className="text-3xl font-bold text-blue-400 mb-2">100%</div>
-            <div className="text-gray-400 text-sm">OSHA compliance rate</div>
+            <div className="text-3xl font-bold text-red-400 mb-2">100%</div>
+            <div className="text-gray-400 text-sm">Digital data capture</div>
           </div>
         </motion.div>
       </div>

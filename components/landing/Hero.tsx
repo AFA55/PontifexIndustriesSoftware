@@ -131,22 +131,24 @@ export default function Hero() {
                 initial={{ y: 0 }}
                 animate={{ y: [-10, 10, -10] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -top-10 -right-10 w-64 h-40 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-2xl"
+                className="absolute -top-10 -right-10 w-72 h-44 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-2xl"
               >
-                <div className="text-white/80 text-sm font-semibold mb-2">Today's Revenue</div>
-                <div className="text-white text-3xl font-bold">$12,450</div>
-                <div className="text-green-400 text-sm mt-2">+18% from yesterday</div>
+                <div className="text-white/80 text-sm font-semibold mb-2">⏱️ Time Saved This Week</div>
+                <div className="text-white text-4xl font-bold">18.5 hrs</div>
+                <div className="text-green-400 text-sm mt-2">No paperwork, no guessing</div>
+                <div className="text-gray-400 text-xs mt-1">= $925 in labor costs saved</div>
               </motion.div>
 
               <motion.div
                 initial={{ y: 0 }}
                 animate={{ y: [10, -10, 10] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -bottom-10 -left-10 w-64 h-40 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-2xl"
+                className="absolute -bottom-10 -left-10 w-72 h-44 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-2xl"
               >
-                <div className="text-white/80 text-sm font-semibold mb-2">Active Jobs</div>
-                <div className="text-white text-3xl font-bold">7</div>
-                <div className="text-blue-400 text-sm mt-2">3 crews working</div>
+                <div className="text-white/80 text-sm font-semibold mb-2">💰 Real-Time Job Profit</div>
+                <div className="text-white text-4xl font-bold">$2,340</div>
+                <div className="text-blue-400 text-sm mt-2">Known before leaving site</div>
+                <div className="text-gray-400 text-xs mt-1">42% profit margin • Job #2847</div>
               </motion.div>
 
               {/* Central Element */}
@@ -164,21 +166,23 @@ export default function Hero() {
 
                   <div className="space-y-3">
                     <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-300 text-sm">Job Completion</span>
-                        <span className="text-green-400 font-bold">94%</span>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-gray-300 text-sm">📊 Digital Data Collection</span>
+                        <span className="text-green-400 font-bold">100%</span>
                       </div>
-                      <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full" style={{ width: '94%' }}></div>
+                      <div className="text-xs text-gray-400 mb-2">Every job creates company value</div>
+                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full" style={{ width: '100%' }}></div>
                       </div>
                     </div>
 
                     <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-300 text-sm">OSHA Compliance</span>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-gray-300 text-sm">🛡️ OSHA Compliance</span>
                         <span className="text-blue-400 font-bold">100%</span>
                       </div>
-                      <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div className="text-xs text-gray-400 mb-2">Zero paperwork, full compliance</div>
+                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full" style={{ width: '100%' }}></div>
                       </div>
                     </div>

@@ -3,6 +3,7 @@
 import React from 'react';
 import Navigation from '@/components/landing/Navigation';
 import Hero from '@/components/landing/Hero';
+import StatsBar from '@/components/landing/StatsBar';
 import FeatureShowcase from '@/components/landing/FeatureShowcase';
 import ComparisonTable from '@/components/landing/ComparisonTable';
 import HowItWorks from '@/components/landing/HowItWorks';
@@ -18,6 +19,9 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <Hero />
+
+      {/* Stats Bar - Time & Money Saved */}
+      <StatsBar />
 
       {/* Feature Showcase Section */}
       <FeatureShowcase />

@@ -59,6 +59,180 @@ const features = [
   },
 ];
 
+// Mockup Components
+function WorkflowMockup() {
+  return (
+    <div className="relative bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
+      {/* Mobile App Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6 text-white">
+        <div className="text-xs font-semibold mb-1 opacity-80">JOB #2847</div>
+        <div className="text-2xl font-bold mb-1">Smith Residence</div>
+        <div className="text-sm opacity-90">123 Main St, Los Angeles, CA</div>
+      </div>
+
+      {/* Job Status */}
+      <div className="p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-gray-600 text-sm font-medium">Status</div>
+          <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+            ✓ In Progress
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-blue-50 rounded-xl p-4">
+            <div className="text-blue-600 text-xs font-semibold mb-1">TIME ON SITE</div>
+            <div className="text-gray-900 text-2xl font-bold">2.5 hrs</div>
+          </div>
+          <div className="bg-green-50 rounded-xl p-4">
+            <div className="text-green-600 text-xs font-semibold mb-1">PROFIT</div>
+            <div className="text-gray-900 text-2xl font-bold">$2,340</div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-2">
+          <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold text-sm shadow-lg hover:bg-blue-700 transition-colors">
+            📸 Add Photos
+          </button>
+          <button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-semibold text-sm shadow-lg hover:from-green-600 hover:to-emerald-700 transition-colors">
+            ✍️ Customer Signature
+          </button>
+        </div>
+
+        {/* GPS Footer */}
+        <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <span className="text-gray-500 text-xs">GPS Verified • Live Tracking</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfitabilityMockup() {
+  return (
+    <div className="relative bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
+      {/* Dashboard Header */}
+      <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6 text-white">
+        <div className="text-xs font-semibold mb-1 opacity-80">LIVE PROFIT ANALYSIS</div>
+        <div className="text-3xl font-bold mb-1">$2,340</div>
+        <div className="text-sm opacity-90">42% Profit Margin</div>
+      </div>
+
+      {/* Cost Breakdown */}
+      <div className="p-6 space-y-4">
+        <div>
+          <div className="text-gray-600 text-xs font-semibold mb-3">COST BREAKDOWN</div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <span className="text-blue-600 text-xs">👷</span>
+                </div>
+                <span className="text-gray-700 text-sm font-medium">Labor</span>
+              </div>
+              <span className="text-gray-900 font-bold">$850</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <span className="text-orange-600 text-xs">⚙️</span>
+                </div>
+                <span className="text-gray-700 text-sm font-medium">Equipment</span>
+              </div>
+              <span className="text-gray-900 font-bold">$450</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <span className="text-purple-600 text-xs">🧱</span>
+                </div>
+                <span className="text-gray-700 text-sm font-medium">Materials</span>
+              </div>
+              <span className="text-gray-900 font-bold">$1,920</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Revenue */}
+        <div className="pt-4 border-t-2 border-gray-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-gray-600 text-sm font-semibold">REVENUE</span>
+            <span className="text-gray-900 text-xl font-bold">$5,560</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-green-600 text-sm font-semibold">NET PROFIT</span>
+            <span className="text-green-600 text-2xl font-bold">$2,340</span>
+          </div>
+        </div>
+
+        {/* Real-time Badge */}
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <span className="text-green-700 text-xs font-semibold">Updated in real-time</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ComplianceMockup() {
+  return (
+    <div className="relative bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
+      {/* Safety Header */}
+      <div className="bg-gradient-to-r from-red-600 to-orange-600 p-6 text-white">
+        <div className="text-xs font-semibold mb-1 opacity-80">SAFETY COMPLIANCE</div>
+        <div className="text-2xl font-bold mb-1">Job Hazard Analysis</div>
+        <div className="text-sm opacity-90">Digital Safety Forms</div>
+      </div>
+
+      {/* Compliance Checklist */}
+      <div className="p-6 space-y-4">
+        <div className="space-y-3">
+          {[
+            { label: 'JHA Form Completed', checked: true },
+            { label: 'Silica Exposure Logged', checked: true },
+            { label: 'Equipment Inspected', checked: true },
+            { label: 'PPE Verified', checked: true },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+              <span className="text-gray-700 text-sm font-medium">{item.label}</span>
+              <div className={`w-6 h-6 rounded-full ${
+                item.checked ? 'bg-green-500' : 'bg-gray-300'
+              } flex items-center justify-center`}>
+                {item.checked && <CheckCircle className="text-white" size={16} />}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Compliance Status */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+              <CheckCircle className="text-white" size={24} />
+            </div>
+            <div>
+              <div className="text-green-900 font-bold text-lg">100% Compliant</div>
+              <div className="text-green-700 text-sm">Ready for OSHA audit</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Digital Storage Info */}
+        <div className="pt-4 border-t border-gray-200">
+          <div className="flex items-center gap-2 text-gray-500 text-xs">
+            <span>☁️</span>
+            <span>Stored digitally • Searchable • Always accessible</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FeatureShowcase() {
   return (
     <section id="features" className="py-24 bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden">
@@ -153,57 +327,10 @@ export default function FeatureShowcase() {
                     transition={{ duration: 0.8 }}
                     className="relative"
                   >
-                    {/* Card Mockup */}
-                    <div className="relative bg-white rounded-3xl shadow-2xl border border-gray-200 p-8 transform hover:scale-[1.02] transition-transform duration-300">
-                      {/* Header */}
-                      <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-200">
-                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.bgGradient} flex items-center justify-center`}>
-                          <Icon className={feature.iconColor} size={24} />
-                        </div>
-                        <div>
-                          <div className="text-gray-900 font-bold text-lg">Feature Preview</div>
-                          <div className="text-gray-500 text-sm">Live Dashboard</div>
-                        </div>
-                      </div>
-
-                      {/* Content Bars (simulating data) */}
-                      <div className="space-y-4">
-                        {[85, 92, 78, 95].map((percent, i) => (
-                          <div key={i} className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Metric {i + 1}</span>
-                              <span className="text-gray-900 font-bold">{percent}%</span>
-                            </div>
-                            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                              <motion.div
-                                initial={{ width: 0 }}
-                                whileInView={{ width: `${percent}%` }}
-                                viewport={{ once: true }}
-                                transition={{ duration: 1, delay: i * 0.1 + 0.5 }}
-                                className={`h-full bg-gradient-to-r ${feature.bgGradient} rounded-full`}
-                                style={{
-                                  background: `linear-gradient(to right, ${
-                                    index === 0 ? '#3b82f6' : index === 1 ? '#10b981' : '#ef4444'
-                                  }, ${
-                                    index === 0 ? '#06b6d4' : index === 1 ? '#059669' : '#f97316'
-                                  })`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Status Badge */}
-                      <div className="mt-6 pt-6 border-t border-gray-200">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${
-                            index === 0 ? 'bg-blue-500' : index === 1 ? 'bg-green-500' : 'bg-red-500'
-                          } animate-pulse`}></div>
-                          <span className="text-gray-600 text-sm font-medium">Live and active</span>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Platform Mockup */}
+                    {index === 0 && <WorkflowMockup />}
+                    {index === 1 && <ProfitabilityMockup />}
+                    {index === 2 && <ComplianceMockup />}
 
                     {/* Floating Badge */}
                     <motion.div
@@ -228,7 +355,7 @@ export default function FeatureShowcase() {
           })}
         </div>
 
-        {/* Bottom Stats */}
+        {/* Bottom Value Props */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -237,8 +364,8 @@ export default function FeatureShowcase() {
           className="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-8"
         >
           {[
-            { number: '500+', label: 'Jobs Tracked Monthly' },
-            { number: '99.9%', label: 'Uptime Guarantee' },
+            { number: 'Zero', label: 'Paperwork Needed' },
+            { number: 'Real-Time', label: 'Data Collection' },
             { number: '5 min', label: 'Setup Time' },
           ].map((stat, index) => (
             <div key={index} className="text-center">
