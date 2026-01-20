@@ -12,6 +12,10 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || 'https://placeholder.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY0NTE5MjgwMCwiZXhwIjoxOTYwNzY4ODAwfQ.placeholder';
 
+// Validate URL format
+const isValidUrl = supabaseUrl.startsWith('https://') && supabaseUrl.includes('.supabase.co');
+const finalUrl = isValidUrl ? supabaseUrl : 'https://placeholder.supabase.co';
+
 /**
  * Admin client with full privileges
  * - Bypasses Row Level Security (RLS)
@@ -20,7 +24,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || 'eyJ
  *
  * ⚠️ NEVER expose this client to the frontend!
  */
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabaseAdmin = createClient(finalUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
