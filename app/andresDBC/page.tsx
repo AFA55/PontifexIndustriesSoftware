@@ -35,8 +35,14 @@ export default function AndresDigitalBusinessCard() {
           {/* Profile Image */}
           <div className="relative w-48 h-48 mx-auto mb-6">
             <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full opacity-75 blur-xl"></div>
-            <div className="relative w-full h-full bg-gradient-to-br from-slate-700 to-slate-800 rounded-full flex items-center justify-center text-white text-6xl font-bold border-4 border-orange-500 shadow-2xl">
-              AA
+            <div className="relative w-full h-full rounded-full border-4 border-orange-500 shadow-2xl overflow-hidden">
+              <Image
+                src="/andres-profile.jpeg"
+                alt="Andres Altamirano"
+                fill
+                className="object-cover"
+                priority
+              />
             </div>
           </div>
 
