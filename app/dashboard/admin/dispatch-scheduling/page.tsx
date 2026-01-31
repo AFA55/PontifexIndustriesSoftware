@@ -27,6 +27,11 @@ interface JobOrderForm {
   priority: 'high' | 'medium' | 'low';
   difficulty_rating: number;
 
+  // Job Site Conditions
+  truck_parking: 'close' | 'far';
+  work_environment: 'outdoor' | 'indoor';
+  site_cleanliness: number;
+
   // Schedule - Updated to support date range
   startDate: string;
   endDate: string;
@@ -435,6 +440,9 @@ export default function DispatchScheduling() {
     status: 'scheduled',
     priority: 'medium',
     difficulty_rating: 5,
+    truck_parking: 'close',
+    work_environment: 'outdoor',
+    site_cleanliness: 5,
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
     arrivalTime: '08:00',
@@ -1122,6 +1130,10 @@ export default function DispatchScheduling() {
         po_number: formData.po || null,
         customer_job_number: formData.customerJobNumber || null,
         job_quote: formData.jobQuote || null,
+        difficulty_rating: formData.difficulty_rating,
+        truck_parking: formData.truck_parking,
+        work_environment: formData.work_environment,
+        site_cleanliness: formData.site_cleanliness,
       };
 
       // Save to database via API
@@ -1166,6 +1178,9 @@ export default function DispatchScheduling() {
       status: 'scheduled',
       priority: 'medium',
       difficulty_rating: 5,
+      truck_parking: 'close',
+      work_environment: 'outdoor',
+      site_cleanliness: 5,
       startDate: new Date().toISOString().split('T')[0],
       endDate: new Date().toISOString().split('T')[0],
       arrivalTime: '08:00',
@@ -1413,6 +1428,101 @@ export default function DispatchScheduling() {
                         {p.toUpperCase()}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* How close can truck park to work area */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    How close can truck park to work area? *
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('truck_parking', 'close')}
+                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
+                        formData.truck_parking === 'close'
+                          ? 'bg-green-500 text-white border-green-600'
+                          : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                      }`}
+                    >
+                      Close (Under 300 ft)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('truck_parking', 'far')}
+                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
+                        formData.truck_parking === 'far'
+                          ? 'bg-orange-500 text-white border-orange-600'
+                          : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                      }`}
+                    >
+                      Far (Unload & Carry Equipment)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Work Environment */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Work Environment *
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('work_environment', 'outdoor')}
+                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
+                        formData.work_environment === 'outdoor'
+                          ? 'bg-blue-500 text-white border-blue-600'
+                          : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                      }`}
+                    >
+                      Outdoor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('work_environment', 'indoor')}
+                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
+                        formData.work_environment === 'indoor'
+                          ? 'bg-purple-500 text-white border-purple-600'
+                          : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                      }`}
+                    >
+                      Indoor
+                    </button>
+                  </div>
+                </div>
+
+                {/* Site Cleanliness */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Site Cleanliness (1-10) *
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
+                      <button
+                        key={rating}
+                        type="button"
+                        onClick={() => handleInputChange('site_cleanliness', rating)}
+                        className={`flex-1 py-3 px-2 rounded-xl font-bold text-sm transition-all ${
+                          formData.site_cleanliness === rating
+                            ? rating <= 3
+                              ? 'bg-red-500 text-white shadow-lg scale-105'
+                              : rating <= 6
+                              ? 'bg-yellow-500 text-white shadow-lg scale-105'
+                              : 'bg-green-500 text-white shadow-lg scale-105'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {rating}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500 mt-2 px-1">
+                    <span>Dirty</span>
+                    <span>Moderate</span>
+                    <span>Clean</span>
+                    <span>Very Clean</span>
                   </div>
                 </div>
               </div>
@@ -2465,6 +2575,13 @@ export default function DispatchScheduling() {
                                 }).join('')}
                               </>
                             )}
+                            {'\n'}
+                            {/* Job Site Conditions */}
+                            {`---\nJOB SITE CONDITIONS:\n`}
+                            {`Truck Parking: ${formData.truck_parking === 'close' ? 'Close (Under 300 ft)' : 'Far (Unload & Carry Equipment)'}\n`}
+                            {`Work Environment: ${formData.work_environment === 'indoor' ? 'Indoor' : 'Outdoor'}\n`}
+                            {`Site Cleanliness: ${formData.site_cleanliness}/10\n`}
+                            {`Job Difficulty: ${formData.difficulty_rating}/10\n`}
                           </p>
                         </div>
                       </div>
