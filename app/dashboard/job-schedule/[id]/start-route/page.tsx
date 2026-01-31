@@ -353,7 +353,7 @@ export default function StartRoutePage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link
-              href={`/dashboard/job-schedule/${jobId}/actions`}
+              href="/dashboard/job-schedule"
               className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl transition-all duration-300 font-medium border border-gray-300"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -554,7 +554,7 @@ export default function StartRoutePage() {
         {/* Action Buttons */}
         <div className="flex gap-4">
           <Link
-            href={`/dashboard/job-schedule/${jobId}/actions`}
+            href="/dashboard/job-schedule"
             className="flex-1 px-6 py-4 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-2xl font-bold text-center transition-all shadow-lg hover:shadow-xl"
           >
             Cancel
