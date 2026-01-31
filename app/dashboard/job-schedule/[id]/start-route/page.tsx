@@ -20,6 +20,16 @@ interface JobOrder {
   foreman_phone: string;
 }
 
+interface WorkflowStatus {
+  equipment_checklist_completed: boolean;
+  sms_sent: boolean;
+  silica_form_completed: boolean;
+  work_performed_completed: boolean;
+  pictures_submitted: boolean;
+  customer_signature_received: boolean;
+  current_step: string;
+}
+
 export default function StartRoutePage() {
   const router = useRouter();
   const params = useParams();
@@ -33,10 +43,59 @@ export default function StartRoutePage() {
   const [operatorName, setOperatorName] = useState<string>('');
 
   useEffect(() => {
+    checkWorkflowAndRedirect();
     fetchJobDetails();
     fetchOperatorName();
     updateWorkflowStep();
   }, [jobId]);
+
+  // Check workflow status and redirect if already past this step
+  const checkWorkflowAndRedirect = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/workflow?jobId=${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          const workflow: WorkflowStatus = result.data;
+
+          // If equipment checklist is completed, redirect to the appropriate step
+          if (workflow.equipment_checklist_completed) {
+            console.log('Equipment checklist already completed, redirecting...');
+
+            if (!workflow.sms_sent) {
+              router.replace(`/dashboard/job-schedule/${jobId}/in-route`);
+              return;
+            } else if (!workflow.silica_form_completed) {
+              router.replace(`/dashboard/job-schedule/${jobId}/silica-exposure`);
+              return;
+            } else if (!workflow.work_performed_completed) {
+              router.replace(`/dashboard/job-schedule/${jobId}/work-performed`);
+              return;
+            } else if (!workflow.pictures_submitted) {
+              router.replace(`/dashboard/job-schedule/${jobId}/pictures`);
+              return;
+            } else if (!workflow.customer_signature_received) {
+              router.replace(`/dashboard/job-schedule/${jobId}/customer-signature`);
+              return;
+            } else {
+              router.replace(`/dashboard/job-schedule/${jobId}/complete-job`);
+              return;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Workflow check error (non-blocking):', error);
+    }
+  };
 
   const updateWorkflowStep = async () => {
     try {

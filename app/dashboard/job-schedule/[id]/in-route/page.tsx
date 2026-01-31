@@ -58,10 +58,22 @@ export default function InRoutePage() {
           if (result.success && result.data) {
             const workflow = result.data;
 
-            // If in_route is already completed, redirect to next step automatically
+            // If in_route is already completed, redirect to the appropriate next step
             if (workflow.sms_sent && workflow.equipment_checklist_completed) {
               console.log('In Route already completed, redirecting to next step');
-              router.push(`/dashboard/job-schedule/${jobId}/silica-exposure`);
+
+              // Find the first incomplete step
+              if (!workflow.silica_form_completed) {
+                router.replace(`/dashboard/job-schedule/${jobId}/silica-exposure`);
+              } else if (!workflow.work_performed_completed) {
+                router.replace(`/dashboard/job-schedule/${jobId}/work-performed`);
+              } else if (!workflow.pictures_submitted) {
+                router.replace(`/dashboard/job-schedule/${jobId}/pictures`);
+              } else if (!workflow.customer_signature_received) {
+                router.replace(`/dashboard/job-schedule/${jobId}/customer-signature`);
+              } else {
+                router.replace(`/dashboard/job-schedule/${jobId}/complete-job`);
+              }
               return;
             }
           }
