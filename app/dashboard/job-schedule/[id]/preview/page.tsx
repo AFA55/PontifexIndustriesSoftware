@@ -19,6 +19,12 @@ interface JobOrder {
   scheduled_date: string;
   arrival_time: string;
   shop_arrival_time?: string;
+  // Job Site Conditions
+  truck_parking?: 'close' | 'far';
+  work_environment?: 'outdoor' | 'indoor';
+  site_cleanliness?: number;
+  difficulty_rating?: number;
+  priority?: string;
 }
 
 interface WorkflowStatus {
@@ -264,6 +270,82 @@ export default function PreviewTicketPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Job Site Conditions */}
+        <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-xl border border-gray-200/50 p-6 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Job Site Conditions</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Truck Parking */}
+                <div className={`p-4 rounded-xl border-2 ${job.truck_parking === 'far' ? 'bg-orange-50 border-orange-300' : 'bg-green-50 border-green-300'}`}>
+                  <div className="text-xs font-semibold text-gray-500 mb-1">Truck Parking</div>
+                  <div className={`font-bold ${job.truck_parking === 'far' ? 'text-orange-700' : 'text-green-700'}`}>
+                    {job.truck_parking === 'far' ? 'Far (Unload & Carry)' : 'Close (Under 300 ft)'}
+                  </div>
+                </div>
+
+                {/* Work Environment */}
+                <div className={`p-4 rounded-xl border-2 ${job.work_environment === 'indoor' ? 'bg-purple-50 border-purple-300' : 'bg-blue-50 border-blue-300'}`}>
+                  <div className="text-xs font-semibold text-gray-500 mb-1">Work Environment</div>
+                  <div className={`font-bold ${job.work_environment === 'indoor' ? 'text-purple-700' : 'text-blue-700'}`}>
+                    {job.work_environment === 'indoor' ? 'Indoor' : 'Outdoor'}
+                  </div>
+                </div>
+
+                {/* Site Cleanliness */}
+                <div className={`p-4 rounded-xl border-2 ${
+                  (job.site_cleanliness || 5) <= 3 ? 'bg-red-50 border-red-300' :
+                  (job.site_cleanliness || 5) <= 6 ? 'bg-yellow-50 border-yellow-300' :
+                  'bg-green-50 border-green-300'
+                }`}>
+                  <div className="text-xs font-semibold text-gray-500 mb-1">Site Cleanliness</div>
+                  <div className={`font-bold ${
+                    (job.site_cleanliness || 5) <= 3 ? 'text-red-700' :
+                    (job.site_cleanliness || 5) <= 6 ? 'text-yellow-700' :
+                    'text-green-700'
+                  }`}>
+                    {job.site_cleanliness || 5}/10
+                  </div>
+                </div>
+
+                {/* Job Difficulty */}
+                <div className={`p-4 rounded-xl border-2 ${
+                  (job.difficulty_rating || 5) >= 7 ? 'bg-red-50 border-red-300' :
+                  (job.difficulty_rating || 5) >= 4 ? 'bg-yellow-50 border-yellow-300' :
+                  'bg-green-50 border-green-300'
+                }`}>
+                  <div className="text-xs font-semibold text-gray-500 mb-1">Job Difficulty</div>
+                  <div className={`font-bold ${
+                    (job.difficulty_rating || 5) >= 7 ? 'text-red-700' :
+                    (job.difficulty_rating || 5) >= 4 ? 'text-yellow-700' :
+                    'text-green-700'
+                  }`}>
+                    {job.difficulty_rating || 5}/10
+                  </div>
+                </div>
+              </div>
+
+              {/* Priority Badge */}
+              {job.priority && (
+                <div className="mt-4">
+                  <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${
+                    job.priority === 'high' ? 'bg-red-100 text-red-700 border-2 border-red-300' :
+                    job.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 border-2 border-yellow-300' :
+                    'bg-green-100 text-green-700 border-2 border-green-300'
+                  }`}>
+                    {job.priority.toUpperCase()} PRIORITY
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
