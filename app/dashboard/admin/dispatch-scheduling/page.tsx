@@ -2467,6 +2467,13 @@ export default function DispatchScheduling() {
                         <div className="mt-4 p-4 bg-white rounded-xl border-2 border-gray-200">
                           <p className="text-xs font-semibold text-gray-500 mb-2">PREVIEW:</p>
                           <p className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                            {/* Job Site Conditions - shown first */}
+                            {`JOB SITE CONDITIONS:\n`}
+                            {`• Truck Parking: ${formData.truck_parking === 'close' ? 'Close (Under 300 ft)' : 'Far (Unload & Carry Equipment)'}\n`}
+                            {`• Work Environment: ${formData.work_environment === 'indoor' ? 'Indoor' : 'Outdoor'}\n`}
+                            {`• Site Cleanliness: ${formData.site_cleanliness}/10\n`}
+                            {`• Job Difficulty: ${formData.difficulty_rating}/10\n`}
+                            {`---\n`}
                             {jobType === 'CORE DRILLING' ? (
                               <>
                                 {(() => {
@@ -2575,13 +2582,6 @@ export default function DispatchScheduling() {
                                 }).join('')}
                               </>
                             )}
-                            {'\n'}
-                            {/* Job Site Conditions */}
-                            {`---\nJOB SITE CONDITIONS:\n`}
-                            {`Truck Parking: ${formData.truck_parking === 'close' ? 'Close (Under 300 ft)' : 'Far (Unload & Carry Equipment)'}\n`}
-                            {`Work Environment: ${formData.work_environment === 'indoor' ? 'Indoor' : 'Outdoor'}\n`}
-                            {`Site Cleanliness: ${formData.site_cleanliness}/10\n`}
-                            {`Job Difficulty: ${formData.difficulty_rating}/10\n`}
                           </p>
                         </div>
                       </div>
