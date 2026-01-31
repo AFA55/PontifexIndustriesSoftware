@@ -389,7 +389,11 @@ export default function JobSchedule() {
             jobs.map((job, index) => (
               <div
                 key={job.id}
-                onClick={() => router.push(`/dashboard/job-schedule/${job.id}/actions`)}
+                onClick={async () => {
+                  // Always check workflow state before navigating
+                  const redirectUrl = await getWorkflowRedirectUrl(job.id, job.status);
+                  router.push(redirectUrl);
+                }}
                 className="block group cursor-pointer"
               >
                 <div className="relative bg-white/90 backdrop-blur-lg rounded-3xl shadow-xl hover:shadow-2xl border border-gray-200/50 overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
