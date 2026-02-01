@@ -1527,23 +1527,15 @@ export default function DispatchScheduling() {
                 </div>
               </div>
 
-              {/* Job Site Conditions Summary - Live Preview */}
-              <div className="mt-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-200">
-                <h3 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  JOB SITE CONDITIONS SUMMARY
-                </h3>
-                <div className="bg-white rounded-xl p-4 font-mono text-sm text-gray-700 whitespace-pre-wrap">
-                  {`Activity: ${formData.jobTypes.length > 0 ? formData.jobTypes.join(', ') : 'None selected'}\n`}
-                  {`Job Difficulty: ${formData.difficulty_rating}/10\n`}
-                  {`Priority: ${formData.priority.toUpperCase()}\n`}
-                  {`Truck Parking: ${formData.truck_parking === 'close' ? 'Close (Under 300 ft)' : 'Far (Unload & Carry Equipment)'}\n`}
-                  {`Work Environment: ${formData.work_environment === 'indoor' ? 'Indoor' : 'Outdoor'}\n`}
-                  {`Site Cleanliness: ${formData.site_cleanliness}/10`}
-                </div>
-                <p className="text-xs text-blue-600 mt-2">This summary will be shown to operators on their job tickets.</p>
+              {/* Preview */}
+              <div className="mt-4 p-4 bg-white rounded-xl border-2 border-gray-200">
+                <p className="text-xs font-semibold text-gray-500 mb-2">PREVIEW:</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                  {`Job Types: ${formData.jobTypes.length > 0 ? formData.jobTypes.join(', ') : 'None selected'}\n`}
+                  {`Difficulty: ${formData.difficulty_rating}/10 | Priority: ${formData.priority.toUpperCase()}\n`}
+                  {`Truck Parking: ${formData.truck_parking === 'close' ? 'Close (Under 300 ft)' : 'Far (Unload & Carry)'}\n`}
+                  {`Environment: ${formData.work_environment === 'outdoor' ? 'Outdoor' : 'Indoor'} | Cleanliness: ${formData.site_cleanliness}/10`}
+                </p>
               </div>
 
               {/* Navigation Buttons */}
