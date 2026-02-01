@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AdminProtection from '@/components/AdminProtection';
@@ -468,6 +468,9 @@ export default function DispatchScheduling() {
   // LocalStorage key for draft persistence
   const DRAFT_STORAGE_KEY = 'dispatch-scheduling-draft';
 
+  // Track if initial load from localStorage has completed (prevent race condition)
+  const hasLoadedDraft = useRef(false);
+
   // Default form data for reset
   const getDefaultFormData = (): JobOrderForm => ({
     title: '',
@@ -514,20 +517,39 @@ export default function DispatchScheduling() {
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft);
         if (parsed.formData) {
-          setFormData(parsed.formData);
+          // Ensure numeric values are properly typed
+          const restoredFormData = {
+            ...parsed.formData,
+            estimatedDriveHours: Number(parsed.formData.estimatedDriveHours) || 0,
+            estimatedDriveMinutes: Number(parsed.formData.estimatedDriveMinutes) || 0,
+            difficulty_rating: Number(parsed.formData.difficulty_rating) || 5,
+            site_cleanliness: Number(parsed.formData.site_cleanliness) || 5
+          };
+          setFormData(restoredFormData);
+          console.log('📋 Loaded draft from localStorage:', {
+            step: parsed.currentStep,
+            driveTime: `${restoredFormData.estimatedDriveHours}h ${restoredFormData.estimatedDriveMinutes}m`,
+            savedAt: parsed.savedAt
+          });
         }
         if (parsed.currentStep) {
           setCurrentStep(parsed.currentStep);
         }
-        console.log('📋 Loaded draft from localStorage');
       }
     } catch (error) {
       console.error('Error loading draft from localStorage:', error);
     }
+    // Mark that initial load is complete
+    hasLoadedDraft.current = true;
   }, []);
 
   // Save draft to localStorage when formData or currentStep changes
+  // Only save AFTER initial load is complete to prevent overwriting saved data
   useEffect(() => {
+    // Don't save until initial load is complete
+    if (!hasLoadedDraft.current) {
+      return;
+    }
     try {
       const draft = {
         formData,
@@ -535,6 +557,7 @@ export default function DispatchScheduling() {
         savedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+      console.log('💾 Draft saved to localStorage');
     } catch (error) {
       console.error('Error saving draft to localStorage:', error);
     }
@@ -1042,18 +1065,38 @@ export default function DispatchScheduling() {
 
     const [hours, minutes] = formData.arrivalTime.split(':').map(Number);
 
+    // Ensure numeric values for drive time (handle potential string values from localStorage)
+    const driveHours = Number(formData.estimatedDriveHours) || 0;
+    const driveMinutes = Number(formData.estimatedDriveMinutes) || 0;
+
     // Calculate total drive time in minutes
-    const driveTimeMinutes = (formData.estimatedDriveHours * 60) + formData.estimatedDriveMinutes;
+    const driveTimeMinutes = (driveHours * 60) + driveMinutes;
+
+    console.log('🚗 Shop Arrival Calculation:', {
+      jobArrivalTime: formData.arrivalTime,
+      jobArrivalMinutes: hours * 60 + minutes,
+      driveHours,
+      driveMinutes,
+      driveTimeMinutes,
+      minutesBeforeLeaving: minutesBefore,
+      formDataDriveHours: formData.estimatedDriveHours,
+      formDataDriveMinutes: formData.estimatedDriveMinutes,
+      typeOfDriveHours: typeof formData.estimatedDriveHours,
+      typeOfDriveMinutes: typeof formData.estimatedDriveMinutes
+    });
 
     // Shop arrival = Job arrival - drive time - time at shop before leaving
     // Example: Job at 12:00, 30min drive, 30min at shop = arrive shop at 11:00
     const totalMinutes = hours * 60 + minutes - driveTimeMinutes - minutesBefore;
+
+    console.log('🕐 Calculated totalMinutes:', totalMinutes, '=', hours * 60 + minutes, '-', driveTimeMinutes, '-', minutesBefore);
 
     // Handle negative times (wrap to previous day)
     const shopHours = Math.floor((totalMinutes + 1440) % 1440 / 60);
     const shopMinutes = (totalMinutes + 1440) % 60;
 
     const shopArrivalTime = `${String(shopHours).padStart(2, '0')}:${String(shopMinutes).padStart(2, '0')}`;
+    console.log('✅ Shop Arrival Time:', shopArrivalTime);
     handleInputChange('shopArrivalTime', shopArrivalTime);
   };
 
