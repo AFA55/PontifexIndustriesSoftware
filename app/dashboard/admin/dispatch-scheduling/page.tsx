@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import AdminProtection from '@/components/AdminProtection';
 import { supabase } from '@/lib/supabase';
 import { documentTemplates } from '@/lib/document-types';
+import { GoogleAddressAutocomplete } from '@/components/ui/GoogleAddressAutocomplete';
 
 interface JobOrderForm {
   // Basic Info
@@ -2727,13 +2728,11 @@ export default function DispatchScheduling() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Full Address *
                   </label>
-                  <input
-                    type="text"
-                    required
+                  <GoogleAddressAutocomplete
                     value={formData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none transition-colors"
-                    placeholder="e.g., 1199 PRINCE AVE, ATHENS, GA"
+                    onChange={(address) => handleInputChange('address', address)}
+                    placeholder="Start typing an address..."
+                    required
                   />
                 </div>
 

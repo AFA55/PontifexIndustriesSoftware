@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
+    "@react-google-maps/api": "^2.20.8",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/supabase-js": "^2.45.4",
@@ -33,6 +34,7 @@
     "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^3.2.1",
     "resend": "^6.5.2",
+    "use-places-autocomplete": "^4.0.1",
     "zod": "^4.1.5"
   },
   "devDependencies": {
