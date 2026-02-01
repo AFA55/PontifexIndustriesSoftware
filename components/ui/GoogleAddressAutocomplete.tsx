@@ -6,6 +6,7 @@ import usePlacesAutocomplete, {
   getLatLng,
 } from 'use-places-autocomplete';
 import { MapPin } from 'lucide-react';
+import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 
 interface GoogleAddressAutocompleteProps {
   value: string;
@@ -32,17 +33,41 @@ export function GoogleAddressAutocomplete({
   className = '',
   required = false,
 }: GoogleAddressAutocompleteProps) {
+  const { isLoaded, loadError } = useGoogleMaps();
+
   const {
     ready,
     suggestions: { status, data },
     setValue,
     clearSuggestions,
+    init,
   } = usePlacesAutocomplete({
     requestOptions: {
       componentRestrictions: { country: 'us' }, // Restrict to US addresses
     },
     debounce: 300,
+    initOnMount: false, // Don't init until Google Maps is loaded
   });
+
+  // Initialize when Google Maps is loaded
+  useEffect(() => {
+    if (isLoaded && !ready) {
+      console.log('GoogleAddressAutocomplete: Google Maps loaded, initializing Places API...');
+      init();
+    }
+  }, [isLoaded, ready, init]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('GoogleAddressAutocomplete Debug:', {
+      isLoaded,
+      loadError: loadError?.message,
+      ready,
+      googleExists: typeof window !== 'undefined' && !!window.google,
+      googleMapsExists: typeof window !== 'undefined' && !!window.google?.maps,
+      googlePlacesExists: typeof window !== 'undefined' && !!window.google?.maps?.places,
+    });
+  }, [isLoaded, loadError, ready]);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -119,6 +144,16 @@ export function GoogleAddressAutocomplete({
     }
   };
 
+  // Determine placeholder based on state
+  const getPlaceholder = () => {
+    if (loadError) return 'Maps API error - check console';
+    if (!isLoaded) return 'Loading Maps API...';
+    if (!ready) return 'Initializing Places...';
+    return placeholder;
+  };
+
+  const isDisabled = !ready || !isLoaded || !!loadError;
+
   return (
     <div className="relative">
       <div className="relative">
@@ -128,12 +163,12 @@ export function GoogleAddressAutocomplete({
           type="text"
           value={value}
           onChange={handleInput}
-          disabled={!ready}
-          placeholder={ready ? placeholder : 'Loading...'}
+          disabled={isDisabled}
+          placeholder={getPlaceholder()}
           required={required}
           autoComplete="off"
           className={`w-full pl-10 pr-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none transition-colors ${
-            !ready ? 'bg-gray-100 cursor-not-allowed' : ''
+            isDisabled ? 'bg-gray-100 cursor-not-allowed' : ''
           } ${className}`}
         />
       </div>
