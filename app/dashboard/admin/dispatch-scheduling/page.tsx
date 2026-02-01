@@ -465,6 +465,91 @@ export default function DispatchScheduling() {
     jobQuote: undefined // Admin only field
   });
 
+  // LocalStorage key for draft persistence
+  const DRAFT_STORAGE_KEY = 'dispatch-scheduling-draft';
+
+  // Default form data for reset
+  const getDefaultFormData = (): JobOrderForm => ({
+    title: '',
+    customer: '',
+    companyName: '',
+    customerEmail: '',
+    salespersonEmail: '',
+    jobTypes: [],
+    location: '',
+    address: '',
+    estimatedDriveHours: 0,
+    estimatedDriveMinutes: 0,
+    status: 'scheduled',
+    priority: 'medium',
+    difficulty_rating: 5,
+    truck_parking: 'close',
+    work_environment: 'outdoor',
+    site_cleanliness: 5,
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    arrivalTime: '08:00',
+    shopArrivalTime: '',
+    estimatedHours: '8.00',
+    technicians: [],
+    salesman: '',
+    description: '',
+    additionalInfo: '',
+    jobTypeDetails: {},
+    equipment: [],
+    requiredDocuments: ['silica-dust-control'],
+    jobSiteNumber: '',
+    po: '',
+    customerJobNumber: '',
+    contactOnSite: '',
+    contactPhone: '',
+    jobSiteGC: '',
+    jobQuote: undefined
+  });
+
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.formData) {
+          setFormData(parsed.formData);
+        }
+        if (parsed.currentStep) {
+          setCurrentStep(parsed.currentStep);
+        }
+        console.log('📋 Loaded draft from localStorage');
+      }
+    } catch (error) {
+      console.error('Error loading draft from localStorage:', error);
+    }
+  }, []);
+
+  // Save draft to localStorage when formData or currentStep changes
+  useEffect(() => {
+    try {
+      const draft = {
+        formData,
+        currentStep,
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    } catch (error) {
+      console.error('Error saving draft to localStorage:', error);
+    }
+  }, [formData, currentStep]);
+
+  // Reset draft and form data
+  const resetDraft = () => {
+    if (confirm('Are you sure you want to reset the draft? All unsaved progress will be lost.')) {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      setFormData(getDefaultFormData());
+      setCurrentStep(1);
+      console.log('🗑️ Draft reset');
+    }
+  };
+
   // Fetch team members and autocomplete suggestions from database
   useEffect(() => {
     const fetchData = async () => {
@@ -1170,44 +1255,10 @@ export default function DispatchScheduling() {
         router.push('/dashboard/admin');
       }, 3000);
 
-      // Reset form
-      setFormData({
-      title: '',
-      customer: '',
-      companyName: '',
-      customerEmail: '',
-      salespersonEmail: '',
-      jobTypes: [],
-      location: '',
-      address: '',
-      estimatedDriveHours: 0,
-      estimatedDriveMinutes: 0,
-      status: 'scheduled',
-      priority: 'medium',
-      difficulty_rating: 5,
-      truck_parking: 'close',
-      work_environment: 'outdoor',
-      site_cleanliness: 5,
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0],
-      arrivalTime: '08:00',
-      shopArrivalTime: '',
-      estimatedHours: '8.00',
-      technicians: [],
-      salesman: '',
-      description: '',
-      additionalInfo: '',
-      jobTypeDetails: {},
-      equipment: [],
-      requiredDocuments: ['silica-dust-control'], // Silica Dust Control always required
-      jobSiteNumber: '',
-      po: '',
-      customerJobNumber: '',
-      contactOnSite: '',
-      contactPhone: '',
-      jobSiteGC: '',
-      jobQuote: undefined
-    });
+      // Clear draft from localStorage and reset form
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      setFormData(getDefaultFormData());
+      setCurrentStep(1);
     } catch (error: any) {
       console.error('Error creating job order:', error);
       alert(`Failed to create job order: ${error.message}`);
@@ -1338,14 +1389,26 @@ export default function DispatchScheduling() {
             {/* Step 1: Basic Information */}
             {currentStep === 1 && (
             <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-xl border border-gray-200/50 p-6 overflow-visible">
-              <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  Step 1: Basic Information
+                </h2>
+                <button
+                  type="button"
+                  onClick={resetDraft}
+                  className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                </div>
-                Step 1: Basic Information
-              </h2>
+                  Reset Draft
+                </button>
+              </div>
 
               <div className="space-y-6">
                 {/* Job Types */}
