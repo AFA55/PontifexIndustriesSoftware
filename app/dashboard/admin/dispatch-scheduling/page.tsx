@@ -1576,6 +1576,54 @@ export default function DispatchScheduling() {
                   Step 2: Work Details (Estimate Style)
                 </h2>
 
+                {/* Job Site Conditions Summary from Step 1 */}
+                <div className="mb-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-200">
+                  <h3 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    JOB SITE CONDITIONS (from Step 1)
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="text-xs text-gray-500 font-medium">Difficulty</div>
+                      <div className={`text-lg font-bold ${formData.difficulty_rating >= 7 ? 'text-red-600' : formData.difficulty_rating >= 4 ? 'text-yellow-600' : 'text-green-600'}`}>
+                        {formData.difficulty_rating}/10
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="text-xs text-gray-500 font-medium">Priority</div>
+                      <div className={`text-lg font-bold ${formData.priority === 'high' ? 'text-red-600' : formData.priority === 'medium' ? 'text-yellow-600' : 'text-green-600'}`}>
+                        {formData.priority.toUpperCase()}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="text-xs text-gray-500 font-medium">Truck Parking</div>
+                      <div className={`text-sm font-bold ${formData.truck_parking === 'far' ? 'text-orange-600' : 'text-green-600'}`}>
+                        {formData.truck_parking === 'close' ? 'Close' : 'Far'}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="text-xs text-gray-500 font-medium">Environment</div>
+                      <div className={`text-sm font-bold ${formData.work_environment === 'indoor' ? 'text-purple-600' : 'text-blue-600'}`}>
+                        {formData.work_environment === 'indoor' ? 'Indoor' : 'Outdoor'}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="text-xs text-gray-500 font-medium">Cleanliness</div>
+                      <div className={`text-lg font-bold ${formData.site_cleanliness <= 3 ? 'text-red-600' : formData.site_cleanliness <= 6 ? 'text-yellow-600' : 'text-green-600'}`}>
+                        {formData.site_cleanliness}/10
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="text-xs text-gray-500 font-medium">Job Types</div>
+                      <div className="text-sm font-bold text-orange-600">
+                        {formData.jobTypes.length} selected
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-8">
                   {formData.jobTypes.map((jobType, idx) => {
                     const config = jobTypeConfig[jobType];
