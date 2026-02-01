@@ -948,7 +948,7 @@ export default function DispatchScheduling() {
     );
   };
 
-  // Calculate shop arrival time based on job arrival time minus offset
+  // Calculate shop arrival time based on job arrival time minus drive time minus time at shop before leaving
   const calculateShopArrival = (minutesBefore: number) => {
     if (!formData.arrivalTime) {
       alert('Please set the job arrival time first');
@@ -956,7 +956,13 @@ export default function DispatchScheduling() {
     }
 
     const [hours, minutes] = formData.arrivalTime.split(':').map(Number);
-    const totalMinutes = hours * 60 + minutes - minutesBefore;
+
+    // Calculate total drive time in minutes
+    const driveTimeMinutes = (formData.estimatedDriveHours * 60) + formData.estimatedDriveMinutes;
+
+    // Shop arrival = Job arrival - drive time - time at shop before leaving
+    // Example: Job at 12:00, 30min drive, 30min at shop = arrive shop at 11:00
+    const totalMinutes = hours * 60 + minutes - driveTimeMinutes - minutesBefore;
 
     // Handle negative times (wrap to previous day)
     const shopHours = Math.floor((totalMinutes + 1440) % 1440 / 60);
@@ -2890,30 +2896,30 @@ export default function DispatchScheduling() {
                     onChange={(e) => handleInputChange('shopArrivalTime', e.target.value)}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors"
                   />
-                  <p className="text-xs text-gray-500 mt-1 mb-2">When operator should be at shop</p>
+                  <p className="text-xs text-gray-500 mt-1 mb-2">When operator should be at shop (accounts for drive time)</p>
 
-                  {/* Quick Choose Buttons */}
+                  {/* Quick Choose Buttons - time at shop before leaving */}
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => calculateShopArrival(30)}
                       className="px-3 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
                     >
-                      30 min before
+                      30 min at shop
                     </button>
                     <button
                       type="button"
                       onClick={() => calculateShopArrival(45)}
                       className="px-3 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
                     >
-                      45 min before
+                      45 min at shop
                     </button>
                     <button
                       type="button"
                       onClick={() => calculateShopArrival(60)}
                       className="px-3 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
                     >
-                      1 hr before
+                      1 hr at shop
                     </button>
                   </div>
                 </div>
