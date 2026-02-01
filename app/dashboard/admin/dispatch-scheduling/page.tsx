@@ -270,6 +270,14 @@ const commonEquipment = [
 // Operators and salesmen will be fetched from database
 // const operators and salesmen removed - now fetched dynamically
 
+// Shop address for drive time calculation
+// TODO: Move this to environment variable or company settings
+const SHOP_ADDRESS = {
+  address: '1234 Shop Street, Santa Ana, CA 92701', // Replace with actual shop address
+  lat: 33.7455, // Santa Ana, CA coordinates
+  lng: -117.8677
+};
+
 // Available core drilling locations
 const coreDrillingLocations = [
   'Columns',
@@ -426,6 +434,7 @@ export default function DispatchScheduling() {
   const [gcSuggestions, setGcSuggestions] = useState<string[]>([]);
   const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [calculatingDriveTime, setCalculatingDriveTime] = useState(false);
 
   const [formData, setFormData] = useState<JobOrderForm>({
     title: '',
@@ -1098,6 +1107,92 @@ export default function DispatchScheduling() {
     const shopArrivalTime = `${String(shopHours).padStart(2, '0')}:${String(shopMinutes).padStart(2, '0')}`;
     console.log('✅ Shop Arrival Time:', shopArrivalTime);
     handleInputChange('shopArrivalTime', shopArrivalTime);
+  };
+
+  // Calculate drive time from shop to job site using Google Maps Distance Matrix API
+  const calculateDriveTime = async (destinationLat: number, destinationLng: number) => {
+    // Check if Google Maps is loaded
+    if (typeof window === 'undefined' || !window.google?.maps) {
+      console.warn('Google Maps not loaded, cannot calculate drive time');
+      return;
+    }
+
+    setCalculatingDriveTime(true);
+    console.log('🚗 Calculating drive time from shop to job site...');
+    console.log('   Shop:', SHOP_ADDRESS.lat, SHOP_ADDRESS.lng);
+    console.log('   Job Site:', destinationLat, destinationLng);
+
+    try {
+      const service = new window.google.maps.DistanceMatrixService();
+
+      const result = await new Promise<google.maps.DistanceMatrixResponse>((resolve, reject) => {
+        service.getDistanceMatrix(
+          {
+            origins: [{ lat: SHOP_ADDRESS.lat, lng: SHOP_ADDRESS.lng }],
+            destinations: [{ lat: destinationLat, lng: destinationLng }],
+            travelMode: google.maps.TravelMode.DRIVING,
+            unitSystem: google.maps.UnitSystem.IMPERIAL,
+            drivingOptions: {
+              departureTime: new Date(), // Use current time for traffic
+              trafficModel: google.maps.TrafficModel.BEST_GUESS
+            }
+          },
+          (response, status) => {
+            if (status === 'OK' && response) {
+              resolve(response);
+            } else {
+              reject(new Error(`Distance Matrix API error: ${status}`));
+            }
+          }
+        );
+      });
+
+      const element = result.rows[0]?.elements[0];
+
+      if (element?.status === 'OK' && element.duration) {
+        // Use duration_in_traffic if available, otherwise use duration
+        const durationSeconds = element.duration_in_traffic?.value || element.duration.value;
+        const durationText = element.duration_in_traffic?.text || element.duration.text;
+        const distanceText = element.distance?.text || '';
+
+        // Convert seconds to hours and minutes
+        const totalMinutes = Math.ceil(durationSeconds / 60);
+        const driveHours = Math.floor(totalMinutes / 60);
+        const driveMinutes = totalMinutes % 60;
+
+        console.log('✅ Drive time calculated:', {
+          durationText,
+          distanceText,
+          totalMinutes,
+          driveHours,
+          driveMinutes
+        });
+
+        // Update form data with calculated drive time
+        setFormData(prev => ({
+          ...prev,
+          estimatedDriveHours: driveHours,
+          estimatedDriveMinutes: driveMinutes
+        }));
+      } else {
+        console.warn('Could not calculate drive time:', element?.status);
+      }
+    } catch (error) {
+      console.error('Error calculating drive time:', error);
+    } finally {
+      setCalculatingDriveTime(false);
+    }
+  };
+
+  // Handle address change with drive time calculation
+  const handleAddressChange = async (address: string, placeDetails?: { lat?: number; lng?: number }) => {
+    handleInputChange('address', address);
+
+    // If we have coordinates, calculate drive time
+    if (placeDetails?.lat && placeDetails?.lng) {
+      console.log('📍 Address selected with coordinates:', placeDetails);
+      await calculateDriveTime(placeDetails.lat, placeDetails.lng);
+    }
   };
 
   const toggleOperator = (operatorName: string) => {
@@ -2842,7 +2937,7 @@ export default function DispatchScheduling() {
                   </label>
                   <GoogleAddressAutocomplete
                     value={formData.address}
-                    onChange={(address) => handleInputChange('address', address)}
+                    onChange={(address, placeDetails) => handleAddressChange(address, placeDetails)}
                     placeholder="Start typing an address..."
                     required
                   />
@@ -2850,7 +2945,7 @@ export default function DispatchScheduling() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Estimated Drive Time
+                    Estimated Drive Time {calculatingDriveTime && <span className="text-orange-500 text-xs ml-2">(Calculating...)</span>}
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -2880,6 +2975,9 @@ export default function DispatchScheduling() {
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     Total: {formData.estimatedDriveHours}h {formData.estimatedDriveMinutes}m
+                    {(formData.estimatedDriveHours > 0 || formData.estimatedDriveMinutes > 0) &&
+                      <span className="text-green-600 ml-2">(Auto-calculated from address - adjust if needed)</span>
+                    }
                   </p>
                 </div>
               </div>
