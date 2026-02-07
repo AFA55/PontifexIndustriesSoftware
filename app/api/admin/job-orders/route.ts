@@ -59,9 +59,9 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    // Build query using the active_job_orders view
+    // Build query directly from job_orders table
     let query = supabaseAdmin
-      .from('active_job_orders')
+      .from('job_orders')
       .select('*')
       .order('created_at', { ascending: false });
 
