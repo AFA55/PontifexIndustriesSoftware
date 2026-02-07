@@ -393,10 +393,14 @@ export default function AdminDashboard() {
 
           {/* Quick Stats Bar with Professional Gradients */}
           <div className="flex justify-center gap-6 mt-8">
-            <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
+            <Link
+              href="/dashboard/admin/debug/active-jobs"
+              className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all cursor-pointer group"
+            >
               <p className="text-4xl font-bold text-white drop-shadow-lg">{stats.activeJobs}</p>
               <p className="text-sm text-white/90 font-semibold mt-1">Active Jobs</p>
-            </div>
+              <p className="text-xs text-white/70 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Click to debug</p>
+            </Link>
             <div className="bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
               <p className="text-4xl font-bold text-white drop-shadow-lg">{stats.crewsWorking}</p>
               <p className="text-sm text-white/90 font-semibold mt-1">Crews Working</p>
