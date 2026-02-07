@@ -7,6 +7,14 @@ import AdminProtection from '@/components/AdminProtection';
 import { supabase } from '@/lib/supabase';
 import { documentTemplates } from '@/lib/document-types';
 import { GoogleAddressAutocomplete } from '@/components/ui/GoogleAddressAutocomplete';
+import { FormResumeModal } from '@/components/FormResumeModal';
+import {
+  saveFormState,
+  loadFormState,
+  clearFormState,
+  hasSavedFormState,
+  getSavedFormAge,
+} from '@/lib/form-autosave';
 
 interface JobOrderForm {
   // Basic Info
@@ -94,7 +102,8 @@ const jobTypes = [
   'WIRE SAWING',
   'CONCRETE DEMOLITION',
   'HAND SAWING',
-  'GPR SCANNING'
+  'GPR SCANNING',
+  'SHOP TICKET'
 ];
 
 // Core Drilling Equipment - Organized by category
@@ -414,6 +423,14 @@ export default function DispatchScheduling() {
   // Success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdJobId, setCreatedJobId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Auto-save state
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [savedFormAge, setSavedFormAge] = useState<string>('');
+  const [savedFormStep, setSavedFormStep] = useState(1);
+  const FORM_KEY = 'dispatch-scheduling';
+  const FORM_VERSION = '1.0';
 
   // Team members from database
   const [operators, setOperators] = useState<Array<{ id: string; full_name: string }>>([]);
@@ -464,6 +481,35 @@ export default function DispatchScheduling() {
     jobSiteGC: '',
     jobQuote: undefined // Admin only field
   });
+
+  // Check for saved form data on mount
+  useEffect(() => {
+    const checkForSavedForm = () => {
+      if (hasSavedFormState(FORM_KEY)) {
+        const savedAge = getSavedFormAge(FORM_KEY);
+        const savedState = loadFormState<JobOrderForm>(FORM_KEY, FORM_VERSION);
+
+        if (savedState && savedAge) {
+          setSavedFormAge(savedAge);
+          setSavedFormStep(savedState.currentStep);
+          setShowResumeModal(true);
+        }
+      }
+    };
+
+    checkForSavedForm();
+  }, []);
+
+  // Auto-save form data whenever formData or currentStep changes
+  useEffect(() => {
+    // Don't auto-save if we haven't started filling the form yet
+    if (formData.jobTypes.length === 0 && currentStep === 1) {
+      return;
+    }
+
+    // Save form state
+    saveFormState(FORM_KEY, formData, currentStep, FORM_VERSION);
+  }, [formData, currentStep]);
 
   // Fetch team members and autocomplete suggestions from database
   useEffect(() => {
@@ -696,7 +742,11 @@ export default function DispatchScheduling() {
                     if (hole.quantity || hole.diameter || hole.depth) {
                       desc += `${hole.quantity || '?'} holes @ ${hole.diameter || '?'}" diameter x ${hole.depth || '?'}" deep`;
                       if (hole.aboveFiveFeet) {
-                        desc += ` (Above 5ft - Ladder/Lift Required)`;
+                        if (hole.ladderLiftOption) {
+                          desc += ` (Above 5ft - ${hole.ladderLiftOption} Required)`;
+                        } else {
+                          desc += ` (Above 5ft - Ladder/Lift Required)`;
+                        }
                       }
                       desc += `\n`;
                     }
@@ -955,12 +1005,21 @@ export default function DispatchScheduling() {
       return;
     }
 
+    // Convert arrival time to minutes
     const [hours, minutes] = formData.arrivalTime.split(':').map(Number);
-    const totalMinutes = hours * 60 + minutes - minutesBefore;
+    const arrivalTimeInMinutes = hours * 60 + minutes;
 
-    // Handle negative times (wrap to previous day)
-    const shopHours = Math.floor((totalMinutes + 1440) % 1440 / 60);
-    const shopMinutes = (totalMinutes + 1440) % 60;
+    // Calculate drive time in minutes
+    const driveTimeInMinutes = (formData.estimatedDriveHours * 60) + formData.estimatedDriveMinutes;
+
+    // Calculate shop arrival: arrival time - buffer time - drive time
+    const totalMinutesToSubtract = minutesBefore + driveTimeInMinutes;
+    const shopArrivalInMinutes = arrivalTimeInMinutes - totalMinutesToSubtract;
+
+    // Handle negative times (wrap to previous day if needed)
+    const adjustedMinutes = (shopArrivalInMinutes + 1440) % 1440;
+    const shopHours = Math.floor(adjustedMinutes / 60);
+    const shopMinutes = adjustedMinutes % 60;
 
     const shopArrivalTime = `${String(shopHours).padStart(2, '0')}:${String(shopMinutes).padStart(2, '0')}`;
     handleInputChange('shopArrivalTime', shopArrivalTime);
@@ -973,6 +1032,24 @@ export default function DispatchScheduling() {
         ? prev.technicians.filter(t => t !== operatorName)
         : [...prev.technicians, operatorName]
     }));
+  };
+
+  // Handle resuming saved form
+  const handleResumeSavedForm = () => {
+    const savedState = loadFormState<JobOrderForm>(FORM_KEY, FORM_VERSION);
+
+    if (savedState) {
+      setFormData(savedState.data);
+      setCurrentStep(savedState.currentStep);
+      setShowResumeModal(false);
+    }
+  };
+
+  // Handle starting new form
+  const handleStartNewForm = () => {
+    clearFormState(FORM_KEY);
+    setShowResumeModal(false);
+    // Form already has default state from useState
   };
 
   const toggleJobType = (jobType: string) => {
@@ -1088,6 +1165,14 @@ export default function DispatchScheduling() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prevent double submissions
+    if (submitting) {
+      console.log('Form already submitting, ignoring duplicate submit');
+      return;
+    }
+
+    setSubmitting(true);
+
     try {
       // Generate final description
       const finalDescription = generateDescription();
@@ -1155,6 +1240,9 @@ export default function DispatchScheduling() {
 
       console.log('Job order created successfully:', result.data);
 
+      // Clear saved form state since job was created successfully
+      clearFormState(FORM_KEY);
+
       // Show success modal
       setCreatedJobId(jobNumber);
       setShowSuccessModal(true);
@@ -1205,6 +1293,9 @@ export default function DispatchScheduling() {
     } catch (error: any) {
       console.error('Error creating job order:', error);
       alert(`Failed to create job order: ${error.message}`);
+    } finally {
+      // Always reset submitting state, even if there was an error
+      setSubmitting(false);
     }
   };
 
@@ -1370,162 +1461,184 @@ export default function DispatchScheduling() {
                   )}
                 </div>
 
-                {/* Job Difficulty Rating */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Job Difficulty Rating (1-10) *
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
-                      <button
-                        key={rating}
-                        type="button"
-                        onClick={() => handleInputChange('difficulty_rating', rating)}
-                        className={`flex-1 py-3 px-2 rounded-xl font-bold text-sm transition-all ${
-                          formData.difficulty_rating === rating
-                            ? rating <= 3
-                              ? 'bg-orange-500 text-white shadow-lg scale-105'
-                              : rating <= 6
-                              ? 'bg-yellow-500 text-white shadow-lg scale-105'
-                              : rating <= 8
-                              ? 'bg-orange-500 text-white shadow-lg scale-105'
-                              : 'bg-red-500 text-white shadow-lg scale-105'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {rating}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-2 px-1">
-                    <span>Easy</span>
-                    <span>Moderate</span>
-                    <span>Hard</span>
-                    <span>Very Hard</span>
-                  </div>
-                </div>
+                {/* Hide these fields for SHOP TICKET */}
+                {!formData.jobTypes.includes('SHOP TICKET') && (
+                  <>
+                    {/* Job Difficulty Rating */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        Job Difficulty Rating (1-10) *
+                      </label>
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
+                          <button
+                            key={rating}
+                            type="button"
+                            onClick={() => handleInputChange('difficulty_rating', rating)}
+                            className={`flex-1 py-3 px-2 rounded-xl font-bold text-sm transition-all ${
+                              formData.difficulty_rating === rating
+                                ? rating <= 3
+                                  ? 'bg-orange-500 text-white shadow-lg scale-105'
+                                  : rating <= 6
+                                  ? 'bg-yellow-500 text-white shadow-lg scale-105'
+                                  : rating <= 8
+                                  ? 'bg-orange-500 text-white shadow-lg scale-105'
+                                  : 'bg-red-500 text-white shadow-lg scale-105'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {rating}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500 mt-2 px-1">
+                        <span>Easy</span>
+                        <span>Moderate</span>
+                        <span>Hard</span>
+                        <span>Very Hard</span>
+                      </div>
+                    </div>
 
-                {/* Priority */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Priority *
-                  </label>
-                  <div className="flex gap-3">
-                    {(['high', 'medium', 'low'] as const).map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => handleInputChange('priority', p)}
-                        className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
-                          formData.priority === p
-                            ? p === 'high'
-                              ? 'bg-red-500 text-white border-red-600'
-                              : p === 'medium'
-                              ? 'bg-yellow-500 text-white border-yellow-600'
-                              : 'bg-orange-500 text-white border-orange-600'
-                            : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
-                        }`}
-                      >
-                        {p.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {/* Priority */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Priority *
+                      </label>
+                      <div className="flex gap-3">
+                        {(['high', 'medium', 'low'] as const).map(p => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => handleInputChange('priority', p)}
+                            className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
+                              formData.priority === p
+                                ? p === 'high'
+                                  ? 'bg-red-500 text-white border-red-600'
+                                  : p === 'medium'
+                                  ? 'bg-yellow-500 text-white border-yellow-600'
+                                  : 'bg-orange-500 text-white border-orange-600'
+                                : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                            }`}
+                          >
+                            {p.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* How close can truck park to work area */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    How close can truck park to work area? *
-                  </label>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleInputChange('truck_parking', 'close')}
-                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
-                        formData.truck_parking === 'close'
-                          ? 'bg-green-500 text-white border-green-600'
-                          : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
-                      }`}
-                    >
-                      Close (Under 300 ft)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleInputChange('truck_parking', 'far')}
-                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
-                        formData.truck_parking === 'far'
-                          ? 'bg-orange-500 text-white border-orange-600'
-                          : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
-                      }`}
-                    >
-                      Far (Unload & Carry Equipment)
-                    </button>
-                  </div>
-                </div>
+                    {/* How close can truck park to work area */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        How close can truck park to work area? *
+                      </label>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleInputChange('truck_parking', 'close')}
+                          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
+                            formData.truck_parking === 'close'
+                              ? 'bg-green-500 text-white border-green-600'
+                              : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                          }`}
+                        >
+                          Close (Under 300 ft)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleInputChange('truck_parking', 'far')}
+                          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
+                            formData.truck_parking === 'far'
+                              ? 'bg-orange-500 text-white border-orange-600'
+                              : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                          }`}
+                        >
+                          Far (Unload & Carry Equipment)
+                        </button>
+                      </div>
+                    </div>
 
-                {/* Work Environment */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Work Environment *
-                  </label>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleInputChange('work_environment', 'outdoor')}
-                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
-                        formData.work_environment === 'outdoor'
-                          ? 'bg-blue-500 text-white border-blue-600'
-                          : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
-                      }`}
-                    >
-                      Outdoor
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleInputChange('work_environment', 'indoor')}
-                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
-                        formData.work_environment === 'indoor'
-                          ? 'bg-purple-500 text-white border-purple-600'
-                          : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
-                      }`}
-                    >
-                      Indoor
-                    </button>
-                  </div>
-                </div>
+                    {/* Work Environment */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Work Environment *
+                      </label>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleInputChange('work_environment', 'outdoor')}
+                          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
+                            formData.work_environment === 'outdoor'
+                              ? 'bg-blue-500 text-white border-blue-600'
+                              : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                          }`}
+                        >
+                          Outdoor
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleInputChange('work_environment', 'indoor')}
+                          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
+                            formData.work_environment === 'indoor'
+                              ? 'bg-purple-500 text-white border-purple-600'
+                              : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                          }`}
+                        >
+                          Indoor
+                        </button>
+                      </div>
+                    </div>
 
-                {/* Site Cleanliness */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Site Cleanliness (1-10) *
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
-                      <button
-                        key={rating}
-                        type="button"
-                        onClick={() => handleInputChange('site_cleanliness', rating)}
-                        className={`flex-1 py-3 px-2 rounded-xl font-bold text-sm transition-all ${
-                          formData.site_cleanliness === rating
-                            ? rating <= 3
-                              ? 'bg-red-500 text-white shadow-lg scale-105'
-                              : rating <= 6
-                              ? 'bg-yellow-500 text-white shadow-lg scale-105'
-                              : 'bg-green-500 text-white shadow-lg scale-105'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {rating}
-                      </button>
-                    ))}
+                    {/* Site Cleanliness */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        Site Cleanliness (1-10) *
+                      </label>
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
+                          <button
+                            key={rating}
+                            type="button"
+                            onClick={() => handleInputChange('site_cleanliness', rating)}
+                            className={`flex-1 py-3 px-2 rounded-xl font-bold text-sm transition-all ${
+                              formData.site_cleanliness === rating
+                                ? rating <= 3
+                                  ? 'bg-red-500 text-white shadow-lg scale-105'
+                                  : rating <= 6
+                                  ? 'bg-yellow-500 text-white shadow-lg scale-105'
+                                  : 'bg-green-500 text-white shadow-lg scale-105'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {rating}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500 mt-2 px-1">
+                        <span>Dirty</span>
+                        <span>Moderate</span>
+                        <span>Clean</span>
+                        <span>Very Clean</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* For SHOP TICKET - Show simplified work details field */}
+                {formData.jobTypes.includes('SHOP TICKET') && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Work Details *
+                    </label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      placeholder="Describe what needs to be done at the shop..."
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-gray-900 placeholder-gray-500"
+                      rows={6}
+                      style={{ color: '#000000' }}
+                    />
                   </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-2 px-1">
-                    <span>Dirty</span>
-                    <span>Moderate</span>
-                    <span>Clean</span>
-                    <span>Very Clean</span>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Preview */}
@@ -1877,6 +1990,35 @@ export default function DispatchScheduling() {
                                           Above 5 feet? (Ladder/Lift needed)
                                         </label>
                                       </div>
+
+                                      {/* Show ladder/lift options when above 5 feet is checked */}
+                                      {hole.aboveFiveFeet && (
+                                        <div className="mt-3 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                                          <label className="block text-sm font-bold text-blue-900 mb-3">
+                                            Select Ladder or Lift:
+                                          </label>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            {['6ft Ladder', '8ft Ladder', '12ft Ladder', 'Scissor Lift'].map((option) => (
+                                              <button
+                                                key={option}
+                                                type="button"
+                                                onClick={() => {
+                                                  const currentHoles = [...((formData.jobTypeDetails[jobType]?.holes || []) as any[])];
+                                                  currentHoles[idx] = { ...currentHoles[idx], ladderLiftOption: option };
+                                                  handleJobTypeDetailChange(jobType, 'holes', currentHoles);
+                                                }}
+                                                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                                                  hole.ladderLiftOption === option
+                                                    ? 'bg-blue-600 text-white border-2 border-blue-700'
+                                                    : 'bg-white text-blue-900 border-2 border-blue-300 hover:bg-blue-100'
+                                                }`}
+                                              >
+                                                {option}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   ))}
                                   <button
@@ -1913,83 +2055,137 @@ export default function DispatchScheduling() {
                                         </button>
                                       </div>
                                       <div className="space-y-3">
-                                        {/* Quantity Field */}
-                                        <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-3">
-                                          <label className="block text-xs font-semibold text-blue-800 mb-1">How Many Areas (Quantity)</label>
+                                        {/* Linear Cut Only Checkbox */}
+                                        <div className="flex items-center gap-3 mb-3 bg-blue-50 border-2 border-blue-300 rounded-lg p-3">
                                           <input
-                                            type="number"
-                                            min="1"
-                                            value={cut.quantity || '1'}
+                                            type="checkbox"
+                                            id={`linearCutOnly-${idx}`}
+                                            checked={cut.linearCutOnly || false}
                                             onChange={(e) => {
                                               const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
-                                              currentCuts[idx] = { ...currentCuts[idx], quantity: e.target.value };
+                                              currentCuts[idx] = { ...currentCuts[idx], linearCutOnly: e.target.checked };
                                               handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
                                             }}
-                                            className="w-full px-3 py-2 bg-white border-2 border-blue-300 rounded-lg text-sm text-gray-900 font-bold"
-                                            placeholder="e.g., 10"
+                                            className="w-5 h-5 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                                           />
-                                          <p className="text-xs text-blue-700 mt-1">Enter the number of identical openings (e.g., 10 for ten 10x10 openings)</p>
+                                          <label htmlFor={`linearCutOnly-${idx}`} className="text-sm font-bold text-blue-900">
+                                            Linear Cut Only (No specific opening size - just linear feet and thickness)
+                                          </label>
                                         </div>
 
-                                        {/* Opening Size and Dimensions */}
-                                        <div className="grid md:grid-cols-4 gap-3">
-                                          <div>
-                                            <label className="block text-xs font-semibold text-gray-700 mb-1">Opening Size</label>
-                                            <input
-                                              type="text"
-                                              value={cut.openingSize || ''}
-                                              onChange={(e) => {
-                                                const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
-                                                currentCuts[idx] = { ...currentCuts[idx], openingSize: e.target.value };
-                                                handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
-                                              }}
-                                              className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
-                                              placeholder="e.g., Standard"
-                                            />
+                                        {cut.linearCutOnly ? (
+                                          // Linear Cut Only Mode - Just Linear Feet and Thickness
+                                          <div className="grid md:grid-cols-2 gap-3">
+                                            <div>
+                                              <label className="block text-xs font-semibold text-gray-700 mb-1">Linear Feet</label>
+                                              <input
+                                                type="text"
+                                                value={cut.linearFeet || ''}
+                                                onChange={(e) => {
+                                                  const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                                  currentCuts[idx] = { ...currentCuts[idx], linearFeet: e.target.value };
+                                                  handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                                }}
+                                                className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                                placeholder="e.g., 100"
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="block text-xs font-semibold text-gray-700 mb-1">Thickness (inches)</label>
+                                              <input
+                                                type="text"
+                                                value={cut.thickness || ''}
+                                                onChange={(e) => {
+                                                  const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                                  currentCuts[idx] = { ...currentCuts[idx], thickness: e.target.value };
+                                                  handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                                }}
+                                                className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                                placeholder="e.g., 8"
+                                              />
+                                            </div>
                                           </div>
-                                          <div>
-                                            <label className="block text-xs font-semibold text-gray-700 mb-1">Length (feet)</label>
-                                            <input
-                                              type="text"
-                                              value={cut.length || ''}
-                                              onChange={(e) => {
-                                                const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
-                                                currentCuts[idx] = { ...currentCuts[idx], length: e.target.value };
-                                                handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
-                                              }}
-                                              className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
-                                              placeholder="e.g., 3"
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="block text-xs font-semibold text-gray-700 mb-1">Width (feet)</label>
-                                            <input
-                                              type="text"
-                                              value={cut.width || ''}
-                                              onChange={(e) => {
-                                                const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
-                                                currentCuts[idx] = { ...currentCuts[idx], width: e.target.value };
-                                                handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
-                                              }}
-                                              className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
-                                              placeholder="e.g., 4"
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="block text-xs font-semibold text-gray-700 mb-1">Thickness (inches)</label>
-                                            <input
-                                              type="text"
-                                              value={cut.thickness || ''}
-                                              onChange={(e) => {
-                                                const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
-                                                currentCuts[idx] = { ...currentCuts[idx], thickness: e.target.value };
-                                                handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
-                                              }}
-                                              className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
-                                              placeholder="e.g., 8"
-                                            />
-                                          </div>
-                                        </div>
+                                        ) : (
+                                          <>
+                                            {/* Quantity Field */}
+                                            <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-3">
+                                              <label className="block text-xs font-semibold text-blue-800 mb-1">How Many Areas (Quantity)</label>
+                                              <input
+                                                type="number"
+                                                min="1"
+                                                value={cut.quantity || '1'}
+                                                onChange={(e) => {
+                                                  const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                                  currentCuts[idx] = { ...currentCuts[idx], quantity: e.target.value };
+                                                  handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                                }}
+                                                className="w-full px-3 py-2 bg-white border-2 border-blue-300 rounded-lg text-sm text-gray-900 font-bold"
+                                                placeholder="e.g., 10"
+                                              />
+                                              <p className="text-xs text-blue-700 mt-1">Enter the number of identical openings (e.g., 10 for ten 10x10 openings)</p>
+                                            </div>
+
+                                            {/* Opening Size and Dimensions */}
+                                            <div className="grid md:grid-cols-4 gap-3">
+                                              <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Opening Size</label>
+                                                <input
+                                                  type="text"
+                                                  value={cut.openingSize || ''}
+                                                  onChange={(e) => {
+                                                    const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                                    currentCuts[idx] = { ...currentCuts[idx], openingSize: e.target.value };
+                                                    handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                                  }}
+                                                  className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                                  placeholder="e.g., Standard"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Length (feet)</label>
+                                                <input
+                                                  type="text"
+                                                  value={cut.length || ''}
+                                                  onChange={(e) => {
+                                                    const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                                    currentCuts[idx] = { ...currentCuts[idx], length: e.target.value };
+                                                    handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                                  }}
+                                                  className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                                  placeholder="e.g., 3"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Width (feet)</label>
+                                                <input
+                                                  type="text"
+                                                  value={cut.width || ''}
+                                                  onChange={(e) => {
+                                                    const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                                    currentCuts[idx] = { ...currentCuts[idx], width: e.target.value };
+                                                    handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                                  }}
+                                                  className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                                  placeholder="e.g., 4"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Thickness (inches)</label>
+                                                <input
+                                                  type="text"
+                                                  value={cut.thickness || ''}
+                                                  onChange={(e) => {
+                                                    const currentCuts = [...((formData.jobTypeDetails[jobType]?.cuts || []) as any[])];
+                                                    currentCuts[idx] = { ...currentCuts[idx], thickness: e.target.value };
+                                                    handleJobTypeDetailChange(jobType, 'cuts', currentCuts);
+                                                  }}
+                                                  className="w-full px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900"
+                                                  placeholder="e.g., 8"
+                                                />
+                                              </div>
+                                            </div>
+                                          </>
+                                        )}
 
                                         {/* Removing Material Checkbox */}
                                         <div className="flex items-center gap-3 pt-2">
@@ -2562,7 +2758,11 @@ export default function DispatchScheduling() {
                                       if (hole.quantity || hole.diameter || hole.depth) {
                                         let holeDesc = `${hole.quantity || '?'} holes @ ${hole.diameter || '?'}" diameter x ${hole.depth || '?'}" deep`;
                                         if (hole.aboveFiveFeet) {
-                                          holeDesc += ` (Above 5ft - Ladder/Lift Required)`;
+                                          if (hole.ladderLiftOption) {
+                                            holeDesc += ` (Above 5ft - ${hole.ladderLiftOption} Required)`;
+                                          } else {
+                                            holeDesc += ` (Above 5ft - Ladder/Lift Required)`;
+                                          }
                                         }
                                         return holeDesc + '\n';
                                       }
@@ -2647,6 +2847,27 @@ export default function DispatchScheduling() {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Additional Comments for Operator */}
+                <div className="mt-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-300">
+                  <label className="block text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                    Additional Comments for Operator
+                  </label>
+                  <textarea
+                    value={formData.additionalInfo}
+                    onChange={(e) => handleInputChange('additionalInfo', e.target.value)}
+                    placeholder="Add any special instructions, notes, or important information for the operator..."
+                    className="w-full px-4 py-3 rounded-xl border-2 border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-gray-900 placeholder-gray-500 bg-white"
+                    rows={4}
+                    style={{ color: '#000000' }}
+                  />
+                  <p className="text-xs text-blue-700 mt-2">
+                    These comments will be visible to operators in the job preview
+                  </p>
                 </div>
 
               {/* Navigation Buttons */}
@@ -2892,6 +3113,18 @@ export default function DispatchScheduling() {
                   />
                   <p className="text-xs text-gray-500 mt-1 mb-2">When operator should be at shop</p>
 
+                  {/* Drive Time Info */}
+                  {(formData.estimatedDriveHours > 0 || formData.estimatedDriveMinutes > 0) && (
+                    <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs text-blue-700 font-medium">
+                        📍 Drive time: {formData.estimatedDriveHours}h {formData.estimatedDriveMinutes}m
+                      </p>
+                      <p className="text-xs text-blue-600 mt-0.5">
+                        Shop arrival = Job arrival - buffer - drive time
+                      </p>
+                    </div>
+                  )}
+
                   {/* Quick Choose Buttons */}
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -2899,21 +3132,21 @@ export default function DispatchScheduling() {
                       onClick={() => calculateShopArrival(30)}
                       className="px-3 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
                     >
-                      30 min before
+                      30 min buffer
                     </button>
                     <button
                       type="button"
                       onClick={() => calculateShopArrival(45)}
                       className="px-3 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
                     >
-                      45 min before
+                      45 min buffer
                     </button>
                     <button
                       type="button"
                       onClick={() => calculateShopArrival(60)}
                       className="px-3 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
                     >
-                      1 hr before
+                      1 hr buffer
                     </button>
                   </div>
                 </div>
@@ -3387,117 +3620,152 @@ export default function DispatchScheduling() {
               </h2>
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Customer Job Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.title}
-                    onChange={(e) => handleInputChange('title', e.target.value)}
-                    onBlur={(e) => saveSuggestion('customer_job_titles', 'title', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors text-gray-900 font-medium"
-                    placeholder="e.g., PIEDMONT ATH."
-                    list="job-title-suggestions"
-                  />
-                  <datalist id="job-title-suggestions">
-                    {jobTitleSuggestions.map((suggestion, idx) => (
-                      <option key={idx} value={suggestion} />
-                    ))}
-                  </datalist>
-                </div>
+                {/* For SHOP TICKET, only show Contact On Site and Contact Phone */}
+                {formData.jobTypes.includes('SHOP TICKET') ? (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Contact Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.contactOnSite}
+                        onChange={(e) => handleInputChange('contactOnSite', e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
+                        placeholder="Enter contact name..."
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Customer Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.customer}
-                    onChange={(e) => handleInputChange('customer', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors text-gray-900 font-medium"
-                    placeholder="e.g., WHITEHAWK (CAM)"
-                    list="customer-names"
-                  />
-                  <datalist id="customer-names">
-                    {/* Customers will be populated here from database later */}
-                  </datalist>
-                </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Contact Phone *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={formData.contactPhone}
+                        onChange={(e) => handleInputChange('contactPhone', e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
+                        placeholder="Enter phone number..."
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Customer Job Title *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.title}
+                        onChange={(e) => handleInputChange('title', e.target.value)}
+                        onBlur={(e) => saveSuggestion('customer_job_titles', 'title', e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors text-gray-900 font-medium"
+                        placeholder="e.g., PIEDMONT ATH."
+                        list="job-title-suggestions"
+                      />
+                      <datalist id="job-title-suggestions">
+                        {jobTitleSuggestions.map((suggestion, idx) => (
+                          <option key={idx} value={suggestion} />
+                        ))}
+                      </datalist>
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Customer Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.customerJobNumber}
-                    onChange={(e) => handleInputChange('customerJobNumber', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
-                    placeholder="Enter customer phone..."
-                  />
-                </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Customer Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.customer}
+                        onChange={(e) => handleInputChange('customer', e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors text-gray-900 font-medium"
+                        placeholder="e.g., WHITEHAWK (CAM)"
+                        list="customer-names"
+                      />
+                      <datalist id="customer-names">
+                        {/* Customers will be populated here from database later */}
+                      </datalist>
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Contact On Site *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.contactOnSite}
-                    onChange={(e) => handleInputChange('contactOnSite', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
-                    placeholder="Enter contact name..."
-                  />
-                </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Customer Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.customerJobNumber}
+                        onChange={(e) => handleInputChange('customerJobNumber', e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
+                        placeholder="Enter customer phone..."
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Contact Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.contactPhone}
-                    onChange={(e) => handleInputChange('contactPhone', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
-                    placeholder="Enter phone number..."
-                  />
-                </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Contact On Site *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.contactOnSite}
+                        onChange={(e) => handleInputChange('contactOnSite', e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
+                        placeholder="Enter contact name..."
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    PO Number
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.po}
-                    onChange={(e) => handleInputChange('po', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
-                    placeholder="Optional"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Contact Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.contactPhone}
+                        onChange={(e) => handleInputChange('contactPhone', e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
+                        placeholder="Enter phone number..."
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Company Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.companyName}
-                    onChange={(e) => handleInputChange('companyName', e.target.value)}
-                    onBlur={(e) => saveSuggestion('company_names', 'name', e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
-                    placeholder="e.g., ABC Construction"
-                    list="company-name-suggestions"
-                  />
-                  <datalist id="company-name-suggestions">
-                    {companyNameSuggestions.map((suggestion, idx) => (
-                      <option key={idx} value={suggestion} />
-                    ))}
-                  </datalist>
-                </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        PO Number
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.po}
+                        onChange={(e) => handleInputChange('po', e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
+                        placeholder="Optional"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Company Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.companyName}
+                        onChange={(e) => handleInputChange('companyName', e.target.value)}
+                        onBlur={(e) => saveSuggestion('company_names', 'name', e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:outline-none transition-colors"
+                        placeholder="e.g., ABC Construction"
+                        list="company-name-suggestions"
+                      />
+                      <datalist id="company-name-suggestions">
+                        {companyNameSuggestions.map((suggestion, idx) => (
+                          <option key={idx} value={suggestion} />
+                        ))}
+                      </datalist>
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
@@ -3836,6 +4104,16 @@ export default function DispatchScheduling() {
       </div>
 
       {/* Modern Success Modal */}
+      {/* Resume Form Modal */}
+      <FormResumeModal
+        isOpen={showResumeModal}
+        savedAge={savedFormAge}
+        currentStep={savedFormStep}
+        totalSteps={totalSteps}
+        onResume={handleResumeSavedForm}
+        onStartNew={handleStartNewForm}
+      />
+
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4 animate-slideUp">

@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { MapPin, Phone } from 'lucide-react';
+import { MapPin, Phone, Clock, AlertCircle } from 'lucide-react';
+import LoadingTransition from '@/components/LoadingTransition';
 
 interface QuickAccessButtonsProps {
   jobId: string;
+  onStandbyChange?: (isOnStandby: boolean) => void;
 }
 
 interface JobData {
@@ -16,14 +18,51 @@ interface JobData {
   foreman_name?: string;
 }
 
-export default function QuickAccessButtons({ jobId }: QuickAccessButtonsProps) {
+interface StandbyLog {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+}
+
+export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAccessButtonsProps) {
   const [jobData, setJobData] = useState<JobData | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showStandbyModal, setShowStandbyModal] = useState(false);
+  const [isOnStandby, setIsOnStandby] = useState(false);
+  const [currentStandbyLog, setCurrentStandbyLog] = useState<StandbyLog | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [confirmedStartTime, setConfirmedStartTime] = useState('');
+  const [confirmedEndTime, setConfirmedEndTime] = useState('');
 
   useEffect(() => {
     fetchJobData();
+    checkStandbyStatus();
   }, [jobId]);
+
+  // Set default start time when opening start standby modal
+  useEffect(() => {
+    if (showStandbyModal && !isOnStandby && !confirmedStartTime) {
+      const now = new Date();
+      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      setConfirmedStartTime(localDateTime);
+    }
+  }, [showStandbyModal, isOnStandby]);
+
+  // Set default end time when opening end standby modal
+  useEffect(() => {
+    if (showStandbyModal && isOnStandby && !confirmedEndTime) {
+      const now = new Date();
+      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      setConfirmedEndTime(localDateTime);
+    }
+  }, [showStandbyModal, isOnStandby]);
+
 
   const fetchJobData = async () => {
     try {
@@ -47,6 +86,133 @@ export default function QuickAccessButtons({ jobId }: QuickAccessButtonsProps) {
     }
   };
 
+  const checkStandbyStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // TEMPORARILY DISABLED due to RLS policy issues
+      // Will be re-enabled once RLS policies are fixed
+      console.log('Standby status check temporarily disabled');
+      return;
+
+      // Check if there's an active standby log (ended_at is null)
+      // const { data, error } = await supabase
+      //   .from('standby_logs')
+      //   .select('*')
+      //   .eq('job_order_id', jobId)
+      //   .eq('operator_id', session.user.id)
+      //   .is('ended_at', null)
+      //   .maybeSingle();
+
+      // if (error) {
+      //   console.warn('Could not check standby status (RLS policy):', error.message);
+      //   // Continue without standby status - user can still use the feature
+      //   return;
+      // }
+
+      // if (data) {
+      //   setIsOnStandby(true);
+      //   setCurrentStandbyLog(data);
+      //   if (onStandbyChange) {
+      //     onStandbyChange(true);
+      //   }
+      // }
+    } catch (error) {
+      console.error('Error checking standby status:', error);
+    }
+  };
+
+  const startStandby = async () => {
+    if (!confirmedStartTime) {
+      alert('Please confirm the start time');
+      return;
+    }
+
+    setLoading(true);
+    setLoadingMessage('Starting standby time...');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/standby', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          jobId: jobId,
+          startedAt: confirmedStartTime,
+          reason: 'Waiting for work to proceed'
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setIsOnStandby(true);
+        setCurrentStandbyLog(result.data);
+        setShowStandbyModal(false);
+        setConfirmedStartTime('');
+        if (onStandbyChange) {
+          onStandbyChange(true);
+        }
+        alert('Standby time started. Remember to stop standby before continuing work!');
+      } else {
+        alert('Error starting standby time');
+      }
+    } catch (error) {
+      console.error('Error starting standby:', error);
+      alert('Error starting standby time');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const endStandby = async () => {
+    if (!confirmedEndTime) {
+      alert('Please confirm the end time');
+      return;
+    }
+
+    setLoading(true);
+    setLoadingMessage('Ending standby time...');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/standby', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          standbyLogId: currentStandbyLog?.id,
+          endedAt: confirmedEndTime
+        })
+      });
+
+      if (response.ok) {
+        setIsOnStandby(false);
+        setCurrentStandbyLog(null);
+        setShowStandbyModal(false);
+        setConfirmedEndTime('');
+        if (onStandbyChange) {
+          onStandbyChange(false);
+        }
+        alert('Standby time ended. You can now continue with your work.');
+      } else {
+        alert('Error ending standby time');
+      }
+    } catch (error) {
+      console.error('Error ending standby:', error);
+      alert('Error ending standby time');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getDirectionsUrl = (address: string) => {
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
   };
@@ -63,6 +229,35 @@ export default function QuickAccessButtons({ jobId }: QuickAccessButtonsProps) {
 
   return (
     <>
+      {/* Loading Transition */}
+      <LoadingTransition isLoading={loading} message={loadingMessage} />
+
+      {/* Standby Warning Banner */}
+      {isOnStandby && (
+        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-2xl p-4 mb-6 animate-pulse">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-bold text-yellow-900">⚠️ You are on standby time</p>
+              <p className="text-sm text-yellow-800">
+                Stop standby before proceeding with your work
+              </p>
+            </div>
+            <button
+              onClick={endStandby}
+              disabled={loading}
+              className={`px-6 py-2 rounded-xl font-semibold transition-all ${
+                loading
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-yellow-600 hover:bg-yellow-700 text-white'
+              }`}
+            >
+              {loading ? 'Stopping...' : 'Stop Standby'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Quick Access Buttons */}
       <div className="flex gap-3 mb-6">
         <button
@@ -74,11 +269,27 @@ export default function QuickAccessButtons({ jobId }: QuickAccessButtonsProps) {
         </button>
 
         <button
-          onClick={() => setShowContactModal(true)}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+          onClick={() => isOnStandby ? setShowStandbyModal(true) : setShowContactModal(true)}
+          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 ${
+            isOnStandby
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white'
+          }`}
         >
           <Phone className="w-5 h-5" />
           Contact On Site
+        </button>
+
+        <button
+          onClick={() => setShowStandbyModal(true)}
+          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 ${
+            isOnStandby
+              ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 text-white'
+              : 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white'
+          }`}
+        >
+          <Clock className="w-5 h-5" />
+          {isOnStandby ? 'Stop Standby' : 'Start Standby'}
         </button>
       </div>
 
@@ -195,6 +406,133 @@ export default function QuickAccessButtons({ jobId }: QuickAccessButtonsProps) {
                 >
                   Close
                 </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Standby Time Modal */}
+      {showStandbyModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-2xl">
+            <div className="flex items-start gap-4 mb-6">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                isOnStandby ? 'bg-yellow-100' : 'bg-orange-100'
+              }`}>
+                <Clock className={`w-8 h-8 ${isOnStandby ? 'text-yellow-600' : 'text-orange-600'}`} />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                  {isOnStandby ? 'Stop Standby Time' : 'Start Standby Time'}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {isOnStandby
+                    ? 'Stop standby to continue working'
+                    : 'Track time when contractor is not ready'}
+                </p>
+              </div>
+            </div>
+
+            {isOnStandby ? (
+              <div className="space-y-4">
+                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">
+                  <p className="text-sm text-yellow-700 font-semibold mb-1">Currently on standby</p>
+                  <p className="text-xs text-yellow-600 mb-4">
+                    Started: {currentStandbyLog && new Date(currentStandbyLog.started_at).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-yellow-800">
+                    Confirm the end time below. Adjust if you forgot to stop standby at the actual time.
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="confirmedEndTime" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Confirm End Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="confirmedEndTime"
+                    name="confirmedEndTime"
+                    value={confirmedEndTime}
+                    onChange={(e) => setConfirmedEndTime(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-yellow-500 focus:outline-none text-gray-900"
+                  />
+                  <p className="text-xs text-gray-600 mt-1">
+                    Adjust if you forgot to stop standby at the actual time
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={endStandby}
+                    disabled={loading}
+                    className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-xl ${
+                      loading
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 text-white'
+                    }`}
+                  >
+                    {loading ? 'Stopping Standby...' : 'Stop Standby Time'}
+                  </button>
+                  <button
+                    onClick={() => setShowStandbyModal(false)}
+                    className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4 mb-4">
+                  <p className="text-sm text-orange-800 font-medium">
+                    Use standby time when the contractor is not ready and you're waiting to begin work.
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="confirmedStartTime" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Confirm Start Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="confirmedStartTime"
+                    name="confirmedStartTime"
+                    value={confirmedStartTime}
+                    onChange={(e) => setConfirmedStartTime(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none text-gray-900"
+                  />
+                  <p className="text-xs text-gray-600 mt-1">
+                    Adjust if you forgot to start standby at the actual time
+                  </p>
+                </div>
+
+                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
+                  <p className="text-xs text-yellow-800 font-medium">
+                    ⚠️ Remember: You cannot proceed with workflow steps while on standby time. Stop standby before continuing work.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={startStandby}
+                    disabled={loading}
+                    className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-xl ${
+                      loading
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white'
+                    }`}
+                  >
+                    {loading ? 'Starting Standby...' : 'Start Standby Time'}
+                  </button>
+                  <button
+                    onClick={() => setShowStandbyModal(false)}
+                    className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </div>

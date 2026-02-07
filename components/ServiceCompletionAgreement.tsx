@@ -22,6 +22,7 @@ interface ServiceCompletionAgreementProps {
     signature: string;
     acceptedTerms: boolean;
     workSatisfactory: boolean;
+    contactNotOnSite: boolean;
     acknowledgedPayment: boolean;
     additionalNotes?: string;
     cleanlinessRating?: number;
@@ -42,6 +43,7 @@ export default function ServiceCompletionAgreement({
   const [customerTitle, setCustomerTitle] = useState('');
   const [signature, setSignature] = useState('');
   const [workSatisfactory, setWorkSatisfactory] = useState<boolean | null>(null);
+  const [contactNotOnSite, setContactNotOnSite] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acknowledgedPayment, setAcknowledgedPayment] = useState(false);
   const [additionalNotes, setAdditionalNotes] = useState('');
@@ -62,25 +64,45 @@ export default function ServiceCompletionAgreement({
 
   const handleNext = () => {
     if (currentSection < 4) {
-      setCurrentSection(currentSection + 1);
+      // Skip section 3 (Payment & Liability) if contact not on site
+      if (currentSection === 2 && contactNotOnSite) {
+        setCurrentSection(4);
+      } else {
+        setCurrentSection(currentSection + 1);
+      }
     }
   };
 
   const handleBack = () => {
     if (currentSection > 1) {
-      setCurrentSection(currentSection - 1);
+      // Skip section 3 (Payment & Liability) if contact not on site
+      if (currentSection === 4 && contactNotOnSite) {
+        setCurrentSection(2);
+      } else {
+        setCurrentSection(currentSection - 1);
+      }
     }
   };
 
   const handleSubmit = async () => {
-    if (!customerName || !signature || workSatisfactory === null) {
-      alert('Please complete all required fields');
-      return;
-    }
+    // If contact not on site, skip signature and terms validation
+    if (contactNotOnSite) {
+      if (workSatisfactory === null) {
+        alert('Please select contact status');
+        return;
+      }
+      // No need to validate terms when contact not on site
+    } else {
+      // Normal validation with signature required
+      if (!customerName || !signature || workSatisfactory === null) {
+        alert('Please complete all required fields');
+        return;
+      }
 
-    if (!acceptedTerms || !acknowledgedPayment) {
-      alert('You must accept all terms to proceed');
-      return;
+      if (!acceptedTerms || !acknowledgedPayment) {
+        alert('You must accept all terms to proceed');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -91,12 +113,13 @@ export default function ServiceCompletionAgreement({
         signature,
         acceptedTerms,
         workSatisfactory,
+        contactNotOnSite,
         acknowledgedPayment,
         additionalNotes,
-        cleanlinessRating,
-        communicationRating,
-        overallRating,
-        feedbackComments
+        cleanlinessRating: contactNotOnSite ? undefined : cleanlinessRating,
+        communicationRating: contactNotOnSite ? undefined : communicationRating,
+        overallRating: contactNotOnSite ? undefined : overallRating,
+        feedbackComments: contactNotOnSite ? undefined : feedbackComments
       });
     } catch (error) {
       console.error('Error submitting signature:', error);
@@ -115,7 +138,8 @@ export default function ServiceCompletionAgreement({
       case 3:
         return acceptedTerms && acknowledgedPayment;
       case 4:
-        return !!(customerName && signature);
+        // If contact not on site, section 4 is complete without signature
+        return contactNotOnSite || !!(customerName && signature);
       default:
         return false;
     }
@@ -127,7 +151,9 @@ export default function ServiceCompletionAgreement({
       <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-8 py-6">
         <h2 className="text-2xl font-bold text-white mb-4">Service Completion Agreement</h2>
         <div className="flex items-center justify-between">
-          {sections.map((section, index) => (
+          {sections
+            .filter(section => !(contactNotOnSite && section.id === 3))
+            .map((section, index) => (
             <div key={section.id} className="flex items-center flex-1">
               <div className="flex flex-col items-center flex-1">
                 <div
@@ -353,18 +379,21 @@ export default function ServiceCompletionAgreement({
 
                   <div className="space-y-2">
                     <button
-                      onClick={() => setWorkSatisfactory(true)}
+                      onClick={() => {
+                        setWorkSatisfactory(true);
+                        setContactNotOnSite(false);
+                      }}
                       className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                        workSatisfactory === true
+                        workSatisfactory === true && !contactNotOnSite
                           ? 'border-green-500 bg-green-50'
                           : 'border-gray-300 hover:border-gray-400'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                          workSatisfactory === true ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                          workSatisfactory === true && !contactNotOnSite ? 'border-green-500 bg-green-500' : 'border-gray-300'
                         }`}>
-                          {workSatisfactory === true && (
+                          {workSatisfactory === true && !contactNotOnSite && (
                             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
@@ -378,18 +407,21 @@ export default function ServiceCompletionAgreement({
                     </button>
 
                     <button
-                      onClick={() => setWorkSatisfactory(false)}
+                      onClick={() => {
+                        setWorkSatisfactory(false);
+                        setContactNotOnSite(false);
+                      }}
                       className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                        workSatisfactory === false
+                        workSatisfactory === false && !contactNotOnSite
                           ? 'border-orange-500 bg-orange-50'
                           : 'border-gray-300 hover:border-gray-400'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                          workSatisfactory === false ? 'border-orange-500 bg-orange-500' : 'border-gray-300'
+                          workSatisfactory === false && !contactNotOnSite ? 'border-orange-500 bg-orange-500' : 'border-gray-300'
                         }`}>
-                          {workSatisfactory === false && (
+                          {workSatisfactory === false && !contactNotOnSite && (
                             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
@@ -398,6 +430,34 @@ export default function ServiceCompletionAgreement({
                         <div>
                           <p className="font-semibold text-gray-900">Work requires correction or completion</p>
                           <p className="text-sm text-gray-600">Issues need to be addressed</p>
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setWorkSatisfactory(true);
+                        setContactNotOnSite(true);
+                      }}
+                      className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                        contactNotOnSite
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                          contactNotOnSite ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                        }`}>
+                          {contactNotOnSite && (
+                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">Contact not on site</p>
+                          <p className="text-sm text-gray-600">No one available to sign</p>
                         </div>
                       </div>
                     </button>
@@ -422,9 +482,26 @@ export default function ServiceCompletionAgreement({
               </div>
             </div>
 
-            {/* Customer Feedback Survey */}
-            {workSatisfactory !== null && (
+            {/* Customer Feedback Survey - Hidden when contact not on site */}
+            {workSatisfactory !== null && !contactNotOnSite && (
               <div className="bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-6 space-y-6">
+                {/* Warning for Operators */}
+                <div className="bg-yellow-100 border-2 border-yellow-400 rounded-lg p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="font-bold text-yellow-900 mb-1">⚠️ OPERATOR NOTICE</p>
+                      <p className="text-sm text-yellow-800">
+                        This survey is for <strong>CUSTOMER FEEDBACK ONLY</strong>. Do not fill this out yourself.
+                        Hand the device to the customer to complete the survey. These ratings directly affect your
+                        performance metrics and profile ratings.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-3">
                   <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -669,62 +746,105 @@ export default function ServiceCompletionAgreement({
           </div>
         )}
 
-        {/* Section 4: Final Signature */}
+        {/* Section 4: Final Signature or Submit (Contact Not On Site) */}
         {currentSection === 4 && (
           <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900">Final Signature</h3>
-                <p className="text-sm text-gray-600">Authorize and complete the agreement</p>
-              </div>
-            </div>
+            {contactNotOnSite ? (
+              <>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">Complete Job Ticket</h3>
+                    <p className="text-sm text-gray-600">No signature required - contact not on site</p>
+                  </div>
+                </div>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Customer Name (Print) *
-                </label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-green-500 focus:outline-none text-gray-900 font-medium"
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+                  <div className="flex gap-3 mb-4">
+                    <svg className="w-6 h-6 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="font-semibold text-blue-900 mb-2">Contact Not Available</p>
+                      <p className="text-sm text-blue-800">
+                        Since no contact was available on site to sign, this job ticket will be marked as completed without a customer signature. The admin will be able to review this ticket in the Completed Jobs Archive.
+                      </p>
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Title/Position
-                </label>
-                <input
-                  type="text"
-                  value={customerTitle}
-                  onChange={(e) => setCustomerTitle(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-green-500 focus:outline-none text-gray-900"
-                  placeholder="e.g., Project Manager, Property Owner"
-                />
-              </div>
+                  <div className="mt-4 bg-white rounded-lg p-4">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Optional Notes
+                    </label>
+                    <textarea
+                      value={additionalNotes}
+                      onChange={(e) => setAdditionalNotes(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none"
+                      rows={3}
+                      placeholder="Add any notes about why contact was not available..."
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">Final Signature</h3>
+                    <p className="text-sm text-gray-600">Authorize and complete the agreement</p>
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Electronic Signature *
-                </label>
-                <input
-                  type="text"
-                  value={signature}
-                  onChange={(e) => setSignature(e.target.value)}
-                  className="w-full px-4 py-4 rounded-xl border-2 border-gray-300 focus:border-green-500 focus:outline-none font-signature text-2xl text-gray-900"
-                  placeholder="Type your full name to sign"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-2">
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Customer Name (Print) *
+                    </label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-green-500 focus:outline-none text-gray-900 font-medium"
+                      placeholder="Enter your full name"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Title/Position
+                    </label>
+                    <input
+                      type="text"
+                      value={customerTitle}
+                      onChange={(e) => setCustomerTitle(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-green-500 focus:outline-none text-gray-900"
+                      placeholder="e.g., Project Manager, Property Owner"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Electronic Signature *
+                    </label>
+                    <input
+                      type="text"
+                      value={signature}
+                      onChange={(e) => setSignature(e.target.value)}
+                      className="w-full px-4 py-4 rounded-xl border-2 border-gray-300 focus:border-green-500 focus:outline-none font-signature text-2xl text-gray-900"
+                      placeholder="Type your full name to sign"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
                   By typing your name above, you are creating a legally binding electronic signature equivalent to a handwritten signature.
                 </p>
               </div>
@@ -758,6 +878,8 @@ export default function ServiceCompletionAgreement({
                 <p><strong>Job Order:</strong> {jobData.orderId}</p>
               </div>
             </div>
+          </>
+            )}
           </div>
         )}
 

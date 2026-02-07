@@ -37,7 +37,7 @@ async function updateJobStatus(
 
     // Parse request body
     const body = await request.json();
-    const { status, latitude, longitude, accuracy } = body;
+    const { status, latitude, longitude, accuracy, departure_time } = body;
 
     // Validate status
     const validStatuses = ['scheduled', 'assigned', 'in_route', 'in_progress', 'completed', 'cancelled'];
@@ -89,6 +89,10 @@ async function updateJobStatus(
       updateData.route_started_at = now;
       updateData.route_start_latitude = latitude;
       updateData.route_start_longitude = longitude;
+      // If departure_time is provided, save it
+      if (departure_time) {
+        updateData.departure_time = departure_time;
+      }
     }
 
     if (status === 'in_progress' && !existingJob.work_started_at) {

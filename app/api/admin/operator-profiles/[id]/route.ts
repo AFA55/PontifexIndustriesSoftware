@@ -166,7 +166,9 @@ export async function PATCH(
       'hire_date',
       'notes',
       'phone',
-      'full_name'
+      'full_name',
+      'phone_number',
+      'email'
     ];
 
     const sanitizedUpdates: any = {};

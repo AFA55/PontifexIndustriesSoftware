@@ -41,6 +41,10 @@ export default function StartRoutePage() {
   const [eta, setEta] = useState<{ distance: number; driveTime: number; arrivalTime: string } | null>(null);
   const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>({});
   const [operatorName, setOperatorName] = useState<string>('');
+  const [showTimeConfirmModal, setShowTimeConfirmModal] = useState(false);
+  const [currentTime, setCurrentTime] = useState('');
+  const [departureTime24, setDepartureTime24] = useState('');
+  const [displayDepartureTime, setDisplayDepartureTime] = useState('');
 
   useEffect(() => {
     checkWorkflowAndRedirect();
@@ -254,6 +258,27 @@ export default function StartRoutePage() {
       return;
     }
 
+    // Set initial time values
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // 24-hour format for input
+    const time24 = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    setDepartureTime24(time24);
+
+    // 12-hour format for display
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHour = hours % 12 || 12;
+    const displayTimeString = `${displayHour}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    setDisplayDepartureTime(displayTimeString);
+    setCurrentTime(displayTimeString);
+
+    setShowTimeConfirmModal(true);
+  };
+
+  const handleConfirmTime = async () => {
+    setShowTimeConfirmModal(false);
     setSubmitting(true);
 
     try {
@@ -278,7 +303,7 @@ export default function StartRoutePage() {
         })
       });
 
-      // Update job status to "in_route"
+      // Update job status to "in_route" with departure time
       const statusResponse = await fetch(`/api/job-orders/${jobId}/status`, {
         method: 'POST',
         headers: {
@@ -286,7 +311,8 @@ export default function StartRoutePage() {
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          status: 'in_route'
+          status: 'in_route',
+          departure_time: displayDepartureTime
         })
       });
 
@@ -317,7 +343,6 @@ export default function StartRoutePage() {
     } catch (error) {
       console.error('Error starting route:', error);
       alert('An error occurred while starting your route. Please try again.');
-    } finally {
       setSubmitting(false);
     }
   };
@@ -589,6 +614,82 @@ export default function StartRoutePage() {
           </button>
         </div>
       </div>
+
+      {/* Time Confirmation Modal */}
+      {showTimeConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 animate-in fade-in zoom-in duration-200">
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirm Route Start Time</h3>
+              <p className="text-gray-600">Please confirm the time you are leaving the shop</p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Departure Time
+              </label>
+              <div className="relative">
+                <input
+                  type="time"
+                  value={departureTime24}
+                  onChange={(e) => {
+                    const timeValue = e.target.value;
+                    setDepartureTime24(timeValue);
+
+                    // Convert 24-hour format to 12-hour AM/PM format for display
+                    const [hours, minutes] = timeValue.split(':');
+                    const hour = parseInt(hours);
+                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                    const displayHour = hour % 12 || 12;
+                    const formatted = `${displayHour}:${minutes} ${ampm}`;
+                    setDisplayDepartureTime(formatted);
+                    setCurrentTime(formatted);
+                  }}
+                  className="w-full px-4 py-4 text-2xl font-bold text-center text-blue-600 bg-blue-50 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                />
+              </div>
+              <p className="text-sm text-gray-600 mt-3 text-center font-medium">
+                Selected Time: <span className="text-blue-600">{displayDepartureTime}</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1 text-center">
+                This time will be recorded as your official departure from the shop
+              </p>
+            </div>
+
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-yellow-800">
+                  This time will be recorded as your official departure from the shop. An SMS will be sent to the point of contact.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowTimeConfirmModal(false);
+                  setSubmitting(false);
+                }}
+                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmTime}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
+              >
+                Confirm & Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ interface OperatorProfile {
   full_name: string;
   email: string;
   phone: string | null;
+  phone_number: string | null;
   role: string;
   hourly_rate: number | null;
   skill_levels: Record<string, { level: string; proficiency: number }>;
@@ -39,6 +40,14 @@ interface OperatorProfile {
     revenue_per_hour: number;
     on_time_completion_rate: number;
   };
+  cleanliness_rating_avg: number | null;
+  cleanliness_rating_count: number;
+  communication_rating_avg: number | null;
+  communication_rating_count: number;
+  overall_rating_avg: number | null;
+  overall_rating_count: number;
+  total_ratings_received: number;
+  last_rating_received_at: string | null;
 }
 
 const AVAILABLE_TASKS = [
@@ -147,6 +156,9 @@ export default function OperatorProfilesPage() {
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
+          full_name: selectedOperator.full_name,
+          phone_number: selectedOperator.phone_number,
+          email: selectedOperator.email,
           hourly_rate: selectedOperator.hourly_rate,
           skill_levels: selectedOperator.skill_levels,
           tasks_qualified_for: selectedOperator.tasks_qualified_for,
@@ -439,6 +451,46 @@ export default function OperatorProfilesPage() {
                     </div>
                   </div>
 
+                  {/* Customer Ratings Section */}
+                  {operator.total_ratings_received > 0 && (
+                    <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-xl p-4 border-2 border-green-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                        <p className="text-xs font-bold text-green-900 uppercase">Customer Ratings</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mb-2">
+                        <div className="text-center bg-white rounded-lg p-2">
+                          <div className="text-lg font-bold text-green-600">
+                            {operator.cleanliness_rating_avg?.toFixed(1) || 'N/A'}
+                          </div>
+                          <div className="text-xs text-gray-600">Cleanliness</div>
+                        </div>
+                        <div className="text-center bg-white rounded-lg p-2">
+                          <div className="text-lg font-bold text-blue-600">
+                            {operator.communication_rating_avg?.toFixed(1) || 'N/A'}
+                          </div>
+                          <div className="text-xs text-gray-600">Communication</div>
+                        </div>
+                        <div className="text-center bg-white rounded-lg p-2">
+                          <div className="text-lg font-bold text-purple-600">
+                            {operator.overall_rating_avg?.toFixed(1) || 'N/A'}
+                          </div>
+                          <div className="text-xs text-gray-600">Overall</div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-center text-gray-500">
+                        Based on {operator.total_ratings_received} customer {operator.total_ratings_received === 1 ? 'review' : 'reviews'}
+                      </div>
+                      {operator.last_rating_received_at && (
+                        <div className="text-xs text-center text-gray-400 mt-1">
+                          Last review: {new Date(operator.last_rating_received_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Skills Overview */}
                   {Object.keys(operator.skill_levels || {}).length > 0 && (
                     <div>
@@ -560,6 +612,60 @@ export default function OperatorProfilesPage() {
               {/* Basic Info Tab */}
               {activeTab === 'basic' && (
                 <div className="space-y-6">
+                  {/* Contact Information Section */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
+                    <h3 className="font-bold text-gray-900 text-lg mb-4">Contact Information</h3>
+                    <p className="text-xs text-gray-600 mb-4">This information will autofill silica exposure forms</p>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          Full Name
+                        </label>
+                        <input
+                          type="text"
+                          value={selectedOperator.full_name || ''}
+                          onChange={(e) => setSelectedOperator({
+                            ...selectedOperator,
+                            full_name: e.target.value
+                          })}
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold text-gray-900 bg-white"
+                          placeholder="John Doe"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          value={selectedOperator.phone_number || ''}
+                          onChange={(e) => setSelectedOperator({
+                            ...selectedOperator,
+                            phone_number: e.target.value || null
+                          })}
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold text-gray-900 bg-white"
+                          placeholder="5555551234"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          value={selectedOperator.email || ''}
+                          onChange={(e) => setSelectedOperator({
+                            ...selectedOperator,
+                            email: e.target.value
+                          })}
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold text-gray-900 bg-white"
+                          placeholder="operator@pontifexindustries.com"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Employment Information Section */}
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-2">

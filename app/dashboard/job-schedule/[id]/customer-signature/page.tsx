@@ -16,10 +16,48 @@ export default function CustomerSignaturePage() {
   const [workPerformed, setWorkPerformed] = useState<string[]>([]);
   const [workPerformedDetails, setWorkPerformedDetails] = useState<any[]>([]);
   const [showAgreement, setShowAgreement] = useState(false);
+  const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
+  const [totalStandbyHours, setTotalStandbyHours] = useState<number>(0);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [isMultiDayJob, setIsMultiDayJob] = useState<boolean>(false);
 
   useEffect(() => {
     loadJobData();
   }, []);
+
+  const showNotification = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  const loadStandbyLogs = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/standby?jobId=${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          const logs = result.data.filter((log: any) => log.status === 'completed');
+          setStandbyLogs(logs);
+
+          // Calculate total standby hours
+          const total = logs.reduce((sum: number, log: any) => {
+            return sum + (log.duration_hours || 0);
+          }, 0);
+          setTotalStandbyHours(total);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading standby logs:', e);
+    }
+  };
 
   const loadJobData = async () => {
     try {
@@ -71,6 +109,22 @@ export default function CustomerSignaturePage() {
         console.log('No work performed data found in localStorage');
       }
 
+      // Load standby logs
+      await loadStandbyLogs();
+
+      // Check if this is a multi-day job by looking at scheduled_duration or checking daily logs
+      // A job is considered multi-day if it has existing daily logs (indicating previous days)
+      // OR if admin has scheduled it for multiple days
+      const { data: dailyLogs } = await supabase
+        .from('daily_job_logs')
+        .select('id')
+        .eq('job_order_id', jobId);
+
+      // If there are daily logs, this job has been running for multiple days
+      // OR check if there's a scheduled_duration field > 1
+      const hasMultipleDays = (dailyLogs && dailyLogs.length > 0) || (data.scheduled_duration && data.scheduled_duration > 1);
+      setIsMultiDayJob(hasMultipleDays);
+
       setJob(data);
       setWorkPerformed(workPerformedList);
       setWorkPerformedDetails(workDetails);
@@ -86,28 +140,30 @@ export default function CustomerSignaturePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('Session expired. Please log in again.');
-        router.push('/login');
+        showNotification('Session expired. Please log in again.', 'error');
+        setTimeout(() => router.push('/login'), 1500);
         return;
       }
 
-      // Save completion signature and customer feedback
+      // Save completion signature and customer feedback, and mark job as completed
       const { error } = await supabase
         .from('job_orders')
         .update({
-          completion_signature: signatureData.signature,
-          completion_signer_name: signatureData.customerName,
+          completion_signature: signatureData.contactNotOnSite ? null : signatureData.signature,
+          completion_signer_name: signatureData.contactNotOnSite ? null : signatureData.customerName,
           completion_signed_at: new Date().toISOString(),
           completion_notes: signatureData.additionalNotes || null,
+          contact_not_on_site: signatureData.contactNotOnSite || false,
           customer_cleanliness_rating: signatureData.cleanlinessRating || null,
           customer_communication_rating: signatureData.communicationRating || null,
           customer_overall_rating: signatureData.overallRating || null,
-          customer_feedback_comments: signatureData.feedbackComments || null
+          customer_feedback_comments: signatureData.feedbackComments || null,
+          status: 'completed'
         })
         .eq('id', jobId);
 
       if (error) {
-        alert('Error saving signature: ' + error.message);
+        showNotification('Error saving signature: ' + error.message, 'error');
         throw error;
       }
 
@@ -136,6 +192,34 @@ export default function CustomerSignaturePage() {
         console.error('PDF generation failed:', e);
       }
 
+      // Update operator ratings if ratings were provided
+      if (signatureData.cleanlinessRating || signatureData.communicationRating || signatureData.overallRating) {
+        try {
+          // Get the assigned operator for this job
+          const operatorId = job.assigned_to;
+
+          if (operatorId) {
+            await fetch('/api/operator-ratings/update', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                operatorId: operatorId,
+                cleanlinessRating: signatureData.cleanlinessRating,
+                communicationRating: signatureData.communicationRating,
+                overallRating: signatureData.overallRating
+              })
+            });
+            console.log('Operator ratings updated successfully');
+          }
+        } catch (e) {
+          console.error('Failed to update operator ratings:', e);
+          // Don't block completion if rating update fails
+        }
+      }
+
       // Update workflow
       try {
         await fetch('/api/workflow', {
@@ -154,8 +238,8 @@ export default function CustomerSignaturePage() {
         console.log('Workflow update failed, but signature saved');
       }
 
-      alert('Service Completion Agreement signed successfully! PDF has been generated and saved. Thank you for your feedback.');
-      router.push('/dashboard');
+      showNotification('Service Completion Agreement signed successfully! PDF has been generated and saved.', 'success');
+      setTimeout(() => router.push('/dashboard'), 2000);
     } catch (error) {
       console.error('Error saving signature:', error);
       throw error;
@@ -399,10 +483,134 @@ export default function CustomerSignaturePage() {
                 </div>
               )}
 
+              {/* Display standby time if available */}
+              {standbyLogs.length > 0 && (
+                <div className="bg-yellow-50 rounded-xl p-6 mb-6 text-left border-2 border-yellow-300">
+                  <h3 className="font-bold text-yellow-900 mb-4">Standby Time:</h3>
+                  <div className="space-y-3">
+                    {standbyLogs.map((log: any, index) => {
+                      const hours = Math.floor(log.duration_hours);
+                      const minutes = Math.round((log.duration_hours - hours) * 60);
+                      return (
+                        <div key={index} className="bg-white rounded-lg p-4 border border-yellow-300">
+                          <div className="flex items-start gap-3">
+                            <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div className="flex-1">
+                              <div className="text-sm text-gray-700 space-y-1">
+                                <div>
+                                  <strong>Duration:</strong> {hours > 0 && `${hours}h `}{minutes}m
+                                </div>
+                                <div>
+                                  <strong>Started:</strong> {new Date(log.started_at).toLocaleString()}
+                                </div>
+                                <div>
+                                  <strong>Ended:</strong> {new Date(log.ended_at).toLocaleString()}
+                                </div>
+                                {log.reason && (
+                                  <div className="mt-2 bg-yellow-50 p-2 rounded">
+                                    <strong>Reason:</strong> {log.reason}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="bg-yellow-100 rounded-lg p-4 border-2 border-yellow-400">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-yellow-900">Total Standby Time:</span>
+                        <span className="text-lg font-bold text-yellow-900">
+                          {Math.floor(totalStandbyHours)}h {Math.round((totalStandbyHours - Math.floor(totalStandbyHours)) * 60)}m
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <p className="text-sm text-gray-500 mb-8">
-                All data loaded successfully. Click below to proceed with the Service Completion Agreement.
+                All data loaded successfully. Choose how to complete this workday:
               </p>
 
+              {/* End Day Button - Only show if job is scheduled for multiple days */}
+              {isMultiDayJob && (
+                <button
+                  onClick={async () => {
+                    if (!confirm('Are you sure you want to end the day? The job will continue tomorrow and you will need to start En Route and In Progress again.')) {
+                      return;
+                    }
+
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (!session) {
+                        showNotification('Session expired. Please log in again.', 'error');
+                        setTimeout(() => router.push('/login'), 1500);
+                        return;
+                      }
+
+                      // Get current location
+                      let latitude: number | null = null;
+                      let longitude: number | null = null;
+                      try {
+                        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                          navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
+                          });
+                        });
+                        latitude = position.coords.latitude;
+                        longitude = position.coords.longitude;
+                      } catch (e) {
+                        console.log('Could not get location:', e);
+                      }
+
+                      // Submit daily log
+                      const response = await fetch(`/api/job-orders/${jobId}/daily-log`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${session.access_token}`
+                        },
+                        body: JSON.stringify({
+                          workPerformed: workPerformedDetails,
+                          notes: null,
+                          continueNextDay: true,
+                          latitude,
+                          longitude
+                        })
+                      });
+
+                      const result = await response.json();
+
+                      if (!response.ok) {
+                        throw new Error(result.error || 'Failed to save daily progress');
+                      }
+
+                      showNotification('Daily progress saved! Job has been reset for tomorrow.', 'success');
+
+                      // Clear work performed data
+                      localStorage.removeItem(`work-performed-${jobId}`);
+
+                      setTimeout(() => router.push('/dashboard'), 2000);
+                    } catch (error: any) {
+                      console.error('Error saving daily progress:', error);
+                      showNotification('Error saving daily progress: ' + error.message, 'error');
+                    }
+                  }}
+                  className="w-full py-5 rounded-xl font-bold text-lg transition-all duration-200 flex items-center justify-center gap-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] mb-4"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                  End Day & Continue Tomorrow
+                </button>
+              )}
+
+              {/* Complete Job Button - Get signature and finish */}
               <button
                 onClick={() => setShowAgreement(true)}
                 className="w-full py-5 rounded-xl font-bold text-lg transition-all duration-200 flex items-center justify-center gap-3 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] mb-4"
@@ -410,7 +618,7 @@ export default function CustomerSignaturePage() {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Proceed to Completion Agreement
+                Complete Job & Get Signature
               </button>
 
               <button
@@ -422,6 +630,44 @@ export default function CustomerSignaturePage() {
             </div>
           ) : null}
         </div>
+
+        {/* Notification Toast */}
+        {notification && (
+          <div className="fixed top-4 right-4 z-[60] animate-slide-in">
+            <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[300px] ${
+              notification.type === 'success' ? 'bg-green-500 text-white' :
+              notification.type === 'error' ? 'bg-red-500 text-white' :
+              'bg-yellow-500 text-white'
+            }`}>
+              <div className="flex-shrink-0">
+                {notification.type === 'success' && (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {notification.type === 'error' && (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+                {notification.type === 'warning' && (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                )}
+              </div>
+              <p className="font-semibold">{notification.message}</p>
+              <button
+                onClick={() => setNotification(null)}
+                className="ml-auto flex-shrink-0 hover:bg-white/20 rounded-lg p-1 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

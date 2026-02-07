@@ -33,11 +33,12 @@ export default function WorkflowNavigation({
     { id: 'work_order_agreement', name: 'Agreement', order: 1, url: `/dashboard/job-schedule/${jobId}/work-order-agreement` },
     { id: 'equipment_checklist', name: 'Equipment', order: 2, url: `/dashboard/job-schedule/${jobId}/start-route` },
     { id: 'in_route', name: 'In Route', order: 3, url: `/dashboard/job-schedule/${jobId}/in-route` },
-    { id: 'silica_form', name: 'Silica Form', order: 4, url: `/dashboard/job-schedule/${jobId}/silica-exposure` },
-    { id: 'work_performed', name: 'Work Log', order: 5, url: `/dashboard/job-schedule/${jobId}/work-performed` },
-    { id: 'pictures', name: 'Pictures', order: 6, url: `/dashboard/job-schedule/${jobId}/pictures` },
-    { id: 'customer_signature', name: 'Signature', order: 7, url: `/dashboard/job-schedule/${jobId}/customer-signature` },
-    { id: 'job_complete', name: 'Complete', order: 8, url: `/dashboard/job-schedule/${jobId}/complete` },
+    { id: 'liability_release', name: 'Liability', order: 4, url: `/dashboard/job-schedule/${jobId}/liability-release` },
+    { id: 'silica_form', name: 'Silica Form', order: 5, url: `/dashboard/job-schedule/${jobId}/silica-exposure` },
+    { id: 'work_performed', name: 'Work Log', order: 6, url: `/dashboard/job-schedule/${jobId}/work-performed` },
+    { id: 'pictures', name: 'Pictures', order: 7, url: `/dashboard/job-schedule/${jobId}/pictures` },
+    { id: 'customer_signature', name: 'Signature', order: 8, url: `/dashboard/job-schedule/${jobId}/customer-signature` },
+    { id: 'job_complete', name: 'Complete', order: 9, url: `/dashboard/job-schedule/${jobId}/complete` },
   ];
 
   useEffect(() => {
@@ -85,6 +86,8 @@ export default function WorkflowNavigation({
         return workflow.equipment_checklist_completed || false;
       case 'in_route':
         return workflow.sms_sent || false;
+      case 'liability_release':
+        return workflow.liability_release_signed || false;
       case 'silica_form':
         return workflow.silica_form_completed || false;
       case 'work_performed':

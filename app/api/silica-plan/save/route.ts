@@ -121,6 +121,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Save PDF to job_orders for admin viewing in completed jobs
+    const { error: jobOrderUpdateError } = await supabaseAdmin
+      .from('job_orders')
+      .update({
+        silica_form_pdf: pdfBase64,
+        silica_form_completed_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+
+    if (jobOrderUpdateError) {
+      console.error('⚠️ Failed to save PDF to job_orders:', jobOrderUpdateError);
+    } else {
+      console.log('✅ PDF saved to job_orders.silica_form_pdf');
+    }
+
     // Track PDF in pdf_documents table for versioning
     if (!uploadError && publicUrl) {
       const { error: pdfDocError } = await supabaseAdmin

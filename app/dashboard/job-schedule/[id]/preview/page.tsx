@@ -15,6 +15,7 @@ interface JobOrder {
   location: string;
   address: string;
   description: string;
+  additional_info?: string;
   equipment_needed: string[];
   scheduled_date: string;
   arrival_time: string;
@@ -218,31 +219,24 @@ export default function PreviewTicketPage() {
           </div>
         </div>
 
-        {/* Job Location */}
+        {/* Location Hidden - Only shown after starting route */}
+        {/* Location details are revealed in the in-route page after equipment checklist */}
+
         <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-xl border border-gray-200/50 p-6 mb-6">
-          <div className="flex items-start gap-4 mb-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <MapPin className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-gray-800 mb-2">Job Location</h3>
-              <p className="text-gray-900 font-semibold text-lg mb-1">{job.location}</p>
-              <p className="text-gray-600 mb-3">{job.address}</p>
-              <a
-                href={getDirectionsUrl(job.address)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all shadow-lg hover:shadow-xl"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                </svg>
-                Get Directions
-              </a>
+          {/* Arrival Times - Show only location name, not address */}
+          <div className="mb-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-800 mb-2">Job Site</h3>
+                <p className="text-gray-900 font-semibold text-lg">{job.location}</p>
+                <p className="text-sm text-gray-500 mt-1">📍 Full address shown after starting route</p>
+              </div>
             </div>
           </div>
 
-          {/* Arrival Times */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {job.shop_arrival_time && (
               <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-4">
@@ -371,6 +365,27 @@ export default function PreviewTicketPage() {
             </div>
           </div>
         </div>
+
+        {/* Additional Comments (if provided by admin) */}
+        {job.additional_info && (
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 backdrop-blur-lg rounded-3xl shadow-xl border-2 border-blue-300 p-6 mb-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-blue-900 mb-4">Additional Comments</h3>
+                <div className="bg-white border-2 border-blue-300 rounded-2xl p-6">
+                  <pre className="whitespace-pre-wrap text-blue-900 font-medium leading-relaxed">
+                    {job.additional_info}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Equipment Checklist */}
         <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-xl border border-gray-200/50 p-6 mb-6">

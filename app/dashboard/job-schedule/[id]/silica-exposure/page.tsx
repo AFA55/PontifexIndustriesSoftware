@@ -41,34 +41,19 @@ const WORK_TYPES = [
   'Jack Hammer'
 ];
 
-// Job data (from your screenshots)
-const jobDetails = {
-  1: {
-    id: '234893',
-    title: 'WHITEHAWK (CAM) / PIEDMONT ATH.',
-    customer: 'WHITEHAWK (CAM)',
-    location: '1199 PRINCE AVE, ATHENS, GA',
-    technician: 'ANDRES GUERRERO-C',
-    foreman: 'JAMES',
-    workType: 'CORE DRILLING'
-  }
-  // Add more jobs as needed
-};
+// Removed hardcoded jobDetails - now fetching from job order assigned_to field
 
 export default function SilicaExposureControlPlan() {
   const router = useRouter();
   const params = useParams();
 
-  // Get job info for auto-fill
-  const jobInfo = jobDetails[params.id as unknown as keyof typeof jobDetails] || jobDetails[1];
-
   const [formData, setFormData] = useState<SilicaFormData>({
-    employeeName: jobInfo.technician || '',
+    employeeName: '',
     employeePhone: '',
-    employeesOnJob: [jobInfo.technician || '', jobInfo.foreman || ''].filter(Boolean),
+    employeesOnJob: [],
     jobNumber: params.id as string || '',
-    jobLocation: jobInfo.location || '',
-    workType: jobInfo.workType ? [jobInfo.workType] : [],  // Initialize as array
+    jobLocation: '',
+    workType: [],
     waterDeliveryIntegrated: '',
     workLocation: '',
     cuttingTime: '',
@@ -79,15 +64,12 @@ export default function SilicaExposureControlPlan() {
   });
 
   const [currentStep, setCurrentStep] = useState(1);
-  const [employees, setEmployees] = useState<string[]>(
-    [jobInfo.technician || '', jobInfo.foreman || ''].filter(Boolean).length > 0
-      ? [jobInfo.technician || '', jobInfo.foreman || ''].filter(Boolean)
-      : ['']
-  );
+  const [employees, setEmployees] = useState<string[]>(['']);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [checkingSubmission, setCheckingSubmission] = useState(true);
+  const [isOnStandby, setIsOnStandby] = useState(false);
 
   // Check if silica plan already exists for this job
   useEffect(() => {
@@ -122,32 +104,71 @@ export default function SilicaExposureControlPlan() {
     }
   };
 
-  // Fetch operator's phone number from profile on mount
+  // Fetch job order and assigned operator info on mount
   useEffect(() => {
-    const fetchOperatorProfile = async () => {
+    const fetchJobAndOperator = async () => {
       try {
+        console.log('[SILICA FORM] Starting data fetch...');
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        if (!session) {
+          console.log('[SILICA FORM] No session found');
+          return;
+        }
+        console.log('[SILICA FORM] Session user ID:', session.user.id);
 
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('phone_number')
-          .eq('id', session.user.id)
-          .single();
+        // Fetch job order data with operator profiles from API
+        const response = await fetch(`/api/job-orders?id=${params.id}`, {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+        const jobData = await response.json();
+        console.log('[SILICA FORM] Full API response:', jobData);
 
-        if (profile && profile.phone_number && !error) {
-          setFormData(prev => ({
-            ...prev,
-            employeePhone: profile.phone_number
-          }));
+        if (jobData.success && jobData.data && jobData.data.length > 0) {
+          const job = jobData.data[0];
+          const operatorProfile = jobData.operator_profile;
+          const assignedOperatorProfile = jobData.assigned_operator_profile;
+
+          console.log('[SILICA FORM] Job:', job);
+          console.log('[SILICA FORM] Operator profile:', operatorProfile);
+          console.log('[SILICA FORM] Assigned operator profile:', assignedOperatorProfile);
+
+          // Get assigned operator name for employees list
+          const assignedOperatorName = assignedOperatorProfile?.full_name || '';
+
+          // Autofill operator information from API response
+          const newFormData = {
+            employeeName: operatorProfile?.full_name || '',
+            employeePhone: operatorProfile?.phone_number || '',
+            employeesOnJob: assignedOperatorName ? [assignedOperatorName] : [],
+            jobNumber: job.job_number || params.id as string,
+            jobLocation: job.address || job.location || ''
+          };
+          console.log('[SILICA FORM] Setting form data:', newFormData);
+
+          setFormData(prev => {
+            const updated = {
+              ...prev,
+              ...newFormData
+            };
+            console.log('[SILICA FORM] Form data after update:', updated);
+            return updated;
+          });
+
+          // Set employees state for the UI
+          if (assignedOperatorName) {
+            console.log('[SILICA FORM] Setting employees:', [assignedOperatorName]);
+            setEmployees([assignedOperatorName]);
+          } else {
+            console.log('[SILICA FORM] No assigned operator, employees will be empty');
+          }
         }
       } catch (error) {
-        console.error('Error fetching operator profile:', error);
+        console.error('[SILICA FORM] Error fetching job and operator data:', error);
       }
     };
 
-    fetchOperatorProfile();
-  }, []);
+    fetchJobAndOperator();
+  }, [params.id]);
 
   const handleInputChange = (field: keyof SilicaFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -266,6 +287,12 @@ export default function SilicaExposureControlPlan() {
   };
 
   const submitDocument = async () => {
+    // Check if on standby before submitting
+    if (isOnStandby) {
+      alert('Please end standby time before submitting the silica exposure plan');
+      return;
+    }
+
     try {
       // Generate PDF blob
       const pdf = new jsPDF();
@@ -427,7 +454,10 @@ export default function SilicaExposureControlPlan() {
         <WorkflowNavigation jobId={params.id as string} currentStepId="silica_form" />
 
         {/* Quick Access Buttons */}
-        <QuickAccessButtons jobId={params.id as string} />
+        <QuickAccessButtons
+          jobId={params.id as string}
+          onStandbyChange={(standbyStatus) => setIsOnStandby(standbyStatus)}
+        />
 
         {/* Loading State */}
         {checkingSubmission && (
@@ -553,38 +583,64 @@ export default function SilicaExposureControlPlan() {
                 Employee Information
               </h3>
 
+              {/* Info Banner */}
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-blue-800">
+                    Your contact information has been autofilled from your profile. You can edit these fields if needed (e.g., use a nickname or different phone number).
+                  </p>
+                </div>
+              </div>
+
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Employee Name *</label>
+                  <label htmlFor="employeeName" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Employee Name *
+                    <span className="text-xs font-normal text-gray-500 ml-2">(Autofilled from profile)</span>
+                  </label>
                   <input
                     type="text"
+                    id="employeeName"
+                    name="employeeName"
                     value={formData.employeeName}
                     onChange={(e) => handleInputChange('employeeName', e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium bg-white"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium bg-blue-50"
                     placeholder="Enter your full name"
                   />
+                  <p className="text-xs text-gray-500 mt-1">You can use a nickname if preferred</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Employee Phone # *</label>
+                  <label htmlFor="employeePhone" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Employee Phone # *
+                    <span className="text-xs font-normal text-gray-500 ml-2">(Autofilled from profile)</span>
+                  </label>
                   <input
                     type="tel"
+                    id="employeePhone"
+                    name="employeePhone"
                     value={formData.employeePhone}
                     onChange={(e) => handleInputChange('employeePhone', e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium bg-white"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium bg-blue-50"
                     placeholder="(xxx) xxx-xxxx"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Edit if you prefer a different contact number</p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="employeeOnJob-0" className="block text-sm font-semibold text-gray-700 mb-2">
                   Employees Working On This Job *
                 </label>
                 {employees.map((emp, index) => (
                   <div key={index} className="flex gap-2 mb-2">
                     <input
                       type="text"
+                      id={`employeeOnJob-${index}`}
+                      name={`employeeOnJob-${index}`}
                       value={emp}
                       onChange={(e) => updateEmployee(index, e.target.value)}
                       className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium"
@@ -744,10 +800,12 @@ export default function SilicaExposureControlPlan() {
 
               {/* Other Safety Concerns */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="otherSafetyConcerns" className="block text-sm font-semibold text-gray-700 mb-2">
                   Other Safety Concerns
                 </label>
                 <textarea
+                  id="otherSafetyConcerns"
+                  name="otherSafetyConcerns"
                   value={formData.otherSafetyConcerns}
                   onChange={(e) => handleInputChange('otherSafetyConcerns', e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium bg-white"
@@ -812,11 +870,13 @@ export default function SilicaExposureControlPlan() {
 
               {/* Signature */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="signature" className="block text-sm font-semibold text-gray-700 mb-2">
                   Electronic Signature *
                 </label>
                 <input
                   type="text"
+                  id="signature"
+                  name="signature"
                   value={formData.signature}
                   onChange={(e) => handleInputChange('signature', e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors font-signature text-xl text-gray-900 bg-white"

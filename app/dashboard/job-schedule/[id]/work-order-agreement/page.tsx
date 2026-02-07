@@ -45,6 +45,12 @@ export default function WorkOrderAgreementPage() {
 
   const handleSign = async (signatureData: any) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Session expired. Please log in again.');
+        return;
+      }
+
       // Save the contract signature to database
       const { error: updateError } = await supabase
         .from('job_orders')
@@ -61,26 +67,35 @@ export default function WorkOrderAgreementPage() {
 
       if (updateError) throw updateError;
 
-      // Generate PDF of signed contract
-      try {
-        const pdfResult = await pdfGenerator.generateWorkOrderContract(
-          {
-            ...jobData,
-            jobId: params.id
-          },
-          signatureData
-        );
-
-        if (pdfResult.success) {
-          console.log('PDF generated successfully:', pdfResult.url);
-        } else {
-          console.error('PDF generation failed:', pdfResult.error);
-          // Don't block navigation if PDF fails
-        }
-      } catch (pdfError) {
-        console.error('Error generating PDF:', pdfError);
-        // Don't block navigation if PDF fails
-      }
+      // Generate PDF and save to job ticket (async, don't wait for it)
+      fetch('/api/work-order-agreement/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          jobId: params.id,
+          jobNumber: jobData.orderId,
+          jobDate: jobData.date,
+          customerName: jobData.customer,
+          jobLocation: jobData.jobLocation,
+          poNumber: jobData.poNumber,
+          workDescription: jobData.workDescription,
+          scopeOfWork: jobData.scopeOfWork,
+          signerName: signatureData.name,
+          signerTitle: signatureData.title,
+          signedAt: signatureData.date,
+          cutThroughAuthorized: signatureData.cutThroughAuthorized,
+          cutThroughSignature: signatureData.cutThroughSignature
+        })
+      }).then(response => response.json())
+        .then(data => {
+          console.log('[AGREEMENT] PDF generation result:', data);
+        })
+        .catch(err => {
+          console.error('[AGREEMENT] PDF generation error:', err);
+        });
 
       // Navigate to equipment checklist or next step
       router.push(`/dashboard/job-schedule/${params.id}/equipment-checklist`);

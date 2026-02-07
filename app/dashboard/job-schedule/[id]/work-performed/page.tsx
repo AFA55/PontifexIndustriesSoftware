@@ -71,6 +71,8 @@ const POPULAR_ITEMS = [
   'CORE DRILL',
   'SLAB SAW',
   'WALL SAW',
+  'HAND SAW',
+  'CHAIN SAW',
   'BREAK & REMOVE',
   'JACK HAMMERING'
 ];
@@ -196,6 +198,109 @@ export default function WorkPerformed() {
   const [equipmentUsageEntries, setEquipmentUsageEntries] = useState<any[]>([]);
   const [showEquipmentForm, setShowEquipmentForm] = useState(false);
   const [savingEquipment, setSavingEquipment] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [jobDifficultyRating, setJobDifficultyRating] = useState<number>(0);
+  const [jobAccessRating, setJobAccessRating] = useState<number>(0);
+  const [difficultyNotes, setDifficultyNotes] = useState('');
+  const [accessNotes, setAccessNotes] = useState('');
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
+  const [totalStandbyMinutes, setTotalStandbyMinutes] = useState(0);
+
+  // Quick Entry Modal State (Slab/Wall/Hand Saw)
+  const [showQuickEntryModal, setShowQuickEntryModal] = useState(false);
+  const [quickEntryCuts, setQuickEntryCuts] = useState<Array<{
+    numCuts: number;
+    lengthFeet: number;
+    depth: number;
+  }>>([]);
+  const [quickEntryNumCuts, setQuickEntryNumCuts] = useState<number>(1);
+  const [quickEntryLengthFeet, setQuickEntryLengthFeet] = useState<number>(0);
+  const [quickEntryDepth, setQuickEntryDepth] = useState<number>(0);
+
+  // Chain Saw Quick Entry State (length in inches)
+  const [showChainsawModal, setShowChainsawModal] = useState(false);
+  const [chainsawCuts, setChainsawCuts] = useState<Array<{
+    numCuts: number;
+    lengthInches: number;
+    depth: number;
+  }>>([]);
+  const [chainsawNumCuts, setChainsawNumCuts] = useState<number>(1);
+  const [chainsawLengthInches, setChainsawLengthInches] = useState<number>(0);
+  const [chainsawDepth, setChainsawDepth] = useState<number>(0);
+
+  // Break & Remove Quick Entry State
+  const [showBreakRemoveModal, setShowBreakRemoveModal] = useState(false);
+  const [breakRemoveAreas, setBreakRemoveAreas] = useState<Array<{
+    length: number;
+    width: number;
+    depth: number;
+  }>>([]);
+  const [breakRemoveLength, setBreakRemoveLength] = useState<number>(0);
+  const [breakRemoveWidth, setBreakRemoveWidth] = useState<number>(0);
+  const [breakRemoveDepth, setBreakRemoveDepth] = useState<number>(0);
+  const [removalMethod, setRemovalMethod] = useState<string>('');
+  const [removalEquipment, setRemovalEquipment] = useState<string>('');
+
+  // Jack Hammering Quick Entry State
+  const [showJackhammerModal, setShowJackhammerModal] = useState(false);
+  const [jackhammerEquipment, setJackhammerEquipment] = useState<string>('');
+  const [jackhammerOther, setJackhammerOther] = useState<string>('');
+  const [jackhammerAreas, setJackhammerAreas] = useState<Array<{
+    length: number;
+    width: number;
+  }>>([]);
+  const [jackhammerLength, setJackhammerLength] = useState<number>(0);
+  const [jackhammerWidth, setJackhammerWidth] = useState<number>(0);
+
+  // Brokk Quick Entry State
+  const [showBrokkModal, setShowBrokkModal] = useState(false);
+  const [brokkAreas, setBrokkAreas] = useState<Array<{
+    length: number;
+    width: number;
+    thickness: number;
+  }>>([]);
+  const [brokkLength, setBrokkLength] = useState<number>(0);
+  const [brokkWidth, setBrokkWidth] = useState<number>(0);
+  const [brokkThickness, setBrokkThickness] = useState<number>(0);
+
+  // Fetch standby logs for this job
+  useEffect(() => {
+    const fetchStandbyLogs = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const response = await fetch(`/api/standby?jobId=${params.id}`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const logs = result.data || [];
+          setStandbyLogs(logs);
+
+          // Calculate total standby time
+          const totalMinutes = logs.reduce((sum: number, log: any) => {
+            if (log.ended_at) {
+              const start = new Date(log.started_at).getTime();
+              const end = new Date(log.ended_at).getTime();
+              const minutes = Math.round((end - start) / 60000);
+              return sum + minutes;
+            }
+            return sum;
+          }, 0);
+          setTotalStandbyMinutes(totalMinutes);
+        }
+      } catch (error) {
+        console.error('Error fetching standby logs:', error);
+      }
+    };
+
+    fetchStandbyLogs();
+  }, [params.id]);
 
   // Get all available work items
   const getAllItems = () => {
@@ -261,6 +366,22 @@ export default function WorkPerformed() {
 
   const isChainsaw = (itemName: string) => {
     return itemName.includes('CHAIN SAW');
+  };
+
+  const isBreakAndRemove = (itemName: string) => {
+    return itemName.includes('BREAK & REMOVE') || itemName.includes('REMOVAL') || itemName.includes('DEMOLITION');
+  };
+
+  const isJackHammering = (itemName: string) => {
+    return itemName.includes('JACK HAMMERING') || itemName.includes('JACKHAMMER');
+  };
+
+  const isChipping = (itemName: string) => {
+    return itemName.includes('CHIPPING');
+  };
+
+  const isBrokk = (itemName: string) => {
+    return itemName.includes('BROKK');
   };
 
   const handleSelectItem = (itemName: string) => {
@@ -468,6 +589,275 @@ export default function WorkPerformed() {
     setTempAreas(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Quick Entry Modal Functions
+  const addQuickEntryCut = () => {
+    if (quickEntryNumCuts <= 0 || quickEntryLengthFeet <= 0) {
+      alert('Please specify number of cuts and length');
+      return;
+    }
+
+    const newCut = {
+      numCuts: quickEntryNumCuts,
+      lengthFeet: quickEntryLengthFeet,
+      depth: quickEntryDepth
+    };
+
+    setQuickEntryCuts(prev => [...prev, newCut]);
+
+    // Reset inputs
+    setQuickEntryNumCuts(1);
+    setQuickEntryLengthFeet(0);
+    setQuickEntryDepth(0);
+  };
+
+  const removeQuickEntryCut = (index: number) => {
+    setQuickEntryCuts(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const calculateQuickEntryTotal = () => {
+    return quickEntryCuts.reduce((total, cut) => {
+      return total + (cut.numCuts * cut.lengthFeet);
+    }, 0);
+  };
+
+  const applyQuickEntry = () => {
+    if (quickEntryCuts.length === 0) {
+      alert('Please add at least one cut entry');
+      return;
+    }
+
+    const totalLinearFeet = calculateQuickEntryTotal();
+    setCurrentCut(prev => ({ ...prev, linearFeet: totalLinearFeet, cutDepth: quickEntryDepth }));
+
+    // Close modal and reset
+    setShowQuickEntryModal(false);
+    setQuickEntryCuts([]);
+    setQuickEntryNumCuts(1);
+    setQuickEntryLengthFeet(0);
+    setQuickEntryDepth(0);
+  };
+
+  // Chain Saw Quick Entry Functions
+  const addChainsawCut = () => {
+    if (chainsawNumCuts <= 0 || chainsawLengthInches <= 0) {
+      alert('Please specify number of cuts and length in inches');
+      return;
+    }
+
+    const newCut = {
+      numCuts: chainsawNumCuts,
+      lengthInches: chainsawLengthInches,
+      depth: chainsawDepth
+    };
+
+    setChainsawCuts(prev => [...prev, newCut]);
+
+    // Reset inputs
+    setChainsawNumCuts(1);
+    setChainsawLengthInches(0);
+    setChainsawDepth(0);
+  };
+
+  const removeChainsawCut = (index: number) => {
+    setChainsawCuts(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const calculateChainsawTotal = () => {
+    return chainsawCuts.reduce((total, cut) => {
+      // Convert inches to feet
+      const lengthInFeet = cut.lengthInches / 12;
+      return total + (cut.numCuts * lengthInFeet);
+    }, 0);
+  };
+
+  const applyChainsawEntry = () => {
+    if (chainsawCuts.length === 0) {
+      alert('Please add at least one cut entry');
+      return;
+    }
+
+    const totalLinearFeet = calculateChainsawTotal();
+    setCurrentCut(prev => ({ ...prev, linearFeet: totalLinearFeet, cutDepth: chainsawDepth }));
+
+    // Close modal and reset
+    setShowChainsawModal(false);
+    setChainsawCuts([]);
+    setChainsawNumCuts(1);
+    setChainsawLengthInches(0);
+    setChainsawDepth(0);
+  };
+
+  // Break & Remove Quick Entry Functions
+  const addBreakRemoveArea = () => {
+    if (breakRemoveLength <= 0 || breakRemoveWidth <= 0 || breakRemoveDepth <= 0) {
+      alert('Please specify length, width, and depth');
+      return;
+    }
+
+    const newArea = {
+      length: breakRemoveLength,
+      width: breakRemoveWidth,
+      depth: breakRemoveDepth
+    };
+
+    setBreakRemoveAreas(prev => [...prev, newArea]);
+
+    // Reset inputs
+    setBreakRemoveLength(0);
+    setBreakRemoveWidth(0);
+    setBreakRemoveDepth(0);
+  };
+
+  const removeBreakRemoveArea = (index: number) => {
+    setBreakRemoveAreas(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const calculateBreakRemoveTotal = () => {
+    return breakRemoveAreas.reduce((total, area) => {
+      return total + (area.length * area.width);
+    }, 0);
+  };
+
+  const applyBreakRemoveEntry = () => {
+    if (breakRemoveAreas.length === 0) {
+      alert('Please add at least one area');
+      return;
+    }
+
+    if (!removalMethod) {
+      alert('Please select a removal method');
+      return;
+    }
+
+    if (removalMethod === 'rigged' && !removalEquipment) {
+      alert('Please specify equipment used for rigging');
+      return;
+    }
+
+    const totalSquareFeet = calculateBreakRemoveTotal();
+    const notes = `Removal Method: ${removalMethod}${removalEquipment ? ` (${removalEquipment})` : ''} | Total: ${totalSquareFeet.toFixed(2)} sq ft`;
+
+    setCurrentQuantity(totalSquareFeet);
+    setCurrentNotes(notes);
+
+    // Close modal and reset
+    setShowBreakRemoveModal(false);
+    setBreakRemoveAreas([]);
+    setBreakRemoveLength(0);
+    setBreakRemoveWidth(0);
+    setBreakRemoveDepth(0);
+    setRemovalMethod('');
+    setRemovalEquipment('');
+  };
+
+  // Jack Hammering Quick Entry Functions
+  const addJackhammerArea = () => {
+    if (jackhammerLength <= 0 || jackhammerWidth <= 0) {
+      alert('Please specify length and width');
+      return;
+    }
+
+    const newArea = {
+      length: jackhammerLength,
+      width: jackhammerWidth
+    };
+
+    setJackhammerAreas(prev => [...prev, newArea]);
+
+    // Reset inputs
+    setJackhammerLength(0);
+    setJackhammerWidth(0);
+  };
+
+  const removeJackhammerArea = (index: number) => {
+    setJackhammerAreas(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const calculateJackhammerTotal = () => {
+    return jackhammerAreas.reduce((total, area) => {
+      return total + (area.length * area.width);
+    }, 0);
+  };
+
+  const applyJackhammerEntry = () => {
+    if (jackhammerAreas.length === 0) {
+      alert('Please add at least one area');
+      return;
+    }
+
+    if (!jackhammerEquipment) {
+      alert('Please select equipment used');
+      return;
+    }
+
+    const equipment = jackhammerEquipment === 'other' ? jackhammerOther : jackhammerEquipment;
+    const totalSquareFeet = calculateJackhammerTotal();
+    const notes = `Equipment: ${equipment} | Total: ${totalSquareFeet.toFixed(2)} sq ft`;
+
+    setCurrentQuantity(totalSquareFeet);
+    setCurrentNotes(notes);
+
+    // Close modal and reset
+    setShowJackhammerModal(false);
+    setJackhammerAreas([]);
+    setJackhammerLength(0);
+    setJackhammerWidth(0);
+    setJackhammerEquipment('');
+    setJackhammerOther('');
+  };
+
+  // Brokk Quick Entry Functions
+  const addBrokkArea = () => {
+    if (brokkLength <= 0 || brokkWidth <= 0 || brokkThickness <= 0) {
+      alert('Please specify length, width, and thickness');
+      return;
+    }
+
+    const newArea = {
+      length: brokkLength,
+      width: brokkWidth,
+      thickness: brokkThickness
+    };
+
+    setBrokkAreas(prev => [...prev, newArea]);
+
+    // Reset inputs
+    setBrokkLength(0);
+    setBrokkWidth(0);
+    setBrokkThickness(0);
+  };
+
+  const removeBrokkArea = (index: number) => {
+    setBrokkAreas(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const calculateBrokkTotal = () => {
+    return brokkAreas.reduce((total, area) => {
+      return total + (area.length * area.width);
+    }, 0);
+  };
+
+  const applyBrokkEntry = () => {
+    if (brokkAreas.length === 0) {
+      alert('Please add at least one area');
+      return;
+    }
+
+    const totalSquareFeet = calculateBrokkTotal();
+    const avgThickness = brokkAreas.reduce((sum, area) => sum + area.thickness, 0) / brokkAreas.length;
+    const notes = `Total: ${totalSquareFeet.toFixed(2)} sq ft | Avg Thickness: ${avgThickness.toFixed(1)}"`;
+
+    setCurrentQuantity(totalSquareFeet);
+    setCurrentNotes(notes);
+
+    // Close modal and reset
+    setShowBrokkModal(false);
+    setBrokkAreas([]);
+    setBrokkLength(0);
+    setBrokkWidth(0);
+    setBrokkThickness(0);
+  };
+
   const toggleBladeSelection = (blade: string) => {
     setSelectedBlades(prev => {
       if (prev.includes(blade)) {
@@ -492,6 +882,25 @@ export default function WorkPerformed() {
 
     if (isChainsaw(itemName)) {
       return ['10" Chain', '15" Chain', '20" Chain', '24" Chain'];
+    }
+
+    if (isWallSaw(itemName)) {
+      return ['32" Diamond', '42" Diamond', '56" Diamond', '62" Diamond', '72" Diamond'];
+    }
+
+    if (isSlabSaw(itemName)) {
+      return [
+        '20" Diamond',
+        '24" Diamond',
+        '26" Diamond',
+        '30" Diamond',
+        '32" Diamond',
+        '36" Diamond',
+        '42" Diamond',
+        '54" Diamond',
+        '62" Diamond',
+        '72" Diamond'
+      ];
     }
 
     // Standard blades for other saw types
@@ -686,9 +1095,30 @@ export default function WorkPerformed() {
     }
   };
 
+  const showNotification = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   const handleSubmit = async () => {
     if (selectedItems.length === 0) {
-      alert('Please select at least one work item');
+      showNotification('Please select at least one work item', 'warning');
+      return;
+    }
+
+    // Show feedback modal instead of submitting directly
+    setShowFeedbackModal(true);
+  };
+
+  const handleSubmitWithFeedback = async () => {
+    // Validate feedback ratings
+    if (jobDifficultyRating === 0) {
+      showNotification('Please rate the job difficulty', 'warning');
+      return;
+    }
+
+    if (jobAccessRating === 0) {
+      showNotification('Please rate the job site access', 'warning');
       return;
     }
 
@@ -730,6 +1160,31 @@ export default function WorkPerformed() {
           // Continue even if blade tracking fails
         }
 
+        // Save job feedback ratings
+        try {
+          const feedbackResponse = await fetch(`/api/job-orders?id=${params.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+              job_difficulty_rating: jobDifficultyRating,
+              job_access_rating: jobAccessRating,
+              job_difficulty_notes: difficultyNotes,
+              job_access_notes: accessNotes,
+              feedback_submitted_at: new Date().toISOString()
+            })
+          });
+
+          if (feedbackResponse.ok) {
+            console.log('Job feedback saved successfully');
+          }
+        } catch (feedbackError) {
+          console.error('Error saving job feedback:', feedbackError);
+          // Continue even if feedback saving fails
+        }
+
         // Update workflow - mark work_performed as complete and move to pictures
         await fetch('/api/workflow', {
           method: 'POST',
@@ -745,10 +1200,12 @@ export default function WorkPerformed() {
         });
       }
 
-      alert('Work performed items saved successfully!');
+      showNotification('Work performed and feedback saved successfully!', 'success');
 
-      // Navigate to pictures page (users can skip if no pictures)
-      router.push(`/dashboard/job-schedule/${params.id}/pictures`);
+      // Navigate to pictures page after a short delay
+      setTimeout(() => {
+        router.push(`/dashboard/job-schedule/${params.id}/pictures`);
+      }, 1500);
     } catch (error) {
       console.error('Error submitting work performed:', error);
       alert('Work saved, but there was an error updating workflow');
@@ -933,6 +1390,75 @@ export default function WorkPerformed() {
           /* Selected Items View */
           <div className="bg-white rounded-2xl shadow-xl p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Selected Work Items</h2>
+
+            {/* Standby Time Summary */}
+            {standbyLogs.length > 0 && (
+              <div className="mb-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-yellow-900 mb-2">⏱️ Standby Time Recorded</h3>
+                    <div className="space-y-2">
+                      {standbyLogs.map((log, index) => {
+                        const start = new Date(log.started_at);
+                        const end = log.ended_at ? new Date(log.ended_at) : null;
+                        const durationMinutes = end ? Math.round((end.getTime() - start.getTime()) / 60000) : 0;
+                        const hours = Math.floor(durationMinutes / 60);
+                        const minutes = durationMinutes % 60;
+
+                        return (
+                          <div key={log.id || index} className="bg-white rounded-lg p-3 border border-yellow-200">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-800">
+                                  {start.toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true
+                                  })}
+                                  {end && (
+                                    <span className="text-gray-500"> → {end.toLocaleString('en-US', {
+                                      hour: 'numeric',
+                                      minute: '2-digit',
+                                      hour12: true
+                                    })}</span>
+                                  )}
+                                </p>
+                                {log.reason && (
+                                  <p className="text-xs text-gray-600 mt-1">Reason: {log.reason}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-yellow-700">
+                                  {hours > 0 ? `${hours}h ` : ''}{minutes}m
+                                </p>
+                                <p className="text-xs text-gray-500">Duration</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 pt-3 border-t-2 border-yellow-300">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-yellow-900">Total Standby Time:</p>
+                        <p className="text-2xl font-bold text-yellow-700">
+                          {Math.floor(totalStandbyMinutes / 60) > 0 ? `${Math.floor(totalStandbyMinutes / 60)}h ` : ''}
+                          {totalStandbyMinutes % 60}m
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {selectedItems.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">No items selected yet</p>
@@ -1320,8 +1846,8 @@ export default function WorkPerformed() {
                     </h4>
 
                     {/* Add New Hole Entry */}
-                    <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-4 border-2 border-orange-200">
-                      <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+                      <h5 className="font-bold text-gray-900 mb-4 flex items-center gap-2 text-lg">
                         <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
@@ -1329,7 +1855,7 @@ export default function WorkPerformed() {
                       </h5>
 
                       <div className="grid grid-cols-3 gap-4">
-                        {/* Bit Size - Modern Custom Dropdown */}
+                        {/* Bit Size - Text Input */}
                         <div>
                           <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                             <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1337,37 +1863,14 @@ export default function WorkPerformed() {
                             </svg>
                             Bit Size
                           </label>
-                          <div className="relative">
-                            <select
-                              value={currentHole.bitSize}
-                              onChange={(e) => setCurrentHole(prev => ({ ...prev, bitSize: e.target.value }))}
-                              className="w-full appearance-none px-4 py-3 text-base font-semibold text-gray-900 bg-white border-3 border-gray-400 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-200 focus:outline-none transition-all duration-200 cursor-pointer hover:border-orange-400 shadow-md hover:shadow-lg"
-                              style={{
-                                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23f97316'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                                backgroundRepeat: 'no-repeat',
-                                backgroundPosition: 'right 0.75rem center',
-                                backgroundSize: '1.5rem',
-                                paddingRight: '3rem'
-                              }}
-                            >
-                              <option value="" style={{color: '#9CA3AF'}}>Select size...</option>
-                              <option value='1/2"' style={{color: '#111827', fontWeight: 600}}>1/2&quot;</option>
-                              <option value='5/8"' style={{color: '#111827', fontWeight: 600}}>5/8&quot;</option>
-                              <option value='3/4"' style={{color: '#111827', fontWeight: 600}}>3/4&quot;</option>
-                              <option value='1"' style={{color: '#111827', fontWeight: 600}}>1&quot;</option>
-                              <option value='1-1/4"' style={{color: '#111827', fontWeight: 600}}>1-1/4&quot;</option>
-                              <option value='1-1/2"' style={{color: '#111827', fontWeight: 600}}>1-1/2&quot;</option>
-                              <option value='2"' style={{color: '#111827', fontWeight: 600}}>2&quot;</option>
-                              <option value='2-1/2"' style={{color: '#111827', fontWeight: 600}}>2-1/2&quot;</option>
-                              <option value='3"' style={{color: '#111827', fontWeight: 600}}>3&quot;</option>
-                              <option value='4"' style={{color: '#111827', fontWeight: 600}}>4&quot;</option>
-                              <option value='5"' style={{color: '#111827', fontWeight: 600}}>5&quot;</option>
-                              <option value='6"' style={{color: '#111827', fontWeight: 600}}>6&quot;</option>
-                              <option value='8"' style={{color: '#111827', fontWeight: 600}}>8&quot;</option>
-                              <option value='10"' style={{color: '#111827', fontWeight: 600}}>10&quot;</option>
-                              <option value='12"' style={{color: '#111827', fontWeight: 600}}>12&quot;</option>
-                            </select>
-                          </div>
+                          <input
+                            type="text"
+                            value={currentHole.bitSize}
+                            onChange={(e) => setCurrentHole(prev => ({ ...prev, bitSize: e.target.value }))}
+                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 bg-white border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md hover:border-orange-400 placeholder:text-gray-400 placeholder:font-normal"
+                            placeholder='e.g., 1", 2-1/2", 6"'
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Common: 1/2", 1", 2", 4", 6", 8", 12"</p>
                         </div>
 
                         {/* Depth - Modern Input */}
@@ -1384,7 +1887,7 @@ export default function WorkPerformed() {
                             min="0"
                             value={currentHole.depthInches || ''}
                             onChange={(e) => setCurrentHole(prev => ({ ...prev, depthInches: parseFloat(e.target.value) || 0 }))}
-                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 bg-white border-3 border-gray-400 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-200 focus:outline-none transition-all duration-200 shadow-md hover:shadow-lg hover:border-blue-400 placeholder:text-gray-500 placeholder:font-medium"
+                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 bg-white border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md hover:border-blue-400 placeholder:text-gray-400 placeholder:font-normal"
                             placeholder="0.00"
                           />
                         </div>
@@ -1402,51 +1905,51 @@ export default function WorkPerformed() {
                             min="1"
                             value={currentHole.quantity}
                             onChange={(e) => setCurrentHole(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 bg-white border-3 border-gray-400 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-200 focus:outline-none transition-all duration-200 shadow-md hover:shadow-lg hover:border-green-400 placeholder:text-gray-500 placeholder:font-medium"
+                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 bg-white border-2 border-gray-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md hover:border-green-400 placeholder:text-gray-400 placeholder:font-normal"
                             placeholder="1"
                           />
                         </div>
                       </div>
 
                       {/* Plastic Setup for this hole */}
-                      <div className="mt-4 bg-blue-50 rounded-lg p-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                      <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-100">
+                        <label className="flex items-start gap-3 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={currentHole.plasticSetup}
                             onChange={(e) => setCurrentHole(prev => ({ ...prev, plasticSetup: e.target.checked }))}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                            className="w-5 h-5 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-0.5"
                           />
                           <div>
-                            <span className="text-sm font-medium text-gray-700">Plastic Setup Required</span>
-                            <p className="text-xs text-gray-500">Need plastic for dust control?</p>
+                            <span className="text-sm font-semibold text-gray-900">Plastic Setup Required</span>
+                            <p className="text-xs text-gray-600 mt-0.5">Need plastic for dust control?</p>
                           </div>
                         </label>
                       </div>
 
                       {/* Cut Through Steel for this hole */}
-                      <div className="mt-3 bg-red-50 rounded-lg p-3">
-                        <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <div className="mt-3 bg-red-50 rounded-xl p-4 border border-red-100">
+                        <label className="flex items-start gap-3 cursor-pointer mb-2">
                           <input
                             type="checkbox"
                             checked={currentHole.cutSteel}
                             onChange={(e) => setCurrentHole(prev => ({ ...prev, cutSteel: e.target.checked }))}
-                            className="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500"
+                            className="w-5 h-5 text-red-600 bg-white border-2 border-gray-300 rounded focus:ring-2 focus:ring-red-500 mt-0.5"
                           />
                           <div>
-                            <span className="text-sm font-medium text-gray-700">Cut Through Steel</span>
-                            <p className="text-xs text-gray-500">Cut through steel/rebar?</p>
+                            <span className="text-sm font-semibold text-gray-900">Cut Through Steel</span>
+                            <p className="text-xs text-gray-600 mt-0.5">Cut through steel/rebar?</p>
                           </div>
                         </label>
 
                         {currentHole.cutSteel && (
-                          <div className="mt-2">
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Steel Type</label>
+                          <div className="mt-3 ml-8">
+                            <label className="block text-xs font-bold text-gray-700 mb-1.5">Steel Type</label>
                             <textarea
                               value={currentHole.steelEncountered || ''}
                               onChange={(e) => setCurrentHole(prev => ({ ...prev, steelEncountered: e.target.value }))}
                               placeholder="e.g., #4 rebar, angle iron, etc..."
-                              className="w-full px-3 py-2 text-sm border-2 border-red-300 rounded-lg focus:border-red-500 focus:outline-none bg-white text-gray-900 placeholder:text-gray-500"
+                              className="w-full px-3 py-2.5 text-sm border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 placeholder:text-gray-400"
                               rows={2}
                             />
                           </div>
@@ -1586,35 +2089,98 @@ export default function WorkPerformed() {
                       {/* LINEAR MODE - Traditional linear feet input */}
                       {cutInputMode === 'linear' && (
                         <>
-                          <div className="grid grid-cols-2 gap-4 mb-4">
-                            {/* Linear Feet */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Linear Feet Cut</label>
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                value={currentCut.linearFeet}
-                                onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
-                                className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
-                                placeholder="Linear feet"
-                              />
-                            </div>
+                          {/* Chainsaw Quick Entry (length in inches) */}
+                          {isChainsaw(currentItem) ? (
+                            <div className="mb-4">
+                              {/* Chainsaw Quick Entry Button */}
+                              <button
+                                type="button"
+                                onClick={() => setShowChainsawModal(true)}
+                                className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Quick Entry - Chain Saw (Inches)
+                              </button>
 
-                            {/* Cut Depth */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Cut Depth (in)</label>
-                              <input
-                                type="number"
-                                step="0.25"
-                                min="0"
-                                value={currentCut.cutDepth}
-                                onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
-                                className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
-                                placeholder="Depth"
-                              />
+                              {/* Total Linear Feet Display */}
+                              <div className="bg-white rounded-xl p-4 border-2 border-purple-300">
+                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Total Linear Feet</label>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  value={currentCut.linearFeet}
+                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
+                                  className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-purple-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                  placeholder="Total linear feet"
+                                />
+                                <p className="text-xs text-gray-500 mt-1.5">Use Quick Entry button above or type directly</p>
+                              </div>
                             </div>
-                          </div>
+                          ) : (isSlabSaw(currentItem) || isWallSaw(currentItem) || isHandSaw(currentItem)) ? (
+                            /* Saw Types Multi-Cut Entry (Slab, Wall, Hand Saw) */
+                            <div className="mb-4">
+                              {/* Quick Entry Button */}
+                              <button
+                                type="button"
+                                onClick={() => setShowQuickEntryModal(true)}
+                                className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Quick Entry - Multiple Cuts
+                              </button>
+
+                              {/* Total Linear Feet Display */}
+                              <div className="bg-white rounded-xl p-4 border-2 border-blue-300">
+                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Total Linear Feet</label>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  value={currentCut.linearFeet}
+                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
+                                  className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-blue-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                  placeholder="Total linear feet"
+                                />
+                                <p className="text-xs text-gray-500 mt-1.5">Use Quick Entry button above or type directly</p>
+                              </div>
+                            </div>
+                          ) : (
+                            // Standard linear feet input for other saw types
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                              {/* Linear Feet */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Linear Feet Cut</label>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  value={currentCut.linearFeet}
+                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
+                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
+                                  placeholder="Linear feet"
+                                />
+                              </div>
+
+                              {/* Cut Depth */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Cut Depth (in)</label>
+                                <input
+                                  type="number"
+                                  step="0.25"
+                                  min="0"
+                                  value={currentCut.cutDepth}
+                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
+                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
+                                  placeholder="Depth"
+                                />
+                              </div>
+                            </div>
+                          )}
 
                           {/* Chainsaw Question */}
                           <div className="mb-4 bg-purple-50 rounded-lg p-3 border-2 border-purple-200">
@@ -2114,10 +2680,73 @@ export default function WorkPerformed() {
                   </div>
                 )}
 
+                {/* Quick Entry Buttons for Specific Work Types */}
+                {!isCoreDrilling(currentItem) && !isSawing(currentItem) && (
+                  <div className="mb-6">
+                    {/* Break & Remove Quick Entry */}
+                    {isBreakAndRemove(currentItem) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowBreakRemoveModal(true)}
+                        className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Quick Entry - Area Calculator
+                      </button>
+                    )}
+
+                    {/* Jack Hammering Quick Entry */}
+                    {isJackHammering(currentItem) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowJackhammerModal(true)}
+                        className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Quick Entry - Jack Hammering
+                      </button>
+                    )}
+
+                    {/* Chipping Quick Entry */}
+                    {isChipping(currentItem) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowJackhammerModal(true)}
+                        className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Quick Entry - Chipping Area
+                      </button>
+                    )}
+
+                    {/* Brokk Quick Entry */}
+                    {isBrokk(currentItem) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowBrokkModal(true)}
+                        className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-gray-700 to-slate-700 hover:from-gray-800 hover:to-slate-800 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Quick Entry - Brokk Area
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* General Notes for non-specialized items */}
                 {!isCoreDrilling(currentItem) && !isSawing(currentItem) && (
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      {(isBreakAndRemove(currentItem) || isJackHammering(currentItem) || isChipping(currentItem) || isBrokk(currentItem)) ? 'Quantity/Notes (Auto-filled by Quick Entry)' : 'Notes'}
+                    </label>
                     <textarea
                       value={currentNotes}
                       onChange={(e) => setCurrentNotes(e.target.value)}
@@ -2196,6 +2825,1098 @@ export default function WorkPerformed() {
               onSave={handleSaveEquipmentUsage}
               onCancel={() => setShowEquipmentForm(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Job Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Job Feedback</h2>
+              <p className="text-gray-600">Help us improve by rating this job</p>
+            </div>
+
+            <div className="space-y-6">
+              {/* Job Difficulty Rating */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  How difficult was this job? *
+                </label>
+                <div className="flex gap-2 justify-between">
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() => setJobDifficultyRating(rating)}
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
+                        jobDifficultyRating === rating
+                          ? 'bg-blue-500 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">
+                        {rating === 1 && '😊'}
+                        {rating === 2 && '🙂'}
+                        {rating === 3 && '😐'}
+                        {rating === 4 && '😰'}
+                        {rating === 5 && '😫'}
+                      </div>
+                      <div className="text-xs font-medium">
+                        {rating === 1 && 'Very Easy'}
+                        {rating === 2 && 'Easy'}
+                        {rating === 3 && 'Moderate'}
+                        {rating === 4 && 'Hard'}
+                        {rating === 5 && 'Very Hard'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Difficulty Notes */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  What made it {jobDifficultyRating >= 4 ? 'difficult' : jobDifficultyRating >= 3 ? 'challenging' : 'easy'}? (Optional)
+                </label>
+                <textarea
+                  value={difficultyNotes}
+                  onChange={(e) => setDifficultyNotes(e.target.value)}
+                  placeholder="E.g., Steel rebar, tight spaces, complex cuts..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-gray-900"
+                  rows={2}
+                />
+              </div>
+
+              {/* Job Access Rating */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  How was the job site access? *
+                </label>
+                <div className="flex gap-2 justify-between">
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() => setJobAccessRating(rating)}
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
+                        jobAccessRating === rating
+                          ? 'bg-green-500 text-white border-green-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-green-300'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">
+                        {rating === 1 && '✅'}
+                        {rating === 2 && '👍'}
+                        {rating === 3 && '👌'}
+                        {rating === 4 && '⚠️'}
+                        {rating === 5 && '🚫'}
+                      </div>
+                      <div className="text-xs font-medium">
+                        {rating === 1 && 'Excellent'}
+                        {rating === 2 && 'Good'}
+                        {rating === 3 && 'Fair'}
+                        {rating === 4 && 'Poor'}
+                        {rating === 5 && 'Very Poor'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Access Notes */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Access details (Optional)
+                </label>
+                <textarea
+                  value={accessNotes}
+                  onChange={(e) => setAccessNotes(e.target.value)}
+                  placeholder="E.g., Narrow stairs, elevator out of service, parking far away..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none text-gray-900"
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={() => setShowFeedbackModal(false)}
+                className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitWithFeedback}
+                disabled={jobDifficultyRating === 0 || jobAccessRating === 0}
+                className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl ${
+                  jobDifficultyRating === 0 || jobAccessRating === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white'
+                }`}
+              >
+                Submit Work Performed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Entry Modal */}
+      {showQuickEntryModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full p-8 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">Quick Entry - Multiple Cuts</h3>
+                <p className="text-sm text-gray-600 mt-1">Add multiple different cut lengths with ease</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowQuickEntryModal(false);
+                  setQuickEntryCuts([]);
+                  setQuickEntryNumCuts(1);
+                  setQuickEntryLengthFeet(0);
+                  setQuickEntryDepth(0);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Entry Form */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 mb-6 border-2 border-blue-200">
+              <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Cut Entry
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Number of Cuts */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-800 mb-2">
+                    Number of Cuts
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={quickEntryNumCuts}
+                    onChange={(e) => setQuickEntryNumCuts(parseInt(e.target.value) || 1)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                    placeholder="e.g., 5"
+                  />
+                </div>
+
+                {/* Length in Feet */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-800 mb-2">
+                    Length (ft)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={quickEntryLengthFeet}
+                    onChange={(e) => setQuickEntryLengthFeet(parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                    placeholder="e.g., 25.5"
+                  />
+                </div>
+
+                {/* Depth */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-800 mb-2">
+                    Depth (in)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.25"
+                    min="0"
+                    value={quickEntryDepth}
+                    onChange={(e) => setQuickEntryDepth(parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                    placeholder="e.g., 6"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={addQuickEntryCut}
+                className="mt-4 w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add to List
+              </button>
+            </div>
+
+            {/* List of Added Cuts */}
+            {quickEntryCuts.length > 0 && (
+              <div className="mb-6">
+                <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  Cut Entries ({quickEntryCuts.length})
+                </h4>
+
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {quickEntryCuts.map((cut, index) => {
+                    const totalForCut = cut.numCuts * cut.lengthFeet;
+
+                    return (
+                      <div
+                        key={index}
+                        className="bg-white rounded-xl p-4 border-2 border-gray-200 hover:border-blue-300 transition-colors flex items-center justify-between"
+                      >
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900">
+                            {cut.numCuts} cuts @ {cut.lengthFeet} ft
+                            {cut.depth > 0 && ` × ${cut.depth}" deep`}
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            = {totalForCut.toFixed(2)} linear feet
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeQuickEntryCut(index)}
+                          className="ml-4 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Total Calculation */}
+                <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-300">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900 text-lg">Total Linear Feet:</span>
+                    <span className="font-bold text-green-700 text-2xl">
+                      {calculateQuickEntryTotal().toFixed(2)} ft
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQuickEntryModal(false);
+                  setQuickEntryCuts([]);
+                  setQuickEntryNumCuts(1);
+                  setQuickEntryLengthFeet(0);
+                  setQuickEntryDepth(0);
+                }}
+                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyQuickEntry}
+                disabled={quickEntryCuts.length === 0}
+                className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all shadow-lg ${
+                  quickEntryCuts.length === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-xl hover:shadow-2xl'
+                }`}
+              >
+                Apply to Total Linear Feet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chainsaw Quick Entry Modal */}
+      {showChainsawModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-3xl flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Chain Saw Quick Entry</h2>
+                <p className="text-purple-100 text-sm mt-1">Length measurements in INCHES</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowChainsawModal(false);
+                  setChainsawCuts([]);
+                  setChainsawNumCuts(1);
+                  setChainsawLengthInches(0);
+                  setChainsawDepth(0);
+                }}
+                className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Entry Form */}
+            <div className="p-6">
+              <div className="bg-purple-50 rounded-2xl p-6 mb-6 border-2 border-purple-200">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Add Cut Entry</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Number of Cuts */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Number of Cuts
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={chainsawNumCuts}
+                      onChange={(e) => setChainsawNumCuts(parseInt(e.target.value) || 1)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 5"
+                    />
+                  </div>
+
+                  {/* Length in Inches */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Length (inches)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      value={chainsawLengthInches}
+                      onChange={(e) => setChainsawLengthInches(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 48"
+                    />
+                  </div>
+
+                  {/* Depth */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Depth (in)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      value={chainsawDepth}
+                      onChange={(e) => setChainsawDepth(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 12"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addChainsawCut}
+                  className="mt-4 w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+                >
+                  Add to List
+                </button>
+              </div>
+
+              {/* List of Cuts */}
+              {chainsawCuts.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3">Cuts Added:</h3>
+                  <div className="space-y-2">
+                    {chainsawCuts.map((cut, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-100 rounded-xl p-4">
+                        <div className="flex items-center gap-4 text-sm font-semibold text-gray-700">
+                          <span>{cut.numCuts} cuts</span>
+                          <span>×</span>
+                          <span>{cut.lengthInches}" long</span>
+                          {cut.depth > 0 && (
+                            <>
+                              <span>@</span>
+                              <span>{cut.depth}" deep</span>
+                            </>
+                          )}
+                          <span>=</span>
+                          <span className="text-purple-600 font-bold">
+                            {((cut.numCuts * cut.lengthInches) / 12).toFixed(2)} ft
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeChainsawCut(index)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-2 transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total */}
+                  <div className="mt-4 bg-purple-100 rounded-xl p-4 border-2 border-purple-300">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold text-gray-800">Total Linear Feet:</span>
+                      <span className="text-2xl font-bold text-purple-600">
+                        {calculateChainsawTotal().toFixed(2)} ft
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-3xl flex gap-4 border-t-2 border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowChainsawModal(false);
+                  setChainsawCuts([]);
+                  setChainsawNumCuts(1);
+                  setChainsawLengthInches(0);
+                  setChainsawDepth(0);
+                }}
+                className="flex-1 px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-xl font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyChainsawEntry}
+                className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+              >
+                Apply to Total Linear Feet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Break & Remove Quick Entry Modal */}
+      {showBreakRemoveModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-red-600 to-rose-600 text-white p-6 rounded-t-3xl flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Break & Remove - Area Calculator</h2>
+                <p className="text-red-100 text-sm mt-1">Calculate total square footage removed</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBreakRemoveModal(false);
+                  setBreakRemoveAreas([]);
+                  setBreakRemoveLength(0);
+                  setBreakRemoveWidth(0);
+                  setBreakRemoveDepth(0);
+                  setRemovalMethod('');
+                  setRemovalEquipment('');
+                }}
+                className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Entry Form */}
+            <div className="p-6">
+              <div className="bg-red-50 rounded-2xl p-6 mb-6 border-2 border-red-200">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Add Area</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Length */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Length (ft)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={breakRemoveLength}
+                      onChange={(e) => setBreakRemoveLength(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 10"
+                    />
+                  </div>
+
+                  {/* Width */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Width (ft)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={breakRemoveWidth}
+                      onChange={(e) => setBreakRemoveWidth(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 8"
+                    />
+                  </div>
+
+                  {/* Depth */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Depth (in)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      value={breakRemoveDepth}
+                      onChange={(e) => setBreakRemoveDepth(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 6"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addBreakRemoveArea}
+                  className="mt-4 w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+                >
+                  Add Area to List
+                </button>
+              </div>
+
+              {/* List of Areas */}
+              {breakRemoveAreas.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3">Areas Added:</h3>
+                  <div className="space-y-2">
+                    {breakRemoveAreas.map((area, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-100 rounded-xl p-4">
+                        <div className="flex items-center gap-4 text-sm font-semibold text-gray-700">
+                          <span>{area.length} ft</span>
+                          <span>×</span>
+                          <span>{area.width} ft</span>
+                          {area.depth > 0 && (
+                            <>
+                              <span>@</span>
+                              <span>{area.depth}" deep</span>
+                            </>
+                          )}
+                          <span>=</span>
+                          <span className="text-red-600 font-bold">
+                            {(area.length * area.width).toFixed(2)} sq ft
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeBreakRemoveArea(index)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-2 transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total */}
+                  <div className="mt-4 bg-red-100 rounded-xl p-4 border-2 border-red-300">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold text-gray-800">Total Square Feet:</span>
+                      <span className="text-2xl font-bold text-red-600">
+                        {calculateBreakRemoveTotal().toFixed(2)} sq ft
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Removal Method */}
+              <div className="mb-6 bg-rose-50 rounded-2xl p-6 border-2 border-rose-200">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Removal Method</h3>
+
+                {/* Method Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-bold text-gray-800 mb-2">
+                    How was the material removed?
+                  </label>
+                  <select
+                    value={removalMethod}
+                    onChange={(e) => {
+                      setRemovalMethod(e.target.value);
+                      if (e.target.value !== 'rigged') {
+                        setRemovalEquipment('');
+                      }
+                    }}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                  >
+                    <option value="">Select removal method...</option>
+                    <option value="hand_removal">Hand Removal</option>
+                    <option value="rigged">Rigged with Equipment</option>
+                  </select>
+                </div>
+
+                {/* Equipment Selection (only if rigged) */}
+                {removalMethod === 'rigged' && (
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Equipment Used
+                    </label>
+                    <select
+                      value={removalEquipment}
+                      onChange={(e) => setRemovalEquipment(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                    >
+                      <option value="">Select equipment...</option>
+                      <option value="lull">Lull</option>
+                      <option value="forklift">Forklift</option>
+                      <option value="skidsteer">Skidsteer</option>
+                      <option value="mini_x">Mini X</option>
+                      <option value="sherpa">Sherpa</option>
+                      <option value="dingo">Dingo</option>
+                      <option value="other">Other</option>
+                    </select>
+
+                    {/* Other Equipment Text Input */}
+                    {removalEquipment === 'other' && (
+                      <input
+                        type="text"
+                        placeholder="Specify equipment..."
+                        value={removalEquipment === 'other' ? '' : removalEquipment}
+                        onChange={(e) => setRemovalEquipment(e.target.value)}
+                        className="w-full mt-3 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-3xl flex gap-4 border-t-2 border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBreakRemoveModal(false);
+                  setBreakRemoveAreas([]);
+                  setBreakRemoveLength(0);
+                  setBreakRemoveWidth(0);
+                  setBreakRemoveDepth(0);
+                  setRemovalMethod('');
+                  setRemovalEquipment('');
+                }}
+                className="flex-1 px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-xl font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyBreakRemoveEntry}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+              >
+                Apply to Work Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Jack Hammering Quick Entry Modal */}
+      {showJackhammerModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-yellow-600 to-amber-600 text-white p-6 rounded-t-3xl flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {isChipping(currentItem) ? 'Chipping' : 'Jack Hammering'} Quick Entry
+                </h2>
+                <p className="text-yellow-100 text-sm mt-1">Calculate total square footage</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowJackhammerModal(false);
+                  setJackhammerEquipment('');
+                  setJackhammerOther('');
+                  setJackhammerAreas([]);
+                  setJackhammerLength(0);
+                  setJackhammerWidth(0);
+                }}
+                className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Entry Form */}
+            <div className="p-6">
+              {/* Equipment Selection */}
+              <div className="mb-6 bg-yellow-50 rounded-2xl p-6 border-2 border-yellow-200">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Equipment Used</h3>
+                <select
+                  value={jackhammerEquipment}
+                  onChange={(e) => {
+                    setJackhammerEquipment(e.target.value);
+                    if (e.target.value !== 'other') {
+                      setJackhammerOther('');
+                    }
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                >
+                  <option value="">Select equipment...</option>
+                  <option value="hilti_1000">Hilti 1000</option>
+                  <option value="hilti_3000">Hilti 3000</option>
+                  <option value="other">Other</option>
+                </select>
+
+                {/* Other Equipment Text Input */}
+                {jackhammerEquipment === 'other' && (
+                  <input
+                    type="text"
+                    placeholder="Specify equipment..."
+                    value={jackhammerOther}
+                    onChange={(e) => setJackhammerOther(e.target.value)}
+                    className="w-full mt-3 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                  />
+                )}
+              </div>
+
+              {/* Area Entry */}
+              <div className="bg-amber-50 rounded-2xl p-6 mb-6 border-2 border-amber-200">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Add Area</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Length */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Length (ft)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={jackhammerLength}
+                      onChange={(e) => setJackhammerLength(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 10"
+                    />
+                  </div>
+
+                  {/* Width */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Width (ft)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={jackhammerWidth}
+                      onChange={(e) => setJackhammerWidth(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 8"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addJackhammerArea}
+                  className="mt-4 w-full px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+                >
+                  Add Area to List
+                </button>
+              </div>
+
+              {/* List of Areas */}
+              {jackhammerAreas.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3">Areas Added:</h3>
+                  <div className="space-y-2">
+                    {jackhammerAreas.map((area, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-100 rounded-xl p-4">
+                        <div className="flex items-center gap-4 text-sm font-semibold text-gray-700">
+                          <span>{area.length} ft</span>
+                          <span>×</span>
+                          <span>{area.width} ft</span>
+                          <span>=</span>
+                          <span className="text-yellow-600 font-bold">
+                            {(area.length * area.width).toFixed(2)} sq ft
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeJackhammerArea(index)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-2 transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total */}
+                  <div className="mt-4 bg-yellow-100 rounded-xl p-4 border-2 border-yellow-300">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold text-gray-800">Total Square Feet:</span>
+                      <span className="text-2xl font-bold text-yellow-600">
+                        {calculateJackhammerTotal().toFixed(2)} sq ft
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-3xl flex gap-4 border-t-2 border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowJackhammerModal(false);
+                  setJackhammerEquipment('');
+                  setJackhammerOther('');
+                  setJackhammerAreas([]);
+                  setJackhammerLength(0);
+                  setJackhammerWidth(0);
+                }}
+                className="flex-1 px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-xl font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyJackhammerEntry}
+                className="flex-1 px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+              >
+                Apply to Work Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Brokk Quick Entry Modal */}
+      {showBrokkModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-gray-700 to-slate-700 text-white p-6 rounded-t-3xl flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Brokk Quick Entry</h2>
+                <p className="text-gray-300 text-sm mt-1">Calculate area and thickness</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBrokkModal(false);
+                  setBrokkAreas([]);
+                  setBrokkLength(0);
+                  setBrokkWidth(0);
+                  setBrokkThickness(0);
+                }}
+                className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Entry Form */}
+            <div className="p-6">
+              <div className="bg-gray-100 rounded-2xl p-6 mb-6 border-2 border-gray-300">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Add Area</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Length */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Length (ft)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={brokkLength}
+                      onChange={(e) => setBrokkLength(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-500 focus:ring-2 focus:ring-gray-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 10"
+                    />
+                  </div>
+
+                  {/* Width */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Width (ft)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={brokkWidth}
+                      onChange={(e) => setBrokkWidth(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-500 focus:ring-2 focus:ring-gray-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 8"
+                    />
+                  </div>
+
+                  {/* Thickness */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2">
+                      Thickness (in)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      value={brokkThickness}
+                      onChange={(e) => setBrokkThickness(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-500 focus:ring-2 focus:ring-gray-200 focus:outline-none bg-white text-gray-900 font-semibold"
+                      placeholder="e.g., 6"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addBrokkArea}
+                  className="mt-4 w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+                >
+                  Add Area to List
+                </button>
+              </div>
+
+              {/* List of Areas */}
+              {brokkAreas.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3">Areas Added:</h3>
+                  <div className="space-y-2">
+                    {brokkAreas.map((area, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-100 rounded-xl p-4">
+                        <div className="flex items-center gap-4 text-sm font-semibold text-gray-700">
+                          <span>{area.length} ft</span>
+                          <span>×</span>
+                          <span>{area.width} ft</span>
+                          <span>@</span>
+                          <span>{area.thickness}" thick</span>
+                          <span>=</span>
+                          <span className="text-gray-700 font-bold">
+                            {(area.length * area.width).toFixed(2)} sq ft
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeBrokkArea(index)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-2 transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Totals */}
+                  <div className="mt-4 bg-gray-200 rounded-xl p-4 border-2 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-lg font-bold text-gray-800">Total Square Feet:</span>
+                      <span className="text-2xl font-bold text-gray-700">
+                        {calculateBrokkTotal().toFixed(2)} sq ft
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-gray-600">Average Thickness:</span>
+                      <span className="text-lg font-bold text-gray-600">
+                        {brokkAreas.length > 0
+                          ? (brokkAreas.reduce((sum, a) => sum + a.thickness, 0) / brokkAreas.length).toFixed(2)
+                          : 0
+                        } in
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-3xl flex gap-4 border-t-2 border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBrokkModal(false);
+                  setBrokkAreas([]);
+                  setBrokkLength(0);
+                  setBrokkWidth(0);
+                  setBrokkThickness(0);
+                }}
+                className="flex-1 px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-xl font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyBrokkEntry}
+                className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+              >
+                Apply to Work Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[60] animate-slide-in">
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[300px] ${
+            notification.type === 'success' ? 'bg-green-500 text-white' :
+            notification.type === 'error' ? 'bg-red-500 text-white' :
+            'bg-yellow-500 text-white'
+          }`}>
+            <div className="flex-shrink-0">
+              {notification.type === 'success' && (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {notification.type === 'error' && (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+              {notification.type === 'warning' && (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              )}
+            </div>
+            <p className="font-semibold">{notification.message}</p>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-auto flex-shrink-0 hover:bg-white/20 rounded-lg p-1 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}

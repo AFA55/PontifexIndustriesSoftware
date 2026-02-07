@@ -257,6 +257,41 @@ export default function ProjectStatusBoard() {
       if (result.success && result.data?.jobOrders) {
         const allJobs = result.data.jobOrders;
 
+        // Fetch work performed and daily logs for each job to show accurate progress
+        const jobsWithWorkData = await Promise.all(
+          allJobs.map(async (job: JobOrder) => {
+            try {
+              // Get work performed for this job
+              const { data: workPerformed } = await supabase
+                .from('work_performed')
+                .select('*')
+                .eq('job_order_id', job.id);
+
+              // Get daily logs for multi-day tracking
+              const { data: dailyLogs } = await supabase
+                .from('daily_job_logs')
+                .select('*')
+                .eq('job_order_id', job.id)
+                .order('created_at', { ascending: false });
+
+              return {
+                ...job,
+                workPerformed: workPerformed || [],
+                dailyLogs: dailyLogs || [],
+                totalWorkDays: (dailyLogs?.length || 0) + (job.status === 'in_progress' ? 1 : 0)
+              };
+            } catch (e) {
+              console.error(`Error fetching data for job ${job.job_number}:`, e);
+              return {
+                ...job,
+                workPerformed: [],
+                dailyLogs: [],
+                totalWorkDays: 0
+              };
+            }
+          })
+        );
+
         // Separate today's/active jobs from upcoming jobs
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -264,7 +299,7 @@ export default function ProjectStatusBoard() {
         const activeJobsList: UIJob[] = [];
         const upcomingJobsList: UIJob[] = [];
 
-        allJobs.forEach((job: JobOrder) => {
+        jobsWithWorkData.forEach((job: any) => {
           // Skip completed and cancelled jobs
           if (job.status === 'completed' || job.status === 'cancelled') {
             return;
@@ -274,6 +309,11 @@ export default function ProjectStatusBoard() {
           jobDate.setHours(0, 0, 0, 0);
 
           const transformedJob = transformJobToUI(job);
+
+          // Add work data to transformed job
+          (transformedJob as any).workPerformedCount = job.workPerformed?.length || 0;
+          (transformedJob as any).totalWorkDays = job.totalWorkDays || 0;
+          (transformedJob as any).hasWorkPerformed = (job.workPerformed?.length || 0) > 0;
 
           // Jobs scheduled for today or earlier, or currently in progress
           if (jobDate <= today || job.status === 'in_route' || job.status === 'in_progress') {
@@ -910,6 +950,38 @@ export default function ProjectStatusBoard() {
                       <div className="text-sm font-medium text-gray-800">{job.crew.length} workers</div>
                     </div>
                   </div>
+
+                  {/* Work Performed Info */}
+                  {((job as any).hasWorkPerformed || (job as any).totalWorkDays > 0) && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                        </svg>
+                        <div className="text-xs font-bold text-blue-900">Work Tracked</div>
+                      </div>
+                      <div className="flex gap-4 text-xs">
+                        {(job as any).workPerformedCount > 0 && (
+                          <div>
+                            <span className="text-blue-600 font-semibold">{(job as any).workPerformedCount}</span>
+                            <span className="text-blue-700"> work items</span>
+                          </div>
+                        )}
+                        {(job as any).totalWorkDays > 1 && (
+                          <div>
+                            <span className="text-blue-600 font-semibold">{(job as any).totalWorkDays}</span>
+                            <span className="text-blue-700"> work days</span>
+                          </div>
+                        )}
+                      </div>
+                      <Link
+                        href={`/dashboard/job-schedule/${job.id}`}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 inline-block hover:underline"
+                      >
+                        View Job Ticket →
+                      </Link>
+                    </div>
+                  )}
 
                   {/* Notes */}
                   {job.notes && (

@@ -36,7 +36,11 @@ interface JobData {
   customer_communication_rating: number | null;
   customer_feedback_comments: string | null;
   job_difficulty_rating: number | null;
-  site_access_rating: number | null;
+  job_access_rating: number | null;
+  job_difficulty_notes: string | null;
+  job_access_notes: string | null;
+  feedback_submitted_at: string | null;
+  feedback_submitted_by: string | null;
   operator_notes: string | null;
   admin_operator_rating: number | null;
   admin_feedback: string | null;
@@ -471,38 +475,63 @@ export default function CompletedJobDetailsPage() {
 
         {/* Ratings Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Operator Ratings */}
-          {(job.job_difficulty_rating || job.site_access_rating) && (
+          {/* Operator Job Survey */}
+          {(job.job_difficulty_rating || job.job_access_rating) && (
             <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Star className="w-5 h-5 text-orange-500" />
-                Operator Ratings
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Star className="w-5 h-5 text-orange-500" />
+                  Operator Job Survey
+                </h2>
+                {job.feedback_submitted_at && (
+                  <span className="text-xs text-gray-500">
+                    {new Date(job.feedback_submitted_at).toLocaleString()}
+                  </span>
+                )}
+              </div>
+
+              {job.feedback_submitted_by && (
+                <div className="mb-4 text-sm text-gray-600">
+                  <strong>Submitted by:</strong> {job.feedback_submitted_by}
+                </div>
+              )}
 
               <div className="space-y-4">
                 {job.job_difficulty_rating && (
-                  <div>
+                  <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-gray-600">Job Difficulty</span>
+                      <span className="text-sm font-bold text-gray-700 uppercase">Job Difficulty</span>
                       <span className="text-lg font-bold text-orange-600">{job.job_difficulty_rating}/5</span>
                     </div>
                     {renderStars(job.job_difficulty_rating, 5)}
+                    {job.job_difficulty_notes && (
+                      <div className="mt-3 pt-3 border-t border-orange-300">
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">Notes:</p>
+                        <p className="text-sm text-gray-700">{job.job_difficulty_notes}</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {job.site_access_rating && (
-                  <div>
+                {job.job_access_rating && (
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-gray-600">Site Access</span>
-                      <span className="text-lg font-bold text-orange-600">{job.site_access_rating}/5</span>
+                      <span className="text-sm font-bold text-gray-700 uppercase">Site Access</span>
+                      <span className="text-lg font-bold text-blue-600">{job.job_access_rating}/5</span>
                     </div>
-                    {renderStars(job.site_access_rating, 5)}
+                    {renderStars(job.job_access_rating, 5)}
+                    {job.job_access_notes && (
+                      <div className="mt-3 pt-3 border-t border-blue-300">
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">Notes:</p>
+                        <p className="text-sm text-gray-700">{job.job_access_notes}</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {job.operator_notes && (
-                  <div className="bg-orange-50 rounded-lg p-3 border border-orange-200 mt-4">
-                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Operator Notes:</p>
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-xs font-bold text-gray-500 uppercase mb-2">Additional Operator Notes:</p>
                     <p className="text-sm text-gray-700">{job.operator_notes}</p>
                   </div>
                 )}
@@ -537,13 +566,16 @@ export default function CompletedJobDetailsPage() {
             </div>
           )}
 
-          {/* Customer Feedback */}
+          {/* Customer Performance Survey */}
           {(job.customer_overall_rating || job.customer_cleanliness_rating || job.customer_communication_rating) && (
             <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 md:col-span-2">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                Customer Feedback
+                Customer Performance Survey
               </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Survey completed by: <strong>{job.completion_signer_name || 'Customer'}</strong>
+              </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                 {job.customer_overall_rating && (

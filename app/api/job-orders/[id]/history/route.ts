@@ -124,3 +124,90 @@ function formatValue(value: any): string {
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
+
+// POST: Add a history event (e.g., jobsite arrival, completion)
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    // Get user from Supabase session
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Get user profile for name
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name, role')
+      .eq('id', user.id)
+      .single();
+
+    // Parse request body
+    const body = await request.json();
+    const { event, timestamp, time, notes } = body;
+
+    if (!event) {
+      return NextResponse.json(
+        { error: 'Event type is required' },
+        { status: 400 }
+      );
+    }
+
+    // Create history entry
+    const { data: historyEntry, error: historyError } = await supabaseAdmin
+      .from('job_orders_history')
+      .insert({
+        job_order_id: id,
+        change_type: event,
+        changed_by: user.id,
+        changed_by_name: profile?.full_name || 'Unknown User',
+        changed_by_role: profile?.role || 'operator',
+        changed_at: timestamp || new Date().toISOString(),
+        changes: { event, time },
+        notes: notes || null,
+      })
+      .select()
+      .single();
+
+    if (historyError) {
+      console.error('Error creating history entry:', historyError);
+      return NextResponse.json(
+        { error: 'Failed to create history entry', details: historyError.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: historyEntry,
+      },
+      { status: 201 }
+    );
+  } catch (error: any) {
+    console.error('Unexpected error in job history POST:', error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: error.message },
+      { status: 500 }
+    );
+  }
+}

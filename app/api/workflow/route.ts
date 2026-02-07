@@ -125,6 +125,9 @@ export async function POST(request: NextRequest) {
         case 'in_route':
           updateData.sms_sent = true;
           break;
+        case 'liability_release':
+          updateData.liability_release_signed = true;
+          break;
         case 'silica_form':
           updateData.silica_form_completed = true;
           break;

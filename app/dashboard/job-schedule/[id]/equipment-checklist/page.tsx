@@ -222,10 +222,28 @@ export default function EquipmentChecklistPage() {
         {/* Action Button */}
         {allChecked && job.equipment_needed && job.equipment_needed.length > 0 && (
           <button
-            onClick={() => router.push('/dashboard/job-schedule')}
+            onClick={async () => {
+              // Mark equipment checklist as complete
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session) {
+                await fetch('/api/workflow', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                  },
+                  body: JSON.stringify({
+                    jobId: jobId,
+                    completedStep: 'equipment_checklist'
+                  })
+                });
+              }
+              // Redirect to in-route page to show location
+              router.push(`/dashboard/job-schedule/${jobId}/in-route`);
+            }}
             className="w-full px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-2xl font-bold text-lg shadow-2xl transition-all"
           >
-            ✓ All Equipment Checked - Return to Schedule
+            ✓ Continue to In Route
           </button>
         )}
       </div>

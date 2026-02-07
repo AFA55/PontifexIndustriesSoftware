@@ -76,11 +76,37 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      // Fetch operator profile data for autofilling forms
+      let operatorProfile = null;
+      let assignedOperatorProfile = null;
+
+      // Get current user's profile
+      const { data: currentUserProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name, phone_number, email')
+        .eq('id', user.id)
+        .single();
+
+      operatorProfile = currentUserProfile;
+
+      // Get assigned operator's profile (for the employees list)
+      if (specificJob.assigned_to) {
+        const { data: assignedProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name, phone_number, email')
+          .eq('id', specificJob.assigned_to)
+          .single();
+
+        assignedOperatorProfile = assignedProfile;
+      }
+
       console.log('Returning specific job:', specificJob.job_number);
       return NextResponse.json(
         {
           success: true,
           data: [specificJob],
+          operator_profile: operatorProfile,
+          assigned_operator_profile: assignedOperatorProfile
         },
         { status: 200 }
       );
