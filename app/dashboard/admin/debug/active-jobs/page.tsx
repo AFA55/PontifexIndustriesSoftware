@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { getCurrentUser } from '@/lib/auth';
 import { ArrowLeft, RefreshCw, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -31,13 +32,12 @@ export default function ActiveJobsDebugPage() {
   }, []);
 
   const checkAuth = async () => {
-    const userStr = localStorage.getItem('pontifex-user');
-    if (!userStr) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
       router.push('/login');
       return;
     }
-    const user = JSON.parse(userStr);
-    if (user.role !== 'admin') {
+    if (currentUser.role !== 'admin') {
       router.push('/dashboard');
     }
   };
