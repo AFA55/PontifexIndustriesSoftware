@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
-import { Calendar, Phone, MessageSquare, MapPin, User, Clock, ArrowLeft, Trash2 } from 'lucide-react';
+import { Calendar, Phone, MessageSquare, MapPin, User, Clock, ArrowLeft, CheckCircle2, Circle } from 'lucide-react';
 import Link from 'next/link';
 
 interface Job {
@@ -68,7 +68,7 @@ export default function ActiveJobBoard() {
         return;
       }
 
-      // Separate into upcoming (future) and active (today or in progress)
+      // Separate into upcoming (future) and active (today only or in progress)
       const upcoming: Job[] = [];
       const active: Job[] = [];
 
@@ -76,17 +76,17 @@ export default function ActiveJobBoard() {
         const jobDate = new Date(job.scheduled_date);
         jobDate.setHours(0, 0, 0, 0);
 
-        // Active jobs: scheduled for today or earlier, or currently in route/progress
-        if (
-          jobDate <= today ||
-          job.status === 'in_route' ||
-          job.status === 'in_progress'
-        ) {
+        // Active jobs: scheduled for TODAY specifically, or currently in route/progress
+        const isToday = jobDate.getTime() === today.getTime();
+        const isInProgress = job.status === 'in_route' || job.status === 'in_progress';
+
+        if (isToday || isInProgress) {
           active.push(job);
-        } else {
-          // Upcoming jobs: scheduled for future dates
+        } else if (jobDate > today) {
+          // Upcoming jobs: scheduled for FUTURE dates only
           upcoming.push(job);
         }
+        // Jobs in the past (before today) that aren't in progress are ignored
       });
 
       setUpcomingJobs(upcoming);
@@ -110,29 +110,29 @@ export default function ActiveJobBoard() {
     }
   };
 
-  const handleDelete = async (jobId: string, jobNumber: string) => {
-    if (!confirm(`Are you sure you want to delete job ${jobNumber}? This action cannot be undone.`)) {
-      return;
-    }
+  const getWorkflowProgress = (job: Job) => {
+    // Workflow stages for operator process:
+    // 1. Assigned/Scheduled
+    // 2. In Route
+    // 3. Legal Doc 1 (liability_release_signed_at)
+    // 4. In Progress
+    // 5. Silica Sheet (silica_acknowledgment_signed_at)
+    // 6. Work Performed (completion_signed_at or work performed records)
+    // 7. Legal Doc 2 (work_order_agreement_signed_at)
+    // 8. Complete
 
-    try {
-      const { error } = await supabase
-        .from('job_orders')
-        .delete()
-        .eq('id', jobId);
+    const stages = [
+      { name: 'Assigned', key: 'assigned', completed: !!job.assigned_to },
+      { name: 'In Route', key: 'in_route', completed: job.status === 'in_route' || job.status === 'in_progress' },
+      { name: 'Legal Doc 1', key: 'legal1', completed: false }, // Will check from additional data
+      { name: 'In Progress', key: 'in_progress', completed: job.status === 'in_progress' },
+      { name: 'Silica Sheet', key: 'silica', completed: false }, // Will check from additional data
+      { name: 'Work Done', key: 'work', completed: false }, // Will check from additional data
+      { name: 'Legal Doc 2', key: 'legal2', completed: false }, // Will check from additional data
+      { name: 'Complete', key: 'complete', completed: job.status === 'completed' },
+    ];
 
-      if (error) {
-        console.error('Error deleting job:', error);
-        alert('Failed to delete job. Please try again.');
-        return;
-      }
-
-      // Reload jobs after deletion
-      await loadJobs();
-    } catch (error) {
-      console.error('Error deleting job:', error);
-      alert('Failed to delete job. Please try again.');
-    }
+    return stages;
   };
 
   const getStatusColor = (status: string) => {
@@ -333,39 +333,61 @@ export default function ActiveJobBoard() {
                   )}
                 </div>
 
+                {/* Workflow Progress - Only show for Active Jobs */}
+                {activeTab === 'active' && (
+                  <div className="px-6 py-4 border-t border-gray-200">
+                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">
+                      Workflow Progress
+                    </h4>
+                    <div className="space-y-2">
+                      {getWorkflowProgress(job).map((stage, index) => (
+                        <div key={stage.key} className="flex items-center gap-2">
+                          {stage.completed ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                          ) : (
+                            <Circle className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                          )}
+                          <span
+                            className={`text-sm ${
+                              stage.completed
+                                ? 'text-green-700 font-semibold'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            {stage.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Card Footer - Action Buttons */}
                 <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => handleCall(job.foreman_phone)}
                       disabled={!job.foreman_phone}
-                      className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg font-semibold transition-all ${
+                      className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
                         job.foreman_phone
                           ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
                           : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}
                     >
                       <Phone className="w-4 h-4" />
-                      <span className="hidden sm:inline">Call</span>
+                      Call
                     </button>
                     <button
                       onClick={() => handleMessage(job.foreman_phone)}
                       disabled={!job.foreman_phone}
-                      className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg font-semibold transition-all ${
+                      className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
                         job.foreman_phone
                           ? 'bg-green-600 text-white hover:bg-green-700 hover:shadow-md'
                           : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}
                     >
                       <MessageSquare className="w-4 h-4" />
-                      <span className="hidden sm:inline">Text</span>
-                    </button>
-                    <button
-                      onClick={() => handleDelete(job.id, job.job_number)}
-                      className="flex items-center justify-center gap-2 px-3 py-3 bg-red-600 text-white hover:bg-red-700 rounded-lg font-semibold transition-all hover:shadow-md"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="hidden sm:inline">Delete</span>
+                      Message
                     </button>
                   </div>
                 </div>
