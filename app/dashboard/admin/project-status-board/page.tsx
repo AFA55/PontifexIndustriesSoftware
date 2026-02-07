@@ -26,7 +26,7 @@ interface Job {
 
 export default function ActiveJobBoard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'active'>('active');
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'active'>('upcoming');
   const [upcomingJobs, setUpcomingJobs] = useState<Job[]>([]);
   const [activeJobs, setActiveJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,25 +68,20 @@ export default function ActiveJobBoard() {
         return;
       }
 
-      // Separate into upcoming (future) and active (today only or in progress)
+      // Separate into upcoming and active based on route status
+      // Upcoming = Not started yet (scheduled/assigned)
+      // Active = Operator has started (in_route or in_progress)
       const upcoming: Job[] = [];
       const active: Job[] = [];
 
       jobs?.forEach((job) => {
-        const jobDate = new Date(job.scheduled_date);
-        jobDate.setHours(0, 0, 0, 0);
-
-        // Active jobs: scheduled for TODAY specifically, or currently in route/progress
-        const isToday = jobDate.getTime() === today.getTime();
-        const isInProgress = job.status === 'in_route' || job.status === 'in_progress';
-
-        if (isToday || isInProgress) {
+        // Active jobs: Operator has started route or work
+        if (job.status === 'in_route' || job.status === 'in_progress') {
           active.push(job);
-        } else if (jobDate > today) {
-          // Upcoming jobs: scheduled for FUTURE dates only
+        } else {
+          // Upcoming jobs: Still scheduled or assigned, not started yet
           upcoming.push(job);
         }
-        // Jobs in the past (before today) that aren't in progress are ignored
       });
 
       setUpcomingJobs(upcoming);
@@ -194,10 +189,10 @@ export default function ActiveJobBoard() {
               <div>
                 <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                   <Calendar className="w-8 h-8" />
-                  Active Job Board
+                  Job Board
                 </h1>
                 <p className="text-blue-100 mt-1">
-                  Manage current and upcoming projects
+                  Manage upcoming and active projects
                 </p>
               </div>
             </div>
@@ -222,16 +217,6 @@ export default function ActiveJobBoard() {
         <div className="container mx-auto px-6">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setActiveTab('active')}
-              className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
-                activeTab === 'active'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Active Jobs ({activeJobs.length})
-            </button>
-            <button
               onClick={() => setActiveTab('upcoming')}
               className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
                 activeTab === 'upcoming'
@@ -240,6 +225,16 @@ export default function ActiveJobBoard() {
               }`}
             >
               Upcoming Jobs ({upcomingJobs.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
+                activeTab === 'active'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Active Jobs ({activeJobs.length})
             </button>
           </div>
         </div>
