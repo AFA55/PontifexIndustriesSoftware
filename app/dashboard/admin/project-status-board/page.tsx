@@ -592,7 +592,6 @@ export default function ProjectStatusBoard() {
                 <div className="text-xs text-gray-600 font-medium group-hover:text-orange-600 transition-colors">Active Jobs</div>
                 <div className="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Click to debug</div>
               </Link>
-              </div>
               <div className="text-center bg-white/70 backdrop-blur-xl rounded-xl border border-green-200 px-6 py-3 shadow-sm">
                 <div className="text-3xl font-bold text-green-600">
                   {statusCounts['on-track']}
