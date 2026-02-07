@@ -12,8 +12,11 @@ import {
 interface JobData {
   id: string;
   job_number: string;
+  title: string;
   customer: string;
   customer_name: string;
+  customer_contact: string;
+  customer_email: string;
   job_location: string;
   location: string;
   address: string;
@@ -26,6 +29,11 @@ interface JobData {
   completion_signed_at: string;
   completion_signer_name: string;
   contact_not_on_site: boolean;
+  foreman_name: string;
+  foreman_phone: string;
+  job_site_number: string;
+  po_number: string;
+  customer_job_number: string;
   liability_release_signed_by: string;
   liability_release_signed_at: string;
   liability_release_pdf_url: string;
@@ -412,28 +420,111 @@ export default function CompletedJobDetailsPage() {
         <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-blue-600" />
-            Job Overview
+            Job Information
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-6">
+            {/* Row 1: Basic Job Info */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Customer</label>
-              <p className="text-gray-900 font-semibold">{job.customer || job.customer_name}</p>
+              <h3 className="text-sm font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-2">Basic Information</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Job Number</label>
+                  <p className="text-gray-900 font-semibold">{job.job_number}</p>
+                </div>
+                {job.title && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Job Title</label>
+                    <p className="text-gray-900 font-semibold">{job.title}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Operator</label>
+                  <p className="text-gray-900 font-semibold">{operatorName}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Scheduled Date</label>
+                  <p className="text-gray-900 font-semibold">
+                    {job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+              </div>
             </div>
+
+            {/* Row 2: Customer Information */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Job Number</label>
-              <p className="text-gray-900 font-semibold">{job.job_number}</p>
+              <h3 className="text-sm font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-2">Customer Information</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Company Name</label>
+                  <p className="text-gray-900 font-semibold">{job.customer_name || 'N/A'}</p>
+                </div>
+                {job.customer_contact && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Customer Contact</label>
+                    <p className="text-gray-900 font-semibold">{job.customer_contact}</p>
+                  </div>
+                )}
+                {job.customer_email && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Customer Email</label>
+                    <p className="text-gray-900 font-semibold">{job.customer_email}</p>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Row 3: Job Site Contact */}
+            {(job.foreman_name || job.foreman_phone) && (
+              <div>
+                <h3 className="text-sm font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-2">Job Site Contact</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {job.foreman_name && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Contact On Site</label>
+                      <p className="text-gray-900 font-semibold">{job.foreman_name}</p>
+                    </div>
+                  )}
+                  {job.foreman_phone && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Contact Phone</label>
+                      <p className="text-gray-900 font-semibold">{job.foreman_phone}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Row 4: Job Details */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Location</label>
-              <p className="text-gray-900 font-semibold flex items-center gap-1">
-                <MapPin className="w-4 h-4 text-gray-500" />
-                {job.job_location || job.location}
-              </p>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Operator</label>
-              <p className="text-gray-900 font-semibold">{operatorName}</p>
+              <h3 className="text-sm font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-2">Job Details</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {job.po_number && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">PO Number</label>
+                    <p className="text-gray-900 font-semibold">{job.po_number}</p>
+                  </div>
+                )}
+                {job.customer_job_number && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Customer Job Number</label>
+                    <p className="text-gray-900 font-semibold">{job.customer_job_number}</p>
+                  </div>
+                )}
+                {job.job_site_number && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Job Site Number</label>
+                    <p className="text-gray-900 font-semibold">{job.job_site_number}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Location</label>
+                  <p className="text-gray-900 font-semibold flex items-center gap-1">
+                    <MapPin className="w-4 h-4 text-gray-500" />
+                    {job.job_location || job.location}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

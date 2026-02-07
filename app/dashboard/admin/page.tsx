@@ -105,18 +105,28 @@ export default function AdminDashboard() {
 
   const checkOnboardingStatus = async (userId: string) => {
     try {
+      // Check if walkthrough was already shown in this session
+      const shownThisSession = sessionStorage.getItem('admin-walkthrough-shown-this-session');
+      if (shownThisSession === 'true') {
+        return; // Don't show again in the same session
+      }
+
       const response = await fetch(`/api/onboarding?userId=${userId}&type=admin`);
       const data = await response.json();
 
       if (!data.hasCompleted && !data.hasSkipped) {
         setShowWalkthrough(true);
+        // Mark as shown for this session
+        sessionStorage.setItem('admin-walkthrough-shown-this-session', 'true');
       }
     } catch (error) {
       console.error('Error checking onboarding status:', error);
       // Fallback to localStorage
       const hasSeenWalkthrough = localStorage.getItem('demo-admin-walkthrough-seen');
-      if (!hasSeenWalkthrough) {
+      const shownThisSession = sessionStorage.getItem('admin-walkthrough-shown-this-session');
+      if (!hasSeenWalkthrough && shownThisSession !== 'true') {
         setShowWalkthrough(true);
+        sessionStorage.setItem('admin-walkthrough-shown-this-session', 'true');
       }
     }
   };

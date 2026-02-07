@@ -1645,10 +1645,10 @@ export default function DispatchScheduling() {
               <div className="mt-4 p-4 bg-white rounded-xl border-2 border-gray-200">
                 <p className="text-xs font-semibold text-gray-500 mb-2">PREVIEW:</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
-                  {`Job Types: ${formData.jobTypes.length > 0 ? formData.jobTypes.join(', ') : 'None selected'}\n`}
-                  {`Difficulty: ${formData.difficulty_rating}/10 | Priority: ${formData.priority.toUpperCase()}\n`}
-                  {`Truck Parking: ${formData.truck_parking === 'close' ? 'Close (Under 300 ft)' : 'Far (Unload & Carry)'}\n`}
-                  {`Environment: ${formData.work_environment === 'outdoor' ? 'Outdoor' : 'Indoor'} | Cleanliness: ${formData.site_cleanliness}/10`}
+                  {`Job Types: ${formData.jobTypes.length > 0 ? formData.jobTypes.join(', ') : 'None selected'}`}
+                  {!formData.jobTypes.includes('SHOP TICKET') && (
+                    `\nDifficulty: ${formData.difficulty_rating}/10 | Priority: ${formData.priority.toUpperCase()}\nTruck Parking: ${formData.truck_parking === 'close' ? 'Close (Under 300 ft)' : 'Far (Unload & Carry)'}\nEnvironment: ${formData.work_environment === 'outdoor' ? 'Outdoor' : 'Indoor'} | Cleanliness: ${formData.site_cleanliness}/10`
+                  )}
                 </p>
               </div>
 
@@ -1682,7 +1682,8 @@ export default function DispatchScheduling() {
                   Step 2: Work Details (Estimate Style)
                 </h2>
 
-                {/* Job Site Conditions Summary from Step 1 */}
+                {/* Job Site Conditions Summary from Step 1 - Hide for SHOP TICKET */}
+                {!formData.jobTypes.includes('SHOP TICKET') && (
                 <div className="mb-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-200">
                   <h3 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1729,6 +1730,7 @@ export default function DispatchScheduling() {
                     </div>
                   </div>
                 </div>
+                )}
 
                 <div className="space-y-8">
                   {formData.jobTypes.map((jobType, idx) => {
