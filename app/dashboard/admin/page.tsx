@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
+import AdminOnboardingTour from '@/components/AdminOnboardingTour';
 
 // Pontifex Industries Logo Component
 function PontifexLogo({ className = "h-8" }: { className?: string }) {
@@ -65,6 +66,8 @@ export default function AdminDashboard() {
     activeJobs: 0,
     crewsWorking: 0,
   });
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const [isDemoAdmin, setIsDemoAdmin] = useState(false);
 
   useEffect(() => {
     console.log('🔍 Checking admin access...');
@@ -84,9 +87,39 @@ export default function AdminDashboard() {
 
     console.log('✅ Admin access granted');
     setUser(currentUser);
+
+    // Check if this is demo admin account
+    const isDemo = currentUser.email?.toLowerCase().includes('demo') ||
+                   currentUser.email === 'admin@demo.com' ||
+                   currentUser.email === 'admin@pontifex.com';
+    setIsDemoAdmin(isDemo);
+
+    // Show walkthrough for demo admin on first visit
+    if (isDemo) {
+      checkOnboardingStatus(currentUser.id);
+    }
+
     setLoading(false);
     fetchDashboardStats();
   }, [router]);
+
+  const checkOnboardingStatus = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/onboarding?userId=${userId}&type=admin`);
+      const data = await response.json();
+
+      if (!data.hasCompleted && !data.hasSkipped) {
+        setShowWalkthrough(true);
+      }
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      // Fallback to localStorage
+      const hasSeenWalkthrough = localStorage.getItem('demo-admin-walkthrough-seen');
+      if (!hasSeenWalkthrough) {
+        setShowWalkthrough(true);
+      }
+    }
+  };
 
   const fetchDashboardStats = async () => {
     try {
@@ -143,6 +176,28 @@ export default function AdminDashboard() {
     console.log('🚪 Admin logging out...');
     logout();
     router.push('/login');
+  };
+
+  const markWalkthroughComplete = () => {
+    localStorage.setItem('demo-admin-walkthrough-seen', 'true');
+    setShowWalkthrough(false);
+  };
+
+  // Check if card should be accessible for demo admin
+  const isCardAccessible = (moduleTitle: string) => {
+    if (!isDemoAdmin) return true; // Full access for real admins
+
+    const accessibleCards = [
+      'Dispatch & Scheduling',
+      'Schedule Board',
+      'Project Board',
+      'Completed Job Tickets',
+      'Operator Profiles',
+      'Access Requests',
+      'Team Management'
+    ];
+
+    return accessibleCards.includes(moduleTitle);
   };
 
   const adminModules = [
@@ -227,13 +282,13 @@ export default function AdminDashboard() {
       status: 'active'
     },
     {
-      title: 'Completed Jobs Archive',
-      description: 'View all signed jobs, documents, and customer feedback',
-      icon: '📋',
-      href: '/dashboard/admin/completed-jobs',
+      title: 'Completed Job Tickets',
+      description: 'View completed jobs with customer signatures and documents',
+      icon: '✅',
+      href: '/dashboard/admin/completed-job-tickets',
       bgColor: 'from-green-500 to-emerald-600',
       iconBg: 'bg-green-500',
-      features: ['View completed jobs', 'Access all documents', 'Customer ratings', 'PDF downloads'],
+      features: ['Signed job tickets', 'Customer feedback', 'Legal documents', 'Job analytics'],
       status: 'active'
     },
     {
@@ -343,6 +398,8 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">
           {adminModules.map((module, index) => {
             const isActive = module.status === 'active';
+            const isAccessible = isCardAccessible(module.title);
+            const isBlurred = isDemoAdmin && !isAccessible;
 
             const cardContent = (
               <>
@@ -385,24 +442,33 @@ export default function AdminDashboard() {
               </>
             );
 
-            return isActive ? (
-              <Link
-                key={index}
-                href={module.href}
-                className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white ${
-                  module.bgColor === 'from-orange-500 to-red-600' ? 'to-red-50' :
-                  module.bgColor === 'from-gray-500 to-gray-600' ? 'to-gray-50' :
-                  module.bgColor === 'from-red-500 to-red-600' ? 'to-red-50' :
-                  module.bgColor === 'from-blue-500 to-blue-600' ? 'to-blue-50' :
-                  module.bgColor === 'from-green-500 to-emerald-600' ? 'to-green-50' :
-                  module.bgColor === 'from-purple-500 to-purple-600' ? 'to-purple-50' :
-                  'to-gray-50'
-                } p-1 shadow-xl hover:shadow-2xl hover:scale-[1.02] cursor-pointer animate-fade-in-up transition-all duration-500`}
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                {cardContent}
-              </Link>
-            ) : (
+            // Only render active modules
+            if (!isActive) return null;
+
+            // If accessible, render as clickable link
+            if (isAccessible) {
+              return (
+                <Link
+                  key={index}
+                  href={module.href}
+                  className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white ${
+                    module.bgColor === 'from-orange-500 to-red-600' ? 'to-red-50' :
+                    module.bgColor === 'from-gray-500 to-gray-600' ? 'to-gray-50' :
+                    module.bgColor === 'from-red-500 to-red-600' ? 'to-red-50' :
+                    module.bgColor === 'from-blue-500 to-blue-600' ? 'to-blue-50' :
+                    module.bgColor === 'from-green-500 to-emerald-600' ? 'to-green-50' :
+                    module.bgColor === 'from-purple-500 to-purple-600' ? 'to-purple-50' :
+                    'to-gray-50'
+                  } p-1 shadow-xl hover:shadow-2xl hover:scale-[1.02] cursor-pointer animate-fade-in-up transition-all duration-500`}
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  {cardContent}
+                </Link>
+              );
+            }
+
+            // If not accessible (blurred for demo), render as non-clickable div
+            return (
               <div
                 key={index}
                 className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white ${
@@ -413,16 +479,26 @@ export default function AdminDashboard() {
                   module.bgColor === 'from-green-500 to-emerald-600' ? 'to-green-50' :
                   module.bgColor === 'from-purple-500 to-purple-600' ? 'to-purple-50' :
                   'to-gray-50'
-                } p-1 shadow-xl opacity-60 cursor-not-allowed animate-fade-in-up transition-all duration-500`}
+                } p-1 shadow-xl blur-sm opacity-50 cursor-not-allowed animate-fade-in-up transition-all duration-500`}
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 {cardContent}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/5 backdrop-blur-sm rounded-3xl">
+                  <div className="bg-white/90 px-4 py-2 rounded-full shadow-lg">
+                    <p className="text-sm font-semibold text-gray-700">Available in Full Version</p>
+                  </div>
+                </div>
               </div>
             );
           })}
         </div>
 
       </div>
+
+      {/* Admin Onboarding Tour */}
+      {showWalkthrough && isDemoAdmin && user && (
+        <AdminOnboardingTour userId={user.id} onComplete={markWalkthroughComplete} />
+      )}
 
       {/* Add custom animations */}
       <style jsx>{`
