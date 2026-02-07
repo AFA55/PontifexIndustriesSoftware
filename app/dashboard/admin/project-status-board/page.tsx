@@ -584,9 +584,14 @@ export default function ProjectStatusBoard() {
 
             {/* Quick Stats */}
             <div className="flex items-center gap-4">
-              <div className="text-center bg-white/70 backdrop-blur-xl rounded-xl border border-gray-200 px-6 py-3 shadow-sm">
+              <Link
+                href="/dashboard/admin/debug/active-jobs"
+                className="text-center bg-white/70 backdrop-blur-xl rounded-xl border border-gray-200 px-6 py-3 shadow-sm hover:shadow-md hover:bg-white transition-all cursor-pointer group"
+              >
                 <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">{jobs.length}</div>
-                <div className="text-xs text-gray-600 font-medium">Active Jobs</div>
+                <div className="text-xs text-gray-600 font-medium group-hover:text-orange-600 transition-colors">Active Jobs</div>
+                <div className="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Click to debug</div>
+              </Link>
               </div>
               <div className="text-center bg-white/70 backdrop-blur-xl rounded-xl border border-green-200 px-6 py-3 shadow-sm">
                 <div className="text-3xl font-bold text-green-600">
