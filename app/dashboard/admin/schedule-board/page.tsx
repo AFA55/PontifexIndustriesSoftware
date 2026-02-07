@@ -409,6 +409,7 @@ export default function ScheduleBoardPage() {
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
+          scheduled_date: editingJob.scheduled_date,
           arrival_time: editingJob.arrival_time,
           shop_arrival_time: editingJob.shop_arrival_time,
           location: editingJob.location,
@@ -1309,6 +1310,24 @@ export default function ScheduleBoardPage() {
                         </button>
                       </div>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Scheduled Date */}
+              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-5 rounded-xl border-2 border-blue-200">
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-6 h-6 text-blue-600 mt-1" />
+                  <div className="flex-1">
+                    <label className="block text-sm font-bold text-gray-900 mb-2">
+                      Scheduled Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={editingJob.scheduled_date ? editingJob.scheduled_date.split('T')[0] : ''}
+                      onChange={(e) => setEditingJob({ ...editingJob, scheduled_date: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-900 text-lg font-semibold"
+                    />
                   </div>
                 </div>
               </div>
