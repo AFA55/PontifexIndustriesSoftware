@@ -78,22 +78,28 @@ export async function PATCH(
       );
     }
 
+    // Build update object - only include fields that were actually sent
+    const updateFields: Record<string, any> = {
+      updated_at: new Date().toISOString()
+    };
+
+    const allowedFields = [
+      'arrival_time', 'shop_arrival_time', 'location', 'address',
+      'customer_name', 'foreman_name', 'foreman_phone', 'equipment_needed',
+      'description', 'assigned_to', 'scheduled_date', 'end_date',
+      'estimated_hours', 'operator_name', 'status', 'priority',
+    ];
+
+    allowedFields.forEach(field => {
+      if (field in updates) {
+        updateFields[field] = updates[field];
+      }
+    });
+
     // Update job order
     const { data: jobOrder, error: updateError } = await supabaseAdmin
       .from('job_orders')
-      .update({
-        arrival_time: updates.arrival_time,
-        shop_arrival_time: updates.shop_arrival_time,
-        location: updates.location,
-        address: updates.address,
-        customer_name: updates.customer_name,
-        foreman_name: updates.foreman_name,
-        foreman_phone: updates.foreman_phone,
-        equipment_needed: updates.equipment_needed,
-        description: updates.description,
-        assigned_to: updates.assigned_to,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateFields)
       .eq('id', id)
       .select()
       .single();
@@ -115,7 +121,13 @@ export async function PATCH(
         'foreman_phone',
         'equipment_needed',
         'description',
-        'assigned_to'
+        'assigned_to',
+        'scheduled_date',
+        'end_date',
+        'estimated_hours',
+        'operator_name',
+        'status',
+        'priority',
       ];
 
       fieldsToTrack.forEach(field => {

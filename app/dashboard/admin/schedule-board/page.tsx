@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { Calendar, Send, Users, Clock, MapPin, History, LayoutGrid, List, CalendarDays, Filter, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import JobHistoryModal from '@/components/JobHistoryModal';
+import type { JobOrder as SharedJobOrder } from '@/types/job';
+import type { OperatorSchedule as SharedOperatorSchedule } from '@/types/operator';
 
 type ViewMode = 'timeline' | 'calendar' | 'columns';
 
@@ -70,26 +72,21 @@ const commonEquipment = [
   'Wall Saw', 'Slab Saw', 'Hand Saw', 'Diamond Blades', 'Water Hose (250\')', 'Water Tank', 'Safety Gear',
 ];
 
-interface JobOrder {
-  id: string;
-  job_number: string;
-  title: string;
-  customer_name: string;
-  location: string;
-  address: string;
-  scheduled_date: string;
-  arrival_time: string;
-  shop_arrival_time: string;
-  assigned_to: string;
-  operator_name: string;
+/**
+ * Schedule Board extends the shared JobOrder with operator_email
+ * for SMS dispatch. Uses Pick to keep only the fields this page needs
+ * while staying linked to the single source of truth.
+ */
+type JobOrder = Pick<SharedJobOrder,
+  | 'id' | 'job_number' | 'title' | 'customer_name'
+  | 'location' | 'address' | 'scheduled_date' | 'end_date'
+  | 'arrival_time' | 'shop_arrival_time' | 'assigned_to'
+  | 'operator_name' | 'status' | 'foreman_name' | 'foreman_phone'
+  | 'description' | 'equipment_needed' | 'priority'
+> & {
+  /** Extra field for SMS dispatch — not on the shared type */
   operator_email: string;
-  status: string;
-  foreman_name: string;
-  foreman_phone: string;
-  description: string;
-  equipment_needed: string[];
-  priority: string;
-}
+};
 
 interface OperatorSchedule {
   operator_id: string;
@@ -410,6 +407,7 @@ export default function ScheduleBoardPage() {
         },
         body: JSON.stringify({
           scheduled_date: editingJob.scheduled_date,
+          end_date: editingJob.end_date || null,
           arrival_time: editingJob.arrival_time,
           shop_arrival_time: editingJob.shop_arrival_time,
           location: editingJob.location,
@@ -474,7 +472,7 @@ export default function ScheduleBoardPage() {
     }
   };
 
-  const formatTime = (time: string) => {
+  const formatTime = (time: string | null) => {
     if (!time) return 'Not set';
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours);
@@ -791,7 +789,7 @@ export default function ScheduleBoardPage() {
                                           UNASSIGNED
                                         </span>
                                       )}
-                                      {job.priority && job.priority !== 'normal' && (
+                                      {job.priority && job.priority !== 'medium' && (
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
                                           job.priority === 'urgent' ? 'bg-red-500 text-white' :
                                           job.priority === 'high' ? 'bg-orange-500 text-white' :
@@ -1008,7 +1006,7 @@ export default function ScheduleBoardPage() {
                                     </div>
                                   )}
 
-                                  {job.priority && job.priority !== 'normal' && (
+                                  {job.priority && job.priority !== 'medium' && (
                                     <div className="mt-2">
                                       <span className={`px-2 py-1 rounded text-xs font-bold ${
                                         job.priority === 'urgent' ? 'bg-red-500 text-white' :
@@ -1129,7 +1127,7 @@ export default function ScheduleBoardPage() {
                               </div>
                             </div>
 
-                            {job.priority && job.priority !== 'normal' && (
+                            {job.priority && job.priority !== 'medium' && (
                               <div className="mb-3">
                                 <span className={`px-2 py-1 rounded-md text-xs font-bold ${
                                   job.priority === 'urgent' ? 'bg-red-100 text-red-700' :
@@ -1328,6 +1326,24 @@ export default function ScheduleBoardPage() {
                       onChange={(e) => setEditingJob({ ...editingJob, scheduled_date: e.target.value })}
                       className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-900 text-lg font-semibold"
                     />
+                  </div>
+                </div>
+
+                {/* End Date for multi-day jobs */}
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-6 h-6 text-purple-600 mt-1" />
+                  <div className="flex-1">
+                    <label className="block text-sm font-bold text-gray-900 mb-2">
+                      End Date (multi-day jobs)
+                    </label>
+                    <input
+                      type="date"
+                      value={editingJob.end_date || ''}
+                      onChange={(e) => setEditingJob({ ...editingJob, end_date: e.target.value || null })}
+                      min={editingJob.scheduled_date ? editingJob.scheduled_date.split('T')[0] : ''}
+                      className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 text-lg font-semibold"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Leave empty for single-day jobs</p>
                   </div>
                 </div>
               </div>
@@ -1776,7 +1792,7 @@ export default function ScheduleBoardPage() {
                       )}
 
                       {/* Priority */}
-                      {job.priority && job.priority !== 'normal' && (
+                      {job.priority && job.priority !== 'medium' && (
                         <div className="mb-3">
                           <span className={`px-3 py-1 rounded-lg text-sm font-bold ${
                             job.priority === 'urgent' ? 'bg-red-100 text-red-700' :

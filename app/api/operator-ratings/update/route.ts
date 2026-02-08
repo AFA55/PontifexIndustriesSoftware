@@ -1,15 +1,18 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    // Verify authentication via Bearer token
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
     }
 
     // Get current operator ratings
-    const { data: profile, error: fetchError } = await supabase
+    const { data: profile, error: fetchError } = await supabaseAdmin
       .from('profiles')
       .select('cleanliness_rating_avg, cleanliness_rating_count, communication_rating_avg, communication_rating_count, overall_rating_avg, overall_rating_count, total_ratings_received')
       .eq('id', operatorId)
@@ -86,7 +89,7 @@ export async function POST(request: Request) {
     }
 
     // Update operator profile with new ratings
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('profiles')
       .update(updates)
       .eq('id', operatorId);

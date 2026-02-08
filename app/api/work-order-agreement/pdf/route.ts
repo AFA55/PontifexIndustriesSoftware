@@ -3,6 +3,7 @@
  * Generate PDF of work order agreement and save to job ticket
  */
 
+import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { renderToBuffer } from '@react-pdf/renderer';
@@ -68,22 +69,22 @@ export async function POST(request: NextRequest) {
 
     // Generate PDF
     console.log('[AGREEMENT PDF] Generating PDF document...');
-    const pdfBuffer = await renderToBuffer(
-      WorkOrderAgreementPDF({
-        jobNumber,
-        jobDate: jobDate || new Date().toISOString(),
-        customerName,
-        jobLocation: jobLocation || 'N/A',
-        poNumber,
-        workDescription: workDescription || 'Concrete cutting and coring services',
-        scopeOfWork,
-        signerName,
-        signerTitle: signerTitle || '',
-        signedAt,
-        cutThroughAuthorized: cutThroughAuthorized || false,
-        cutThroughSignature
-      })
-    );
+    const pdfElement = WorkOrderAgreementPDF({
+      jobNumber,
+      jobDate: jobDate || new Date().toISOString(),
+      customerName,
+      jobLocation: jobLocation || 'N/A',
+      poNumber,
+      workDescription: workDescription || 'Concrete cutting and coring services',
+      scopeOfWork,
+      signerName,
+      signerTitle: signerTitle || '',
+      signedAt,
+      cutThroughAuthorized: cutThroughAuthorized || false,
+      cutThroughSignature
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfBuffer = await renderToBuffer(pdfElement as any);
 
     console.log('[AGREEMENT PDF] PDF generated, size:', pdfBuffer.length, 'bytes');
 

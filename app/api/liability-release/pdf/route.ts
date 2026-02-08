@@ -3,6 +3,7 @@
  * Generate PDF of liability release and send via email
  */
 
+import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { renderToBuffer } from '@react-pdf/renderer';
@@ -87,17 +88,17 @@ export async function POST(request: NextRequest) {
 
     // Generate PDF
     console.log('[LIABILITY PDF] Generating PDF document...');
-    const pdfBuffer = await renderToBuffer(
-      LiabilityReleasePDF({
-        customerName,
-        customerEmail,
-        operatorName,
-        signatureDataURL,
-        jobNumber: jobNumber || jobId,
-        jobAddress: jobAddress || 'N/A',
-        signedAt: new Date().toISOString()
-      })
-    );
+    const pdfElement = LiabilityReleasePDF({
+      customerName,
+      customerEmail,
+      operatorName,
+      signatureDataURL,
+      jobNumber: jobNumber || jobId,
+      jobAddress: jobAddress || 'N/A',
+      signedAt: new Date().toISOString()
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfBuffer = await renderToBuffer(pdfElement as any);
 
     console.log('[LIABILITY PDF] PDF generated, size:', pdfBuffer.length, 'bytes');
 

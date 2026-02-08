@@ -3,18 +3,28 @@
  * Handles sending SMS via Twilio for job notifications
  */
 
-import twilio from 'twilio';
-
 // Twilio configuration
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-// Initialize Twilio client (only on server-side)
-let twilioClient: ReturnType<typeof twilio> | null = null;
+// Lazily initialize Twilio client (only on server-side, only when needed)
+let twilioClient: any = null;
 
-if (typeof window === 'undefined' && accountSid && authToken) {
-  twilioClient = twilio(accountSid, authToken);
+async function getTwilioClient() {
+  if (twilioClient) return twilioClient;
+  if (typeof window !== 'undefined') return null;
+  if (!accountSid || !authToken) return null;
+
+  try {
+    // @ts-ignore - twilio is an optional runtime dependency
+    const twilio = (await import('twilio')).default;
+    twilioClient = twilio(accountSid, authToken);
+    return twilioClient;
+  } catch {
+    console.warn('Twilio package not installed. SMS will be unavailable.');
+    return null;
+  }
 }
 
 export interface SMSOptions {
@@ -33,7 +43,8 @@ export async function sendSMS(options: SMSOptions): Promise<{
 }> {
   try {
     // Validation
-    if (!twilioClient) {
+    const client = await getTwilioClient();
+    if (!client) {
       console.error('❌ Twilio not configured. Check environment variables.');
       return {
         success: false,
@@ -60,7 +71,7 @@ export async function sendSMS(options: SMSOptions): Promise<{
 
     // Send message
     console.log(`📱 Sending SMS to ${toNumber}...`);
-    const message = await twilioClient.messages.create({
+    const message = await client.messages.create({
       body: options.message,
       from: twilioPhoneNumber,
       to: toNumber,
