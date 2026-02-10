@@ -49,6 +49,10 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+      // If table doesn't exist yet, return empty workflow
+      if (error.code === 'PGRST204' || error.code === 'PGRST205' || error.code === '42P01') {
+        return NextResponse.json({ success: true, data: null, message: 'Workflow table not available yet' }, { status: 200 });
+      }
       console.error('Error fetching workflow:', error);
       return NextResponse.json({ error: 'Failed to fetch workflow' }, { status: 500 });
     }
@@ -72,6 +76,10 @@ export async function GET(request: NextRequest) {
         .single();
 
       if (createError) {
+        // If table doesn't exist yet, return success silently
+        if (createError.code === 'PGRST204' || createError.code === 'PGRST205' || createError.code === '42P01') {
+          return NextResponse.json({ success: true, data: null, message: 'Workflow table not available yet' }, { status: 200 });
+        }
         console.error('Error creating workflow:', createError);
         return NextResponse.json({ error: 'Failed to create workflow' }, { status: 500 });
       }
@@ -159,6 +167,10 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
+      // If table doesn't exist yet, return success silently — workflow tracking is optional
+      if (error.code === 'PGRST204' || error.code === 'PGRST205' || error.code === '42P01') {
+        return NextResponse.json({ success: true, data: null, message: 'Workflow table not available yet' }, { status: 200 });
+      }
       console.error('Error updating workflow:', error);
       return NextResponse.json({ error: 'Failed to update workflow' }, { status: 500 });
     }

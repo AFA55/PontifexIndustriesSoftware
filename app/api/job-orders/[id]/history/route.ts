@@ -68,6 +68,13 @@ export async function GET(
       .order('changed_at', { ascending: false });
 
     if (historyError) {
+      // If table doesn't exist yet, return empty history
+      if (historyError.code === 'PGRST204' || historyError.code === 'PGRST205' || historyError.code === '42P01') {
+        return NextResponse.json(
+          { success: true, jobOrderId: id, historyCount: 0, history: [] },
+          { status: 200 }
+        );
+      }
       console.error('Error fetching job history:', historyError);
       return NextResponse.json(
         { error: 'Failed to fetch job history', details: historyError.message },
@@ -172,7 +179,7 @@ export async function POST(
       );
     }
 
-    // Create history entry
+    // Create history entry (table may not exist yet — gracefully handle)
     const { data: historyEntry, error: historyError } = await supabaseAdmin
       .from('job_orders_history')
       .insert({
@@ -189,6 +196,14 @@ export async function POST(
       .single();
 
     if (historyError) {
+      // If table doesn't exist (PGRST204/PGRST205), return success silently
+      // History tracking is optional — don't block operator workflow
+      if (historyError.code === 'PGRST204' || historyError.code === 'PGRST205' || historyError.code === '42P01') {
+        return NextResponse.json(
+          { success: true, data: null, message: 'History table not available yet' },
+          { status: 200 }
+        );
+      }
       console.error('Error creating history entry:', historyError);
       return NextResponse.json(
         { error: 'Failed to create history entry', details: historyError.message },
