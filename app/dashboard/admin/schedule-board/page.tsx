@@ -7,91 +7,25 @@ import { Calendar, Send, Users, Clock, MapPin, History, LayoutGrid, List, Calend
 import { supabase } from '@/lib/supabase';
 import JobHistoryModal from '@/components/JobHistoryModal';
 import type { JobOrder as SharedJobOrder } from '@/types/job';
-import type { OperatorSchedule as SharedOperatorSchedule } from '@/types/operator';
+import WorkflowProgressBar from '@/components/WorkflowProgressBar';
+import RichEditJobModal from '@/components/RichEditJobModal';
 
 type ViewMode = 'timeline' | 'calendar' | 'columns';
 
-// Equipment constants
-const CORE_DRILLING_EQUIPMENT = {
-  drills: ['Hilti DD250CA', 'Hilti DD500CA', 'Hilti DD160'],
-  bitSizes: ['1/2" Bit', '3/4" Bit', '1" Bit', '1-1/4" Bit', '1-1/2" Bit', '2" Bit', '2-1/2" Bit', '3" Bit', '4" Bit', '5" Bit', '6" Bit', '8" Bit', '10" Bit', '12" Bit'],
-  ladders: ['6ft Ladder', '8ft Ladder', '10ft Ladder', '12ft Ladder'],
-  lifts: ['Scissor Lift'],
-  accessories: ['Plastic', 'Vacuum Base', 'Drill Extensions', 'Tape', 'Sticky Spray'],
-  cords: ['50ft Extension Cord', '100ft Extension Cord', '150ft Extension Cord'],
-  vacuums: ['Hilti Vacuum', 'Regular Vacuum'],
-  power: ['Portable Generator'],
-};
-
-const WALL_SAWING_EQUIPMENT = {
-  saws: ['Pentruder Wall Saw'],
-  hydraulics: ['100ft 480 Cord', '200ft 480 Cord', '250ft 480 Hose'],
-  barsAndChains: ['10\' Bar and Chain', '15\' Bar and Chain', '24" Bar and Chain'],
-  accessories: ['Slurry Drums', 'Plastic'],
-};
-
-const SLAB_SAWING_EQUIPMENT = {
-  blades: ['20" Blade', '26" Blade', '30" Blade', '36" Blade', '42" Blade', '54" Blade'],
-  guards: ['20" Guard', '26" Guard', '30" Guard', '36" Guard', '42" Guard', '54" Guard'],
-  saws: ['5000 Slab Saw', '7000 Slab Saw', 'Electric Slab Saw'],
-  hydraulics: ['100ft 480 Cord', '200ft 480 Cord'],
-  accessories: ['Slurry Drums', 'Plastic'],
-};
-
-const HAND_SAWING_EQUIPMENT = {
-  saws: ['20" Handsaw', '24" Handsaw', '30" Handsaw'],
-  blades: ['20" Blade', '24" Blade', '30" Blade'],
-  accessories: ['Plastic Sheeting', 'Water Bucket'],
-  powerUnits: ['5hp Power Unit', '13hp Power Unit', '20hp Power Unit'],
-  hydraulics: ['Hydraulic Hose (50ft)', 'Hydraulic Hose (100ft)', 'Hydraulic Hose (150ft)', 'Hydraulic Hose (200ft)'],
-};
-
-const commonEquipment = [
-  ...CORE_DRILLING_EQUIPMENT.drills,
-  ...CORE_DRILLING_EQUIPMENT.bitSizes,
-  ...CORE_DRILLING_EQUIPMENT.ladders,
-  ...CORE_DRILLING_EQUIPMENT.lifts,
-  ...CORE_DRILLING_EQUIPMENT.accessories,
-  ...CORE_DRILLING_EQUIPMENT.cords,
-  ...CORE_DRILLING_EQUIPMENT.vacuums,
-  ...CORE_DRILLING_EQUIPMENT.power,
-  ...WALL_SAWING_EQUIPMENT.saws,
-  ...WALL_SAWING_EQUIPMENT.hydraulics,
-  ...WALL_SAWING_EQUIPMENT.barsAndChains,
-  ...WALL_SAWING_EQUIPMENT.accessories,
-  ...SLAB_SAWING_EQUIPMENT.blades,
-  ...SLAB_SAWING_EQUIPMENT.guards,
-  ...SLAB_SAWING_EQUIPMENT.saws,
-  ...SLAB_SAWING_EQUIPMENT.hydraulics,
-  ...SLAB_SAWING_EQUIPMENT.accessories,
-  ...HAND_SAWING_EQUIPMENT.saws,
-  ...HAND_SAWING_EQUIPMENT.blades,
-  ...HAND_SAWING_EQUIPMENT.accessories,
-  ...HAND_SAWING_EQUIPMENT.powerUnits,
-  ...HAND_SAWING_EQUIPMENT.hydraulics,
-  'Wall Saw', 'Slab Saw', 'Hand Saw', 'Diamond Blades', 'Water Hose (250\')', 'Water Tank', 'Safety Gear',
-];
-
 /**
- * Schedule Board extends the shared JobOrder with operator_email
- * for SMS dispatch. Uses Pick to keep only the fields this page needs
- * while staying linked to the single source of truth.
+ * Schedule Board uses the full SharedJobOrder (API returns select('*'))
+ * plus operator_email/phone for SMS dispatch and contact.
  */
-type JobOrder = Pick<SharedJobOrder,
-  | 'id' | 'job_number' | 'title' | 'customer_name'
-  | 'location' | 'address' | 'scheduled_date' | 'end_date'
-  | 'arrival_time' | 'shop_arrival_time' | 'assigned_to'
-  | 'operator_name' | 'status' | 'foreman_name' | 'foreman_phone'
-  | 'description' | 'equipment_needed' | 'priority'
-> & {
-  /** Extra field for SMS dispatch — not on the shared type */
+type JobOrder = SharedJobOrder & {
   operator_email: string;
+  operator_phone: string | null;
 };
 
 interface OperatorSchedule {
   operator_id: string;
   operator_name: string;
   operator_email: string;
+  operator_phone: string | null;
   jobs: JobOrder[];
 }
 
@@ -103,12 +37,18 @@ export default function ScheduleBoardPage() {
   const [selectedDate, setSelectedDate] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    const y = tomorrow.getFullYear();
+    const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const d = String(tomorrow.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   });
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    const y = tomorrow.getFullYear();
+    const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const d = String(tomorrow.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   });
   const [allJobsForWeek, setAllJobsForWeek] = useState<{ [date: string]: JobOrder[] }>({});
   const [editingJob, setEditingJob] = useState<JobOrder | null>(null);
@@ -117,11 +57,7 @@ export default function ScheduleBoardPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [searchQuery, setSearchQuery] = useState('');
   const [operators, setOperators] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
-  const [showOperatorDropdown, setShowOperatorDropdown] = useState(false);
-  const [equipmentSearch, setEquipmentSearch] = useState('');
-  const [showEquipmentDropdown, setShowEquipmentDropdown] = useState(false);
   const [selectedDayView, setSelectedDayView] = useState<{ date: string; jobs: JobOrder[] } | null>(null);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -138,14 +74,20 @@ export default function ScheduleBoardPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, full_name, email')
-        .eq('role', 'operator')
-        .order('full_name');
+      // Use server-side API route to bypass RLS restrictions on profiles table
+      const res = await fetch('/api/admin/operator-profiles', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
 
-      if (!error && data) {
-        setOperators(data);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setOperators(json.data.map((op: any) => ({
+            id: op.id,
+            full_name: op.full_name,
+            email: op.email,
+          })));
+        }
       }
     } catch (error) {
       console.error('Error fetching operators:', error);
@@ -199,9 +141,9 @@ export default function ScheduleBoardPage() {
 
       // Fetch jobs for 6 days starting from weekStartDate
       for (let i = 0; i < 6; i++) {
-        const date = new Date(weekStartDate);
+        const date = parseLocalDate(weekStartDate);
         date.setDate(date.getDate() + i);
-        const dateString = date.toISOString().split('T')[0];
+        const dateString = toDateString(date);
 
         const response = await fetch(`/api/job-orders?scheduled_date=${dateString}`, {
           headers: {
@@ -233,12 +175,15 @@ export default function ScheduleBoardPage() {
       const operatorId = job.assigned_to || 'unassigned';
       const operatorName = job.assigned_to ? (job.operator_name || 'Unknown') : 'Unassigned';
       const operatorEmail = job.assigned_to ? (job.operator_email || '') : '';
+      // Phone not available in profiles table yet — default to null
+      const operatorPhone: string | null = null;
 
       if (!grouped.has(operatorId)) {
         grouped.set(operatorId, {
           operator_id: operatorId,
           operator_name: operatorName,
           operator_email: operatorEmail,
+          operator_phone: operatorPhone,
           jobs: []
         });
       }
@@ -273,7 +218,7 @@ export default function ScheduleBoardPage() {
     }
 
     const confirmSend = confirm(
-      `Send schedule notifications to ${assignedSchedules.length} operator(s) for ${new Date(selectedDate).toLocaleDateString()}?`
+      `Send schedule notifications to ${assignedSchedules.length} operator(s) for ${parseLocalDate(selectedDate).toLocaleDateString()}?`
     );
 
     if (!confirmSend) return;
@@ -316,37 +261,10 @@ export default function ScheduleBoardPage() {
 
   const openEditModal = (job: JobOrder) => {
     setEditingJob(job);
-    setShowOperatorDropdown(false);
-    setShowEquipmentDropdown(false);
-    setEquipmentSearch('');
   };
 
   const closeEditModal = () => {
     setEditingJob(null);
-    setShowOperatorDropdown(false);
-    setShowEquipmentDropdown(false);
-    setEquipmentSearch('');
-  };
-
-  const addEquipment = (item: string) => {
-    if (!editingJob) return;
-    const currentEquipment = editingJob.equipment_needed || [];
-    if (!currentEquipment.includes(item)) {
-      setEditingJob({
-        ...editingJob,
-        equipment_needed: [...currentEquipment, item]
-      });
-    }
-    setEquipmentSearch('');
-    setShowEquipmentDropdown(false);
-  };
-
-  const removeEquipment = (item: string) => {
-    if (!editingJob) return;
-    setEditingJob({
-      ...editingJob,
-      equipment_needed: (editingJob.equipment_needed || []).filter(e => e !== item)
-    });
   };
 
   const handleDeleteJob = async () => {
@@ -369,7 +287,6 @@ export default function ScheduleBoardPage() {
 
       if (response.ok) {
         alert('✅ Job deleted successfully!');
-        setShowDeleteConfirmation(false);
         closeEditModal();
         await fetchSchedules();
         if (viewMode === 'calendar') {
@@ -481,43 +398,61 @@ export default function ScheduleBoardPage() {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
+  // Format a local Date to YYYY-MM-DD string
+  const toDateString = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const goToPreviousDay = () => {
-    const currentDate = new Date(selectedDate);
+    const currentDate = parseLocalDate(selectedDate);
     currentDate.setDate(currentDate.getDate() - 1);
-    setSelectedDate(currentDate.toISOString().split('T')[0]);
+    setSelectedDate(toDateString(currentDate));
   };
 
   const goToNextDay = () => {
-    const currentDate = new Date(selectedDate);
+    const currentDate = parseLocalDate(selectedDate);
     currentDate.setDate(currentDate.getDate() + 1);
-    setSelectedDate(currentDate.toISOString().split('T')[0]);
+    setSelectedDate(toDateString(currentDate));
   };
 
   const goToPreviousWeek = () => {
-    const currentDate = new Date(weekStartDate);
+    const currentDate = parseLocalDate(weekStartDate);
     currentDate.setDate(currentDate.getDate() - 6);
-    setWeekStartDate(currentDate.toISOString().split('T')[0]);
+    setWeekStartDate(toDateString(currentDate));
   };
 
   const goToNextWeek = () => {
-    const currentDate = new Date(weekStartDate);
+    const currentDate = parseLocalDate(weekStartDate);
     currentDate.setDate(currentDate.getDate() + 6);
-    setWeekStartDate(currentDate.toISOString().split('T')[0]);
+    setWeekStartDate(toDateString(currentDate));
+  };
+
+  // Parse YYYY-MM-DD as local date (not UTC) to avoid timezone offset bugs
+  const parseLocalDate = (dateString: string) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
   };
 
   const formatDisplayDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {
+    const dateOnly = new Date(date);
+    dateOnly.setHours(0, 0, 0, 0);
+
+    if (dateOnly.getTime() === today.getTime()) {
       return 'Today';
-    } else if (date.toDateString() === tomorrow.toDateString()) {
+    } else if (dateOnly.getTime() === tomorrow.getTime()) {
       return 'Tomorrow';
-    } else if (date.toDateString() === yesterday.toDateString()) {
+    } else if (dateOnly.getTime() === yesterday.getTime()) {
       return 'Yesterday';
     } else {
       return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -697,7 +632,7 @@ export default function ScheduleBoardPage() {
               <Calendar className="w-10 h-10 text-purple-600" />
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">No Jobs Scheduled</h3>
-            <p className="text-gray-600 mb-6">No jobs scheduled for {new Date(selectedDate).toLocaleDateString()}</p>
+            <p className="text-gray-600 mb-6">No jobs scheduled for {parseLocalDate(selectedDate).toLocaleDateString()}</p>
             <Link
               href="/dashboard/admin/dispatch-scheduling"
               className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl transition-all font-bold shadow-lg hover:shadow-xl hover:scale-[1.02]"
@@ -841,6 +776,14 @@ export default function ScheduleBoardPage() {
                                       </div>
                                     </div>
 
+                                    {/* Workflow Progress */}
+                                    <WorkflowProgressBar
+                                      job={job}
+                                      operatorName={schedule.operator_name !== 'Unassigned' ? schedule.operator_name : null}
+                                      operatorPhone={schedule.operator_phone}
+                                      operatorEmail={schedule.operator_email || null}
+                                    />
+
                                     {/* Actions */}
                                     <div className="flex gap-2 flex-wrap">
                                       {isUnassigned && (
@@ -851,16 +794,6 @@ export default function ScheduleBoardPage() {
                                           Assign Operator
                                         </button>
                                       )}
-                                      <Link
-                                        href={`/dashboard/admin/jobs/${job.id}`}
-                                        className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        View Progress
-                                      </Link>
                                       <button
                                         onClick={() => openEditModal(job)}
                                         className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg"
@@ -925,13 +858,13 @@ export default function ScheduleBoardPage() {
                 <div className="p-4 md:p-6 overflow-x-auto">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
                     {Array.from({ length: 6 }).map((_, dayIndex) => {
-                      const date = new Date(weekStartDate);
+                      const date = parseLocalDate(weekStartDate);
                       date.setDate(date.getDate() + dayIndex);
-                      const dateString = date.toISOString().split('T')[0];
+                      const dateString = toDateString(date);
                       const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
                       const dayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                       const jobs = allJobsForWeek[dateString] || [];
-                      const isToday = dateString === new Date().toISOString().split('T')[0];
+                      const isToday = dateString === toDateString(new Date());
 
                       return (
                         <div key={dateString} className={`flex flex-col border-2 rounded-xl overflow-hidden ${
@@ -1017,6 +950,9 @@ export default function ScheduleBoardPage() {
                                       </span>
                                     </div>
                                   )}
+
+                                  {/* Compact Workflow Progress */}
+                                  <WorkflowProgressBar job={job} compact />
                                 </div>
                               ))
                             )}
@@ -1139,6 +1075,14 @@ export default function ScheduleBoardPage() {
                               </div>
                             )}
 
+                            {/* Workflow Progress */}
+                            <WorkflowProgressBar
+                              job={job}
+                              operatorName={schedule.operator_name !== 'Unassigned' ? schedule.operator_name : null}
+                              operatorPhone={schedule.operator_phone}
+                              operatorEmail={schedule.operator_email || null}
+                            />
+
                             <div className="flex gap-2 flex-wrap">
                               {isUnassigned && (
                                 <button
@@ -1179,499 +1123,18 @@ export default function ScheduleBoardPage() {
         )}
       </div>
 
-      {/* Edit Modal */}
+      {/* Edit Modal (shared component) */}
       {editingJob && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-500 text-white p-6 rounded-t-3xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold mb-1">Edit Job Details</h2>
-                  <p className="text-purple-100">{editingJob.job_number} - {editingJob.title}</p>
-                </div>
-                <button
-                  onClick={() => closeEditModal()}
-                  className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 space-y-6">
-              {/* Operator Assignment */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-xl border-2 border-purple-200">
-                <div className="flex items-start gap-3">
-                  <Users className="w-6 h-6 text-purple-600 mt-1" />
-                  <div className="flex-1">
-                    <label className="block text-sm font-bold text-gray-900 mb-1">
-                      Assigned Operator
-                    </label>
-                    <p className="text-xs text-gray-600 mb-3">
-                      Future updates will include smart recommendations based on task requirements and operator skill levels.
-                    </p>
-
-                    {/* Current Operator Display */}
-                    {!showOperatorDropdown ? (
-                      <div>
-                        <div className="w-full px-4 py-3 bg-white border-2 border-purple-300 rounded-xl mb-3">
-                          <div className="flex items-center gap-2">
-                            {editingJob.assigned_to ? (
-                              <>
-                                <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                                  {editingJob.operator_name?.charAt(0) || '?'}
-                                </div>
-                                <div>
-                                  <p className="font-bold text-gray-900">{editingJob.operator_name || 'Unknown Operator'}</p>
-                                  <p className="text-xs text-gray-500">{editingJob.operator_email || ''}</p>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center">
-                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                </div>
-                                <div>
-                                  <p className="font-bold text-orange-600">Unassigned</p>
-                                  <p className="text-xs text-gray-500">No operator assigned to this job</p>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowOperatorDropdown(true)}
-                            className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
-                          >
-                            Change Operator
-                          </button>
-                          {editingJob.assigned_to && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingJob({
-                                  ...editingJob,
-                                  assigned_to: '',
-                                  operator_name: '',
-                                  operator_email: ''
-                                });
-                              }}
-                              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
-                              title="Remove operator assignment"
-                            >
-                              Unassign
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      /* Operator Dropdown */
-                      <div className="space-y-2">
-                        <select
-                          value={editingJob.assigned_to || ''}
-                          onChange={(e) => {
-                            const selectedId = e.target.value;
-                            const selectedOperator = operators.find(op => op.id === selectedId);
-                            setEditingJob({
-                              ...editingJob,
-                              assigned_to: selectedId,
-                              operator_name: selectedOperator?.full_name || '',
-                              operator_email: selectedOperator?.email || ''
-                            });
-                          }}
-                          className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 bg-white font-medium"
-                          autoFocus
-                        >
-                          <option value="">-- Select Operator --</option>
-                          {operators.map((operator) => (
-                            <option key={operator.id} value={operator.id}>
-                              {operator.full_name} ({operator.email})
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setShowOperatorDropdown(false)}
-                          className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold transition-all"
-                        >
-                          Done
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Scheduled Date */}
-              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-5 rounded-xl border-2 border-blue-200">
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-6 h-6 text-blue-600 mt-1" />
-                  <div className="flex-1">
-                    <label className="block text-sm font-bold text-gray-900 mb-2">
-                      Scheduled Date *
-                    </label>
-                    <input
-                      type="date"
-                      value={editingJob.scheduled_date ? editingJob.scheduled_date.split('T')[0] : ''}
-                      onChange={(e) => setEditingJob({ ...editingJob, scheduled_date: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-900 text-lg font-semibold"
-                    />
-                  </div>
-                </div>
-
-                {/* End Date for multi-day jobs */}
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-6 h-6 text-purple-600 mt-1" />
-                  <div className="flex-1">
-                    <label className="block text-sm font-bold text-gray-900 mb-2">
-                      End Date (multi-day jobs)
-                    </label>
-                    <input
-                      type="date"
-                      value={editingJob.end_date || ''}
-                      onChange={(e) => setEditingJob({ ...editingJob, end_date: e.target.value || null })}
-                      min={editingJob.scheduled_date ? editingJob.scheduled_date.split('T')[0] : ''}
-                      className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 text-lg font-semibold"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Leave empty for single-day jobs</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Times */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Shop Arrival Time
-                  </label>
-                  <input
-                    type="time"
-                    value={editingJob.shop_arrival_time ? editingJob.shop_arrival_time.substring(0, 5) : ''}
-                    onChange={(e) => setEditingJob({ ...editingJob, shop_arrival_time: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 text-lg font-semibold"
-                  />
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditingJob({ ...editingJob, shop_arrival_time: '06:00' })}
-                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-all"
-                    >
-                      6:00 AM
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingJob({ ...editingJob, shop_arrival_time: '07:00' })}
-                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-all"
-                    >
-                      7:00 AM
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingJob({ ...editingJob, shop_arrival_time: '08:00' })}
-                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-all"
-                    >
-                      8:00 AM
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Job Site Arrival Time *
-                  </label>
-                  <input
-                    type="time"
-                    value={editingJob.arrival_time ? editingJob.arrival_time.substring(0, 5) : ''}
-                    onChange={(e) => setEditingJob({ ...editingJob, arrival_time: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-900 text-lg font-semibold"
-                  />
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditingJob({ ...editingJob, arrival_time: '07:00' })}
-                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-all"
-                    >
-                      7:00 AM
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingJob({ ...editingJob, arrival_time: '08:00' })}
-                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-all"
-                    >
-                      8:00 AM
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingJob({ ...editingJob, arrival_time: '09:00' })}
-                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-all"
-                    >
-                      9:00 AM
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Location */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Location Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={editingJob.location}
-                    onChange={(e) => setEditingJob({ ...editingJob, location: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none transition-colors text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Full Address *
-                  </label>
-                  <input
-                    type="text"
-                    value={editingJob.address}
-                    onChange={(e) => setEditingJob({ ...editingJob, address: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none transition-colors text-gray-900"
-                  />
-                </div>
-              </div>
-
-              {/* Customer & Contact */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Customer Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editingJob.customer_name}
-                    onChange={(e) => setEditingJob({ ...editingJob, customer_name: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Contact on Site
-                  </label>
-                  <input
-                    type="text"
-                    value={editingJob.foreman_name || ''}
-                    onChange={(e) => setEditingJob({ ...editingJob, foreman_name: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Contact Phone
-                </label>
-                <input
-                  type="tel"
-                  value={editingJob.foreman_phone || ''}
-                  onChange={(e) => setEditingJob({ ...editingJob, foreman_phone: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Job Description
-                </label>
-                <textarea
-                  value={editingJob.description || ''}
-                  onChange={(e) => setEditingJob({ ...editingJob, description: e.target.value })}
-                  rows={4}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-900"
-                />
-              </div>
-
-              {/* Equipment */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Equipment Needed
-                </label>
-
-                {/* Selected Equipment Tags */}
-                {editingJob.equipment_needed && editingJob.equipment_needed.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                    {editingJob.equipment_needed.map((item, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium"
-                      >
-                        {item}
-                        <button
-                          type="button"
-                          onClick={() => removeEquipment(item)}
-                          className="hover:bg-purple-200 rounded-full p-0.5 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Equipment Search */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={equipmentSearch}
-                    onChange={(e) => {
-                      setEquipmentSearch(e.target.value);
-                      setShowEquipmentDropdown(true);
-                    }}
-                    onFocus={() => setShowEquipmentDropdown(true)}
-                    placeholder="Search equipment..."
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900"
-                    autoComplete="off"
-                  />
-
-                  {/* Equipment Dropdown */}
-                  {showEquipmentDropdown && equipmentSearch && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                      {commonEquipment
-                        .filter(item => item.toLowerCase().includes(equipmentSearch.toLowerCase()))
-                        .map((item, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => addEquipment(item)}
-                            className="px-4 py-2 hover:bg-purple-50 cursor-pointer text-gray-800 border-b border-gray-100 last:border-b-0"
-                          >
-                            {item}
-                          </div>
-                        ))}
-                      {commonEquipment.filter(item => item.toLowerCase().includes(equipmentSearch.toLowerCase())).length === 0 && (
-                        <div className="px-4 py-2 text-gray-500 text-sm">No equipment found</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Type to search and add equipment items
-                </p>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-3xl border-t border-gray-200 flex justify-between items-center gap-3">
-              {/* Delete Button on Left */}
-              <button
-                onClick={() => setShowDeleteConfirmation(true)}
-                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete Job
-              </button>
-
-              {/* Save/Cancel Buttons on Right */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => closeEditModal()}
-                  className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveJob}
-                  disabled={saving}
-                  className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirmation && editingJob && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-red-600 to-red-700 p-6 text-white">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Delete Job</h3>
-                  <p className="text-red-100 text-sm">This action cannot be undone</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6">
-              <p className="text-gray-700 mb-4">
-                Are you sure you want to delete this job?
-              </p>
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <p className="font-bold text-gray-900">{editingJob.customer_name}</p>
-                <p className="text-sm text-gray-600">{editingJob.job_number}</p>
-                <p className="text-sm text-gray-600 mt-2">{editingJob.location}</p>
-              </div>
-              <p className="text-sm text-red-600 font-semibold mt-4 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                This will permanently delete all job data, history, and related records.
-              </p>
-            </div>
-
-            {/* Footer */}
-            <div className="bg-gray-50 p-6 flex justify-end gap-3 border-t border-gray-200">
-              <button
-                onClick={() => setShowDeleteConfirmation(false)}
-                disabled={deleting}
-                className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteJob}
-                disabled={deleting}
-                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {deleting ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Yes, Delete Job
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <RichEditJobModal
+          job={editingJob}
+          operators={operators}
+          saving={saving}
+          deleting={deleting}
+          onJobChange={(j) => setEditingJob(j as JobOrder)}
+          onSave={handleSaveJob}
+          onDelete={handleDeleteJob}
+          onClose={closeEditModal}
+        />
       )}
 
       {/* History Modal */}
@@ -1693,7 +1156,7 @@ export default function ScheduleBoardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold mb-1">
-                    {new Date(selectedDayView.date).toLocaleDateString('en-US', {
+                    {parseLocalDate(selectedDayView.date).toLocaleDateString('en-US', {
                       weekday: 'long',
                       month: 'long',
                       day: 'numeric',

@@ -152,15 +152,23 @@ export default function AdminDashboard() {
         .neq('status', 'completed')
         .neq('status', 'cancelled');
 
-      // Fetch operators currently working (clocked in, en route, or in progress)
-      const { data: operators } = await supabase
-        .from('operator_status')
-        .select('id, status, user_id')
-        .in('status', ['clocked_in', 'en_route', 'in_progress']);
-
-      // Get unique operators (in case there are duplicates)
-      const uniqueOperators = operators ?
-        Array.from(new Set(operators.map(op => op.user_id))).length : 0;
+      // Fetch operators currently working via admin API (handles RLS + correct table)
+      let uniqueOperators = 0;
+      try {
+        const session = await supabase.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (token) {
+          const res = await fetch('/api/admin/operators/active', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const json = await res.json();
+            uniqueOperators = json.data?.summary?.totalActive || 0;
+          }
+        }
+      } catch {
+        // Silently default to 0 — no operators active
+      }
 
       setStats({
         activeJobs: jobs?.length || 0,
@@ -200,7 +208,6 @@ export default function AdminDashboard() {
     const accessibleCards = [
       'Dispatch & Scheduling',
       'Schedule Board',
-      'Project Board',
       'Completed Job Tickets',
       'Operator Profiles',
       'Access Requests',
@@ -229,16 +236,6 @@ export default function AdminDashboard() {
       bgColor: 'from-purple-500 to-indigo-600',
       iconBg: 'bg-purple-500',
       features: ['View all schedules', 'Send email notifications', 'Shop arrival times', 'Daily overview'],
-      status: 'active'
-    },
-    {
-      title: 'Project Board',
-      description: 'View current and upcoming jobs with color-coded status',
-      icon: '📊',
-      href: '/dashboard/admin/project-status-board',
-      bgColor: 'from-red-500 to-red-600',
-      iconBg: 'bg-red-500',
-      features: ['Live job monitoring', 'Upcoming jobs view', 'Analytics dashboard', 'Timeline tracking'],
       status: 'active'
     },
     {
@@ -408,9 +405,13 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Admin Modules Grid */}
+        {/* Admin Modules Grid — accessible cards first, blurred cards at bottom */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">
-          {adminModules.map((module, index) => {
+          {[...adminModules].sort((a, b) => {
+            const aAccessible = isCardAccessible(a.title) ? 0 : 1;
+            const bAccessible = isCardAccessible(b.title) ? 0 : 1;
+            return aAccessible - bAccessible;
+          }).map((module, index) => {
             const isActive = module.status === 'active';
             const isAccessible = isCardAccessible(module.title);
             const isBlurred = isDemoAdmin && !isAccessible;

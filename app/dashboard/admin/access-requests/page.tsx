@@ -39,15 +39,11 @@ export default function AccessRequestsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        // Get user role from profiles
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        if (profile) {
-          setUserRole(profile.role);
-        }
+        // Get user role from session metadata or localStorage (avoids RLS issues with profiles table)
+        const role = user.user_metadata?.role
+          || (() => { try { const u = JSON.parse(localStorage.getItem('pontifex-user') || '{}'); return u.role; } catch { return null; } })()
+          || 'operator';
+        setUserRole(role);
       }
     };
     initUser();

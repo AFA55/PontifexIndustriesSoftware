@@ -162,15 +162,12 @@ export default function StartRoutePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profile && !error) {
-        setOperatorName(profile.full_name || 'Pontifex Team');
-      }
+      // Get name from session metadata or localStorage (avoids RLS issues with profiles table)
+      const name = session.user.user_metadata?.full_name
+        || session.user.user_metadata?.name
+        || (() => { try { const u = JSON.parse(localStorage.getItem('pontifex-user') || '{}'); return u.full_name; } catch { return null; } })()
+        || 'Pontifex Team';
+      setOperatorName(name);
     } catch (error) {
       console.error('Error fetching operator name:', error);
       setOperatorName('Pontifex Team');

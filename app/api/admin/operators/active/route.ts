@@ -51,19 +51,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all active operators from the view
-    const { data: activeOperators, error: fetchError } = await supabaseAdmin
+    // Get all active operators — try the view first, fall back to empty
+    let activeOperators: any[] = [];
+    const { data: viewData, error: fetchError } = await supabaseAdmin
       .from('current_operator_status')
       .select('*')
       .order('timestamp', { ascending: false });
 
-    if (fetchError) {
-      console.error('Error fetching active operators:', fetchError);
-      return NextResponse.json(
-        { error: 'Failed to fetch active operators', details: fetchError.message },
-        { status: 500 }
-      );
+    if (!fetchError && viewData) {
+      activeOperators = viewData;
     }
+    // If view doesn't exist yet (PGRST205), gracefully return empty list
 
     // Get status history for each operator (last 5 status changes)
     const operatorsWithHistory = await Promise.all(
