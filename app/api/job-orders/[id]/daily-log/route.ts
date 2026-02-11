@@ -76,8 +76,9 @@ export async function POST(
     const startTime = workStarted || routeStarted;
     const hoursWorked = startTime ? (new Date().getTime() - startTime.getTime()) / (1000 * 60 * 60) : 0;
 
-    // Create daily log entry
-    const { data: dailyLog, error: logError } = await supabaseAdmin
+    // Create daily log entry — gracefully handle missing table
+    let dailyLog = null;
+    const { data: logData, error: logError } = await supabaseAdmin
       .from('daily_job_logs')
       .insert({
         job_order_id: jobId,
@@ -102,11 +103,18 @@ export async function POST(
       .single();
 
     if (logError) {
-      console.error('Error creating daily log:', logError);
-      return NextResponse.json(
-        { error: 'Failed to create daily log', details: logError.message },
-        { status: 500 }
-      );
+      // If table doesn't exist yet, continue without blocking
+      if (logError.code === 'PGRST204' || logError.code === 'PGRST205' || logError.code === '42P01' || logError.message?.includes('does not exist')) {
+        dailyLog = null;
+      } else {
+        console.error('Error creating daily log:', logError);
+        return NextResponse.json(
+          { error: 'Failed to create daily log', details: logError.message },
+          { status: 500 }
+        );
+      }
+    } else {
+      dailyLog = logData;
     }
 
     if (continueNextDay) {
@@ -129,7 +137,7 @@ export async function POST(
         console.error('Error updating job for next day:', updateError);
       }
 
-      // Reset workflow for next day
+      // Reset workflow for next day — gracefully handle missing table
       const { error: workflowError } = await supabaseAdmin
         .from('workflow_steps')
         .update({
@@ -144,7 +152,7 @@ export async function POST(
         .eq('job_order_id', jobId)
         .eq('operator_id', user.id);
 
-      if (workflowError) {
+      if (workflowError && !(workflowError.code === 'PGRST204' || workflowError.code === 'PGRST205' || workflowError.code === '42P01' || workflowError.message?.includes('does not exist'))) {
         console.error('Error resetting workflow for next day:', workflowError);
       }
 
@@ -200,7 +208,7 @@ export async function GET(
       );
     }
 
-    // Get all daily logs for this job
+    // Get all daily logs for this job — gracefully handle missing table
     const { data: logs, error: logsError } = await supabaseAdmin
       .from('daily_job_logs')
       .select('*')
@@ -208,6 +216,10 @@ export async function GET(
       .order('log_date', { ascending: true });
 
     if (logsError) {
+      // If table doesn't exist yet, return empty logs
+      if (logsError.code === 'PGRST204' || logsError.code === 'PGRST205' || logsError.code === '42P01' || logsError.message?.includes('does not exist')) {
+        return NextResponse.json({ success: true, logs: [] });
+      }
       return NextResponse.json(
         { error: 'Failed to fetch daily logs' },
         { status: 500 }

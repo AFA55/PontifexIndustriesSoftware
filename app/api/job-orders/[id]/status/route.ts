@@ -139,12 +139,16 @@ async function updateJobStatus(
       historyData.work_completed_at = now;
     }
 
-    // Upsert to operator_status_history
-    await supabaseAdmin
+    // Upsert to operator_status_history — gracefully handle missing table
+    const { error: historyUpsertError } = await supabaseAdmin
       .from('operator_status_history')
       .upsert(historyData, {
         onConflict: 'operator_id,job_order_id'
       });
+
+    if (historyUpsertError && !(historyUpsertError.code === 'PGRST204' || historyUpsertError.code === 'PGRST205' || historyUpsertError.code === '42P01' || historyUpsertError.message?.includes('does not exist'))) {
+      console.error('Error updating operator status history:', historyUpsertError);
+    }
 
     return NextResponse.json(
       {

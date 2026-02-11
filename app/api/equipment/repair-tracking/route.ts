@@ -91,7 +91,7 @@ export async function POST(request: Request) {
 
     // Check if user is admin
     const { data: profile } = await supabaseAdmin
-      .from('user_profiles')
+      .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
@@ -187,7 +187,7 @@ export async function PATCH(request: Request) {
 
     // Check if user is admin
     const { data: profile } = await supabaseAdmin
-      .from('user_profiles')
+      .from('profiles')
       .select('role, full_name')
       .eq('id', user.id)
       .single();
@@ -255,7 +255,7 @@ export async function PATCH(request: Request) {
       updateData.returned_to_operator = returnedToOperator;
       // Get operator name
       const { data: operatorProfile } = await supabaseAdmin
-        .from('user_profiles')
+        .from('profiles')
         .select('full_name')
         .eq('id', returnedToOperator)
         .single();

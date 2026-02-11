@@ -143,9 +143,9 @@ export async function PATCH(
         }
       });
 
-      // Only log if something actually changed
+      // Only log if something actually changed — gracefully handle missing history table
       if (Object.keys(changes).length > 0) {
-        await supabaseAdmin
+        const { error: historyError } = await supabaseAdmin
           .from('job_orders_history')
           .insert({
             job_order_id: id,
@@ -158,7 +158,16 @@ export async function PATCH(
             snapshot: jobOrder, // Store complete snapshot
           });
 
-        console.log('Audit trail logged:', Object.keys(changes));
+        if (historyError) {
+          // If table doesn't exist yet, don't block the update
+          if (historyError.code === 'PGRST204' || historyError.code === 'PGRST205' || historyError.code === '42P01' || historyError.message?.includes('does not exist')) {
+            console.log('Audit trail skipped: history table not available yet');
+          } else {
+            console.error('Error logging audit trail:', historyError);
+          }
+        } else {
+          console.log('Audit trail logged:', Object.keys(changes));
+        }
       }
     }
 
@@ -252,8 +261,8 @@ export async function DELETE(
       );
     }
 
-    // Create audit trail entry before deletion
-    await supabaseAdmin
+    // Create audit trail entry before deletion — gracefully handle missing table
+    const { error: deleteHistoryError } = await supabaseAdmin
       .from('job_orders_history')
       .insert({
         job_order_id: id,
@@ -265,6 +274,10 @@ export async function DELETE(
         changes: { deleted: { old: jobOrder, new: null } },
         snapshot: jobOrder,
       });
+
+    if (deleteHistoryError && !(deleteHistoryError.code === 'PGRST204' || deleteHistoryError.code === 'PGRST205' || deleteHistoryError.code === '42P01' || deleteHistoryError.message?.includes('does not exist'))) {
+      console.error('Error logging deletion audit trail:', deleteHistoryError);
+    }
 
     // Delete the job order
     const { error: deleteError } = await supabaseAdmin

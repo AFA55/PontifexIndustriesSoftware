@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
     // Check if user is admin
     const { data: profile } = await supabaseAdmin
-      .from('user_profiles')
+      .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
@@ -170,7 +170,7 @@ export async function PATCH(request: Request) {
 
     // Check if user is admin
     const { data: profile } = await supabaseAdmin
-      .from('user_profiles')
+      .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
@@ -255,7 +255,7 @@ export async function DELETE(request: Request) {
 
     // Check if user is admin
     const { data: profile } = await supabaseAdmin
-      .from('user_profiles')
+      .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();

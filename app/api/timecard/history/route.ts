@@ -57,6 +57,13 @@ export async function GET(request: NextRequest) {
     const { data: timecards, error: fetchError } = await query;
 
     if (fetchError) {
+      // If table doesn't exist yet, return empty history
+      if (fetchError.code === 'PGRST204' || fetchError.code === 'PGRST205' || fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
+        return NextResponse.json(
+          { success: true, data: { timecards: [], summary: { totalEntries: 0, completedEntries: 0, activeEntry: null, totalHours: 0 } } },
+          { status: 200 }
+        );
+      }
       console.error('Error fetching timecard history:', fetchError);
       return NextResponse.json(
         { error: 'Failed to fetch timecard history', details: fetchError.message },

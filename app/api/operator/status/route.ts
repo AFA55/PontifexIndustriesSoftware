@@ -50,8 +50,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find the user's active timecard
-    const { data: activeTimecard, error: timecardError } = await supabaseAdmin
+    // Find the user's active timecard — gracefully handle missing table
+    let activeTimecard: any = null;
+    const { data: timecardData, error: timecardError } = await supabaseAdmin
       .from('timecards')
       .select('*')
       .eq('user_id', user.id)
@@ -61,26 +62,27 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (timecardError) {
-      console.error('Error fetching active timecard:', timecardError);
-      return NextResponse.json(
-        { error: 'Failed to fetch active timecard' },
-        { status: 500 }
-      );
+      // If timecards table doesn't exist yet, don't block the status update
+      if (timecardError.code === 'PGRST204' || timecardError.code === 'PGRST205' || timecardError.code === '42P01' || timecardError.message?.includes('does not exist')) {
+        activeTimecard = null;
+      } else {
+        console.error('Error fetching active timecard:', timecardError);
+        return NextResponse.json(
+          { error: 'Failed to fetch active timecard' },
+          { status: 500 }
+        );
+      }
+    } else {
+      activeTimecard = timecardData;
     }
 
-    if (!activeTimecard) {
-      return NextResponse.json(
-        { error: 'No active timecard found. Please clock in first.' },
-        { status: 400 }
-      );
-    }
-
-    // Create status history entry
-    const { data: statusEntry, error: statusError } = await supabaseAdmin
+    // Create status history entry — gracefully handle missing table
+    let statusEntry = null;
+    const { data: statusData, error: statusError } = await supabaseAdmin
       .from('operator_status_history')
       .insert([{
         user_id: user.id,
-        timecard_id: activeTimecard.id,
+        timecard_id: activeTimecard?.id || null,
         status: status,
         timestamp: new Date().toISOString(),
         latitude: latitude || null,
@@ -93,15 +95,22 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (statusError) {
-      console.error('Error creating status entry:', statusError);
-      return NextResponse.json(
-        { error: 'Failed to update status', details: statusError.message },
-        { status: 500 }
-      );
+      // If table doesn't exist yet, continue without blocking
+      if (statusError.code === 'PGRST204' || statusError.code === 'PGRST205' || statusError.code === '42P01' || statusError.message?.includes('does not exist')) {
+        statusEntry = null;
+      } else {
+        console.error('Error creating status entry:', statusError);
+        return NextResponse.json(
+          { error: 'Failed to update status', details: statusError.message },
+          { status: 500 }
+        );
+      }
+    } else {
+      statusEntry = statusData;
     }
 
-    // If status is 'clocked_out', also clock out the timecard
-    if (status === 'clocked_out') {
+    // If status is 'clocked_out' and we have an active timecard, also clock it out
+    if (status === 'clocked_out' && activeTimecard) {
       const now = new Date();
       const clockInTime = new Date(activeTimecard.clock_in_time);
       const milliseconds = now.getTime() - clockInTime.getTime();
@@ -164,8 +173,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get latest status
-    const { data: latestStatus, error: statusError } = await supabaseAdmin
+    // Get latest status — gracefully handle missing table
+    let latestStatus = null;
+    const { data: statusData, error: statusError } = await supabaseAdmin
       .from('operator_status_history')
       .select('*')
       .eq('user_id', user.id)
@@ -174,11 +184,18 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (statusError) {
-      console.error('Error fetching status:', statusError);
-      return NextResponse.json(
-        { error: 'Failed to fetch status' },
-        { status: 500 }
-      );
+      // If table doesn't exist yet, return null status (not an error)
+      if (statusError.code === 'PGRST204' || statusError.code === 'PGRST205' || statusError.code === '42P01' || statusError.message?.includes('does not exist')) {
+        latestStatus = null;
+      } else {
+        console.error('Error fetching status:', statusError);
+        return NextResponse.json(
+          { error: 'Failed to fetch status' },
+          { status: 500 }
+        );
+      }
+    } else {
+      latestStatus = statusData;
     }
 
     return NextResponse.json(

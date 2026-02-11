@@ -65,12 +65,21 @@ export async function POST(request: NextRequest) {
       .single();
 
     // Check if user already has an active clock-in (no clock-out yet)
-    const { data: activeTimecard } = await supabaseAdmin
+    // Gracefully handle missing timecards table
+    const { data: activeTimecard, error: checkError } = await supabaseAdmin
       .from('timecards')
       .select('*')
       .eq('user_id', user.id)
       .is('clock_out_time', null)
       .single();
+
+    // If table doesn't exist, we can't clock in
+    if (checkError && (checkError.code === 'PGRST204' || checkError.code === 'PGRST205' || checkError.code === '42P01' || checkError.message?.includes('does not exist'))) {
+      return NextResponse.json(
+        { error: 'Timecard system is not available yet. Please contact your administrator.' },
+        { status: 503 }
+      );
+    }
 
     if (activeTimecard) {
       return NextResponse.json(
@@ -107,6 +116,13 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
+      // If table doesn't exist
+      if (insertError.code === 'PGRST204' || insertError.code === 'PGRST205' || insertError.code === '42P01' || insertError.message?.includes('does not exist')) {
+        return NextResponse.json(
+          { error: 'Timecard system is not available yet. Please contact your administrator.' },
+          { status: 503 }
+        );
+      }
       console.error('Error creating timecard:', insertError);
       return NextResponse.json(
         { error: 'Failed to clock in', details: insertError.message },

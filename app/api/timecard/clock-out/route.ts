@@ -56,13 +56,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find active timecard (clocked in but not clocked out)
+    // Find active timecard (clocked in but not clocked out) — gracefully handle missing table
     const { data: activeTimecard, error: fetchError } = await supabaseAdmin
       .from('timecards')
       .select('*')
       .eq('user_id', user.id)
       .is('clock_out_time', null)
       .single();
+
+    if (fetchError) {
+      // If table doesn't exist
+      if (fetchError.code === 'PGRST204' || fetchError.code === 'PGRST205' || fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
+        return NextResponse.json(
+          { error: 'Timecard system is not available yet. Please contact your administrator.' },
+          { status: 503 }
+        );
+      }
+    }
 
     if (fetchError || !activeTimecard) {
       return NextResponse.json(

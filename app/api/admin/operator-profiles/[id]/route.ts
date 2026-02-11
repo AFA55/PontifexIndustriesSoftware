@@ -73,12 +73,18 @@ export async function GET(
       );
     }
 
-    // Get performance data
-    const { data: performance } = await supabaseAdmin
+    // Get performance data — gracefully handle missing table
+    let performance = null;
+    const { data: perfData, error: perfError } = await supabaseAdmin
       .from('operator_performance')
       .select('*')
       .eq('operator_id', id)
       .single();
+
+    if (!perfError) {
+      performance = perfData;
+    }
+    // If table doesn't exist, performance stays null
 
     return NextResponse.json(
       {

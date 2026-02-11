@@ -70,13 +70,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get performance data for each operator
+    // Get performance data for each operator — gracefully handle missing table
     const operatorIds = operators?.map(op => op.id) || [];
 
-    const { data: performanceData } = await supabaseAdmin
+    let performanceData: any[] | null = null;
+    const { data: perfData, error: perfError } = await supabaseAdmin
       .from('operator_performance')
       .select('*')
       .in('operator_id', operatorIds);
+
+    if (!perfError) {
+      performanceData = perfData;
+    }
+    // If table doesn't exist, performanceData stays null — defaults will be used below
 
     // Merge performance data with operator profiles
     const operatorsWithPerformance = operators?.map(operator => {

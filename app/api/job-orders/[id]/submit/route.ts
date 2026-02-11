@@ -126,8 +126,8 @@ export async function PUT(
       );
     }
 
-    // Update operator status history
-    await supabaseAdmin
+    // Update operator status history — gracefully handle missing table
+    const { error: statusHistoryError } = await supabaseAdmin
       .from('operator_status_history')
       .insert({
         user_id: user.id,
@@ -138,6 +138,10 @@ export async function PUT(
         job_id: jobId,
         notes: 'Job completed and data submitted',
       });
+
+    if (statusHistoryError && !(statusHistoryError.code === 'PGRST204' || statusHistoryError.code === 'PGRST205' || statusHistoryError.code === '42P01' || statusHistoryError.message?.includes('does not exist'))) {
+      console.error('Error updating operator status history:', statusHistoryError);
+    }
 
     return NextResponse.json(
       {
