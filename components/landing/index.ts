@@ -5,6 +5,5 @@ export { default as ProblemSolution } from './ProblemSolution';
 export { default as FeatureShowcase } from './FeatureShowcase';
 export { default as HowItWorks } from './HowItWorks';
 export { default as ROISection } from './ROISection';
-export { default as TestimonialsSection } from './TestimonialsSection';
 export { default as CTASection } from './CTASection';
 export { default as Footer } from './Footer';

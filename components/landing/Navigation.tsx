@@ -58,12 +58,12 @@ export default function Navigation() {
                   {link.label}
                 </a>
               ))}
-              <Link
-                href="/login"
+              <a
+                href="#contact"
                 className="px-5 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all duration-300 hover:scale-105"
               >
-                Sign In
-              </Link>
+                Contact Us
+              </a>
             </div>
 
             <button
@@ -95,13 +95,13 @@ export default function Navigation() {
                   {link.label}
                 </a>
               ))}
-              <Link
-                href="/login"
+              <a
+                href="#contact"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="block px-4 py-3 mt-2 text-center bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold rounded-xl shadow-lg"
               >
-                Sign In
-              </Link>
+                Contact Us
+              </a>
             </div>
           </motion.div>
         )}

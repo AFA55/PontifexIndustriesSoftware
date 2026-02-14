@@ -8,7 +8,6 @@ import {
   FeatureShowcase,
   HowItWorks,
   ROISection,
-  TestimonialsSection,
   CTASection,
   Footer,
 } from '@/components/landing';
@@ -23,7 +22,6 @@ export default function LandingPage() {
       <FeatureShowcase />
       <HowItWorks />
       <ROISection />
-      <TestimonialsSection />
       <CTASection />
       <Footer />
     </div>

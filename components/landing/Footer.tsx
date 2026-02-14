@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { BRAND } from './brand-config';
 
@@ -40,24 +39,15 @@ export default function Footer() {
                 { label: 'Features', href: '#features' },
                 { label: 'How It Works', href: '#how-it-works' },
                 { label: 'ROI Calculator', href: '#roi' },
-                { label: 'Sign In', href: '/login' },
+                { label: 'Contact', href: '#contact' },
               ].map((link) => (
                 <li key={link.href}>
-                  {link.href.startsWith('#') ? (
-                    <a
-                      href={link.href}
-                      className="text-zinc-500 hover:text-white transition-colors"
-                    >
-                      {link.label}
-                    </a>
-                  ) : (
-                    <Link
-                      href={link.href}
-                      className="text-zinc-500 hover:text-white transition-colors"
-                    >
-                      {link.label}
-                    </Link>
-                  )}
+                  <a
+                    href={link.href}
+                    className="text-zinc-500 hover:text-white transition-colors"
+                  >
+                    {link.label}
+                  </a>
                 </li>
               ))}
             </ul>
@@ -66,19 +56,19 @@ export default function Footer() {
           {/* Get Started */}
           <div>
             <h3 className="text-white font-semibold mb-4 text-sm uppercase tracking-wider">
-              Get Started
+              Get in Touch
             </h3>
             <p className="text-zinc-500 text-sm mb-5 leading-relaxed">
-              Ready to see it in action? Schedule a personalized demo with our
-              team.
+              Want to see how it works for your business? Reach out for a
+              personalized walkthrough.
             </p>
-            <Link
-              href={BRAND.ctaPrimaryHref}
+            <a
+              href={`mailto:${BRAND.contactEmail}`}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg text-sm font-semibold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all hover:scale-105"
             >
-              Request Demo
+              Contact Us
               <ArrowRight className="w-4 h-4" />
-            </Link>
+            </a>
           </div>
         </div>
 

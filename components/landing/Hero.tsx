@@ -1,9 +1,8 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, CheckCircle, Play } from 'lucide-react';
+import { ArrowRight, CheckCircle, ChevronDown } from 'lucide-react';
 import { BRAND } from './brand-config';
 
 export default function Hero() {
@@ -96,8 +95,8 @@ export default function Hero() {
               className="flex flex-wrap items-center gap-x-6 gap-y-3 mb-10 justify-center lg:justify-start"
             >
               {[
-                'Setup in 5 minutes',
-                'No credit card required',
+                'Built for the field',
+                'Real-time profitability',
                 'Mobile ready',
               ].map((item) => (
                 <div key={item} className="flex items-center gap-2 text-zinc-300 text-sm">
@@ -114,21 +113,21 @@ export default function Hero() {
               transition={{ delay: 0.5, duration: 0.6 }}
               className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
             >
-              <Link
+              <a
                 href={BRAND.ctaPrimaryHref}
                 className="group relative px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 hover:scale-[1.03] flex items-center justify-center gap-2"
               >
                 {BRAND.ctaPrimary}
                 <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
-              </Link>
+              </a>
 
-              <Link
+              <a
                 href={BRAND.ctaSecondaryHref}
                 className="group px-8 py-4 rounded-xl bg-white/10 backdrop-blur-md hover:bg-white/[0.15] text-white font-semibold border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.03] flex items-center justify-center gap-2"
               >
-                <Play size={18} />
+                <ChevronDown size={18} />
                 {BRAND.ctaSecondary}
-              </Link>
+              </a>
             </motion.div>
 
             {/* Sub-CTA Text */}
@@ -138,7 +137,7 @@ export default function Hero() {
               transition={{ delay: 0.65, duration: 0.6 }}
               className="text-zinc-500 text-sm mt-5 text-center lg:text-left"
             >
-              Trusted by concrete cutting contractors across the nation
+              Purpose-built software for concrete cutting operations
             </motion.p>
           </div>
 
