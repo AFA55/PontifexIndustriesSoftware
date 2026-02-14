@@ -6,10 +6,10 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Environment variables required — empty string fallback keeps build working
-// but will fail at runtime with clear errors if env vars are missing
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || '';
+// Environment variables required — placeholder URL keeps build & static generation working
+// Real env vars are set on Vercel and in .env.local for local dev
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || 'https://placeholder.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || 'placeholder-key';
 
 /**
  * Admin client with full privileges
