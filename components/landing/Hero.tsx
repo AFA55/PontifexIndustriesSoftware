@@ -59,7 +59,7 @@ export default function Hero() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
               </span>
               <span className="text-blue-300 text-sm font-medium tracking-wide">
-                Built for Concrete Cutting Contractors
+                Custom Software & Automation for Construction
               </span>
             </motion.div>
 
@@ -70,9 +70,9 @@ export default function Hero() {
               transition={{ delay: 0.15, duration: 0.6 }}
               className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-[1.1] mb-6 tracking-tight"
             >
-              Run Your Concrete Cutting Business{' '}
+              Software That Works{' '}
               <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-violet-400 bg-clip-text text-transparent">
-                Like a Fortune 500 Company
+                The Way You Do
               </span>
             </motion.h1>
 
@@ -83,8 +83,8 @@ export default function Hero() {
               transition={{ delay: 0.3, duration: 0.6 }}
               className="text-lg sm:text-xl text-zinc-400 mb-8 leading-relaxed max-w-xl mx-auto lg:mx-0"
             >
-              From dispatch to digital signature -- track every job, know your profitability in real-time,
-              and maintain OSHA compliance automatically. All before you leave the job site.
+              We build personalized software and automation solutions for construction companies.
+              Track jobs, know your profit in real-time, and eliminate paperwork — customized to fit exactly how your business operates.
             </motion.p>
 
             {/* Trust Indicators */}
@@ -95,9 +95,9 @@ export default function Hero() {
               className="flex flex-wrap items-center gap-x-6 gap-y-3 mb-10 justify-center lg:justify-start"
             >
               {[
+                'Fully customizable',
                 'Built for the field',
-                'Real-time profitability',
-                'Mobile ready',
+                'Any trade, any workflow',
               ].map((item) => (
                 <div key={item} className="flex items-center gap-2 text-zinc-300 text-sm">
                   <CheckCircle className="text-green-400 flex-shrink-0" size={16} />
@@ -137,7 +137,7 @@ export default function Hero() {
               transition={{ delay: 0.65, duration: 0.6 }}
               className="text-zinc-500 text-sm mt-5 text-center lg:text-left"
             >
-              Purpose-built software for concrete cutting operations
+              Personalized software &amp; automation for construction companies
             </motion.p>
           </div>
 
@@ -190,7 +190,7 @@ export default function Hero() {
                     </div>
                     <div>
                       <div className="text-white font-bold">{BRAND.companyName}</div>
-                      <div className="text-zinc-500 text-sm">Concrete Management</div>
+                      <div className="text-zinc-500 text-sm">Construction Software</div>
                     </div>
                   </div>
 

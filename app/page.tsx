@@ -8,7 +8,7 @@ import {
   FeatureShowcase,
   HowItWorks,
   ROISection,
-  CTASection,
+  ScheduleDemoForm,
   Footer,
 } from '@/components/landing';
 
@@ -22,7 +22,7 @@ export default function LandingPage() {
       <FeatureShowcase />
       <HowItWorks />
       <ROISection />
-      <CTASection />
+      <ScheduleDemoForm />
       <Footer />
     </div>
   );

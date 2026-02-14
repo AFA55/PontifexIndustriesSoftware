@@ -23,9 +23,9 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-zinc-500 text-sm max-w-md leading-relaxed">
-              The all-in-one platform for {BRAND.industry} contractors who want to
-              eliminate paperwork, track profitability in real-time, and scale
-              their operations with confidence.
+              Custom software and automation solutions for {BRAND.industry} companies.
+              We build personalized platforms that eliminate paperwork, track profitability
+              in real-time, and scale with your business.
             </p>
           </div>
 
@@ -39,7 +39,7 @@ export default function Footer() {
                 { label: 'Features', href: '#features' },
                 { label: 'How It Works', href: '#how-it-works' },
                 { label: 'ROI Calculator', href: '#roi' },
-                { label: 'Contact', href: '#contact' },
+                { label: 'Schedule Demo', href: '#demo' },
               ].map((link) => (
                 <li key={link.href}>
                   <a

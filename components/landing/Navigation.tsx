@@ -59,7 +59,7 @@ export default function Navigation() {
                 </a>
               ))}
               <a
-                href="#contact"
+                href="#demo"
                 className="px-5 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all duration-300 hover:scale-105"
               >
                 Contact Us
@@ -96,7 +96,7 @@ export default function Navigation() {
                 </a>
               ))}
               <a
-                href="#contact"
+                href="#demo"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="block px-4 py-3 mt-2 text-center bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold rounded-xl shadow-lg"
               >
