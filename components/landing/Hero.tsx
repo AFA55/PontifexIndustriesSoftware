@@ -3,47 +3,76 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, Play, CheckCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle, Play } from 'lucide-react';
+import { BRAND } from './brand-config';
 
 export default function Hero() {
   return (
-    <section className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden pt-16">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-red-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-500"></div>
+    <section className="relative min-h-screen flex items-center justify-center bg-[#09090b] overflow-hidden pt-16">
+      {/* Animated Blur Orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          animate={{
+            x: [0, 30, -20, 0],
+            y: [0, -20, 15, 0],
+            scale: [1, 1.1, 0.95, 1],
+          }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -top-32 -right-32 w-[500px] h-[500px] bg-blue-500/15 rounded-full blur-[120px]"
+        />
+        <motion.div
+          animate={{
+            x: [0, -25, 20, 0],
+            y: [0, 20, -25, 0],
+            scale: [1, 0.95, 1.1, 1],
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -bottom-40 -left-32 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px]"
+        />
+        <motion.div
+          animate={{
+            x: [0, 15, -15, 0],
+            y: [0, -15, 20, 0],
+            scale: [1, 1.05, 0.98, 1],
+          }}
+          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-1/3 left-1/3 w-[400px] h-[400px] bg-violet-500/10 rounded-full blur-[120px]"
+        />
       </div>
 
+      {/* Grid Pattern Overlay */}
+      <div className="absolute inset-0 grid-pattern opacity-[0.03] pointer-events-none" />
+
+      {/* Main Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left Column - Copy */}
+        <div className="grid lg:grid-cols-2 gap-16 items-center">
+          {/* Left Column - Text */}
           <div className="text-center lg:text-left">
             {/* Badge */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/20 backdrop-blur-sm rounded-full border border-blue-400/30 mb-6"
+              className="inline-flex items-center gap-2.5 px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/20 mb-8"
             >
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
               </span>
-              <span className="text-blue-100 text-sm font-semibold">
-                Live at World of Concrete 2026
+              <span className="text-blue-300 text-sm font-medium tracking-wide">
+                Built for Concrete Cutting Contractors
               </span>
             </motion.div>
 
-            {/* Main Headline */}
+            {/* Headline */}
             <motion.h1
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6"
+              transition={{ delay: 0.15, duration: 0.6 }}
+              className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-[1.1] mb-6 tracking-tight"
             >
               Run Your Concrete Cutting Business{' '}
-              <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-red-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-violet-400 bg-clip-text text-transparent">
                 Like a Fortune 500 Company
               </span>
             </motion.h1>
@@ -52,57 +81,53 @@ export default function Hero() {
             <motion.p
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.6 }}
-              className="text-lg sm:text-xl text-gray-300 mb-8 leading-relaxed"
+              transition={{ delay: 0.3, duration: 0.6 }}
+              className="text-lg sm:text-xl text-zinc-400 mb-8 leading-relaxed max-w-xl mx-auto lg:mx-0"
             >
-              From dispatch to signature—track jobs, profitability, and OSHA compliance in real-time.
-              Know what you made before you leave the job site.
+              From dispatch to digital signature -- track every job, know your profitability in real-time,
+              and maintain OSHA compliance automatically. All before you leave the job site.
             </motion.p>
 
             {/* Trust Indicators */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.6 }}
-              className="flex flex-wrap items-center gap-4 mb-10 justify-center lg:justify-start"
+              transition={{ delay: 0.4, duration: 0.6 }}
+              className="flex flex-wrap items-center gap-x-6 gap-y-3 mb-10 justify-center lg:justify-start"
             >
-              <div className="flex items-center gap-2 text-gray-300 text-sm">
-                <CheckCircle className="text-green-400" size={18} />
-                <span>Setup in 5 minutes</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-300 text-sm">
-                <CheckCircle className="text-green-400" size={18} />
-                <span>No credit card required</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-300 text-sm">
-                <CheckCircle className="text-green-400" size={18} />
-                <span>Mobile ready</span>
-              </div>
+              {[
+                'Setup in 5 minutes',
+                'No credit card required',
+                'Mobile ready',
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-2 text-zinc-300 text-sm">
+                  <CheckCircle className="text-green-400 flex-shrink-0" size={16} />
+                  <span>{item}</span>
+                </div>
+              ))}
             </motion.div>
 
             {/* CTA Buttons */}
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.6 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
               className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
             >
-              {/* Primary CTA - Request Demo */}
               <Link
-                href="/request-access"
-                className="group px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white font-bold shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2"
+                href={BRAND.ctaPrimaryHref}
+                className="group relative px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 hover:scale-[1.03] flex items-center justify-center gap-2"
               >
-                Request Live Demo
-                <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
+                {BRAND.ctaPrimary}
+                <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
               </Link>
 
-              {/* Secondary CTA - Try Demo */}
               <Link
-                href="/login"
-                className="group px-8 py-4 rounded-xl bg-white/10 backdrop-blur-md hover:bg-white/20 text-white font-bold border-2 border-white/40 hover:border-white/60 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2"
+                href={BRAND.ctaSecondaryHref}
+                className="group px-8 py-4 rounded-xl bg-white/10 backdrop-blur-md hover:bg-white/[0.15] text-white font-semibold border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.03] flex items-center justify-center gap-2"
               >
-                <Play size={20} />
-                Try Demo Now
+                <Play size={18} />
+                {BRAND.ctaSecondary}
               </Link>
             </motion.div>
 
@@ -110,85 +135,102 @@ export default function Hero() {
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.7, duration: 0.6 }}
-              className="text-gray-400 text-sm mt-4 text-center lg:text-left"
+              transition={{ delay: 0.65, duration: 0.6 }}
+              className="text-zinc-500 text-sm mt-5 text-center lg:text-left"
             >
-              Join contractors already tracking 500+ jobs monthly
+              Trusted by concrete cutting contractors across the nation
             </motion.p>
           </div>
 
-          {/* Right Column - Visual */}
+          {/* Right Column - Floating Cards Visual (hidden on mobile) */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4, duration: 0.8 }}
+            transition={{ delay: 0.3, duration: 0.8 }}
             className="relative hidden lg:block"
           >
-            {/* Dashboard Preview Mockup */}
-            <div className="relative">
-              {/* Floating Cards Animation */}
+            <div className="relative min-h-[480px]">
+              {/* Top-Right Floating Card -- Time Saved */}
               <motion.div
                 initial={{ y: 0 }}
-                animate={{ y: [-10, 10, -10] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -top-10 -right-10 w-72 h-44 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-2xl"
+                animate={{ y: [-8, 12, -8] }}
+                transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute -top-4 -right-4 w-72 bg-white/[0.06] backdrop-blur-2xl rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/20"
               >
-                <div className="text-white/80 text-sm font-semibold mb-2">⏱️ Time Saved This Week</div>
-                <div className="text-white text-4xl font-bold">18.5 hrs</div>
-                <div className="text-green-400 text-sm mt-2">No paperwork, no guessing</div>
-                <div className="text-gray-400 text-xs mt-1">= $925 in labor costs saved</div>
+                <div className="text-zinc-400 text-sm font-medium mb-2">Time Saved This Week</div>
+                <div className="text-white text-4xl font-bold tracking-tight">18.5 hrs</div>
+                <div className="text-green-400 text-sm mt-2 font-medium">No paperwork, no guessing</div>
+                <div className="text-zinc-500 text-xs mt-1">= $925 in labor costs saved</div>
               </motion.div>
 
+              {/* Bottom-Left Floating Card -- Real-Time Profit */}
               <motion.div
                 initial={{ y: 0 }}
-                animate={{ y: [10, -10, 10] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -bottom-10 -left-10 w-72 h-44 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-2xl"
+                animate={{ y: [12, -8, 12] }}
+                transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute -bottom-4 -left-4 w-72 bg-white/[0.06] backdrop-blur-2xl rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/20"
               >
-                <div className="text-white/80 text-sm font-semibold mb-2">💰 Real-Time Job Profit</div>
-                <div className="text-white text-4xl font-bold">$2,340</div>
-                <div className="text-blue-400 text-sm mt-2">Known before leaving site</div>
-                <div className="text-gray-400 text-xs mt-1">42% profit margin • Job #2847</div>
+                <div className="text-zinc-400 text-sm font-medium mb-2">Real-Time Job Profit</div>
+                <div className="text-white text-4xl font-bold tracking-tight">$2,340</div>
+                <div className="text-blue-400 text-sm mt-2 font-medium">Known before leaving site</div>
+                <div className="text-zinc-500 text-xs mt-1">42% profit margin - Job #2847</div>
               </motion.div>
 
-              {/* Central Element */}
-              <div className="relative z-10 bg-white/10 backdrop-blur-2xl rounded-3xl border-2 border-white/30 p-8 shadow-2xl">
+              {/* Central Card -- Branding + Progress */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.7 }}
+                className="relative z-10 mx-6 bg-white/[0.06] backdrop-blur-2xl rounded-3xl border border-white/10 p-8 shadow-2xl shadow-black/20"
+              >
                 <div className="space-y-6">
+                  {/* Brand Header */}
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">
-                      PI
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/20">
+                      {BRAND.logoInitials}
                     </div>
                     <div>
-                      <div className="text-white font-bold">Pontifex Industries</div>
-                      <div className="text-gray-400 text-sm">Concrete Management</div>
+                      <div className="text-white font-bold">{BRAND.companyName}</div>
+                      <div className="text-zinc-500 text-sm">Concrete Management</div>
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+                  {/* Progress Bars */}
+                  <div className="space-y-4">
+                    <div className="bg-white/[0.04] rounded-xl p-4 border border-white/[0.06]">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-gray-300 text-sm">📊 Digital Data Collection</span>
-                        <span className="text-green-400 font-bold">100%</span>
+                        <span className="text-zinc-300 text-sm font-medium">Digital Data Collection</span>
+                        <span className="text-green-400 font-bold text-sm">100%</span>
                       </div>
-                      <div className="text-xs text-gray-400 mb-2">Every job creates company value</div>
-                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full" style={{ width: '100%' }}></div>
+                      <div className="text-xs text-zinc-500 mb-2">Every job creates company value</div>
+                      <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: '100%' }}
+                          transition={{ delay: 0.8, duration: 1.2, ease: 'easeOut' }}
+                          className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
+                        />
                       </div>
                     </div>
 
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+                    <div className="bg-white/[0.04] rounded-xl p-4 border border-white/[0.06]">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-gray-300 text-sm">🛡️ OSHA Compliance</span>
-                        <span className="text-blue-400 font-bold">100%</span>
+                        <span className="text-zinc-300 text-sm font-medium">OSHA Compliance</span>
+                        <span className="text-blue-400 font-bold text-sm">100%</span>
                       </div>
-                      <div className="text-xs text-gray-400 mb-2">Zero paperwork, full compliance</div>
-                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full" style={{ width: '100%' }}></div>
+                      <div className="text-xs text-zinc-500 mb-2">Zero paperwork, full compliance</div>
+                      <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: '100%' }}
+                          transition={{ delay: 1.0, duration: 1.2, ease: 'easeOut' }}
+                          className="h-full bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full"
+                        />
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
           </motion.div>
         </div>
@@ -198,19 +240,19 @@ export default function Hero() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 1, duration: 0.6 }}
-        className="absolute bottom-10 left-1/2 transform -translate-x-1/2"
+        transition={{ delay: 1.2, duration: 0.6 }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2"
       >
         <motion.div
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="w-6 h-10 rounded-full border-2 border-white/30 flex items-start justify-center p-2"
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          className="w-6 h-10 rounded-full border-2 border-white/20 flex items-start justify-center p-2"
         >
           <motion.div
             animate={{ y: [0, 12, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="w-1 h-2 bg-white/60 rounded-full"
-          ></motion.div>
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            className="w-1 h-2 bg-white/50 rounded-full"
+          />
         </motion.div>
       </motion.div>
     </section>

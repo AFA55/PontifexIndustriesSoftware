@@ -4,19 +4,23 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { BRAND } from './brand-config';
 
 export default function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Handle scroll detection
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const navLinks = [
+    { label: 'Features', href: '#features' },
+    { label: 'How It Works', href: '#how-it-works' },
+    { label: 'ROI', href: '#roi' },
+  ];
 
   return (
     <>
@@ -26,99 +30,75 @@ export default function Navigation() {
         transition={{ duration: 0.5 }}
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled
-            ? 'backdrop-blur-xl bg-white/95 shadow-lg border-b border-gray-200'
+            ? 'backdrop-blur-xl bg-[#09090b]/90 shadow-lg shadow-black/10 border-b border-white/5'
             : 'bg-transparent'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo and Brand */}
             <Link href="/" className="flex items-center gap-3 group">
               <Logo />
               <div className="hidden sm:block">
-                <div className="font-bold text-lg bg-gradient-to-r from-blue-600 via-blue-700 to-red-700 bg-clip-text text-transparent group-hover:from-blue-700 group-hover:to-red-800 transition-all">
-                  Pontifex Industries
+                <div className="font-bold text-lg bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
+                  {BRAND.companyName}
                 </div>
-                <div className={`text-xs font-medium transition-colors ${
-                  isScrolled ? 'text-gray-600' : 'text-white/80'
-                }`}>
-                  Concrete Management
+                <div className="text-xs font-medium text-zinc-500">
+                  {BRAND.tagline}
                 </div>
               </div>
             </Link>
 
-            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
-              <a
-                href="#features"
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${
-                  isScrolled ? 'text-gray-700' : 'text-white'
-                }`}
-              >
-                Features
-              </a>
-              <a
-                href="#how-it-works"
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${
-                  isScrolled ? 'text-gray-700' : 'text-white'
-                }`}
-              >
-                How It Works
-              </a>
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+                >
+                  {link.label}
+                </a>
+              ))}
               <Link
                 href="/login"
-                className={`px-6 py-2 rounded-xl font-bold transition-all duration-300 transform hover:scale-105 ${
-                  isScrolled
-                    ? 'bg-gradient-to-r from-blue-600 to-red-600 text-white shadow-lg hover:shadow-xl'
-                    : 'bg-white/20 backdrop-blur-md text-white border-2 border-white/40 hover:bg-white/30'
-                }`}
+                className="px-5 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all duration-300 hover:scale-105"
               >
                 Sign In
               </Link>
             </div>
 
-            {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100/20 transition-colors"
+              className="md:hidden p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
             >
-              {isMobileMenuOpen ? (
-                <X className={isScrolled ? 'text-gray-700' : 'text-white'} size={24} />
-              ) : (
-                <Menu className={isScrolled ? 'text-gray-700' : 'text-white'} size={24} />
-              )}
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
         </div>
       </motion.nav>
 
-      {/* Mobile Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="fixed top-16 left-0 right-0 z-40 md:hidden backdrop-blur-xl bg-white/95 border-b border-gray-200 shadow-lg"
+            className="fixed top-16 left-0 right-0 z-40 md:hidden backdrop-blur-xl bg-[#09090b]/95 border-b border-white/5"
           >
-            <div className="px-4 py-6 space-y-4">
-              <a
-                href="#features"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block px-4 py-3 text-gray-700 font-medium hover:bg-blue-50 rounded-xl transition-colors"
-              >
-                Features
-              </a>
-              <a
-                href="#how-it-works"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block px-4 py-3 text-gray-700 font-medium hover:bg-blue-50 rounded-xl transition-colors"
-              >
-                How It Works
-              </a>
+            <div className="px-4 py-6 space-y-2">
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-zinc-300 font-medium hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+                >
+                  {link.label}
+                </a>
+              ))}
               <Link
                 href="/login"
-                className="block px-4 py-3 text-center bg-gradient-to-r from-blue-600 to-red-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block px-4 py-3 mt-2 text-center bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold rounded-xl shadow-lg"
               >
                 Sign In
               </Link>
@@ -135,11 +115,11 @@ function Logo() {
     <svg width="40" height="40" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="nav-p-gradient" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#1A73E8" />
-          <stop offset="1" stopColor="#0891b2" />
+          <stop stopColor="#3b82f6" />
+          <stop offset="1" stopColor="#06b6d4" />
         </linearGradient>
       </defs>
-      <rect width="48" height="48" rx="12" fill="#ffffff" stroke="#1e293b" strokeWidth="2" />
+      <rect width="48" height="48" rx="12" fill="#18181b" stroke="url(#nav-p-gradient)" strokeWidth="1.5" />
       <path d="M14 34V14h12a8 8 0 1 1 0 16H22v4" stroke="url(#nav-p-gradient)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
