@@ -627,7 +627,9 @@ export default function WorkPerformed() {
     }
 
     const totalLinearFeet = calculateQuickEntryTotal();
-    setCurrentCut(prev => ({ ...prev, linearFeet: totalLinearFeet, cutDepth: quickEntryDepth }));
+    // Get depth from the cut entries (not from quickEntryDepth which resets after each add)
+    const maxDepth = Math.max(...quickEntryCuts.map(cut => cut.depth || 0));
+    setCurrentCut(prev => ({ ...prev, linearFeet: totalLinearFeet, cutDepth: maxDepth }));
 
     // Close modal and reset
     setShowQuickEntryModal(false);
@@ -677,7 +679,9 @@ export default function WorkPerformed() {
     }
 
     const totalLinearFeet = calculateChainsawTotal();
-    setCurrentCut(prev => ({ ...prev, linearFeet: totalLinearFeet, cutDepth: chainsawDepth }));
+    // Get depth from the cut entries (not from chainsawDepth which resets after each add)
+    const maxDepth = Math.max(...chainsawCuts.map(cut => cut.depth || 0));
+    setCurrentCut(prev => ({ ...prev, linearFeet: totalLinearFeet, cutDepth: maxDepth }));
 
     // Close modal and reset
     setShowChainsawModal(false);
@@ -1160,15 +1164,16 @@ export default function WorkPerformed() {
           // Continue even if blade tracking fails
         }
 
-        // Save job feedback ratings
+        // Save job feedback ratings — use status API (POST, not PATCH)
         try {
-          const feedbackResponse = await fetch(`/api/job-orders?id=${params.id}`, {
-            method: 'PATCH',
+          const feedbackResponse = await fetch(`/api/job-orders/${params.id}/status`, {
+            method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`
             },
             body: JSON.stringify({
+              status: 'in_progress',
               job_difficulty_rating: jobDifficultyRating,
               job_access_rating: jobAccessRating,
               job_difficulty_notes: difficultyNotes,
@@ -1185,8 +1190,8 @@ export default function WorkPerformed() {
           // Continue even if feedback saving fails
         }
 
-        // Update workflow - mark work_performed as complete and move to pictures
-        await fetch('/api/workflow', {
+        // Update workflow — fire and forget (optional tracking)
+        fetch('/api/workflow', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1197,7 +1202,7 @@ export default function WorkPerformed() {
             completedStep: 'work_performed',
             currentStep: 'pictures',
           })
-        });
+        }).catch(err => console.log('Workflow tracking unavailable:', err));
       }
 
       showNotification('Work performed and feedback saved successfully!', 'success');
@@ -1208,8 +1213,8 @@ export default function WorkPerformed() {
       }, 1500);
     } catch (error) {
       console.error('Error submitting work performed:', error);
-      alert('Work saved, but there was an error updating workflow');
-      router.push(`/dashboard/job-schedule/${params.id}`);
+      // Still navigate — work was saved to localStorage
+      router.push(`/dashboard/job-schedule/${params.id}/pictures`);
     }
   };
 
@@ -1217,36 +1222,36 @@ export default function WorkPerformed() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Header */}
       <div className="bg-gradient-to-r from-orange-600 to-orange-500 sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto px-4 py-3 sm:py-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
               <Link
                 href={`/dashboard/job-schedule/${params.id}/silica-exposure`}
-                className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl transition-all text-white"
+                className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl transition-all text-white flex-shrink-0"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
               </Link>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="hidden sm:flex w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl items-center justify-center flex-shrink-0">
                   <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                 </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-white">Work Performed</h1>
-                  <p className="text-sm text-orange-100">Select completed work items</p>
+                <div className="min-w-0">
+                  <h1 className="text-lg sm:text-2xl font-bold text-white truncate">Work Performed</h1>
+                  <p className="text-xs sm:text-sm text-orange-100 hidden sm:block">Select completed work items</p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-xl text-sm font-semibold shadow-lg">
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <span className="px-2 sm:px-4 py-1.5 sm:py-2 bg-white/20 backdrop-blur-sm text-white rounded-xl text-xs sm:text-sm font-semibold shadow-lg">
                 {selectedItems.length} Selected
               </span>
               <button
                 onClick={() => setView(view === 'search' ? 'selected' : 'search')}
-                className="px-5 py-2 bg-white text-orange-600 rounded-xl hover:bg-orange-50 transition-all font-semibold text-sm shadow-lg"
+                className="px-3 sm:px-5 py-1.5 sm:py-2 bg-white text-orange-600 rounded-xl hover:bg-orange-50 transition-all font-semibold text-xs sm:text-sm shadow-lg"
               >
                 {view === 'search' ? 'View Selected' : 'Add More'}
               </button>
@@ -1791,12 +1796,12 @@ export default function WorkPerformed() {
 
       {/* Work Item Detail Modal */}
       {showQuantityModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4 flex items-center gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                 </div>
@@ -1846,15 +1851,15 @@ export default function WorkPerformed() {
                     </h4>
 
                     {/* Add New Hole Entry */}
-                    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                      <h5 className="font-bold text-gray-900 mb-4 flex items-center gap-2 text-lg">
+                    <div className="bg-white rounded-2xl p-4 sm:p-6 border border-gray-200 shadow-sm">
+                      <h5 className="font-bold text-gray-900 mb-4 flex items-center gap-2 text-base sm:text-lg">
                         <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                         Add Hole Entry
                       </h5>
 
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-3 gap-2 sm:gap-4">
                         {/* Bit Size - Text Input */}
                         <div>
                           <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
@@ -2104,19 +2109,34 @@ export default function WorkPerformed() {
                                 Quick Entry - Chain Saw (Inches)
                               </button>
 
-                              {/* Total Linear Feet Display */}
-                              <div className="bg-white rounded-xl p-4 border-2 border-purple-300">
-                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Total Linear Feet</label>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  value={currentCut.linearFeet}
-                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
-                                  className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-purple-50 text-gray-900 font-bold placeholder:text-gray-400"
-                                  placeholder="Total linear feet"
-                                />
-                                <p className="text-xs text-gray-500 mt-1.5">Use Quick Entry button above or type directly</p>
+                              {/* Total Linear Feet & Cut Depth */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-white rounded-xl p-4 border-2 border-purple-300">
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Total Linear Feet</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    value={currentCut.linearFeet}
+                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
+                                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-purple-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                    placeholder="Total linear feet"
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1.5">Use Quick Entry button above or type directly</p>
+                                </div>
+                                <div className="bg-white rounded-xl p-4 border-2 border-purple-300">
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Cut Depth (in)</label>
+                                  <input
+                                    type="number"
+                                    step="0.25"
+                                    min="0"
+                                    value={currentCut.cutDepth}
+                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
+                                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-purple-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                    placeholder="Depth"
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1.5">Auto-filled from Quick Entry or type directly</p>
+                                </div>
                               </div>
                             </div>
                           ) : (isSlabSaw(currentItem) || isWallSaw(currentItem) || isHandSaw(currentItem)) ? (
@@ -2134,19 +2154,34 @@ export default function WorkPerformed() {
                                 Quick Entry - Multiple Cuts
                               </button>
 
-                              {/* Total Linear Feet Display */}
-                              <div className="bg-white rounded-xl p-4 border-2 border-blue-300">
-                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Total Linear Feet</label>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  value={currentCut.linearFeet}
-                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
-                                  className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-blue-50 text-gray-900 font-bold placeholder:text-gray-400"
-                                  placeholder="Total linear feet"
-                                />
-                                <p className="text-xs text-gray-500 mt-1.5">Use Quick Entry button above or type directly</p>
+                              {/* Total Linear Feet & Cut Depth */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-white rounded-xl p-4 border-2 border-blue-300">
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Total Linear Feet</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    value={currentCut.linearFeet}
+                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
+                                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-blue-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                    placeholder="Total linear feet"
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1.5">Use Quick Entry button above or type directly</p>
+                                </div>
+                                <div className="bg-white rounded-xl p-4 border-2 border-blue-300">
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Cut Depth (in)</label>
+                                  <input
+                                    type="number"
+                                    step="0.25"
+                                    min="0"
+                                    value={currentCut.cutDepth}
+                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
+                                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-blue-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                    placeholder="Depth"
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1.5">Auto-filled from Quick Entry or type directly</p>
+                                </div>
                               </div>
                             </div>
                           ) : (
@@ -2782,9 +2817,9 @@ export default function WorkPerformed() {
 
       {/* Add More Dialog */}
       {showAddMoreDialog && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
-            <div className="p-6">
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[60] sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-md w-full shadow-2xl">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center justify-center mb-4">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
                   <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2819,8 +2854,8 @@ export default function WorkPerformed() {
 
       {/* Equipment Usage Form Modal */}
       {showEquipmentForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="my-8">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4 overflow-y-auto">
+          <div className="w-full sm:my-8">
             <EquipmentUsageForm
               onSave={handleSaveEquipmentUsage}
               onCancel={() => setShowEquipmentForm(false)}
@@ -2831,8 +2866,8 @@ export default function WorkPerformed() {
 
       {/* Job Feedback Modal */}
       {showFeedbackModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-2xl w-full p-4 sm:p-8 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Job Feedback</h2>
               <p className="text-gray-600">Help us improve by rating this job</p>
@@ -2965,12 +3000,12 @@ export default function WorkPerformed() {
 
       {/* Quick Entry Modal */}
       {showQuickEntryModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full p-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-3xl w-full p-4 sm:p-8 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div>
-                <h3 className="text-2xl font-bold text-gray-900">Quick Entry - Multiple Cuts</h3>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900">Quick Entry - Multiple Cuts</h3>
                 <p className="text-sm text-gray-600 mt-1">Add multiple different cut lengths with ease</p>
               </div>
               <button
@@ -2990,7 +3025,7 @@ export default function WorkPerformed() {
             </div>
 
             {/* Entry Form */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 mb-6 border-2 border-blue-200">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-blue-200">
               <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -3147,13 +3182,13 @@ export default function WorkPerformed() {
 
       {/* Chainsaw Quick Entry Modal */}
       {showChainsawModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-3xl flex justify-between items-center">
+            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 sm:p-6 rounded-t-3xl flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">Chain Saw Quick Entry</h2>
-                <p className="text-purple-100 text-sm mt-1">Length measurements in INCHES</p>
+                <h2 className="text-lg sm:text-2xl font-bold">Chain Saw Quick Entry</h2>
+                <p className="text-purple-100 text-xs sm:text-sm mt-1">Length measurements in INCHES</p>
               </div>
               <button
                 onClick={() => {
@@ -3172,8 +3207,8 @@ export default function WorkPerformed() {
             </div>
 
             {/* Entry Form */}
-            <div className="p-6">
-              <div className="bg-purple-50 rounded-2xl p-6 mb-6 border-2 border-purple-200">
+            <div className="p-4 sm:p-6">
+              <div className="bg-purple-50 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-purple-200">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Add Cut Entry</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Number of Cuts */}
@@ -3310,13 +3345,13 @@ export default function WorkPerformed() {
 
       {/* Break & Remove Quick Entry Modal */}
       {showBreakRemoveModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-red-600 to-rose-600 text-white p-6 rounded-t-3xl flex justify-between items-center">
+            <div className="sticky top-0 bg-gradient-to-r from-red-600 to-rose-600 text-white p-4 sm:p-6 rounded-t-3xl flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">Break & Remove - Area Calculator</h2>
-                <p className="text-red-100 text-sm mt-1">Calculate total square footage removed</p>
+                <h2 className="text-lg sm:text-2xl font-bold">Break & Remove</h2>
+                <p className="text-red-100 text-xs sm:text-sm mt-1">Calculate total square footage removed</p>
               </div>
               <button
                 onClick={() => {
@@ -3337,8 +3372,8 @@ export default function WorkPerformed() {
             </div>
 
             {/* Entry Form */}
-            <div className="p-6">
-              <div className="bg-red-50 rounded-2xl p-6 mb-6 border-2 border-red-200">
+            <div className="p-4 sm:p-6">
+              <div className="bg-red-50 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-red-200">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Add Area</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Length */}
@@ -3538,15 +3573,15 @@ export default function WorkPerformed() {
 
       {/* Jack Hammering Quick Entry Modal */}
       {showJackhammerModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-yellow-600 to-amber-600 text-white p-6 rounded-t-3xl flex justify-between items-center">
+            <div className="sticky top-0 bg-gradient-to-r from-yellow-600 to-amber-600 text-white p-4 sm:p-6 rounded-t-3xl flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">
+                <h2 className="text-lg sm:text-2xl font-bold">
                   {isChipping(currentItem) ? 'Chipping' : 'Jack Hammering'} Quick Entry
                 </h2>
-                <p className="text-yellow-100 text-sm mt-1">Calculate total square footage</p>
+                <p className="text-yellow-100 text-xs sm:text-sm mt-1">Calculate total square footage</p>
               </div>
               <button
                 onClick={() => {
@@ -3566,9 +3601,9 @@ export default function WorkPerformed() {
             </div>
 
             {/* Entry Form */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* Equipment Selection */}
-              <div className="mb-6 bg-yellow-50 rounded-2xl p-6 border-2 border-yellow-200">
+              <div className="mb-4 sm:mb-6 bg-yellow-50 rounded-2xl p-4 sm:p-6 border-2 border-yellow-200">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Equipment Used</h3>
                 <select
                   value={jackhammerEquipment}
@@ -3599,7 +3634,7 @@ export default function WorkPerformed() {
               </div>
 
               {/* Area Entry */}
-              <div className="bg-amber-50 rounded-2xl p-6 mb-6 border-2 border-amber-200">
+              <div className="bg-amber-50 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-amber-200">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Add Area</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Length */}
@@ -3716,13 +3751,13 @@ export default function WorkPerformed() {
 
       {/* Brokk Quick Entry Modal */}
       {showBrokkModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-gray-700 to-slate-700 text-white p-6 rounded-t-3xl flex justify-between items-center">
+            <div className="sticky top-0 bg-gradient-to-r from-gray-700 to-slate-700 text-white p-4 sm:p-6 rounded-t-3xl flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">Brokk Quick Entry</h2>
-                <p className="text-gray-300 text-sm mt-1">Calculate area and thickness</p>
+                <h2 className="text-lg sm:text-2xl font-bold">Brokk Quick Entry</h2>
+                <p className="text-gray-300 text-xs sm:text-sm mt-1">Calculate area and thickness</p>
               </div>
               <button
                 onClick={() => {
@@ -3741,8 +3776,8 @@ export default function WorkPerformed() {
             </div>
 
             {/* Entry Form */}
-            <div className="p-6">
-              <div className="bg-gray-100 rounded-2xl p-6 mb-6 border-2 border-gray-300">
+            <div className="p-4 sm:p-6">
+              <div className="bg-gray-100 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-gray-300">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Add Area</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Length */}

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     if (timecardError) {
       // If timecards table doesn't exist yet, don't block the status update
-      if (timecardError.code === 'PGRST204' || timecardError.code === 'PGRST205' || timecardError.code === '42P01' || timecardError.message?.includes('does not exist')) {
+      if (isTableNotFoundError(timecardError)) {
         activeTimecard = null;
       } else {
         console.error('Error fetching active timecard:', timecardError);
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     if (statusError) {
       // If table doesn't exist yet, continue without blocking
-      if (statusError.code === 'PGRST204' || statusError.code === 'PGRST205' || statusError.code === '42P01' || statusError.message?.includes('does not exist')) {
+      if (isTableNotFoundError(statusError)) {
         statusEntry = null;
       } else {
         console.error('Error creating status entry:', statusError);
@@ -185,7 +186,7 @@ export async function GET(request: NextRequest) {
 
     if (statusError) {
       // If table doesn't exist yet, return null status (not an error)
-      if (statusError.code === 'PGRST204' || statusError.code === 'PGRST205' || statusError.code === '42P01' || statusError.message?.includes('does not exist')) {
+      if (isTableNotFoundError(statusError)) {
         latestStatus = null;
       } else {
         console.error('Error fetching status:', statusError);

@@ -1,12 +1,20 @@
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 
 // GET current clock status
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    if (!session) {
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -14,16 +22,23 @@ export async function GET() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const { data: clockRecord, error } = await supabase
+    const { data: clockRecord, error } = await supabaseAdmin
       .from('time_clock')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .gte('clock_in_time', today.toISOString())
       .order('clock_in_time', { ascending: false })
       .limit(1)
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      // If table doesn't exist yet, treat as not clocked in
+      if (isTableNotFoundError(error)) {
+        return NextResponse.json({
+          isClockedIn: false,
+          clockRecord: null
+        });
+      }
       console.error('Error fetching clock status:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -39,11 +54,18 @@ export async function GET() {
 }
 
 // POST clock in/out
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    if (!session) {
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -55,13 +77,21 @@ export async function POST(request: Request) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const { data: existingClock } = await supabase
+      const { data: existingClock, error: checkError } = await supabaseAdmin
         .from('time_clock')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('user_id', user.id)
         .gte('clock_in_time', today.toISOString())
         .is('clock_out_time', null)
         .single();
+
+      // If table doesn't exist, return service unavailable
+      if (checkError && isTableNotFoundError(checkError)) {
+        return NextResponse.json(
+          { error: 'Time clock system is not available yet. Please contact your administrator.' },
+          { status: 503 }
+        );
+      }
 
       if (existingClock) {
         return NextResponse.json(
@@ -71,10 +101,10 @@ export async function POST(request: Request) {
       }
 
       // Create new clock-in record
-      const { data: newClock, error } = await supabase
+      const { data: newClock, error } = await supabaseAdmin
         .from('time_clock')
         .insert({
-          user_id: session.user.id,
+          user_id: user.id,
           clock_in_time: new Date().toISOString(),
           clock_in_location: location || null,
           notes: notes || null
@@ -83,6 +113,12 @@ export async function POST(request: Request) {
         .single();
 
       if (error) {
+        if (isTableNotFoundError(error)) {
+          return NextResponse.json(
+            { error: 'Time clock system is not available yet.' },
+            { status: 503 }
+          );
+        }
         console.error('Error clocking in:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
@@ -98,13 +134,20 @@ export async function POST(request: Request) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const { data: activeClock } = await supabase
+      const { data: activeClock, error: fetchError } = await supabaseAdmin
         .from('time_clock')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('user_id', user.id)
         .gte('clock_in_time', today.toISOString())
         .is('clock_out_time', null)
         .single();
+
+      if (fetchError && isTableNotFoundError(fetchError)) {
+        return NextResponse.json(
+          { error: 'Time clock system is not available yet.' },
+          { status: 503 }
+        );
+      }
 
       if (!activeClock) {
         return NextResponse.json(
@@ -114,7 +157,7 @@ export async function POST(request: Request) {
       }
 
       // Update with clock-out time
-      const { data: updatedClock, error } = await supabase
+      const { data: updatedClock, error } = await supabaseAdmin
         .from('time_clock')
         .update({
           clock_out_time: new Date().toISOString(),
@@ -125,6 +168,12 @@ export async function POST(request: Request) {
         .single();
 
       if (error) {
+        if (isTableNotFoundError(error)) {
+          return NextResponse.json(
+            { error: 'Time clock system is not available yet.' },
+            { status: 503 }
+          );
+        }
         console.error('Error clocking out:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }

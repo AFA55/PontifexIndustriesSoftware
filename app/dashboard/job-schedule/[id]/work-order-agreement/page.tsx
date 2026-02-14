@@ -18,21 +18,32 @@ export default function WorkOrderAgreementPage() {
 
   const fetchJobData = async () => {
     try {
-      const { data: job, error } = await supabase
-        .from('active_job_orders')
-        .select('*')
-        .eq('id', params.id)
-        .single();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push('/login');
+        return;
+      }
 
-      if (error) throw error;
+      const response = await fetch(`/api/job-orders?id=${params.id}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to load job data');
+
+      const result = await response.json();
+      if (!result.success || !result.data?.length) throw new Error('Job not found');
+
+      const job = result.data[0];
 
       setJobData({
         orderId: job.job_number,
-        date: job.job_date,
+        date: job.job_date || job.scheduled_date,
         customer: job.customer_name,
         jobLocation: job.location || job.address,
         poNumber: job.po_number,
-        workDescription: job.job_description || job.scope_of_work || 'Core drilling and concrete cutting services',
+        workDescription: job.job_description || job.scope_of_work || job.description || 'Core drilling and concrete cutting services',
         scopeOfWork: job.scope_of_work_items || []
       });
     } catch (error) {
@@ -51,10 +62,15 @@ export default function WorkOrderAgreementPage() {
         return;
       }
 
-      // Save the contract signature to database
-      const { error: updateError } = await supabase
-        .from('job_orders')
-        .update({
+      // Save the contract signature to database via API (avoids RLS issues)
+      const saveResponse = await fetch(`/api/job-orders/${params.id}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          status: 'assigned',
           work_order_signed: true,
           work_order_signature: signatureData.signature,
           work_order_signer_name: signatureData.name,
@@ -63,9 +79,12 @@ export default function WorkOrderAgreementPage() {
           cut_through_authorized: signatureData.cutThroughAuthorized || false,
           cut_through_signature: signatureData.cutThroughSignature || null
         })
-        .eq('id', params.id);
+      });
 
-      if (updateError) throw updateError;
+      if (!saveResponse.ok) {
+        const errData = await saveResponse.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to save work order agreement');
+      }
 
       // Generate PDF and save to job ticket (async, don't wait for it)
       fetch('/api/work-order-agreement/pdf', {

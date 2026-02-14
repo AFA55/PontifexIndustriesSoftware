@@ -1,18 +1,13 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
-
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    // Security: require authenticated user
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role')
 

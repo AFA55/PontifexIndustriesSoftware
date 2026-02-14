@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 
 export async function PUT(
   request: NextRequest,
@@ -139,7 +140,7 @@ export async function PUT(
         notes: 'Job completed and data submitted',
       });
 
-    if (statusHistoryError && !(statusHistoryError.code === 'PGRST204' || statusHistoryError.code === 'PGRST205' || statusHistoryError.code === '42P01' || statusHistoryError.message?.includes('does not exist'))) {
+    if (statusHistoryError && !(isTableNotFoundError(statusHistoryError))) {
       console.error('Error updating operator status history:', statusHistoryError);
     }
 

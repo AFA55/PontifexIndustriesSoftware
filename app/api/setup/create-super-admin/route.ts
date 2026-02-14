@@ -6,9 +6,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
+    // Security: require existing admin to create new admins
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
     const body = await request.json();
     const { email, password, fullName } = body;
 

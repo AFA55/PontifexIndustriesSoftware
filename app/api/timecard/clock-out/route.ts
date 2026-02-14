@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS } from '@/lib/geolocation';
 
 export async function POST(request: NextRequest) {
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     if (fetchError) {
       // If table doesn't exist
-      if (fetchError.code === 'PGRST204' || fetchError.code === 'PGRST205' || fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
+      if (isTableNotFoundError(fetchError)) {
         return NextResponse.json(
           { error: 'Timecard system is not available yet. Please contact your administrator.' },
           { status: 503 }

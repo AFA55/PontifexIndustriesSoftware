@@ -5,10 +5,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth, requireAdmin } from '@/lib/api-auth';
 
 // GET - List all contractors
 export async function GET(request: NextRequest) {
   try {
+    // Security: require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
     const status = searchParams.get('status') || 'active';
@@ -57,6 +61,10 @@ export async function GET(request: NextRequest) {
 // POST - Create new contractor
 export async function POST(request: NextRequest) {
   try {
+    // Security: only admins can create contractors
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
     const body = await request.json();
 
     const {

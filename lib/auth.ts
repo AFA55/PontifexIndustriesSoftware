@@ -61,7 +61,7 @@ export const checkCredentials = async (email: string, password: string): Promise
 
     return {
       success: false,
-      error: 'Invalid email or password. Use demo@pontifex.com / Demo1234! or admin@pontifex.com / Admin1234!'
+      error: 'Invalid email or password'
     };
   }
 };
@@ -95,8 +95,16 @@ export const getCurrentUser = (): User | null => {
   return null;
 };
 
-export const logout = (): void => {
+export const logout = async (): Promise<void> => {
   if (typeof window === 'undefined') return;
+
+  // Sign out from Supabase to clear the session token
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    await supabase.auth.signOut();
+  } catch (e) {
+    console.log('Supabase signOut skipped:', e);
+  }
 
   localStorage.removeItem('pontifex-user');
   localStorage.removeItem('supabase-user');

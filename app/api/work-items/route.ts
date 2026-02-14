@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,6 +64,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
+      // If work_items table doesn't exist yet, return success silently
+      if (isTableNotFoundError(insertError)) {
+        return NextResponse.json({
+          success: true,
+          data: null,
+          message: 'Work items table not available yet — data saved to job order only'
+        });
+      }
       console.error('Error inserting work item:', insertError);
       return NextResponse.json(
         { error: 'Failed to save work item', details: insertError.message },
@@ -135,6 +144,13 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (fetchError) {
+      // If work_items table doesn't exist yet, return empty array
+      if (isTableNotFoundError(fetchError)) {
+        return NextResponse.json({
+          success: true,
+          data: []
+        });
+      }
       console.error('Error fetching work items:', fetchError);
       return NextResponse.json(
         { error: 'Failed to fetch work items', details: fetchError.message },

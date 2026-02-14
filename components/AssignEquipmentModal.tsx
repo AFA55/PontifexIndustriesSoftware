@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { X, UserPlus, Package, AlertCircle, CheckCircle } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 
 interface InventoryItem {
   id: string
@@ -57,7 +58,10 @@ export default function AssignEquipmentModal({
   const fetchOperators = async () => {
     setIsLoadingOperators(true)
     try {
-      const response = await fetch('/api/users?role=operator')
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/users?role=operator', {
+        headers: { 'Authorization': `Bearer ${session?.access_token || ''}` },
+      })
       if (response.ok) {
         const data = await response.json()
         setOperators(data)

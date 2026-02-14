@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
+    // Security: require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const type = searchParams.get('type'); // 'admin' or 'operator'
@@ -47,6 +51,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Security: require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
+
     const body = await request.json();
     const { userId, type, completed, skipped } = body;
 

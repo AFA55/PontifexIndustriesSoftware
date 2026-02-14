@@ -69,20 +69,24 @@ export default function CustomerSignaturePage() {
         return;
       }
 
-      // Load all job data
-      const { data, error: queryError } = await supabase
-        .from('job_orders')
-        .select('*')
-        .eq('id', jobId)
-        .single();
+      // Load all job data via API (avoids RLS issues)
+      const jobResponse = await fetch(`/api/job-orders?id=${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
 
-      console.log('Query result:', { data, error: queryError });
-
-      if (queryError) {
-        setError(`Database error: ${queryError.message}`);
+      if (!jobResponse.ok) {
+        const errData = await jobResponse.json().catch(() => ({}));
+        setError(`Database error: ${errData.error || 'Failed to load job'}`);
         setLoading(false);
         return;
       }
+
+      const jobResult = await jobResponse.json();
+      const data = jobResult.success && jobResult.data?.length > 0 ? jobResult.data[0] : null;
+
+      console.log('Query result:', { data });
 
       if (!data) {
         setError('Job not found in database');
@@ -112,18 +116,10 @@ export default function CustomerSignaturePage() {
       // Load standby logs
       await loadStandbyLogs();
 
-      // Check if this is a multi-day job by looking at scheduled_duration or checking daily logs
-      // A job is considered multi-day if it has existing daily logs (indicating previous days)
-      // OR if admin has scheduled it for multiple days
-      const { data: dailyLogs } = await supabase
-        .from('daily_job_logs')
-        .select('id')
-        .eq('job_order_id', jobId);
-
-      // If there are daily logs, this job has been running for multiple days
-      // OR check if there's a scheduled_duration field > 1
-      const hasMultipleDays = (dailyLogs && dailyLogs.length > 0) || (data.scheduled_duration && data.scheduled_duration > 1);
-      setIsMultiDayJob(hasMultipleDays);
+      // Check if this is a multi-day job by looking at scheduled_duration
+      // daily_job_logs table may not exist yet, so just check scheduled_duration
+      const hasMultipleDays = data.scheduled_duration && data.scheduled_duration > 1;
+      setIsMultiDayJob(hasMultipleDays || false);
 
       setJob(data);
       setWorkPerformed(workPerformedList);
@@ -145,10 +141,15 @@ export default function CustomerSignaturePage() {
         return;
       }
 
-      // Save completion signature and customer feedback, and mark job as completed
-      const { error } = await supabase
-        .from('job_orders')
-        .update({
+      // Save completion signature and customer feedback via API (avoids RLS issues)
+      const saveResponse = await fetch(`/api/job-orders/${jobId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          status: 'completed',
           completion_signature: signatureData.contactNotOnSite ? null : signatureData.signature,
           completion_signer_name: signatureData.contactNotOnSite ? null : signatureData.customerName,
           completion_signed_at: new Date().toISOString(),
@@ -158,13 +159,13 @@ export default function CustomerSignaturePage() {
           customer_communication_rating: signatureData.communicationRating || null,
           customer_overall_rating: signatureData.overallRating || null,
           customer_feedback_comments: signatureData.feedbackComments || null,
-          status: 'completed'
         })
-        .eq('id', jobId);
+      });
 
-      if (error) {
-        showNotification('Error saving signature: ' + error.message, 'error');
-        throw error;
+      if (!saveResponse.ok) {
+        const errData = await saveResponse.json().catch(() => ({}));
+        showNotification('Error saving signature: ' + (errData.error || 'Unknown error'), 'error');
+        throw new Error(errData.error || 'Failed to save signature');
       }
 
       // Generate PDF of signed agreement
@@ -242,7 +243,8 @@ export default function CustomerSignaturePage() {
       setTimeout(() => router.push('/dashboard'), 2000);
     } catch (error) {
       console.error('Error saving signature:', error);
-      throw error;
+      // Don't re-throw — the notification already informed the user.
+      // Re-throwing would cause the ServiceCompletionAgreement component to also show an alert().
     }
   };
 

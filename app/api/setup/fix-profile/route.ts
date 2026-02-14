@@ -5,9 +5,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
+    // Security: only admins can fix profiles
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
     const body = await request.json();
     const { email } = body;
 

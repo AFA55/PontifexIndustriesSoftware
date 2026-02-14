@@ -144,25 +144,16 @@ export default function JobSchedule() {
                 <span className="text-gray-700">Previous</span>
               </button>
 
-              <div className="text-center">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">
-                      {dateString}
-                    </h2>
-                    <p className="text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
-                      {currentDateOffset === 0 ? "Today's Schedule" :
-                       currentDateOffset === 1 ? "Tomorrow" :
-                       currentDateOffset === -1 ? "Yesterday" :
-                       `${Math.abs(currentDateOffset)} days ${currentDateOffset > 0 ? 'ahead' : 'ago'}`}
-                    </p>
-                  </div>
-                </div>
+              <div className="text-center flex-1 px-2">
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-900">
+                  {dateString}
+                </h2>
+                <p className="text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
+                  {currentDateOffset === 0 ? "Today's Schedule" :
+                   currentDateOffset === 1 ? "Tomorrow" :
+                   currentDateOffset === -1 ? "Yesterday" :
+                   `${Math.abs(currentDateOffset)} days ${currentDateOffset > 0 ? 'ahead' : 'ago'}`}
+                </p>
               </div>
 
               <button

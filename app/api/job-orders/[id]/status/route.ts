@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -37,7 +38,7 @@ async function updateJobStatus(
 
     // Parse request body
     const body = await request.json();
-    const { status, latitude, longitude, accuracy, departure_time } = body;
+    const { status, latitude, longitude, accuracy, departure_time, ...additionalFields } = body;
 
     // Validate status
     const validStatuses = ['scheduled', 'assigned', 'in_route', 'in_progress', 'completed', 'cancelled'];
@@ -107,8 +108,38 @@ async function updateJobStatus(
       updateData.work_end_longitude = longitude;
     }
 
+    // Allow additional known fields to be updated (whitelisted for safety)
+    const allowedExtraFields = [
+      // Liability release fields
+      'liability_release_signed_by', 'liability_release_signature',
+      'liability_release_signed_at', 'liability_release_customer_name',
+      'liability_release_customer_email',
+      // Customer signature / completion fields
+      'completion_signature', 'completion_signer_name', 'completion_signed_at',
+      'completion_notes', 'contact_not_on_site',
+      'customer_cleanliness_rating', 'customer_communication_rating',
+      'customer_overall_rating', 'customer_feedback_comments',
+      // Work order agreement fields
+      'work_order_signed', 'work_order_signature', 'work_order_signer_name',
+      'work_order_signer_title', 'work_order_signed_at',
+      'cut_through_authorized', 'cut_through_signature',
+      // Arrival time
+      'arrival_time',
+      // Job feedback fields
+      'job_difficulty_rating', 'job_access_rating',
+      'job_difficulty_notes', 'job_access_notes',
+      'feedback_submitted_at',
+    ];
+
+    for (const field of allowedExtraFields) {
+      if (additionalFields[field] !== undefined) {
+        updateData[field] = additionalFields[field];
+      }
+    }
+
     // Update job order
-    const { data: updatedJob, error: updateError } = await supabaseAdmin
+    let updatedJob: any = null;
+    const { data: fullUpdateResult, error: updateError } = await supabaseAdmin
       .from('job_orders')
       .update(updateData)
       .eq('id', jobId)
@@ -116,11 +147,34 @@ async function updateJobStatus(
       .single();
 
     if (updateError) {
-      console.error('Error updating job order status:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to update job order status', details: updateError.message },
-        { status: 500 }
-      );
+      // If the error is about unknown columns, retry with just the status field
+      const errMsg = (updateError.message || '').toLowerCase();
+      if (errMsg.includes('column') || errMsg.includes('does not exist') || errMsg.includes('undefined')) {
+        console.log('Full update failed (likely missing columns), retrying with status only:', updateError.message);
+        const { data: fallbackResult, error: fallbackError } = await supabaseAdmin
+          .from('job_orders')
+          .update({ status })
+          .eq('id', jobId)
+          .select()
+          .single();
+
+        if (fallbackError) {
+          console.error('Fallback status update also failed:', fallbackError);
+          return NextResponse.json(
+            { error: 'Failed to update job order status', details: fallbackError.message },
+            { status: 500 }
+          );
+        }
+        updatedJob = fallbackResult;
+      } else {
+        console.error('Error updating job order status:', updateError);
+        return NextResponse.json(
+          { error: 'Failed to update job order status', details: updateError.message },
+          { status: 500 }
+        );
+      }
+    } else {
+      updatedJob = fullUpdateResult;
     }
 
     // Also update operator_status_history for tracking
@@ -146,8 +200,9 @@ async function updateJobStatus(
         onConflict: 'operator_id,job_order_id'
       });
 
-    if (historyUpsertError && !(historyUpsertError.code === 'PGRST204' || historyUpsertError.code === 'PGRST205' || historyUpsertError.code === '42P01' || historyUpsertError.message?.includes('does not exist'))) {
-      console.error('Error updating operator status history:', historyUpsertError);
+    if (historyUpsertError) {
+      // operator_status_history is optional — log but never block
+      console.log('Operator status history skipped (table may not exist):', historyUpsertError.message || historyUpsertError.code || 'unknown');
     }
 
     return NextResponse.json(

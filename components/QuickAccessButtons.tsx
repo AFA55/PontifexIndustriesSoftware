@@ -259,51 +259,51 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
       )}
 
       {/* Quick Access Buttons */}
-      <div className="flex gap-3 mb-6">
+      <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-6">
         <button
           onClick={() => setShowLocationModal(true)}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+          className="flex-1 px-2 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-1.5 sm:gap-2"
         >
-          <MapPin className="w-5 h-5" />
-          View Location
+          <MapPin className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+          <span className="truncate">View Location</span>
         </button>
 
         <button
           onClick={() => isOnStandby ? setShowStandbyModal(true) : setShowContactModal(true)}
-          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 ${
+          className={`flex-1 px-2 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-1.5 sm:gap-2 ${
             isOnStandby
               ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white'
           }`}
         >
-          <Phone className="w-5 h-5" />
-          Contact On Site
+          <Phone className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+          <span className="truncate">Contact On Site</span>
         </button>
 
         <button
           onClick={() => setShowStandbyModal(true)}
-          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 ${
+          className={`flex-1 px-2 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-1.5 sm:gap-2 ${
             isOnStandby
               ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 text-white'
               : 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white'
           }`}
         >
-          <Clock className="w-5 h-5" />
-          {isOnStandby ? 'Stop Standby' : 'Start Standby'}
+          <Clock className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+          <span className="truncate">{isOnStandby ? 'Stop Standby' : 'Start Standby'}</span>
         </button>
       </div>
 
       {/* Location Modal */}
       {showLocationModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-2xl">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-8 h-8 text-blue-600" />
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-8 shadow-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 sm:w-8 sm:h-8 text-blue-600" />
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Job Location</h2>
-                <p className="text-sm text-gray-600">Get directions to the job site</p>
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">Job Location</h2>
+                <p className="text-xs sm:text-sm text-gray-600">Get directions to the job site</p>
               </div>
             </div>
 
@@ -343,29 +343,29 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
 
       {/* Contact Modal */}
       {showContactModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-2xl">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <Phone className="w-8 h-8 text-green-600" />
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-8 shadow-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-green-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <Phone className="w-5 h-5 sm:w-8 sm:h-8 text-green-600" />
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Contact On Site</h2>
-                <p className="text-sm text-gray-600">Call or text the customer</p>
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">Contact On Site</h2>
+                <p className="text-xs sm:text-sm text-gray-600">Call or text the customer</p>
               </div>
             </div>
 
-            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 mb-6">
+            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <div className="mb-4">
                 <p className="text-sm text-green-700 font-semibold mb-1">Contact On Site</p>
-                <p className="text-lg font-bold text-green-900">
+                <p className="text-base sm:text-lg font-bold text-green-900">
                   {jobData.foreman_name || jobData.customer_name}
                 </p>
               </div>
               {jobData.foreman_phone && (
                 <div>
                   <p className="text-sm text-green-700 font-semibold mb-1">Phone Number</p>
-                  <p className="text-2xl font-bold text-green-900">{jobData.foreman_phone}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-green-900">{jobData.foreman_phone}</p>
                 </div>
               )}
             </div>
@@ -414,19 +414,19 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
 
       {/* Standby Time Modal */}
       {showStandbyModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-2xl">
-            <div className="flex items-start gap-4 mb-6">
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-8 shadow-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
                 isOnStandby ? 'bg-yellow-100' : 'bg-orange-100'
               }`}>
-                <Clock className={`w-8 h-8 ${isOnStandby ? 'text-yellow-600' : 'text-orange-600'}`} />
+                <Clock className={`w-5 h-5 sm:w-8 sm:h-8 ${isOnStandby ? 'text-yellow-600' : 'text-orange-600'}`} />
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">
                   {isOnStandby ? 'Stop Standby Time' : 'Start Standby Time'}
                 </h2>
-                <p className="text-sm text-gray-600">
+                <p className="text-xs sm:text-sm text-gray-600">
                   {isOnStandby
                     ? 'Stop standby to continue working'
                     : 'Track time when contractor is not ready'}
@@ -436,7 +436,7 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
 
             {isOnStandby ? (
               <div className="space-y-4">
-                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">
+                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 sm:p-6">
                   <p className="text-sm text-yellow-700 font-semibold mb-1">Currently on standby</p>
                   <p className="text-xs text-yellow-600 mb-4">
                     Started: {currentStandbyLog && new Date(currentStandbyLog.started_at).toLocaleString()}

@@ -8,7 +8,6 @@ interface AccessRequest {
   id: string;
   full_name: string;
   email: string;
-  password_hash: string;
   date_of_birth: string;
   position: string;
   status: 'pending' | 'approved' | 'denied';
@@ -34,6 +33,15 @@ export default function AccessRequestsPage() {
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
   const [editActiveStatus, setEditActiveStatus] = useState(true);
 
+  // Helper to get auth headers for API calls
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token || ''}`,
+    };
+  };
+
   useEffect(() => {
     const initUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -56,7 +64,8 @@ export default function AccessRequestsPage() {
       console.log('🔍 Fetching access requests...');
 
       // Use API route to fetch requests (bypasses RLS issues)
-      const response = await fetch('/api/access-requests/list');
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/access-requests/list', { headers });
       const result = await response.json();
 
       if (!response.ok) {
@@ -77,11 +86,10 @@ export default function AccessRequestsPage() {
     setProcessing(true);
     try {
       // Call API route to approve request and create user
+      const headers = await getAuthHeaders();
       const response = await fetch(`/api/access-requests/${request.id}/approve`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           role: role,
           reviewedBy: userId,
@@ -118,11 +126,10 @@ export default function AccessRequestsPage() {
     setProcessing(true);
     try {
       // Call API route to deny request
+      const headers = await getAuthHeaders();
       const response = await fetch(`/api/access-requests/${request.id}/deny`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           denialReason: denialReason,
           reviewedBy: userId,
@@ -156,8 +163,10 @@ export default function AccessRequestsPage() {
       console.log(`🗑️ Removing request: ${request.id}`);
 
       // Call API route to delete request
+      const headers = await getAuthHeaders();
       const response = await fetch(`/api/access-requests/${request.id}/delete`, {
         method: 'POST',
+        headers,
       });
 
       const result = await response.json();
@@ -186,11 +195,10 @@ export default function AccessRequestsPage() {
       console.log(`✏️ Updating user: ${selectedRequest.email}`);
 
       // Call API route to update user profile
+      const headers = await getAuthHeaders();
       const response = await fetch(`/api/access-requests/${selectedRequest.id}/update-user`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           role: selectedRole,
           active: editActiveStatus,

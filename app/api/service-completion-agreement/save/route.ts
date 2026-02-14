@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
     const filePath = `job-${jobId}/${fileName}`;
 
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from('job-documents')
+      .from('JobDocuments')
       .upload(filePath, pdfBuffer, {
         contentType: 'application/pdf',
         upsert: true,
@@ -227,12 +227,13 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Upload error:', uploadError);
-      return NextResponse.json({ error: 'Failed to upload PDF' }, { status: 500 });
+      // Don't block job completion if PDF upload fails
+      console.log('PDF upload failed, continuing without PDF storage');
     }
 
     // Get public URL
     const { data: { publicUrl } } = supabaseAdmin.storage
-      .from('job-documents')
+      .from('JobDocuments')
       .getPublicUrl(filePath);
 
     // Track in pdf_documents table

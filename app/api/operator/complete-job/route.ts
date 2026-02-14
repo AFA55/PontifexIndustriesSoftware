@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,11 +46,16 @@ export async function POST(request: NextRequest) {
       .eq('job_order_id', jobId);
 
     if (workItemsError) {
-      console.error('Error fetching work items:', workItemsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch work items' },
-        { status: 500 }
-      );
+      // If work_items table doesn't exist yet, continue with empty data
+      if (isTableNotFoundError(workItemsError)) {
+        // No work items table — skip production calculations
+      } else {
+        console.error('Error fetching work items:', workItemsError);
+        return NextResponse.json(
+          { error: 'Failed to fetch work items' },
+          { status: 500 }
+        );
+      }
     }
 
     // Calculate total linear feet cut
@@ -112,14 +118,18 @@ export async function POST(request: NextRequest) {
     const productivityRate = calculatedHours > 0 ? totalLinearFeet / calculatedHours : 0;
 
     // Check if record already exists for this operator and job
-    const { data: existingRecord } = await supabaseAdmin
+    // Gracefully handle missing operator_job_history table
+    const { data: existingRecord, error: existingRecordError } = await supabaseAdmin
       .from('operator_job_history')
       .select('id')
       .eq('operator_id', user.id)
       .eq('job_id', jobId)
       .maybeSingle();
 
-    if (existingRecord) {
+    if (existingRecordError && isTableNotFoundError(existingRecordError)) {
+      // operator_job_history table doesn't exist yet — skip performance tracking silently
+      console.log('operator_job_history table not available yet — skipping performance tracking');
+    } else if (existingRecord) {
       // Update existing record
       const { error: updateError } = await supabaseAdmin
         .from('operator_job_history')
@@ -134,11 +144,15 @@ export async function POST(request: NextRequest) {
         .eq('id', existingRecord.id);
 
       if (updateError) {
-        console.error('Error updating operator job history:', updateError);
-        return NextResponse.json(
-          { error: 'Failed to update performance record' },
-          { status: 500 }
-        );
+        if (isTableNotFoundError(updateError)) {
+          console.log('operator_job_history table not available yet — skipping');
+        } else {
+          console.error('Error updating operator job history:', updateError);
+          return NextResponse.json(
+            { error: 'Failed to update performance record' },
+            { status: 500 }
+          );
+        }
       }
     } else {
       // Create new record - this will trigger automatic metric calculations
@@ -156,11 +170,15 @@ export async function POST(request: NextRequest) {
         });
 
       if (insertError) {
-        console.error('Error inserting operator job history:', insertError);
-        return NextResponse.json(
-          { error: 'Failed to save performance record', details: insertError.message },
-          { status: 500 }
-        );
+        if (isTableNotFoundError(insertError)) {
+          console.log('operator_job_history table not available yet — skipping');
+        } else {
+          console.error('Error inserting operator job history:', insertError);
+          return NextResponse.json(
+            { error: 'Failed to save performance record', details: insertError.message },
+            { status: 500 }
+          );
+        }
       }
     }
 

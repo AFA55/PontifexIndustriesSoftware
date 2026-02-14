@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     if (fetchError) {
       // If table doesn't exist yet, treat as not clocked in
-      if (fetchError.code === 'PGRST204' || fetchError.code === 'PGRST205' || fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
+      if (isTableNotFoundError(fetchError)) {
         return NextResponse.json(
           { success: true, isClockedIn: false, data: null },
           { status: 200 }

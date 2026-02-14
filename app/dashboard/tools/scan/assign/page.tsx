@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { UserCheck, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 function AssignEquipmentContent() {
   const router = useRouter()
@@ -42,7 +43,10 @@ function AssignEquipmentContent() {
 
   const fetchOperators = async () => {
     try {
-      const response = await fetch('/api/users?role=operator')
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/users?role=operator', {
+        headers: { 'Authorization': `Bearer ${session?.access_token || ''}` },
+      })
       if (response.ok) {
         const data = await response.json()
         setOperators(data)

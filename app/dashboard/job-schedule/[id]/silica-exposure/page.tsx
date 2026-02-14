@@ -84,17 +84,29 @@ export default function SilicaExposureControlPlan() {
         return;
       }
 
-      // Check if silica plan exists for this job
-      const { data, error } = await supabase
-        .from('silica_plans')
-        .select('id')
-        .eq('job_order_id', params.id)
-        .maybeSingle();
-
-      if (data) {
-        // Silica plan already exists
-        setAlreadySubmitted(true);
-        setIsCompleted(true);
+      // Check if silica plan exists for this job via API (avoids RLS issues & missing table)
+      try {
+        const response = await fetch(`/api/silica-plan/check?jobId=${params.id}`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.exists) {
+            setAlreadySubmitted(true);
+            setIsCompleted(true);
+          }
+        }
+        // If API doesn't exist or fails, just allow submission
+      } catch (apiErr) {
+        // Also check localStorage as fallback
+        const localStatus = localStorage.getItem(`silica-plan-${params.id}`);
+        if (localStatus === 'completed') {
+          setAlreadySubmitted(true);
+          setIsCompleted(true);
+        }
+        console.log('Silica plan check unavailable, using localStorage fallback');
       }
 
       setCheckingSubmission(false);
@@ -381,8 +393,8 @@ export default function SilicaExposureControlPlan() {
         // Store completion status in localStorage
         localStorage.setItem(`silica-plan-${params.id}`, 'completed');
 
-        // Update workflow progress
-        await fetch('/api/workflow', {
+        // Update workflow progress — fire and forget (optional tracking)
+        fetch('/api/workflow', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -393,7 +405,7 @@ export default function SilicaExposureControlPlan() {
             completedStep: 'silica_form',
             currentStep: 'work_performed'
           })
-        });
+        }).catch(err => console.log('Workflow tracking unavailable:', err));
 
         console.log('Document saved successfully');
       } else {
@@ -408,12 +420,17 @@ export default function SilicaExposureControlPlan() {
   const isStepComplete = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!(formData.employeeName && formData.employeePhone && formData.employeesOnJob.length > 0);
+        return !!(
+          formData.employeeName &&
+          formData.employeePhone &&
+          formData.employeesOnJob.length > 0 &&
+          formData.workType.length > 0 &&
+          formData.waterDeliveryIntegrated &&
+          formData.workLocation &&
+          formData.cuttingTime &&
+          formData.apf10Required
+        );
       case 2:
-        return !!(formData.workType.length > 0);  // At least one work type selected
-      case 3:
-        return !!(formData.waterDeliveryIntegrated && formData.workLocation && formData.cuttingTime && formData.apf10Required);
-      case 4:
         return !!(formData.signature);
       default:
         return false;
@@ -424,25 +441,25 @@ export default function SilicaExposureControlPlan() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Modern Header */}
       <div className="backdrop-blur-xl bg-white/90 border-b border-gray-200 sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
               <Link
                 href="/dashboard/job-schedule"
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors bg-gray-100"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors bg-gray-100 flex-shrink-0"
               >
-                <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
               </Link>
-              <div>
-                <h1 className="text-xl font-bold text-gray-800">Silica Dust/Exposure Control Plan</h1>
-                <p className="text-sm text-gray-600">OSHA Compliant Documentation</p>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-xl font-bold text-gray-800 truncate">Silica Exposure Plan</h1>
+                <p className="text-xs sm:text-sm text-gray-600">OSHA Compliant Documentation</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                Job #{params.id}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <span className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] sm:text-xs font-semibold whitespace-nowrap">
+                Job #{typeof params.id === 'string' && params.id.length > 8 ? `${(params.id as string).slice(0, 8)}...` : params.id}
               </span>
             </div>
           </div>
@@ -524,18 +541,18 @@ export default function SilicaExposureControlPlan() {
           <>
 
         {/* Company Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-gray-100">
-          <div className="text-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">B&D CONCRETE CUTTING, INC.</h2>
-            <p className="text-gray-600">6215 PURDUE DRIVE SW</p>
-            <p className="text-gray-600">ATLANTA, GA 30336</p>
-            <p className="text-gray-600">404-696-0404 • Fax: 404-696-3249</p>
+        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 border border-gray-100">
+          <div className="text-center">
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-800">B&D CONCRETE CUTTING, INC.</h2>
+            <p className="text-xs sm:text-base text-gray-600">6215 PURDUE DRIVE SW</p>
+            <p className="text-xs sm:text-base text-gray-600">ATLANTA, GA 30336</p>
+            <p className="text-xs sm:text-base text-gray-600">404-696-0404 • Fax: 404-696-3249</p>
           </div>
         </div>
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-between mb-8">
-          {[1, 2, 3, 4].map((step) => (
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
+          {[1, 2].map((step) => (
             <div key={step} className="flex-1">
               <div className="flex items-center">
                 <div
@@ -555,7 +572,7 @@ export default function SilicaExposureControlPlan() {
                     step
                   )}
                 </div>
-                {step < 4 && (
+                {step < 2 && (
                   <div
                     className={`flex-1 h-1 transition-all duration-300 ${
                       isStepComplete(step) ? 'bg-green-500' : 'bg-gray-200'
@@ -564,23 +581,22 @@ export default function SilicaExposureControlPlan() {
                 )}
               </div>
               <p className="text-xs mt-2 font-medium text-gray-600">
-                {step === 1 && 'Employee Info'}
-                {step === 2 && 'Work Type'}
-                {step === 3 && 'Exposure Control'}
-                {step === 4 && 'Review & Sign'}
+                {step === 1 && 'Job Details'}
+                {step === 2 && 'Review & Sign'}
               </p>
             </div>
           ))}
         </div>
 
         {/* Form Content */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          {/* Step 1: Employee Information */}
+        <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-8 border border-gray-100">
+          {/* Step 1: Job Details (Employee Info + Work Type + Exposure Control) */}
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
+              {/* Employee Information Section */}
               <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
                 <span className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm">1</span>
-                Employee Information
+                Job Details
               </h3>
 
               {/* Info Banner */}
@@ -590,7 +606,7 @@ export default function SilicaExposureControlPlan() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-sm text-blue-800">
-                    Your contact information has been autofilled from your profile. You can edit these fields if needed (e.g., use a nickname or different phone number).
+                    Your contact information has been autofilled from your profile. You can edit these fields if needed.
                   </p>
                 </div>
               </div>
@@ -599,7 +615,7 @@ export default function SilicaExposureControlPlan() {
                 <div>
                   <label htmlFor="employeeName" className="block text-sm font-semibold text-gray-700 mb-2">
                     Employee Name *
-                    <span className="text-xs font-normal text-gray-500 ml-2">(Autofilled from profile)</span>
+                    <span className="text-xs font-normal text-gray-500 ml-2">(Autofilled)</span>
                   </label>
                   <input
                     type="text"
@@ -610,13 +626,12 @@ export default function SilicaExposureControlPlan() {
                     className="w-full px-4 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium bg-blue-50"
                     placeholder="Enter your full name"
                   />
-                  <p className="text-xs text-gray-500 mt-1">You can use a nickname if preferred</p>
                 </div>
 
                 <div>
                   <label htmlFor="employeePhone" className="block text-sm font-semibold text-gray-700 mb-2">
                     Employee Phone # *
-                    <span className="text-xs font-normal text-gray-500 ml-2">(Autofilled from profile)</span>
+                    <span className="text-xs font-normal text-gray-500 ml-2">(Autofilled)</span>
                   </label>
                   <input
                     type="tel"
@@ -627,7 +642,6 @@ export default function SilicaExposureControlPlan() {
                     className="w-full px-4 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium bg-blue-50"
                     placeholder="(xxx) xxx-xxxx"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Edit if you prefer a different contact number</p>
                 </div>
               </div>
 
@@ -665,162 +679,151 @@ export default function SilicaExposureControlPlan() {
                   + Add Another Crew Member
                 </button>
               </div>
+
+              {/* Divider */}
+              <div className="border-t-2 border-gray-200 pt-6">
+                <h4 className="text-lg font-bold text-gray-800 mb-4">Work Type(s) *</h4>
+                <p className="text-sm text-gray-600 mb-4">Select all work types that apply to this job</p>
+                <div className="space-y-3">
+                  {WORK_TYPES.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => toggleWorkType(type)}
+                      className={`w-full p-4 rounded-xl border-2 transition-all duration-200 text-left font-medium ${
+                        formData.workType.includes(type)
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                          : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{type}</span>
+                        {formData.workType.includes(type) && (
+                          <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t-2 border-gray-200 pt-6">
+                <h4 className="text-lg font-bold text-gray-800 mb-4">Exposure Control</h4>
+
+                {/* Water Delivery System */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Water Delivery System Integrated In Equipment? *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {['Yes', 'No'].map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => handleInputChange('waterDeliveryIntegrated', option)}
+                        className={`p-4 rounded-xl border-2 transition-all duration-200 font-medium ${
+                          formData.waterDeliveryIntegrated === option
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Work Location */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Where is your work located? *
+                  </label>
+                  <div className="space-y-3">
+                    {['Outdoors or well-ventilated area', 'Indoors or Enclosed area'].map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => handleInputChange('workLocation', option)}
+                        className={`w-full p-4 rounded-xl border-2 transition-all duration-200 text-left font-medium ${
+                          formData.workLocation === option
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cutting Time */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    For TODAY, Is your cutting time: *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {['Less than 4 Hours', 'More than 4 Hours'].map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => handleInputChange('cuttingTime', option)}
+                        className={`p-4 rounded-xl border-2 transition-all duration-200 font-medium ${
+                          formData.cuttingTime === option
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* APF 10 Protection */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    APF 10 Respiratory Protection Required? *
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {['Yes', 'No', 'N/A'].map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => handleInputChange('apf10Required', option)}
+                        className={`p-4 rounded-xl border-2 transition-all duration-200 font-medium ${
+                          formData.apf10Required === option
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Other Safety Concerns */}
+                <div>
+                  <label htmlFor="otherSafetyConcerns" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Other Safety Concerns
+                  </label>
+                  <textarea
+                    id="otherSafetyConcerns"
+                    name="otherSafetyConcerns"
+                    value={formData.otherSafetyConcerns}
+                    onChange={(e) => handleInputChange('otherSafetyConcerns', e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium bg-white"
+                    rows={3}
+                    placeholder="Enter any additional safety concerns..."
+                  />
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Step 2: Choose Work Type */}
+          {/* Step 2: Review & Sign */}
           {currentStep === 2 && (
             <div className="space-y-6 animate-fade-in">
               <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
                 <span className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm">2</span>
-                Choose Work Type(s)
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">Select all work types that apply to this job</p>
-
-              <div className="space-y-3">
-                {WORK_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => toggleWorkType(type)}
-                    className={`w-full p-4 rounded-xl border-2 transition-all duration-200 text-left font-medium ${
-                      formData.workType.includes(type)
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                        : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>{type}</span>
-                      {formData.workType.includes(type) && (
-                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Exposure Control Plan */}
-          {currentStep === 3 && (
-            <div className="space-y-6 animate-fade-in">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                <span className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm">3</span>
-                Exposure Control Plan
-              </h3>
-
-              {/* Water Delivery System */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Water Delivery System Integrated In Equipment? *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Yes', 'No'].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => handleInputChange('waterDeliveryIntegrated', option)}
-                      className={`p-4 rounded-xl border-2 transition-all duration-200 font-medium ${
-                        formData.waterDeliveryIntegrated === option
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                          : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Work Location */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Where is your work located? *
-                </label>
-                <div className="space-y-3">
-                  {['Outdoors or well-ventilated area', 'Indoors or Enclosed area'].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => handleInputChange('workLocation', option)}
-                      className={`w-full p-4 rounded-xl border-2 transition-all duration-200 text-left font-medium ${
-                        formData.workLocation === option
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                          : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Cutting Time */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  For TODAY, Is your cutting time: *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Less than 4 Hours', 'More than 4 Hours'].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => handleInputChange('cuttingTime', option)}
-                      className={`p-4 rounded-xl border-2 transition-all duration-200 font-medium ${
-                        formData.cuttingTime === option
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                          : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* APF 10 Protection */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  APF 10 Respiratory Protection Required? *
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {['Yes', 'No', 'N/A'].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => handleInputChange('apf10Required', option)}
-                      className={`p-4 rounded-xl border-2 transition-all duration-200 font-medium ${
-                        formData.apf10Required === option
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                          : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-900 bg-white'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Other Safety Concerns */}
-              <div>
-                <label htmlFor="otherSafetyConcerns" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Other Safety Concerns
-                </label>
-                <textarea
-                  id="otherSafetyConcerns"
-                  name="otherSafetyConcerns"
-                  value={formData.otherSafetyConcerns}
-                  onChange={(e) => handleInputChange('otherSafetyConcerns', e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 font-medium bg-white"
-                  rows={4}
-                  placeholder="Enter any additional safety concerns..."
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Review & Sign */}
-          {currentStep === 4 && (
-            <div className="space-y-6 animate-fade-in">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                <span className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm">4</span>
                 Review & Sign Document
               </h3>
 
@@ -903,7 +906,7 @@ export default function SilicaExposureControlPlan() {
               Previous
             </button>
 
-            {currentStep < 4 ? (
+            {currentStep < 2 ? (
               <button
                 onClick={() => isStepComplete(currentStep) && setCurrentStep(currentStep + 1)}
                 className={`px-6 py-3 rounded-xl font-bold transition-all duration-200 ${
@@ -913,14 +916,14 @@ export default function SilicaExposureControlPlan() {
                 }`}
                 disabled={!isStepComplete(currentStep)}
               >
-                Next Step
+                Review & Sign
               </button>
             ) : (
               <button
                 onClick={submitDocument}
-                disabled={!isStepComplete(4)}
+                disabled={!isStepComplete(2)}
                 className={`px-8 py-4 rounded-xl font-bold transition-all duration-200 flex items-center gap-3 ${
-                  isStepComplete(4)
+                  isStepComplete(2)
                     ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl transform hover:scale-105'
                     : 'bg-gray-200 text-gray-500 cursor-not-allowed border-2 border-gray-300'
                 }`}

@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+/**
+ * Middleware for route protection.
+ *
+ * NOTE: The Supabase JS client stores sessions in localStorage (not cookies),
+ * so middleware cannot verify auth state for page routes. Page-level protection
+ * is handled by client-side AuthGuard components.
+ *
+ * API-level protection is handled by requireAdmin/requireAuth in each route handler.
+ * This middleware passes all requests through — the real security is at the API layer.
+ */
 export function middleware(request: NextRequest) {
-  // For now, allow all routes through
-  // Client-side auth guards will handle protection
-  // This allows login flow to work smoothly
-
-  // NOTE: Middleware auth is temporarily disabled to allow proper login flow
-  // Dashboard routes are protected by client-side AuthGuard components
-
   return NextResponse.next();
 }
 

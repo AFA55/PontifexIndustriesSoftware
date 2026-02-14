@@ -3,11 +3,15 @@
  * Check if admin exists and get their email
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Security: only admins can check admin list
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
     // Check for existing admin
     const { data: admins, error } = await supabaseAdmin
       .from('profiles')

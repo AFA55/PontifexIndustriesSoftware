@@ -42,6 +42,12 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (fetchError) {
+      // If columns don't exist yet, gracefully skip rating update
+      const errMsg = (fetchError.message || '').toLowerCase();
+      if (errMsg.includes('column') || errMsg.includes('does not exist') || errMsg.includes('undefined')) {
+        console.log('Operator rating columns not available yet, skipping update:', fetchError.message);
+        return NextResponse.json({ success: true, message: 'Rating columns not yet available, skipped', skipped: true });
+      }
       console.error('Error fetching operator profile:', fetchError);
       return NextResponse.json({ error: 'Failed to fetch operator profile' }, { status: 500 });
     }
@@ -95,6 +101,12 @@ export async function POST(request: NextRequest) {
       .eq('id', operatorId);
 
     if (updateError) {
+      // If columns don't exist, gracefully skip
+      const errMsg = (updateError.message || '').toLowerCase();
+      if (errMsg.includes('column') || errMsg.includes('does not exist') || errMsg.includes('undefined')) {
+        console.log('Operator rating update skipped (missing columns):', updateError.message);
+        return NextResponse.json({ success: true, message: 'Rating update skipped, columns not available', skipped: true });
+      }
       console.error('Error updating operator ratings:', updateError);
       return NextResponse.json({ error: 'Failed to update operator ratings' }, { status: 500 });
     }

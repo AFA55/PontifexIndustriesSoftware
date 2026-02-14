@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 
 export async function POST(
   request: NextRequest,
@@ -104,7 +105,7 @@ export async function POST(
 
     if (logError) {
       // If table doesn't exist yet, continue without blocking
-      if (logError.code === 'PGRST204' || logError.code === 'PGRST205' || logError.code === '42P01' || logError.message?.includes('does not exist')) {
+      if (isTableNotFoundError(logError)) {
         dailyLog = null;
       } else {
         console.error('Error creating daily log:', logError);
@@ -152,7 +153,7 @@ export async function POST(
         .eq('job_order_id', jobId)
         .eq('operator_id', user.id);
 
-      if (workflowError && !(workflowError.code === 'PGRST204' || workflowError.code === 'PGRST205' || workflowError.code === '42P01' || workflowError.message?.includes('does not exist'))) {
+      if (workflowError && !(isTableNotFoundError(workflowError))) {
         console.error('Error resetting workflow for next day:', workflowError);
       }
 
@@ -217,7 +218,7 @@ export async function GET(
 
     if (logsError) {
       // If table doesn't exist yet, return empty logs
-      if (logsError.code === 'PGRST204' || logsError.code === 'PGRST205' || logsError.code === '42P01' || logsError.message?.includes('does not exist')) {
+      if (isTableNotFoundError(logsError)) {
         return NextResponse.json({ success: true, logs: [] });
       }
       return NextResponse.json(

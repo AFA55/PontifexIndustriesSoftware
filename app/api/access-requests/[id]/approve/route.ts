@@ -7,12 +7,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmail, generateApprovalEmail } from '@/lib/email';
 import bcrypt from 'bcryptjs';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Security: only admins can approve access requests
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
     const { id } = await params;
     const body = await request.json();
     const { role, reviewedBy } = body;

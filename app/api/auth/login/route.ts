@@ -33,8 +33,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (authError || !authData.user) {
+      console.error('Auth error for', email, ':', authError?.message || 'No user returned');
       return NextResponse.json(
-        { error: 'Invalid email or password' },
+        { error: authError?.message === 'Invalid login credentials'
+            ? 'Invalid email or password. Please check your credentials and try again.'
+            : (authError?.message || 'Authentication failed') },
         { status: 401 }
       );
     }

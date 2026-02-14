@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { Wrench, Disc, Truck, Shield, Package, Layers } from 'lucide-react';
 import { OperatorSelect } from '@/components/ui/OperatorSelect';
 
@@ -89,7 +90,10 @@ export default function AllEquipmentPage() {
     try {
       setLoading(true);
 
-      const response = await fetch('/api/equipment');
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/equipment', {
+        headers: { 'Authorization': `Bearer ${session?.access_token || ''}` },
+      });
 
       if (!response.ok) {
         console.error('Error fetching equipment:', await response.text());

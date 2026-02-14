@@ -176,10 +176,10 @@ export default function StartRoutePage() {
 
   const calculateETA = async (address: string) => {
     try {
-      // Use geocoding to get coordinates from address
-      const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
-      const geocodeResponse = await fetch(geocodeUrl);
-      const geocodeData = await geocodeResponse.json();
+      // Use server-side geocode proxy to avoid CORS issues with Nominatim
+      const geocodeResponse = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
+      const geocodeResult = await geocodeResponse.json();
+      const geocodeData = geocodeResult.results || [];
 
       if (geocodeData && geocodeData.length > 0) {
         const jobLat = parseFloat(geocodeData[0].lat);
@@ -286,8 +286,8 @@ export default function StartRoutePage() {
         return;
       }
 
-      // Mark equipment checklist as completed and move to in_route step
-      await fetch('/api/workflow', {
+      // Mark equipment checklist as completed — fire and forget (optional tracking)
+      fetch('/api/workflow', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -298,31 +298,35 @@ export default function StartRoutePage() {
           completedStep: 'equipment_checklist',
           currentStep: 'in_route',
         })
-      });
+      }).catch(err => console.log('Workflow tracking unavailable:', err));
 
-      // Update job status to "in_route" with departure time
-      const statusResponse = await fetch(`/api/job-orders/${jobId}/status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          status: 'in_route',
-          departure_time: displayDepartureTime
-        })
-      });
+      // Update job status to "in_route" with departure time — don't block navigation
+      try {
+        const statusResponse = await fetch(`/api/job-orders/${jobId}/status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            status: 'in_route',
+            departure_time: displayDepartureTime
+          })
+        });
 
-      if (!statusResponse.ok) {
-        throw new Error('Failed to update job status');
+        if (!statusResponse.ok) {
+          console.log('Status update returned non-ok, but continuing navigation');
+        }
+      } catch (statusErr) {
+        console.log('Status update failed, but continuing navigation:', statusErr);
       }
 
-      // Send SMS to point of contact with ETA
+      // Send SMS to point of contact with ETA — fire and forget
       if (job?.foreman_phone && eta && operatorName) {
         const contactName = job.foreman_name || 'there';
         const smsMessage = `Hey ${contactName}, this is ${operatorName} just wanted to let you know we are ${eta.driveTime} minutes away. We will contact you again once we arrive.`;
 
-        await fetch('/api/send-sms', {
+        fetch('/api/send-sms', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -332,10 +336,10 @@ export default function StartRoutePage() {
             to: job.foreman_phone,
             message: smsMessage
           })
-        });
+        }).catch(err => console.log('SMS send unavailable:', err));
       }
 
-      // Redirect to in-route page
+      // Redirect to in-route page — always navigate regardless of API results
       router.push(`/dashboard/job-schedule/${jobId}/in-route`);
     } catch (error) {
       console.error('Error starting route:', error);

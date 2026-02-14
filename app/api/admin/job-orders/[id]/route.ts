@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 
 export async function PATCH(
   request: NextRequest,
@@ -160,7 +161,7 @@ export async function PATCH(
 
         if (historyError) {
           // If table doesn't exist yet, don't block the update
-          if (historyError.code === 'PGRST204' || historyError.code === 'PGRST205' || historyError.code === '42P01' || historyError.message?.includes('does not exist')) {
+          if (isTableNotFoundError(historyError)) {
             console.log('Audit trail skipped: history table not available yet');
           } else {
             console.error('Error logging audit trail:', historyError);
@@ -275,7 +276,7 @@ export async function DELETE(
         snapshot: jobOrder,
       });
 
-    if (deleteHistoryError && !(deleteHistoryError.code === 'PGRST204' || deleteHistoryError.code === 'PGRST205' || deleteHistoryError.code === '42P01' || deleteHistoryError.message?.includes('does not exist'))) {
+    if (deleteHistoryError && !(isTableNotFoundError(deleteHistoryError))) {
       console.error('Error logging deletion audit trail:', deleteHistoryError);
     }
 

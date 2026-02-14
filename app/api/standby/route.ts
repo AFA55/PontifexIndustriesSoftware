@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isTableNotFoundError } from '@/lib/api-auth';
 import { STANDBY_POLICY_VERSION, STANDBY_HOURLY_RATE, calculateStandbyCharge } from '@/lib/legal/standby-policy';
 
 /**
@@ -52,9 +53,15 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
+      // If standby_logs table doesn't exist yet, return success silently
+      if (isTableNotFoundError(insertError)) {
+        return NextResponse.json({
+          success: true,
+          data: null,
+          message: 'Standby log table not available yet'
+        });
+      }
       console.error('Error creating standby log:', insertError);
-      console.error('Insert error details:', JSON.stringify(insertError, null, 2));
-      console.error('Request body was:', { jobId, reason, startedAt, user_id: user.id });
       return NextResponse.json(
         {
           success: false,
@@ -123,6 +130,16 @@ export async function PUT(request: NextRequest) {
       .eq('id', standbyLogId)
       .eq('operator_id', user.id)
       .single();
+
+    if (fetchError) {
+      // If standby_logs table doesn't exist yet, return not found gracefully
+      if (isTableNotFoundError(fetchError)) {
+        return NextResponse.json(
+          { success: false, error: 'Standby log system not available yet' },
+          { status: 404 }
+        );
+      }
+    }
 
     if (fetchError || !standbyLog) {
       return NextResponse.json(
@@ -215,6 +232,13 @@ export async function GET(request: NextRequest) {
     const { data: logs, error: fetchError } = await query;
 
     if (fetchError) {
+      // If standby_logs table doesn't exist yet, return empty array
+      if (isTableNotFoundError(fetchError)) {
+        return NextResponse.json({
+          success: true,
+          data: []
+        });
+      }
       console.error('Error fetching standby logs:', fetchError);
       return NextResponse.json(
         { success: false, error: 'Failed to fetch standby logs' },

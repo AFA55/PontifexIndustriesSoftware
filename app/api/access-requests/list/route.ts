@@ -5,13 +5,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
+    // Security: only admins can list access requests
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
     // Fetch all access requests using admin client (bypasses RLS)
+    // Explicitly select columns to exclude password_plain and password_hash
     const { data, error } = await supabaseAdmin
       .from('access_requests')
-      .select('*')
+      .select('id, full_name, email, phone_number, date_of_birth, position, status, reviewed_by, reviewed_at, assigned_role, denial_reason, created_at')
       .order('created_at', { ascending: false });
 
     if (error) {

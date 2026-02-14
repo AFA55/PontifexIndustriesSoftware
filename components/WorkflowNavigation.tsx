@@ -160,17 +160,17 @@ export default function WorkflowNavigation({
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+    <div className="bg-white rounded-2xl shadow-lg p-3 sm:p-6 mb-4 sm:mb-6">
       {/* Progress Bar */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
+      <div className="mb-4 sm:mb-6 overflow-x-auto">
+        <div className="flex items-center justify-between min-w-0">
           {steps.map((step, index) => (
-            <div key={step.id} className="flex-1 flex items-center">
+            <div key={step.id} className="flex-1 flex items-center min-w-0">
               {/* Step Circle */}
               <button
                 onClick={() => handleStepClick(step)}
                 disabled={!step.completed && !step.current}
-                className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all ${
+                className={`relative z-10 flex items-center justify-center w-7 h-7 sm:w-10 sm:h-10 rounded-full border-2 transition-all flex-shrink-0 ${
                   step.completed
                     ? 'bg-green-500 border-green-500 cursor-pointer hover:bg-green-600'
                     : step.current
@@ -179,18 +179,18 @@ export default function WorkflowNavigation({
                 }`}
               >
                 {step.completed ? (
-                  <CheckCircle2 className="w-6 h-6 text-white" />
+                  <CheckCircle2 className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                 ) : step.current ? (
-                  <Circle className="w-6 h-6 text-white fill-current" />
+                  <Circle className="w-4 h-4 sm:w-6 sm:h-6 text-white fill-current" />
                 ) : (
-                  <Lock className="w-5 h-5 text-gray-500" />
+                  <Lock className="w-3 h-3 sm:w-5 sm:h-5 text-gray-500" />
                 )}
               </button>
 
               {/* Connector Line */}
               {index < steps.length - 1 && (
                 <div
-                  className={`flex-1 h-1 mx-2 ${
+                  className={`flex-1 h-0.5 sm:h-1 mx-0.5 sm:mx-2 ${
                     step.completed ? 'bg-green-500' : 'bg-gray-200'
                   }`}
                 />
@@ -200,7 +200,7 @@ export default function WorkflowNavigation({
         </div>
 
         {/* Step Labels - Now Clickable */}
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center justify-between mt-1 sm:mt-2">
           {steps.map((step) => {
             const canClick = (step.completed || step.current) &&
                             !(step.id === 'equipment_checklist' && step.completed && !step.current);
@@ -210,12 +210,12 @@ export default function WorkflowNavigation({
                 key={`label-${step.id}`}
                 onClick={() => canClick && handleStepClick(step)}
                 disabled={!canClick}
-                className={`flex-1 text-center py-1 px-2 rounded-lg transition-all ${
+                className={`flex-1 text-center py-0.5 sm:py-1 px-0.5 sm:px-2 rounded-lg transition-all min-w-0 ${
                   canClick ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed'
                 }`}
               >
                 <p
-                  className={`text-xs font-medium ${
+                  className={`text-[9px] sm:text-xs font-medium truncate ${
                     step.current
                       ? 'text-blue-600 font-bold'
                       : step.completed
@@ -232,11 +232,11 @@ export default function WorkflowNavigation({
       </div>
 
       {/* Navigation Buttons */}
-      <div className="flex gap-3">
+      <div className="flex gap-2 sm:gap-3">
         <button
           onClick={navigatePrevious}
           disabled={!canNavigatePrevious()}
-          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+          className={`flex-1 px-2 sm:px-4 py-2 sm:py-3 rounded-xl text-xs sm:text-base font-semibold transition-all ${
             canNavigatePrevious()
               ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               : 'bg-gray-50 text-gray-400 cursor-not-allowed'
@@ -247,7 +247,7 @@ export default function WorkflowNavigation({
 
         <button
           onClick={() => router.push('/dashboard/job-schedule')}
-          className="flex-1 px-4 py-3 rounded-xl font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all"
+          className="flex-1 px-2 sm:px-4 py-2 sm:py-3 rounded-xl text-xs sm:text-base font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all"
         >
           Back to Schedule
         </button>
@@ -255,7 +255,7 @@ export default function WorkflowNavigation({
         <button
           onClick={navigateNext}
           disabled={!canNavigateNext()}
-          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+          className={`flex-1 px-2 sm:px-4 py-2 sm:py-3 rounded-xl text-xs sm:text-base font-semibold transition-all ${
             canNavigateNext()
               ? 'bg-green-500 text-white hover:bg-green-600'
               : 'bg-gray-50 text-gray-400 cursor-not-allowed'

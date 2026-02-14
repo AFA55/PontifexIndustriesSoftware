@@ -1243,58 +1243,20 @@ export default function DispatchScheduling() {
       // Clear saved form state since job was created successfully
       clearFormState(FORM_KEY);
 
-      // Show success modal
+      // Show success modal FIRST — don't reset form until redirect
       setCreatedJobId(jobNumber);
       setShowSuccessModal(true);
 
-      // Auto-redirect to dashboard after 3 seconds
+      // Keep submitting=true so button stays disabled (we're done)
+      // Auto-redirect to dashboard after 5 seconds
       setTimeout(() => {
         router.push('/dashboard/admin');
-      }, 3000);
+      }, 5000);
 
-      // Reset form
-      setFormData({
-      title: '',
-      customer: '',
-      companyName: '',
-      customerEmail: '',
-      salespersonEmail: '',
-      jobTypes: [],
-      location: '',
-      address: '',
-      estimatedDriveHours: 0,
-      estimatedDriveMinutes: 0,
-      status: 'scheduled',
-      priority: 'medium',
-      difficulty_rating: 5,
-      truck_parking: 'close',
-      work_environment: 'outdoor',
-      site_cleanliness: 5,
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0],
-      arrivalTime: '08:00',
-      shopArrivalTime: '',
-      estimatedHours: '8.00',
-      technicians: [],
-      salesman: '',
-      description: '',
-      additionalInfo: '',
-      jobTypeDetails: {},
-      equipment: [],
-      requiredDocuments: ['silica-dust-control'], // Silica Dust Control always required
-      jobSiteNumber: '',
-      po: '',
-      customerJobNumber: '',
-      contactOnSite: '',
-      contactPhone: '',
-      jobSiteGC: '',
-      jobQuote: undefined
-    });
     } catch (error: any) {
       console.error('Error creating job order:', error);
       alert(`Failed to create job order: ${error.message}`);
-    } finally {
-      // Always reset submitting state, even if there was an error
+      // Only reset submitting on error so user can retry
       setSubmitting(false);
     }
   };
@@ -4002,9 +3964,24 @@ export default function DispatchScheduling() {
                 </button>
                 <button
                   type="submit"
-                  className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-2xl font-bold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                  disabled={submitting}
+                  className={`px-8 py-4 rounded-2xl font-bold transition-all duration-300 shadow-lg ${
+                    submitting
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white hover:shadow-xl hover:scale-105'
+                  }`}
                 >
-                  Create Job Order →
+                  {submitting ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Creating Job Order...
+                    </span>
+                  ) : (
+                    'Create Job Order →'
+                  )}
                 </button>
               </div>
             </div>
@@ -4162,7 +4139,7 @@ export default function DispatchScheduling() {
             </div>
 
             <p className="text-center text-sm text-gray-500 mb-6">
-              Redirecting to dashboard in 3 seconds...
+              Redirecting to dashboard in 5 seconds...
             </p>
 
             <div className="flex gap-3">
@@ -4175,6 +4152,45 @@ export default function DispatchScheduling() {
               <button
                 onClick={() => {
                   setShowSuccessModal(false);
+                  setSubmitting(false);
+                  setCurrentStep(1);
+                  setFormData({
+                    title: '',
+                    customer: '',
+                    companyName: '',
+                    customerEmail: '',
+                    salespersonEmail: '',
+                    jobTypes: [],
+                    location: '',
+                    address: '',
+                    estimatedDriveHours: 0,
+                    estimatedDriveMinutes: 0,
+                    status: 'scheduled',
+                    priority: 'medium',
+                    difficulty_rating: 5,
+                    truck_parking: 'close',
+                    work_environment: 'outdoor',
+                    site_cleanliness: 5,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date().toISOString().split('T')[0],
+                    arrivalTime: '08:00',
+                    shopArrivalTime: '',
+                    estimatedHours: '8.00',
+                    technicians: [],
+                    salesman: '',
+                    description: '',
+                    additionalInfo: '',
+                    jobTypeDetails: {},
+                    equipment: [],
+                    requiredDocuments: ['silica-dust-control'],
+                    jobSiteNumber: '',
+                    po: '',
+                    customerJobNumber: '',
+                    contactOnSite: '',
+                    contactPhone: '',
+                    jobSiteGC: '',
+                    jobQuote: undefined
+                  });
                   setActiveTab('create');
                 }}
                 className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all duration-300"

@@ -4,11 +4,16 @@
  * This is a one-time migration that can be run manually
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Security: only admins can run migrations
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
     console.log('🔄 Applying consent fields migration...');
 
     // Check if columns already exist by trying to select them
@@ -71,8 +76,12 @@ COMMENT ON COLUMN public.access_requests.consent_ip_address IS 'IP address where
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Security: only admins can check migration status
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
     // Check if migration has been applied
     const { data, error } = await supabaseAdmin
       .from('access_requests')

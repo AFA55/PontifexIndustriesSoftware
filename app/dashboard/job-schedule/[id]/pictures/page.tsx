@@ -14,11 +14,11 @@ export default function PicturesPage() {
   const [uploading, setUploading] = useState(false);
 
   const handleSkip = async () => {
+    // Update workflow — fire and forget (optional tracking)
     try {
-      // Update workflow to mark pictures as "completed" (skipped) and move to signature
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        await fetch('/api/workflow', {
+        fetch('/api/workflow', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -29,23 +29,22 @@ export default function PicturesPage() {
             completedStep: 'pictures',
             currentStep: 'customer_signature',
           })
-        });
+        }).catch(err => console.log('Workflow tracking unavailable:', err));
       }
-
-      // Navigate to customer signature
-      router.push(`/dashboard/job-schedule/${jobId}/customer-signature`);
     } catch (error) {
-      console.error('Error skipping pictures:', error);
-      alert('Error updating workflow');
+      console.log('Session check failed, continuing:', error);
     }
+
+    // Always navigate to customer signature
+    router.push(`/dashboard/job-schedule/${jobId}/customer-signature`);
   };
 
   const handleContinue = async () => {
-    // If they added pictures, mark as complete and continue
+    // Update workflow — fire and forget (optional tracking)
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        await fetch('/api/workflow', {
+        fetch('/api/workflow', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -56,14 +55,14 @@ export default function PicturesPage() {
             completedStep: 'pictures',
             currentStep: 'customer_signature',
           })
-        });
+        }).catch(err => console.log('Workflow tracking unavailable:', err));
       }
-
-      router.push(`/dashboard/job-schedule/${jobId}/customer-signature`);
     } catch (error) {
-      console.error('Error continuing:', error);
-      alert('Error updating workflow');
+      console.log('Session check failed, continuing:', error);
     }
+
+    // Always navigate to customer signature
+    router.push(`/dashboard/job-schedule/${jobId}/customer-signature`);
   };
 
   return (
