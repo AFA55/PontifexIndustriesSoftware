@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error in work items route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error in work items route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

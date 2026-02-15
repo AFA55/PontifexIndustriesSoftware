@@ -1,15 +1,42 @@
 /**
  * API Route: POST /api/send-email
  * Sends emails with optional PDF attachments using Resend
+ * SECURITY: Requires authenticated user
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { requireAuth } from '@/lib/api-auth';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
 
+// Allowed domains for PDF URL fetching (SSRF protection)
+const ALLOWED_PDF_DOMAINS = [
+  'pontifexindustries.com',
+  'www.pontifexindustries.com',
+  'pontifex-industries-software-z8py.vercel.app',
+  'localhost',
+];
+
+function isAllowedPdfUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_PDF_DOMAINS.some(domain =>
+      parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) {
+      return auth.response;
+    }
+
     const body = await request.json();
     const { to, subject, html, pdfUrl, pdfName } = body;
 
@@ -20,20 +47,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`📧 Sending email to: ${to}`);
-    console.log(`📧 Subject: ${subject}`);
+    console.log(`[send-email] User ${auth.userId} sending email to: ${to}`);
 
     // Check if Resend API key is configured
     if (!process.env.RESEND_API_KEY) {
-      console.warn('⚠️ RESEND_API_KEY not configured. Email will not be sent.');
-      console.log('📧 Email HTML (for development):');
-      console.log(html);
+      console.warn('[send-email] RESEND_API_KEY not configured.');
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Email service not configured',
-          message: 'RESEND_API_KEY not found in environment variables'
-        },
+        { error: 'Email service not configured' },
         { status: 500 }
       );
     }
@@ -46,16 +66,22 @@ export async function POST(request: NextRequest) {
       html: html,
     };
 
-    // If PDF URL is provided, fetch and attach it
+    // If PDF URL is provided, fetch and attach it (with SSRF protection)
     if (pdfUrl && pdfName) {
-      try {
-        console.log(`📎 Fetching PDF from: ${pdfUrl}`);
+      // SECURITY: Validate PDF URL against allowed domains
+      if (!isAllowedPdfUrl(pdfUrl)) {
+        console.error(`[send-email] SSRF blocked: ${pdfUrl}`);
+        return NextResponse.json(
+          { error: 'PDF URL not allowed' },
+          { status: 400 }
+        );
+      }
 
-        // Fetch the PDF from the provided URL
+      try {
         const pdfResponse = await fetch(pdfUrl);
 
         if (!pdfResponse.ok) {
-          console.error('❌ Failed to fetch PDF:', pdfResponse.statusText);
+          console.error('[send-email] Failed to fetch PDF:', pdfResponse.statusText);
           return NextResponse.json(
             { error: 'Failed to fetch PDF attachment' },
             { status: 500 }
@@ -66,8 +92,6 @@ export async function POST(request: NextRequest) {
         const pdfBuffer = await pdfResponse.arrayBuffer();
         const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
 
-        console.log(`📎 PDF fetched successfully (${(pdfBuffer.byteLength / 1024).toFixed(2)} KB)`);
-
         // Add attachment to email
         emailOptions.attachments = [
           {
@@ -76,7 +100,7 @@ export async function POST(request: NextRequest) {
           }
         ];
       } catch (pdfError) {
-        console.error('❌ Error processing PDF attachment:', pdfError);
+        console.error('[send-email] Error processing PDF attachment:', pdfError);
         // Continue sending email without attachment rather than failing completely
       }
     }
@@ -85,15 +109,12 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send(emailOptions);
 
     if (error) {
-      console.error('❌ Error sending email via Resend:', error);
+      console.error('[send-email] Resend error:', error);
       return NextResponse.json(
-        { error: 'Failed to send email', details: error },
+        { error: 'Failed to send email' },
         { status: 500 }
       );
     }
-
-    console.log('✅ Email sent successfully via Resend!');
-    console.log('📧 Email ID:', data?.id);
 
     return NextResponse.json({
       success: true,
@@ -102,9 +123,9 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('❌ Error in send-email API:', error);
+    console.error('[send-email] Internal error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

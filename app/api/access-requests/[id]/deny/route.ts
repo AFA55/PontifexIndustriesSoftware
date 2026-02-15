@@ -92,7 +92,7 @@ export async function POST(
   } catch (error: any) {
     console.error('Unexpected error in deny route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

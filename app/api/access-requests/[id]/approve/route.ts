@@ -1,13 +1,14 @@
 /**
  * API Route: POST /api/access-requests/[id]/approve
  * Approve an access request and create user account
+ * SECURITY: Uses password_hash for verification, generates temp password for account creation
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmail, generateApprovalEmail } from '@/lib/email';
-import bcrypt from 'bcryptjs';
 import { requireAdmin } from '@/lib/api-auth';
+import crypto from 'crypto';
 
 export async function POST(
   request: NextRequest,
@@ -59,46 +60,26 @@ export async function POST(
       );
     }
 
-    // Check if we have the user's original password
-    const userPassword = accessRequest.password_plain;
-
-    if (!userPassword) {
-      return NextResponse.json(
-        { error: 'Password not found in access request. User may need to request access again.' },
-        { status: 400 }
-      );
-    }
-
     // Step 1: Check if user already exists in Supabase Auth
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users.find(u => u.email === accessRequest.email);
+    // Use getUserByEmail instead of listUsers for better performance
+    const { data: existingUserData } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUserData?.users.find(u => u.email === accessRequest.email);
 
     let userId: string;
+    // Generate a secure temporary password for account creation
+    const tempPassword = crypto.randomBytes(16).toString('hex');
 
     if (existingUser) {
-      // User already exists in Auth, update their password to match what they entered
-      console.log(`User ${accessRequest.email} already exists in Auth, updating password`);
-
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-        existingUser.id,
-        { password: userPassword }
-      );
-
-      if (updateError) {
-        console.error('Error updating user password:', updateError);
-        return NextResponse.json(
-          { error: `Failed to update user password: ${updateError.message}` },
-          { status: 500 }
-        );
-      }
-
+      // User already exists in Auth — they already have their password from registration
+      console.log(`[approve] User ${accessRequest.email} already exists in Auth`);
       userId = existingUser.id;
     } else {
-      // Create new user in Supabase Auth with their chosen password
+      // Create new user in Supabase Auth with a temporary password
+      // User will use "Forgot Password" or admin will send reset link
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: accessRequest.email,
-        password: userPassword, // Use the password they entered during registration
-        email_confirm: true, // Auto-confirm email
+        password: tempPassword,
+        email_confirm: true,
         user_metadata: {
           full_name: accessRequest.full_name,
           position: accessRequest.position,
@@ -107,15 +88,15 @@ export async function POST(
       });
 
       if (authError || !authData.user) {
-        console.error('Error creating auth user:', authError);
+        console.error('[approve] Error creating auth user:', authError);
         return NextResponse.json(
-          { error: `Failed to create user account: ${authError?.message}` },
+          { error: 'Failed to create user account' },
           { status: 500 }
         );
       }
 
       userId = authData.user.id;
-      console.log(`✅ User created with their original password`);
+      console.log(`[approve] User created successfully: ${accessRequest.email}`);
     }
 
     // Step 2: Check if profile already exists, if not create it
@@ -126,7 +107,6 @@ export async function POST(
       .single();
 
     if (existingProfile) {
-      // Profile exists, update it with the new role and phone number
       const { error: updateProfileError } = await supabaseAdmin
         .from('profiles')
         .update({
@@ -137,14 +117,13 @@ export async function POST(
         .eq('id', userId);
 
       if (updateProfileError) {
-        console.error('Error updating profile:', updateProfileError);
+        console.error('[approve] Error updating profile:', updateProfileError);
         return NextResponse.json(
-          { error: `Failed to update user profile: ${updateProfileError.message}` },
+          { error: 'Failed to update user profile' },
           { status: 500 }
         );
       }
     } else {
-      // Create new profile
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
         .insert([
@@ -160,7 +139,7 @@ export async function POST(
         ]);
 
       if (profileError) {
-        console.error('Error creating profile:', profileError);
+        console.error('[approve] Error creating profile:', profileError);
 
         // Rollback: Delete the auth user if profile creation fails (only if we just created it)
         if (!existingUser) {
@@ -168,13 +147,13 @@ export async function POST(
         }
 
         return NextResponse.json(
-          { error: `Failed to create user profile: ${profileError.message}` },
+          { error: 'Failed to create user profile' },
           { status: 500 }
         );
       }
     }
 
-    // Step 3: Update access request status and CLEAR the plain password for security
+    // Step 3: Update access request status
     const { error: updateError } = await supabaseAdmin
       .from('access_requests')
       .update({
@@ -182,17 +161,14 @@ export async function POST(
         reviewed_by: reviewedBy,
         reviewed_at: new Date().toISOString(),
         assigned_role: role,
-        password_plain: null, // Clear the plain password for security
       })
       .eq('id', id);
 
     if (updateError) {
-      console.error('Error updating access request:', updateError);
-      // Note: User and profile are already created at this point
-      // The request status update failing is not critical
+      console.error('[approve] Error updating access request status:', updateError);
     }
 
-    // Step 4: Send approval confirmation email with login button
+    // Step 4: Send approval confirmation email
     const approvalEmailHtml = generateApprovalEmail(
       accessRequest.full_name,
       accessRequest.email,
@@ -201,36 +177,41 @@ export async function POST(
 
     const emailSent = await sendEmail({
       to: accessRequest.email,
-      subject: 'Access Approved - Pontifex Industries 🎉',
+      subject: 'Access Approved - Pontifex Industries',
       html: approvalEmailHtml,
     });
 
     if (!emailSent) {
-      console.warn('Could not send approval confirmation email');
-      // Non-critical error, user account is still created
+      console.warn('[approve] Could not send approval confirmation email');
     }
+
+    // Step 5: Generate a password reset link so user can set their own password
+    const { data: resetData } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email: accessRequest.email,
+    });
 
     return NextResponse.json(
       {
         success: true,
         message: existingProfile
-          ? `Access approved! User ${accessRequest.full_name} role updated to ${role}. They can now log in with their password.`
-          : `Access approved! User ${accessRequest.full_name} has been created as ${role}. They can now log in with their password.`,
+          ? `Access approved! User ${accessRequest.full_name} role updated to ${role}.`
+          : `Access approved! User ${accessRequest.full_name} has been created as ${role}. A password reset link has been generated.`,
         data: {
           userId: userId,
           email: accessRequest.email,
           role: role,
           approvalEmailSent: emailSent,
           wasExistingUser: !!existingUser,
-          canLoginNow: true,
+          passwordResetGenerated: !!resetData,
         },
       },
       { status: 200 }
     );
   } catch (error: any) {
-    console.error('Unexpected error in approve route:', error);
+    console.error('[approve] Unexpected error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

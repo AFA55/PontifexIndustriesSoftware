@@ -91,9 +91,7 @@ export async function POST(request: NextRequest) {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Insert access request
-    // NOTE: We store BOTH the hash (for security) and plain password (temporary, for account creation)
-    // The plain password will be cleared after account approval
+    // Insert access request (password_hash only — never store plaintext)
     const { data, error } = await supabaseAdmin
       .from('access_requests')
       .insert([
@@ -102,9 +100,8 @@ export async function POST(request: NextRequest) {
           email: email.toLowerCase(),
           phone_number: phoneNumber,
           password_hash: passwordHash,
-          password_plain: password, // Store temporarily for account creation
           date_of_birth: dateOfBirth,
-          position: position || 'Not specified', // Default if not provided
+          position: position || 'Not specified',
           status: 'pending',
         },
       ])
@@ -154,7 +151,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in access-requests POST:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

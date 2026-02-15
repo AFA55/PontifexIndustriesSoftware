@@ -1,12 +1,20 @@
 /**
  * API Route: GET /api/google-maps/distance
  * Calculate drive time and distance between two addresses
+ * SECURITY: Requires authenticated user to prevent API quota abuse
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
+    // SECURITY: Require authentication to protect API quota
+    const auth = await requireAuth(request);
+    if (!auth.authorized) {
+      return auth.response;
+    }
+
     const { searchParams } = new URL(request.url);
     const origin = searchParams.get('origin');
     const destination = searchParams.get('destination');
@@ -72,7 +80,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error in distance API:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

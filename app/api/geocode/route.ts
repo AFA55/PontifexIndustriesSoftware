@@ -1,13 +1,20 @@
 /**
  * API Route: GET /api/geocode
  * Server-side proxy for Nominatim geocoding to avoid CORS issues
- * Nominatim blocks direct browser requests but allows server-side calls
+ * SECURITY: Requires authenticated user to prevent abuse
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
+    // SECURITY: Require authentication to prevent API abuse
+    const auth = await requireAuth(request);
+    if (!auth.authorized) {
+      return auth.response;
+    }
+
     const { searchParams } = new URL(request.url);
     const address = searchParams.get('address');
 
