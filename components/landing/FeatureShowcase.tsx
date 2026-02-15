@@ -114,7 +114,7 @@ function WorkflowMockup() {
             <div className="text-blue-400 text-[11px] font-semibold tracking-wider mb-1">
               TIME ON SITE
             </div>
-            <div className="text-white text-xl font-bold">2.5 hrs</div>
+            <div className="text-white text-xl font-bold">30 hrs</div>
           </div>
           <div className="bg-emerald-500/10 border border-emerald-500/10 rounded-xl p-3.5">
             <div className="text-emerald-400 text-[11px] font-semibold tracking-wider mb-1">
