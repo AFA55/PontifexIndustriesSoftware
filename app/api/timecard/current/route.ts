@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       }
       console.error('Error fetching active timecard:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch timecard', details: fetchError.message },
+        { error: 'Failed to fetch timecard' },
         { status: 500 }
       );
     }

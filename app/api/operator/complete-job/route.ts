@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
         } else {
           console.error('Error inserting operator job history:', insertError);
           return NextResponse.json(
-            { error: 'Failed to save performance record', details: insertError.message },
+            { error: 'Failed to save performance record' },
             { status: 500 }
           );
         }

@@ -37,7 +37,7 @@ export async function POST(
     if (fetchError) {
       console.error('❌ Error fetching access request:', fetchError);
       return NextResponse.json(
-        { error: 'Access request not found', details: fetchError.message },
+        { error: 'Access request not found' },
         { status: 404 }
       );
     }
@@ -96,7 +96,7 @@ export async function POST(
     if (deleteError) {
       console.error('❌ Error deleting request:', deleteError);
       return NextResponse.json(
-        { error: 'Failed to delete request', details: deleteError.message },
+        { error: 'Failed to delete request' },
         { status: 500 }
       );
     }
@@ -113,7 +113,7 @@ export async function POST(
   } catch (error: any) {
     console.error('💥 Unexpected error deleting request:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       }
       console.error('Error fetching timecard history:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch timecard history', details: fetchError.message },
+        { error: 'Failed to fetch timecard history' },
         { status: 500 }
       );
     }

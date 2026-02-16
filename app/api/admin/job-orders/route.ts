@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     if (fetchError) {
       console.error('Error fetching job orders:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch job orders', details: fetchError.message },
+        { error: 'Failed to fetch job orders' },
         { status: 500 }
       );
     }
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in job orders route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error creating job order:', insertError);
       return NextResponse.json(
-        { error: 'Failed to create job order', details: insertError.message },
+        { error: 'Failed to create job order' },
         { status: 500 }
       );
     }
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in create job order route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

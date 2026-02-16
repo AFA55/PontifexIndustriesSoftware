@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       if (fetchError) {
         console.error('Error fetching location suggestions:', fetchError);
         return NextResponse.json(
-          { error: 'Failed to fetch suggestions', details: fetchError.message },
+          { error: 'Failed to fetch suggestions' },
           { status: 500 }
         );
       }
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
     if (fetchError) {
       console.error(`Error fetching ${type} suggestions:`, fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch suggestions', details: fetchError.message },
+        { error: 'Failed to fetch suggestions' },
         { status: 500 }
       );
     }
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in suggestions route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
       if (updateError) {
         console.error(`Error updating ${type}:`, updateError);
         return NextResponse.json(
-          { error: 'Failed to update suggestion', details: updateError.message },
+          { error: 'Failed to update suggestion' },
           { status: 500 }
         );
       }
@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
       if (insertError) {
         console.error(`Error inserting ${type}:`, insertError);
         return NextResponse.json(
-          { error: 'Failed to insert suggestion', details: insertError.message },
+          { error: 'Failed to insert suggestion' },
           { status: 500 }
         );
       }
@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in save suggestion route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

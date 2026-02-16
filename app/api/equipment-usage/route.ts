@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error creating equipment usage:', insertError);
       return NextResponse.json(
-        { error: 'Failed to create equipment usage', details: insertError.message },
+        { error: 'Failed to create equipment usage' },
         { status: 500 }
       );
     }
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in equipment usage creation:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
     if (fetchError) {
       console.error('Error fetching equipment usage:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch equipment usage', details: fetchError.message },
+        { error: 'Failed to fetch equipment usage' },
         { status: 500 }
       );
     }
@@ -226,7 +226,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in equipment usage fetch:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

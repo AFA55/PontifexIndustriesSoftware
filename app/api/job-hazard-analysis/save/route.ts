@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
     if (uploadError) {
       console.error('Storage upload failed:', uploadError);
       return NextResponse.json(
-        { error: 'Failed to upload PDF to storage', details: uploadError.message },
+        { error: 'Failed to upload PDF to storage' },
         { status: 500 }
       );
     }
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in JHA save route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

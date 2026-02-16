@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error('[LIABILITY PDF] Error storing PDF:', updateError);
       return NextResponse.json(
-        { error: 'Failed to store PDF', details: updateError.message },
+        { error: 'Failed to store PDF' },
         { status: 500 }
       );
     }

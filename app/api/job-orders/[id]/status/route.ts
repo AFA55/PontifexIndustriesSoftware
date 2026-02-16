@@ -161,7 +161,7 @@ async function updateJobStatus(
         if (fallbackError) {
           console.error('Fallback status update also failed:', fallbackError);
           return NextResponse.json(
-            { error: 'Failed to update job order status', details: fallbackError.message },
+            { error: 'Failed to update job order status' },
             { status: 500 }
           );
         }
@@ -169,7 +169,7 @@ async function updateJobStatus(
       } else {
         console.error('Error updating job order status:', updateError);
         return NextResponse.json(
-          { error: 'Failed to update job order status', details: updateError.message },
+          { error: 'Failed to update job order status' },
           { status: 500 }
         );
       }
@@ -216,7 +216,7 @@ async function updateJobStatus(
   } catch (error: any) {
     console.error('Unexpected error in update job status route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

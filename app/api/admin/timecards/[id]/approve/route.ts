@@ -93,7 +93,7 @@ export async function POST(
     if (updateError) {
       console.error('Error approving timecard:', updateError);
       return NextResponse.json(
-        { error: 'Failed to approve timecard', details: updateError.message },
+        { error: 'Failed to approve timecard' },
         { status: 500 }
       );
     }
@@ -109,7 +109,7 @@ export async function POST(
   } catch (error: any) {
     console.error('Unexpected error in timecard approval route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

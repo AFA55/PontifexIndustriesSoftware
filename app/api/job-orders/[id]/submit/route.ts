@@ -122,7 +122,7 @@ export async function PUT(
     if (updateError) {
       console.error('Error submitting job completion data:', updateError);
       return NextResponse.json(
-        { error: 'Failed to submit job completion data', details: updateError.message },
+        { error: 'Failed to submit job completion data' },
         { status: 500 }
       );
     }
@@ -155,7 +155,7 @@ export async function PUT(
   } catch (error: any) {
     console.error('Unexpected error in submit job route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

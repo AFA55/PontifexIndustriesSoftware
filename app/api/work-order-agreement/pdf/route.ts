@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error('[AGREEMENT PDF] Error storing PDF:', updateError);
       return NextResponse.json(
-        { error: 'Failed to store PDF', details: updateError.message },
+        { error: 'Failed to store PDF' },
         { status: 500 }
       );
     }
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[AGREEMENT PDF] Unexpected error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

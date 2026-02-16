@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in create-super-admin route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

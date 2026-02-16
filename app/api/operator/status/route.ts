@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       } else {
         console.error('Error creating status entry:', statusError);
         return NextResponse.json(
-          { error: 'Failed to update status', details: statusError.message },
+          { error: 'Failed to update status' },
           { status: 500 }
         );
       }

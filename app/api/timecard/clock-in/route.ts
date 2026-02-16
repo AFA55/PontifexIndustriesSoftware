@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       }
       console.error('Error creating timecard:', insertError);
       return NextResponse.json(
-        { error: 'Failed to clock in', details: insertError.message },
+        { error: 'Failed to clock in' },
         { status: 500 }
       );
     }

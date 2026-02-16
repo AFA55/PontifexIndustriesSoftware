@@ -105,7 +105,7 @@ export async function PUT(
     if (updateError) {
       console.error('Error updating timecard:', updateError);
       return NextResponse.json(
-        { error: 'Failed to update timecard', details: updateError.message },
+        { error: 'Failed to update timecard' },
         { status: 500 }
       );
     }
@@ -121,7 +121,7 @@ export async function PUT(
   } catch (error: any) {
     console.error('Unexpected error in timecard update route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

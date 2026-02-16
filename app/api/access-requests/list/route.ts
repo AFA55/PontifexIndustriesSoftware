@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Error fetching access requests:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch access requests', details: error.message },
+        { error: 'Failed to fetch access requests' },
         { status: 500 }
       );
     }
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in list route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

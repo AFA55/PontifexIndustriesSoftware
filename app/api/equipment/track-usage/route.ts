@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
       if (insertError) {
         console.error('Error inserting blade usage:', insertError)
-        return NextResponse.json({ error: 'Failed to track blade usage', details: insertError.message }, { status: 500 })
+        return NextResponse.json({ error: 'Failed to track blade usage' }, { status: 500 })
       }
 
       // The trigger should automatically update the total_usage_linear_feet

@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       }
       console.error('Error inserting work item:', insertError);
       return NextResponse.json(
-        { error: 'Failed to save work item', details: insertError.message },
+        { error: 'Failed to save work item' },
         { status: 500 }
       );
     }
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
       }
       console.error('Error fetching work items:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch work items', details: fetchError.message },
+        { error: 'Failed to fetch work items' },
         { status: 500 }
       );
     }

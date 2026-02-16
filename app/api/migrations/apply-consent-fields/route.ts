@@ -69,7 +69,6 @@ COMMENT ON COLUMN public.access_requests.consent_ip_address IS 'IP address where
       {
         success: false,
         error: 'Failed to check migration status',
-        details: error.message,
       },
       { status: 500 }
     );
@@ -111,7 +110,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Failed to check migration status',
-        details: error.message,
       },
       { status: 500 }
     );

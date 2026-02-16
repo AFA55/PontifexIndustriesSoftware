@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating inventory:', error)
-      return NextResponse.json({ error: 'Failed to create inventory item', details: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to create inventory item' }, { status: 500 })
     }
 
     // Create transaction record for the stock addition

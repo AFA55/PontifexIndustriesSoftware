@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     if (fetchError) {
       console.error('Error fetching timecards:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch timecards', details: fetchError.message },
+        { error: 'Failed to fetch timecards' },
         { status: 500 }
       );
     }
@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in admin timecards route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

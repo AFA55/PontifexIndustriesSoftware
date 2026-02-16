@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error('Error updating timecard:', updateError);
       return NextResponse.json(
-        { error: 'Failed to clock out', details: updateError.message },
+        { error: 'Failed to clock out' },
         { status: 500 }
       );
     }

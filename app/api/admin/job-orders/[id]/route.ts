@@ -175,7 +175,7 @@ export async function PATCH(
     if (updateError) {
       console.error('Error updating job order:', updateError);
       return NextResponse.json(
-        { error: 'Failed to update job order', details: updateError.message },
+        { error: 'Failed to update job order' },
         { status: 500 }
       );
     }
@@ -191,7 +191,7 @@ export async function PATCH(
   } catch (error: any) {
     console.error('Unexpected error in update job order route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -289,7 +289,7 @@ export async function DELETE(
     if (deleteError) {
       console.error('Error deleting job order:', deleteError);
       return NextResponse.json(
-        { error: 'Failed to delete job order', details: deleteError.message },
+        { error: 'Failed to delete job order' },
         { status: 500 }
       );
     }
@@ -306,7 +306,7 @@ export async function DELETE(
   } catch (error: any) {
     console.error('Unexpected error in delete job order route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

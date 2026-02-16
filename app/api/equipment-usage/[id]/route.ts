@@ -110,7 +110,7 @@ export async function PATCH(
     if (updateError) {
       console.error('Error updating equipment usage:', updateError);
       return NextResponse.json(
-        { error: 'Failed to update equipment usage', details: updateError.message },
+        { error: 'Failed to update equipment usage' },
         { status: 500 }
       );
     }
@@ -126,7 +126,7 @@ export async function PATCH(
   } catch (error: any) {
     console.error('Unexpected error in equipment usage update:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -195,7 +195,7 @@ export async function DELETE(
     if (deleteError) {
       console.error('Error deleting equipment usage:', deleteError);
       return NextResponse.json(
-        { error: 'Failed to delete equipment usage', details: deleteError.message },
+        { error: 'Failed to delete equipment usage' },
         { status: 500 }
       );
     }
@@ -210,7 +210,7 @@ export async function DELETE(
   } catch (error: any) {
     console.error('Unexpected error in equipment usage deletion:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -99,7 +99,7 @@ export async function GET(
   } catch (error: any) {
     console.error('Unexpected error in get operator profile route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -199,7 +199,7 @@ export async function PATCH(
     if (updateError) {
       console.error('Error updating operator profile:', updateError);
       return NextResponse.json(
-        { error: 'Failed to update operator profile', details: updateError.message },
+        { error: 'Failed to update operator profile' },
         { status: 500 }
       );
     }
@@ -215,7 +215,7 @@ export async function PATCH(
   } catch (error: any) {
     console.error('Unexpected error in update operator profile route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

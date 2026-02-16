@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     if (operatorsError) {
       console.error('Error fetching operators:', operatorsError);
       return NextResponse.json(
-        { error: 'Failed to fetch operator profiles', details: operatorsError.message },
+        { error: 'Failed to fetch operator profiles' },
         { status: 500 }
       );
     }
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in get operator profiles route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

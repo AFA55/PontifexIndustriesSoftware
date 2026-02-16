@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     if (fetchError) {
       console.error('Error fetching users:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch users', details: fetchError.message },
+        { error: 'Failed to fetch users' },
         { status: 500 }
       );
     }
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in users route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -65,10 +65,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Failed to create standby log',
-          details: insertError.message,
-          code: insertError.code,
-          hint: insertError.hint
+          error: 'Failed to create standby log'
         },
         { status: 500 }
       );

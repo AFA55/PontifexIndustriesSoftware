@@ -110,7 +110,7 @@ export async function POST(
       } else {
         console.error('Error creating daily log:', logError);
         return NextResponse.json(
-          { error: 'Failed to create daily log', details: logError.message },
+          { error: 'Failed to create daily log' },
           { status: 500 }
         );
       }
@@ -176,7 +176,7 @@ export async function POST(
   } catch (error: any) {
     console.error('Error in daily log submission:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

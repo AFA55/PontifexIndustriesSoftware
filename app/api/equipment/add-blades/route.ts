@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     if (insertError) {
       console.error('Error inserting equipment:', insertError)
-      return NextResponse.json({ error: 'Failed to add equipment', details: insertError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to add equipment' }, { status: 500 })
     }
 
     // Store QR code images in storage bucket (optional)
