@@ -27,7 +27,12 @@ export default function ClockInOutButton() {
 
   const fetchClockStatus = async () => {
     try {
-      const response = await fetch('/api/time-clock');
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const response = await fetch('/api/timecard/current', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const data = await response.json();
       setStatus(data);
     } catch (error) {
@@ -68,10 +73,17 @@ export default function ClockInOutButton() {
       const location = await getLocation();
       const action = status?.isClockedIn ? 'clock-out' : 'clock-in';
 
-      const response = await fetch('/api/time-clock', {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const endpoint = action === 'clock-in' ? '/api/timecard/clock-in' : '/api/timecard/clock-out';
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, location })
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ location })
       });
 
       const data = await response.json();

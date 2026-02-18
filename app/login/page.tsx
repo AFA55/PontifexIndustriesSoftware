@@ -227,38 +227,14 @@ export default function LoginPage() {
           </motion.div>
         </form>
 
-        {/* Demo Credentials - Modern Cards */}
+        {/* Footer */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ delay: 0.9 }}
-          className="mt-8 space-y-3"
+          className="mt-8 text-center"
         >
-          <h3 className="text-gray-700 font-bold text-sm mb-4 text-center">Quick Access Demo Accounts</h3>
-
-          {/* Operator Account */}
-          <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 hover:border-blue-300 transition-all hover:shadow-md cursor-default">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <h4 className="text-blue-800 font-bold text-xs tracking-wider">OPERATOR DASHBOARD</h4>
-            </div>
-            <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-              <div><span className="text-blue-700 font-bold">Email:</span> demo@pontifex.com</div>
-              <div><span className="text-blue-700 font-bold">Password:</span> Demo1234!</div>
-            </div>
-          </div>
-
-          {/* Admin Account */}
-          <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200 hover:border-orange-300 transition-all hover:shadow-md cursor-default">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <h4 className="text-red-800 font-bold text-xs tracking-wider">ADMIN DASHBOARD</h4>
-            </div>
-            <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-              <div><span className="text-red-700 font-bold">Email:</span> admin@pontifex.com</div>
-              <div><span className="text-red-700 font-bold">Password:</span> Admin1234!</div>
-            </div>
-          </div>
+          <p className="text-gray-400 text-xs">© {new Date().getFullYear()} Pontifex Industries. All rights reserved.</p>
         </motion.div>
       </motion.div>
     </div>

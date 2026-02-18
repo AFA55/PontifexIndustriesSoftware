@@ -4,53 +4,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { logAudit, getRequestContext } from '@/lib/audit';
 
 // GET: Fetch all job orders (admin only)
 export async function GET(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can view all job orders' },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
@@ -129,48 +91,8 @@ export async function GET(request: NextRequest) {
 // POST: Create new job order (admin only)
 export async function POST(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can create job orders' },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -209,7 +131,7 @@ export async function POST(request: NextRequest) {
       job_site_number: body.job_site_number,
       po_number: body.po_number,
       customer_job_number: body.customer_job_number,
-      created_by: user.id,
+      created_by: auth.userId,
     };
 
     // Set assigned_at if assigning to operator
@@ -231,6 +153,36 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // If operator assigned, also create crew assignment
+    if (body.assigned_to && jobOrder) {
+      await supabaseAdmin
+        .from('job_crew_assignments')
+        .upsert({
+          job_order_id: jobOrder.id,
+          operator_id: body.assigned_to,
+          role: 'lead',
+          assigned_by: auth.userId,
+          assigned_at: new Date().toISOString(),
+        }, {
+          onConflict: 'job_order_id,operator_id',
+        });
+    }
+
+    // Audit log
+    const ctx = getRequestContext(request);
+    await logAudit({
+      userId: auth.userId,
+      userEmail: auth.userEmail,
+      userRole: auth.role,
+      action: 'create',
+      entityType: 'job_order',
+      entityId: jobOrder?.id,
+      description: `Created job order #${body.job_number} for ${body.customer_name}`,
+      changes: { status: { from: null, to: jobOrderData.status } },
+      metadata: { assigned_to: body.assigned_to || null },
+      ...ctx,
+    });
 
     return NextResponse.json(
       {

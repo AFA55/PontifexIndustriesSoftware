@@ -41,53 +41,8 @@ export interface Equipment {
   updated_at?: string;
 }
 
-export interface Job {
-  id?: string;
-  job_number?: string;
-  title: string;
-  customer_name: string;
-  project_name?: string;
-  location: string;
-  address?: string;
-  status: 'scheduled' | 'in_route' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  scheduled_start_date: string;
-  scheduled_end_date?: string;
-  scheduled_arrival_time?: string;
-  estimated_hours?: number;
-  actual_start_time?: string;
-  actual_end_time?: string;
-  actual_hours_worked?: number;
-  assigned_operators?: string[];
-  salesman?: string;
-  job_types?: string[];
-  description?: string;
-  additional_info?: string;
-  contact_on_site?: string;
-  contact_phone?: string;
-  job_site_number?: string;
-  po_number?: string;
-  customer_job_number?: string;
-  job_quote?: number;
-  total_revenue?: number;
-  labor_cost?: number;
-  material_cost?: number;
-  equipment_cost?: number;
-  linear_feet_cut?: number;
-  square_feet_completed?: number;
-  holes_drilled?: number;
-  required_documents?: string[];
-  equipment_assigned?: string[];
-  progress_percentage?: number;
-  photo_urls?: string[];
-  document_urls?: string[];
-  notes?: string;
-  completion_notes?: string;
-  created_by?: string;
-  created_at?: string;
-  updated_at?: string;
-  completed_at?: string;
-}
+// NOTE: The legacy 'Job' interface and 'jobs' table CRUD functions have been removed.
+// The active job system uses the 'job_orders' table — see types/job.ts for the JobOrder type.
 
 export interface Blade {
   id?: string;
@@ -279,127 +234,7 @@ export async function assignEquipment(equipmentId: string, operatorId: string | 
   return updateEquipment(equipmentId, updates);
 }
 
-// =====================================================
-// JOB FUNCTIONS
-// =====================================================
-
-export async function getAllJobs(): Promise<Job[]> {
-  const { data, error } = await supabase
-    .from('jobs')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching jobs:', error);
-    return [];
-  }
-
-  return data || [];
-}
-
-export async function getJobsByStatus(status: Job['status']): Promise<Job[]> {
-  const { data, error } = await supabase
-    .from('jobs')
-    .select('*')
-    .eq('status', status)
-    .order('scheduled_start_date');
-
-  if (error) {
-    console.error('Error fetching jobs by status:', error);
-    return [];
-  }
-
-  return data || [];
-}
-
-export async function getJobsByOperator(operatorId: string): Promise<Job[]> {
-  const { data, error } = await supabase
-    .from('jobs')
-    .select('*')
-    .contains('assigned_operators', [operatorId])
-    .order('scheduled_start_date');
-
-  if (error) {
-    console.error('Error fetching operator jobs:', error);
-    return [];
-  }
-
-  return data || [];
-}
-
-export async function getJobById(id: string): Promise<Job | null> {
-  const { data, error } = await supabase
-    .from('jobs')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    console.error('Error fetching job:', error);
-    return null;
-  }
-
-  return data;
-}
-
-export async function createJob(job: Job) {
-  const { data, error } = await supabase
-    .from('jobs')
-    .insert([job])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating job:', error);
-    throw error;
-  }
-
-  return data;
-}
-
-export async function updateJob(id: string, updates: Partial<Job>) {
-  const { data, error } = await supabase
-    .from('jobs')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating job:', error);
-    throw error;
-  }
-
-  return data;
-}
-
-export async function updateJobStatus(id: string, status: Job['status']) {
-  const updates: Partial<Job> = { status };
-
-  // Set timestamps based on status
-  if (status === 'in_progress' && !updates.actual_start_time) {
-    updates.actual_start_time = new Date().toISOString();
-  }
-  if (status === 'completed') {
-    updates.actual_end_time = new Date().toISOString();
-    updates.completed_at = new Date().toISOString();
-    updates.progress_percentage = 100;
-  }
-
-  return updateJob(id, updates);
-}
-
-export async function deleteJob(id: string) {
-  const { error } = await supabase
-    .from('jobs')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('Error deleting job:', error);
-    throw error;
-  }
-}
+// Legacy 'jobs' table CRUD functions removed — use job_orders API routes instead.
 
 // =====================================================
 // BLADE FUNCTIONS
@@ -566,12 +401,7 @@ export async function uploadEquipmentPhoto(equipmentId: string, file: File) {
 // REAL-TIME SUBSCRIPTIONS
 // =====================================================
 
-export function subscribeToJobs(callback: (payload: any) => void) {
-  return supabase
-    .channel('jobs-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, callback)
-    .subscribe();
-}
+// Legacy subscribeToJobs removed — 'jobs' table dropped. Use job_orders subscriptions.
 
 export function subscribeToEquipment(callback: (payload: any) => void) {
   return supabase

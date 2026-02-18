@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { SHOP_LOCATION, calculateDistance } from '@/lib/geolocation';
 import { ArrowLeft, CheckCircle, Navigation, Clock } from 'lucide-react';
+import { useNotification } from '@/hooks/useNotification';
+import Notification from '@/components/Notification';
 
 interface JobOrder {
   id: string;
@@ -34,6 +36,7 @@ export default function StartRoutePage() {
   const router = useRouter();
   const params = useParams();
   const jobId = params.id as string;
+  const { notification, notify, clearNotification } = useNotification();
   const [job, setJob] = useState<JobOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [checklistConfirmed, setChecklistConfirmed] = useState(false);
@@ -72,8 +75,6 @@ export default function StartRoutePage() {
 
           // If equipment checklist is completed, redirect to the appropriate step
           if (workflow.equipment_checklist_completed) {
-            console.log('Equipment checklist already completed, redirecting...');
-
             if (!workflow.sms_sent) {
               router.replace(`/dashboard/job-schedule/${jobId}/in-route`);
               return;
@@ -97,7 +98,7 @@ export default function StartRoutePage() {
         }
       }
     } catch (error) {
-      console.log('Workflow check error (non-blocking):', error);
+      // Workflow check error (non-blocking)
     }
   };
 
@@ -118,13 +119,9 @@ export default function StartRoutePage() {
           jobId: jobId,
           currentStep: 'equipment_checklist',
         })
-      }).catch(err => {
-        // Silently fail - workflow tracking is optional
-        console.log('Workflow tracking unavailable:', err);
-      });
+      }).catch(() => {});
     } catch (error) {
       // Silently fail - workflow tracking is optional
-      console.log('Workflow tracking error:', error);
     }
   };
 
@@ -151,7 +148,7 @@ export default function StartRoutePage() {
         }
       }
     } catch (error) {
-      console.error('Error fetching job:', error);
+      notify('error', 'Failed to load job details. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -165,11 +162,11 @@ export default function StartRoutePage() {
       // Get name from session metadata or localStorage (avoids RLS issues with profiles table)
       const name = session.user.user_metadata?.full_name
         || session.user.user_metadata?.name
-        || (() => { try { const u = JSON.parse(localStorage.getItem('pontifex-user') || '{}'); return u.full_name; } catch { return null; } })()
+        || (() => { try { const u = JSON.parse(localStorage.getItem('supabase-user') || '{}'); return u.name; } catch { return null; } })()
         || 'Pontifex Team';
       setOperatorName(name);
     } catch (error) {
-      console.error('Error fetching operator name:', error);
+      notify('error', 'Could not load operator name.');
       setOperatorName('Pontifex Team');
     }
   };
@@ -220,7 +217,7 @@ export default function StartRoutePage() {
         });
       }
     } catch (error) {
-      console.error('Error calculating ETA:', error);
+      notify('info', 'Could not calculate ETA. Using default estimate.');
       // Set default ETA if calculation fails
       setEta({
         distance: 0,
@@ -246,12 +243,12 @@ export default function StartRoutePage() {
 
   const handleStartRoute = async () => {
     if (!allEquipmentChecked()) {
-      alert('Please check off all equipment items to confirm you have loaded everything.');
+      notify('error', 'Please check off all equipment items to confirm you have loaded everything.');
       return;
     }
 
     if (!checklistConfirmed) {
-      alert('Please confirm that you have reviewed and completed the equipment checklist.');
+      notify('error', 'Please confirm that you have reviewed and completed the equipment checklist.');
       return;
     }
 
@@ -281,7 +278,7 @@ export default function StartRoutePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('Session expired. Please log in again.');
+        notify('error', 'Session expired. Please log in again.');
         router.push('/login');
         return;
       }
@@ -298,7 +295,7 @@ export default function StartRoutePage() {
           completedStep: 'equipment_checklist',
           currentStep: 'in_route',
         })
-      }).catch(err => console.log('Workflow tracking unavailable:', err));
+      }).catch(() => {});
 
       // Update job status to "in_route" with departure time — don't block navigation
       try {
@@ -315,10 +312,10 @@ export default function StartRoutePage() {
         });
 
         if (!statusResponse.ok) {
-          console.log('Status update returned non-ok, but continuing navigation');
+          // Status update returned non-ok, but continuing navigation
         }
       } catch (statusErr) {
-        console.log('Status update failed, but continuing navigation:', statusErr);
+        // Status update failed, but continuing navigation
       }
 
       // Send SMS to point of contact with ETA — fire and forget
@@ -336,14 +333,13 @@ export default function StartRoutePage() {
             to: job.foreman_phone,
             message: smsMessage
           })
-        }).catch(err => console.log('SMS send unavailable:', err));
+        }).catch(() => {});
       }
 
       // Redirect to in-route page — always navigate regardless of API results
       router.push(`/dashboard/job-schedule/${jobId}/in-route`);
     } catch (error) {
-      console.error('Error starting route:', error);
-      alert('An error occurred while starting your route. Please try again.');
+      notify('error', 'An error occurred while starting your route. Please try again.');
       setSubmitting(false);
     }
   };
@@ -374,6 +370,7 @@ export default function StartRoutePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {notification && <Notification type={notification.type} message={notification.message} onClose={clearNotification} />}
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4">
@@ -499,7 +496,7 @@ export default function StartRoutePage() {
               if (allEquipmentChecked()) {
                 setChecklistConfirmed(!checklistConfirmed);
               } else {
-                alert('Please check off all equipment items first before confirming.');
+                notify('error', 'Please check off all equipment items first before confirming.');
               }
             }}
             className={`border-2 rounded-2xl p-6 transition-all ${

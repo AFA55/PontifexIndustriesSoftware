@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
 
 export async function PATCH(
   request: NextRequest,
@@ -18,48 +18,16 @@ export async function PATCH(
     // Await params as required by Next.js 15+
     const { id } = await params;
 
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    // Verify admin access
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role and name from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // Get user's name for audit trail
+    const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('role, full_name, email')
-      .eq('id', user.id)
+      .select('full_name, email')
+      .eq('id', auth.userId)
       .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can update job orders' },
-        { status: 403 }
-      );
-    }
 
     // Parse request body
     const updates = await request.json();
@@ -151,9 +119,9 @@ export async function PATCH(
           .insert({
             job_order_id: id,
             job_number: jobOrder.job_number,
-            changed_by: user.id,
-            changed_by_name: profile.full_name || user.email,
-            changed_by_role: profile.role,
+            changed_by: auth.userId,
+            changed_by_name: profile?.full_name || auth.userEmail,
+            changed_by_role: auth.role,
             change_type: 'updated',
             changes: changes,
             snapshot: jobOrder, // Store complete snapshot
@@ -205,48 +173,16 @@ export async function DELETE(
     // Await params as required by Next.js 15+
     const { id } = await params;
 
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    // Verify admin access
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role and name from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // Get user's name for audit trail
+    const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('role, full_name, email')
-      .eq('id', user.id)
+      .select('full_name, email')
+      .eq('id', auth.userId)
       .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can delete job orders' },
-        { status: 403 }
-      );
-    }
 
     // Get the job order before deleting (for audit trail)
     const { data: jobOrder, error: fetchError } = await supabaseAdmin
@@ -268,9 +204,9 @@ export async function DELETE(
       .insert({
         job_order_id: id,
         job_number: jobOrder.job_number,
-        changed_by: user.id,
-        changed_by_name: profile.full_name || user.email,
-        changed_by_role: profile.role,
+        changed_by: auth.userId,
+        changed_by_name: profile?.full_name || auth.userEmail,
+        changed_by_role: auth.role,
         change_type: 'deleted',
         changes: { deleted: { old: jobOrder, new: null } },
         snapshot: jobOrder,
@@ -294,7 +230,7 @@ export async function DELETE(
       );
     }
 
-    console.log(`Job order ${id} deleted by ${profile.full_name}`);
+    console.log(`Job order ${id} deleted by ${profile?.full_name || auth.userEmail}`);
 
     return NextResponse.json(
       {

@@ -1,33 +1,18 @@
 /**
  * API Route: GET /api/job-orders
- * Get job orders assigned to the current operator
+ * Get job orders assigned to the current operator (or all if admin)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const isAdmin = auth.role === 'admin';
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -35,15 +20,6 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
     const scheduledDate = searchParams.get('scheduled_date');
-
-    // Check if user is admin
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    const isAdmin = profile?.role === 'admin';
 
     // If ID is provided, fetch that specific job
     if (id) {
@@ -68,39 +44,42 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // Check if user has access to this job
-      if (!isAdmin && specificJob.assigned_to !== user.id) {
-        return NextResponse.json(
-          { error: 'Unauthorized to view this job' },
-          { status: 403 }
-        );
+      // Check if user has access: admin, directly assigned, or in crew
+      if (!isAdmin && specificJob.assigned_to !== auth.userId) {
+        // Also check crew assignments
+        const { data: crewCheck } = await supabaseAdmin
+          .from('job_crew_assignments')
+          .select('id')
+          .eq('job_order_id', id)
+          .eq('operator_id', auth.userId)
+          .is('removed_at', null)
+          .single();
+
+        if (!crewCheck) {
+          return NextResponse.json(
+            { error: 'Unauthorized to view this job' },
+            { status: 403 }
+          );
+        }
       }
 
       // Fetch operator profile data for autofilling forms
-      let operatorProfile = null;
-      let assignedOperatorProfile = null;
-
-      // Get current user's profile
-      const { data: currentUserProfile } = await supabaseAdmin
+      const { data: operatorProfile } = await supabaseAdmin
         .from('profiles')
         .select('full_name, phone_number, email')
-        .eq('id', user.id)
+        .eq('id', auth.userId)
         .single();
 
-      operatorProfile = currentUserProfile;
-
-      // Get assigned operator's profile (for the employees list)
+      let assignedOperatorProfile = null;
       if (specificJob.assigned_to) {
         const { data: assignedProfile } = await supabaseAdmin
           .from('profiles')
           .select('full_name, phone_number, email')
           .eq('id', specificJob.assigned_to)
           .single();
-
         assignedOperatorProfile = assignedProfile;
       }
 
-      console.log('Returning specific job:', specificJob.job_number);
       return NextResponse.json(
         {
           success: true,
@@ -117,9 +96,23 @@ export async function GET(request: NextRequest) {
       .from('active_job_orders')
       .select('*');
 
-    // If not admin, only show jobs assigned to this user
+    // If not admin, show jobs assigned to this user (direct or crew)
     if (!isAdmin) {
-      query = query.eq('assigned_to', user.id);
+      // Get job IDs where this operator is in the crew
+      const { data: crewJobs } = await supabaseAdmin
+        .from('job_crew_assignments')
+        .select('job_order_id')
+        .eq('operator_id', auth.userId)
+        .is('removed_at', null);
+
+      const crewJobIds = crewJobs?.map(c => c.job_order_id) || [];
+
+      if (crewJobIds.length > 0) {
+        // Show jobs where directly assigned OR in crew
+        query = query.or(`assigned_to.eq.${auth.userId},id.in.(${crewJobIds.join(',')})`);
+      } else {
+        query = query.eq('assigned_to', auth.userId);
+      }
     }
 
     // Filter by scheduled_date if provided
@@ -148,15 +141,6 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    console.log('Returning job orders with shop_arrival_time:',
-      (jobOrders || []).map((j: any) => ({
-        id: j.id,
-        job_number: j.job_number,
-        shop_arrival_time: j.shop_arrival_time,
-        arrival_time: j.arrival_time
-      }))
-    );
 
     return NextResponse.json(
       {

@@ -43,7 +43,8 @@ export interface JobOrder {
   additional_info: string | null;
 
   // Assignment
-  assigned_to: string | null;
+  assigned_to: string | null;        // Lead operator (backward compat)
+  crew_size: number | null;          // Number of operators assigned
   operator_name: string | null;
   foreman_name: string | null;
   foreman_phone: string | null;
@@ -83,6 +84,29 @@ export interface JobOrder {
   po_number: string | null;
   customer_job_number: string | null;
   job_quote: number | null;
+
+  // Financial — Revenue & Billing
+  total_revenue: number | null;
+  billing_status: 'unbilled' | 'invoiced' | 'partial' | 'paid' | 'overdue' | 'written_off';
+  invoice_number: string | null;
+  invoiced_at: string | null;
+  paid_at: string | null;
+  payment_method: string | null;
+
+  // Financial — Cost Tracking
+  labor_cost: number | null;
+  material_cost: number | null;
+  equipment_cost: number | null;
+  fuel_cost: number | null;
+  subcontractor_cost: number | null;
+  other_cost: number | null;
+  total_cost: number | null;        // computed column
+  gross_profit: number | null;      // computed column
+
+  // Financial — Labor Hours
+  billable_hours: number | null;
+  overtime_hours: number | null;
+  hourly_rate: number | null;
 
   // Work performed
   work_performed: string | null;
@@ -214,4 +238,33 @@ export interface JobUpdatePayload {
   description?: string | null;
   status?: JobStatus;
   priority?: JobPriority;
+}
+
+// ─── Crew Assignment Types ─────────────────────────────────────────────────
+
+export type CrewRole = 'lead' | 'operator' | 'apprentice' | 'helper';
+
+/** Maps to the `job_crew_assignments` junction table */
+export interface CrewAssignment {
+  id: string;
+  job_order_id: string;
+  operator_id: string;
+  role: CrewRole;
+  assigned_at: string;
+  assigned_by: string | null;
+  removed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Crew member with operator profile info (joined query) */
+export interface CrewMember extends CrewAssignment {
+  profiles: {
+    id: string;
+    full_name: string;
+    email: string;
+    phone: string | null;
+    role: string;
+  };
 }

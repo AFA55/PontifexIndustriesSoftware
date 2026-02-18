@@ -85,7 +85,7 @@ export default function CompletedJobDetailsPage() {
         return;
       }
 
-      const userStr = localStorage.getItem('pontifex-user');
+      const userStr = localStorage.getItem('supabase-user');
       if (userStr) {
         const user = JSON.parse(userStr);
         if (user.role !== 'admin') {

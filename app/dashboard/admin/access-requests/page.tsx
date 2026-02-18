@@ -49,7 +49,7 @@ export default function AccessRequestsPage() {
         setUserId(user.id);
         // Get user role from session metadata or localStorage (avoids RLS issues with profiles table)
         const role = user.user_metadata?.role
-          || (() => { try { const u = JSON.parse(localStorage.getItem('pontifex-user') || '{}'); return u.role; } catch { return null; } })()
+          || (() => { try { const u = JSON.parse(localStorage.getItem('supabase-user') || '{}'); return u.role; } catch { return null; } })()
           || 'operator';
         setUserRole(role);
       }
