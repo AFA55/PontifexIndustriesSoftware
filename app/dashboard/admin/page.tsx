@@ -211,7 +211,9 @@ export default function AdminDashboard() {
       'Completed Job Tickets',
       'Operator Profiles',
       'Access Requests',
-      'Team Management'
+      'Team Management',
+      'Payroll & Finance',
+      'Invoicing & Customers'
     ];
 
     return accessibleCards.includes(moduleTitle);
@@ -316,6 +318,26 @@ export default function AdminDashboard() {
       bgColor: 'from-purple-500 to-pink-600',
       iconBg: 'bg-purple-500',
       features: ['View all equipment', 'Search by operator', 'Equipment status', 'Assignment tracking'],
+      status: 'active'
+    },
+    {
+      title: 'Payroll & Finance',
+      description: 'Manage payroll periods, pay rates, and financial overview',
+      icon: '💰',
+      href: '/dashboard/admin/finance',
+      bgColor: 'from-emerald-500 to-green-600',
+      iconBg: 'bg-emerald-500',
+      features: ['Pay periods', 'Operator pay rates', 'Financial dashboard', 'Payroll settings'],
+      status: 'active'
+    },
+    {
+      title: 'Invoicing & Customers',
+      description: 'Create invoices, manage customers, and track payments',
+      icon: '📄',
+      href: '/dashboard/admin/invoices',
+      bgColor: 'from-amber-500 to-orange-600',
+      iconBg: 'bg-amber-500',
+      features: ['Create invoices', 'Customer management', 'Payment tracking', 'AR aging'],
       status: 'active'
     }
   ];
