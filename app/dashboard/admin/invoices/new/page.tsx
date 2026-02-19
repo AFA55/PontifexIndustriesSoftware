@@ -358,7 +358,7 @@ export default function NewInvoicePage() {
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="e.g. Acme Construction"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                     required={!useExistingCustomer}
                   />
                 </div>
@@ -371,7 +371,7 @@ export default function NewInvoicePage() {
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
                     placeholder="billing@example.com"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   />
                 </div>
               </div>
@@ -387,7 +387,7 @@ export default function NewInvoicePage() {
                 value={billingAddress}
                 onChange={(e) => setBillingAddress(e.target.value)}
                 placeholder="123 Main St, Houston, TX 77001"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               />
             </div>
           </div>
@@ -405,7 +405,7 @@ export default function NewInvoicePage() {
                   value={paymentTerms}
                   onChange={(e) => setPaymentTerms(parseInt(e.target.value) || 0)}
                   min={0}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 />
               </div>
               <div>
@@ -417,7 +417,7 @@ export default function NewInvoicePage() {
                   value={poNumber}
                   onChange={(e) => setPoNumber(e.target.value)}
                   placeholder="Optional"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 />
               </div>
               <div>
@@ -431,7 +431,7 @@ export default function NewInvoicePage() {
                   step="0.01"
                   min={0}
                   max={100}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 />
               </div>
             </div>
@@ -489,7 +489,7 @@ export default function NewInvoicePage() {
                             updateLineItem(item.id, 'description', e.target.value)
                           }
                           placeholder="Description"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                         />
                       </div>
                       <div className="col-span-2">
@@ -498,7 +498,7 @@ export default function NewInvoicePage() {
                           onChange={(e) =>
                             updateLineItem(item.id, 'billing_type', e.target.value)
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                         >
                           {BILLING_TYPES.map((bt) => (
                             <option key={bt.value} value={bt.value}>
@@ -520,7 +520,7 @@ export default function NewInvoicePage() {
                           }
                           min={0}
                           step="0.01"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                         />
                       </div>
                       <div className="col-span-1">
@@ -529,7 +529,7 @@ export default function NewInvoicePage() {
                           onChange={(e) =>
                             updateLineItem(item.id, 'unit', e.target.value)
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                         >
                           {UNIT_OPTIONS.map((u) => (
                             <option key={u} value={u}>
@@ -555,7 +555,7 @@ export default function NewInvoicePage() {
                             }
                             min={0}
                             step="0.01"
-                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                           />
                         </div>
                       </div>
@@ -596,7 +596,7 @@ export default function NewInvoicePage() {
                           updateLineItem(item.id, 'description', e.target.value)
                         }
                         placeholder="Description"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                       />
                       <div className="grid grid-cols-2 gap-3">
                         <select
@@ -604,7 +604,7 @@ export default function NewInvoicePage() {
                           onChange={(e) =>
                             updateLineItem(item.id, 'billing_type', e.target.value)
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                         >
                           {BILLING_TYPES.map((bt) => (
                             <option key={bt.value} value={bt.value}>
@@ -617,7 +617,7 @@ export default function NewInvoicePage() {
                           onChange={(e) =>
                             updateLineItem(item.id, 'unit', e.target.value)
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                         >
                           {UNIT_OPTIONS.map((u) => (
                             <option key={u} value={u}>
@@ -641,7 +641,7 @@ export default function NewInvoicePage() {
                             }
                             min={0}
                             step="0.01"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                           />
                         </div>
                         <div>
@@ -662,7 +662,7 @@ export default function NewInvoicePage() {
                               }
                               min={0}
                               step="0.01"
-                              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                             />
                           </div>
                         </div>
@@ -719,7 +719,7 @@ export default function NewInvoicePage() {
                     onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
                     min={0}
                     step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
                   />
                 </div>
                 <div className="border-t border-gray-200 pt-3 flex justify-between">

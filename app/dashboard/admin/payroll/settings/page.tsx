@@ -288,7 +288,7 @@ export default function PayrollSettingsPage() {
               <select
                 value={settings.pay_frequency}
                 onChange={(e) => handleChange('pay_frequency', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               >
                 <option value="weekly">{formatPayFrequency('weekly')}</option>
                 <option value="biweekly">{formatPayFrequency('biweekly')}</option>
@@ -305,7 +305,7 @@ export default function PayrollSettingsPage() {
               <select
                 value={settings.week_start_day}
                 onChange={(e) => handleChange('week_start_day', parseInt(e.target.value))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               >
                 <option value={0}>Sunday</option>
                 <option value={1}>Monday</option>
@@ -328,7 +328,7 @@ export default function PayrollSettingsPage() {
                 step="1"
                 value={settings.overtime_threshold_weekly}
                 onChange={(e) => handleChange('overtime_threshold_weekly', parseFloat(e.target.value) || 0)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               />
               <p className="text-xs text-gray-400 mt-1">Hours per week before overtime kicks in</p>
             </div>
@@ -344,7 +344,7 @@ export default function PayrollSettingsPage() {
                 step="0.1"
                 value={settings.overtime_multiplier}
                 onChange={(e) => handleChange('overtime_multiplier', parseFloat(e.target.value) || 1.5)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               />
               <p className="text-xs text-gray-400 mt-1">Typically 1.5x regular rate</p>
             </div>
@@ -364,7 +364,7 @@ export default function PayrollSettingsPage() {
                   handleChange('double_time_threshold_daily', val === '' ? null : parseFloat(val));
                 }}
                 placeholder="Leave empty to disable"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               />
               <p className="text-xs text-gray-400 mt-1">Daily hours before double time. Leave empty if not applicable.</p>
             </div>
@@ -380,7 +380,7 @@ export default function PayrollSettingsPage() {
                 step="0.1"
                 value={settings.double_time_multiplier}
                 onChange={(e) => handleChange('double_time_multiplier', parseFloat(e.target.value) || 2.0)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               />
               <p className="text-xs text-gray-400 mt-1">Typically 2.0x regular rate</p>
             </div>
@@ -396,7 +396,7 @@ export default function PayrollSettingsPage() {
                 step="1"
                 value={settings.auto_lock_days_after_period}
                 onChange={(e) => handleChange('auto_lock_days_after_period', parseInt(e.target.value) || 0)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               />
               <p className="text-xs text-gray-400 mt-1">Days after period end before timecards are locked</p>
             </div>
@@ -443,7 +443,7 @@ export default function PayrollSettingsPage() {
                   step="0.01"
                   value={settings.default_per_diem_rate}
                   onChange={(e) => handleChange('default_per_diem_rate', parseFloat(e.target.value) || 0)}
-                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 />
               </div>
               <p className="text-xs text-gray-400 mt-1">Daily per diem allowance for field operators</p>
@@ -488,7 +488,7 @@ export default function PayrollSettingsPage() {
                 value={settings.company_name}
                 onChange={(e) => handleChange('company_name', e.target.value)}
                 placeholder="Pontifex Industries LLC"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               />
             </div>
 
@@ -502,7 +502,7 @@ export default function PayrollSettingsPage() {
                 value={settings.company_ein}
                 onChange={(e) => handleChange('company_ein', e.target.value)}
                 placeholder="XX-XXXXXXX"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               />
             </div>
 
@@ -516,7 +516,7 @@ export default function PayrollSettingsPage() {
                 value={settings.company_address}
                 onChange={(e) => handleChange('company_address', e.target.value)}
                 placeholder="123 Main Street, Suite 100, City, State ZIP"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               />
             </div>
 
@@ -531,7 +531,7 @@ export default function PayrollSettingsPage() {
                 onChange={(e) => handleChange('company_state', e.target.value)}
                 placeholder="TX"
                 maxLength={2}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               />
               <p className="text-xs text-gray-400 mt-1">Two-letter state code (e.g. TX, CA, NY)</p>
             </div>

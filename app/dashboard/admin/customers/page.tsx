@@ -476,7 +476,7 @@ export default function CustomersPage() {
                   value={form.name}
                   onChange={(e) => updateForm('name', e.target.value)}
                   placeholder="e.g. Acme Construction LLC"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   required
                 />
               </div>
@@ -491,7 +491,7 @@ export default function CustomersPage() {
                   value={form.display_name}
                   onChange={(e) => updateForm('display_name', e.target.value)}
                   placeholder="Short name for invoices (optional)"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 />
               </div>
 
@@ -506,7 +506,7 @@ export default function CustomersPage() {
                     value={form.primary_contact_name}
                     onChange={(e) => updateForm('primary_contact_name', e.target.value)}
                     placeholder="John Doe"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   />
                 </div>
                 <div>
@@ -518,7 +518,7 @@ export default function CustomersPage() {
                     value={form.primary_contact_phone}
                     onChange={(e) => updateForm('primary_contact_phone', e.target.value)}
                     placeholder="(555) 123-4567"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   />
                 </div>
               </div>
@@ -532,7 +532,7 @@ export default function CustomersPage() {
                   value={form.primary_contact_email}
                   onChange={(e) => updateForm('primary_contact_email', e.target.value)}
                   placeholder="contact@example.com"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 />
               </div>
 
@@ -546,7 +546,7 @@ export default function CustomersPage() {
                   value={form.billing_address_line1}
                   onChange={(e) => updateForm('billing_address_line1', e.target.value)}
                   placeholder="123 Main St"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 />
               </div>
               <div className="grid grid-cols-3 gap-3">
@@ -557,7 +557,7 @@ export default function CustomersPage() {
                     value={form.billing_city}
                     onChange={(e) => updateForm('billing_city', e.target.value)}
                     placeholder="Houston"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   />
                 </div>
                 <div>
@@ -568,7 +568,7 @@ export default function CustomersPage() {
                     onChange={(e) => updateForm('billing_state', e.target.value)}
                     placeholder="TX"
                     maxLength={2}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   />
                 </div>
                 <div>
@@ -578,7 +578,7 @@ export default function CustomersPage() {
                     value={form.billing_zip}
                     onChange={(e) => updateForm('billing_zip', e.target.value)}
                     placeholder="77001"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   />
                 </div>
               </div>
@@ -594,7 +594,7 @@ export default function CustomersPage() {
                     value={form.payment_terms}
                     onChange={(e) => updateForm('payment_terms', parseInt(e.target.value) || 0)}
                     min={0}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   />
                 </div>
                 <div>

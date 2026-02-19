@@ -827,7 +827,7 @@ export default function InvoiceDetailPage() {
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   placeholder={formatMoney(balanceDue)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-0 outline-none text-lg font-semibold"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-0 outline-none text-lg font-semibold text-gray-900"
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Balance due: {formatMoney(balanceDue)}
@@ -862,7 +862,7 @@ export default function InvoiceDetailPage() {
                   type="date"
                   value={paymentDate}
                   onChange={(e) => setPaymentDate(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-0 outline-none"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-0 outline-none text-gray-900"
                 />
               </div>
 

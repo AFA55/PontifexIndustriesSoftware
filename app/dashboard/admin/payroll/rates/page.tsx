@@ -539,7 +539,7 @@ export default function OperatorPayRatesPage() {
                   <select
                     value={newRate.operator_id}
                     onChange={(e) => setNewRate({ ...newRate, operator_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   >
                     <option value="">Select an operator...</option>
                     {uniqueOperators.map((op) => (
@@ -554,7 +554,7 @@ export default function OperatorPayRatesPage() {
                     value={newRate.operator_id}
                     onChange={(e) => setNewRate({ ...newRate, operator_id: e.target.value })}
                     placeholder="Enter operator ID (UUID)"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 )}
               </div>
@@ -573,7 +573,7 @@ export default function OperatorPayRatesPage() {
                     value={newRate.regular_rate}
                     onChange={(e) => setNewRate({ ...newRate, regular_rate: e.target.value })}
                     placeholder="0.00"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 </div>
                 {newRate.regular_rate && parseFloat(newRate.regular_rate) > 0 && (
@@ -592,7 +592,7 @@ export default function OperatorPayRatesPage() {
                 <select
                   value={newRate.rate_type}
                   onChange={(e) => setNewRate({ ...newRate, rate_type: e.target.value as 'hourly' | 'salary' | 'day_rate' })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="hourly">Hourly</option>
                   <option value="salary">Salary</option>
@@ -609,7 +609,7 @@ export default function OperatorPayRatesPage() {
                   type="date"
                   value={newRate.effective_date}
                   onChange={(e) => setNewRate({ ...newRate, effective_date: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 />
               </div>
 
@@ -623,7 +623,7 @@ export default function OperatorPayRatesPage() {
                   value={newRate.reason}
                   onChange={(e) => setNewRate({ ...newRate, reason: e.target.value })}
                   placeholder="e.g. Annual raise, promotion, new hire rate"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 />
               </div>
 
