@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: Request) {
   try {
-    const { job_order_id, work_items } = await request.json()
+    const { job_order_id, work_items, operator_id } = await request.json()
 
     if (!job_order_id || !work_items || !Array.isArray(work_items)) {
       return NextResponse.json({ error: 'Invalid data' }, { status: 400 })
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
             else if (sawType.includes('chop saw')) equipmentType = 'chop_saw'
 
             // Find assigned blades for this operator and equipment type
-            const { data: assignedBlades } = await supabaseAdmin
+            let query = supabaseAdmin
               .from('blade_assignments')
               .select(`
                 equipment_id,
@@ -41,6 +41,13 @@ export async function POST(request: Request) {
                 )
               `)
               .eq('status', 'active')
+
+            // Filter by operator if provided (critical for correct tracking)
+            if (operator_id) {
+              query = query.eq('operator_id', operator_id)
+            }
+
+            const { data: assignedBlades } = await query
 
             // Filter for matching equipment type
             const matchingBlades = assignedBlades?.filter(
@@ -56,6 +63,7 @@ export async function POST(request: Request) {
               usageRecords.push({
                 equipment_id: assignment.equipment_id,
                 job_order_id,
+                operator_id: operator_id || null,
                 usage_date: new Date().toISOString().split('T')[0],
                 linear_feet_cut: cut.linearFeet,
                 equipment_type_used: equipmentType,

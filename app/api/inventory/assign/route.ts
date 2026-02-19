@@ -77,6 +77,26 @@ export async function POST(request: Request) {
       )
     }
 
+    // Also create a blade_assignments record so track-usage can find this blade
+    // The RPC only creates the equipment record + updates inventory stock
+    if (data) {
+      const { error: bladeAssignError } = await supabaseAdmin
+        .from('blade_assignments')
+        .insert({
+          equipment_id: data,
+          operator_id,
+          assigned_by,
+          assigned_date: new Date().toISOString(),
+          status: 'active',
+          checkout_notes: notes || 'Assigned from inventory'
+        })
+
+      if (bladeAssignError) {
+        // Log but don't fail — the equipment was assigned successfully
+        console.error('Warning: blade_assignments insert failed:', bladeAssignError)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       equipment_id: data,

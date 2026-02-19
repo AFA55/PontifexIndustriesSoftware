@@ -7,135 +7,41 @@ import { supabase } from '@/lib/supabase';
 import WorkflowNavigation from '@/components/WorkflowNavigation';
 import QuickAccessButtons from '@/components/QuickAccessButtons';
 import EquipmentUsageForm from '@/components/EquipmentUsageForm';
-
-// Organized work item categories based on DSM screenshots
-const WORK_CATEGORIES = {
-  'Core Drilling': [
-    'CORE DRILL',
-    'HYDRAULIC CORE DRILL',
-    'SPOT/CAUGHT CORES'
-  ],
-  'Sawing': [
-    'SLAB SAW',
-    'ELECTRIC SLAB SAW',
-    'WALL SAW',
-    'WIRE SAW',
-    'HAND SAW',
-    'FLUSH CUT HAND SAW',
-    'CHAIN SAW',
-    'RING SAW'
-  ],
-  'Breaking & Removal': [
-    'BREAK & REMOVE',
-    'DEMOLITION',
-    'REMOVAL',
-    'EXCAVATE DIRT',
-    'BROKK'
-  ],
-  'Concrete Work': [
-    'POURED/FINISH CONCRETE',
-    'REPAIR',
-    'GRINDING',
-    'CHIPPING'
-  ],
-  'Installation': [
-    'INSTALL BOLLARD(S)',
-    'INSTALL LINTEL(S)',
-    'MANHOLE BOOT',
-    'JOINT SEALING'
-  ],
-  'Equipment & Tools': [
-    'JACK HAMMERING',
-    'HAND DRILL',
-    'PRESSURE WASH',
-    'VACUUMING & WATER CONTROL'
-  ],
-  'Services': [
-    'IMAGE SCAN',
-    'SAFETY MEETINGS/ORIENTATION',
-    'STANDBY TIME',
-    'TRAVEL CHARGE',
-    'TRIP CHARGE',
-    'HAULING',
-    'DELIVER',
-    'DUMPSTER CHARGE'
-  ],
-  'Materials': [
-    'MATERIAL(S)',
-    'SALE OF'
-  ]
-};
-
-// Popular/Common items for quick access
-const POPULAR_ITEMS = [
-  'CORE DRILL',
-  'SLAB SAW',
-  'WALL SAW',
-  'HAND SAW',
-  'CHAIN SAW',
-  'BREAK & REMOVE',
-  'JACK HAMMERING'
-];
-
-interface WorkItem {
-  name: string;
-  quantity: number;
-  notes?: string;
-  details?: CoreDrillingDetails | SawingDetails | GeneralDetails;
-}
-
-interface CoreDrillingHole {
-  bitSize: string;
-  depthInches: number;
-  quantity: number;
-  plasticSetup: boolean;
-  cutSteel: boolean;
-  steelEncountered?: string;
-}
-
-interface CoreDrillingDetails {
-  holes: CoreDrillingHole[];
-  notes?: string;
-}
-
-interface CutArea {
-  length: number; // in feet
-  width: number; // in feet
-  depth: number; // in inches
-  quantity: number; // number of areas
-  cutSteel: boolean;
-  overcut: boolean;
-  steelEncountered?: string;
-  chainsawed: boolean;
-  chainsawAreas?: number;
-  chainsawWidthInches?: number;
-}
-
-interface SawingCut {
-  inputMode: 'linear' | 'area'; // How the cut was specified
-  linearFeet: number; // Total linear feet (calculated from areas or direct input)
-  cutDepth: number;
-  areas?: CutArea[]; // If using area mode
-  bladesUsed: string[];
-  cutSteel: boolean;
-  steelEncountered?: string;
-  overcut: boolean;
-  chainsawed: boolean;
-  chainsawAreas?: number;
-  chainsawWidthInches?: number;
-}
-
-interface SawingDetails {
-  cuts: SawingCut[];
-  cutType: 'wet' | 'dry';
-  notes?: string;
-}
-
-interface GeneralDetails {
-  duration?: number;
-  equipment?: string[];
-  notes?: string;
-}
+import FeedbackModal from '@/components/work-performed/FeedbackModal';
+import StandbyTimeSummary from '@/components/work-performed/StandbyTimeSummary';
+import { useNotification } from '@/hooks/useNotification';
+import Notification from '@/components/Notification';
+import {
+  WORK_CATEGORIES,
+  POPULAR_ITEMS,
+  type WorkItem,
+  type CoreDrillingHole,
+  type CoreDrillingDetails,
+  type CutArea,
+  type SawingCut,
+  type SawingDetails,
+  type GeneralDetails,
+} from '@/lib/work-item-constants';
+import {
+  isCoreDrilling,
+  isSawing,
+  isHandSaw,
+  isSlabSaw,
+  isWallSaw,
+  isChainsaw,
+  isBreakAndRemove,
+  isJackHammering,
+  isChipping,
+  isBrokk,
+  requiresDetailedData,
+  calculateLinearFeetFromArea,
+  calculateTotalFromAreas,
+  getBladesForSawType,
+  getAssignedBladesForSawType,
+  mapSawTypeToEquipmentFor,
+  formatBladeLabel,
+  type AssignedBlade,
+} from '@/lib/work-item-utils';
 
 export default function WorkPerformed() {
   const router = useRouter();
@@ -199,13 +105,15 @@ export default function WorkPerformed() {
   const [showEquipmentForm, setShowEquipmentForm] = useState(false);
   const [savingEquipment, setSavingEquipment] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [jobDifficultyRating, setJobDifficultyRating] = useState<number>(0);
-  const [jobAccessRating, setJobAccessRating] = useState<number>(0);
-  const [difficultyNotes, setDifficultyNotes] = useState('');
-  const [accessNotes, setAccessNotes] = useState('');
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const { notification, notify, clearNotification } = useNotification();
   const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
   const [totalStandbyMinutes, setTotalStandbyMinutes] = useState(0);
+
+  // Assigned blades for this operator (fetched from /api/equipment/my-blades)
+  const [operatorBlades, setOperatorBlades] = useState<Record<string, AssignedBlade[]>>({});
+  const [bladesLoaded, setBladesLoaded] = useState(false);
+  // Track which equipment_id is auto-matched for the current sawing item
+  const [matchedEquipmentId, setMatchedEquipmentId] = useState<string | null>(null);
 
   // Quick Entry Modal State (Slab/Wall/Hand Saw)
   const [showQuickEntryModal, setShowQuickEntryModal] = useState(false);
@@ -264,6 +172,39 @@ export default function WorkPerformed() {
   const [brokkWidth, setBrokkWidth] = useState<number>(0);
   const [brokkThickness, setBrokkThickness] = useState<number>(0);
 
+  // Fetch operator's assigned blades on page load
+  useEffect(() => {
+    const fetchOperatorBlades = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setBladesLoaded(true);
+          return;
+        }
+
+        const response = await fetch('/api/equipment/my-blades', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.blades) {
+            setOperatorBlades(result.blades);
+          }
+        }
+      } catch (error) {
+        // Blade fetch failed — gracefully degrade to hardcoded list
+        console.warn('Could not fetch assigned blades, using defaults');
+      } finally {
+        setBladesLoaded(true);
+      }
+    };
+
+    fetchOperatorBlades();
+  }, []);
+
   // Fetch standby logs for this job
   useEffect(() => {
     const fetchStandbyLogs = async () => {
@@ -295,7 +236,7 @@ export default function WorkPerformed() {
           setTotalStandbyMinutes(totalMinutes);
         }
       } catch (error) {
-        console.error('Error fetching standby logs:', error);
+        // Standby log fetch failed (non-blocking)
       }
     };
 
@@ -337,52 +278,6 @@ export default function WorkPerformed() {
     handleSelectItem(itemName);
   };
 
-  // Check if item requires detailed data collection
-  const requiresDetailedData = (itemName: string) => {
-    return itemName.includes('CORE DRILL') ||
-           itemName.includes('SAW') ||
-           itemName.includes('CUTTING');
-  };
-
-  const isCoreDrilling = (itemName: string) => {
-    return itemName.includes('CORE DRILL');
-  };
-
-  const isSawing = (itemName: string) => {
-    return itemName.includes('SAW') && !itemName.includes('CORE DRILL');
-  };
-
-  const isHandSaw = (itemName: string) => {
-    return itemName.includes('HAND SAW');
-  };
-
-  const isSlabSaw = (itemName: string) => {
-    return itemName.includes('SLAB SAW');
-  };
-
-  const isWallSaw = (itemName: string) => {
-    return itemName.includes('WALL SAW');
-  };
-
-  const isChainsaw = (itemName: string) => {
-    return itemName.includes('CHAIN SAW');
-  };
-
-  const isBreakAndRemove = (itemName: string) => {
-    return itemName.includes('BREAK & REMOVE') || itemName.includes('REMOVAL') || itemName.includes('DEMOLITION');
-  };
-
-  const isJackHammering = (itemName: string) => {
-    return itemName.includes('JACK HAMMERING') || itemName.includes('JACKHAMMER');
-  };
-
-  const isChipping = (itemName: string) => {
-    return itemName.includes('CHIPPING');
-  };
-
-  const isBrokk = (itemName: string) => {
-    return itemName.includes('BROKK');
-  };
 
   const handleSelectItem = (itemName: string) => {
     setCurrentItem(itemName);
@@ -435,7 +330,7 @@ export default function WorkPerformed() {
 
   const addHole = () => {
     if (!currentHole.bitSize || currentHole.depthInches <= 0) {
-      alert('Please specify both bit size and depth for the hole');
+      notify('info', 'Please specify both bit size and depth for the hole.');
       return;
     }
 
@@ -471,7 +366,7 @@ export default function WorkPerformed() {
     if (cutInputMode === 'area') {
       // For area mode, must have at least one area added
       if (tempAreas.length === 0) {
-        alert('Please add at least one cut area');
+        notify('info', 'Please add at least one cut area.');
         return;
       }
 
@@ -483,7 +378,7 @@ export default function WorkPerformed() {
 
       if (selectedBlades.length === 0) {
         const itemType = isChainsaw(currentItem) ? 'chain size' : 'blade type';
-        alert(`Please select at least one ${itemType} used`);
+        notify('info', `Please select at least one ${itemType} used`);
         return;
       }
 
@@ -508,13 +403,13 @@ export default function WorkPerformed() {
     } else {
       // Linear mode validation
       if (currentCut.linearFeet <= 0 || currentCut.cutDepth <= 0) {
-        alert('Please specify both linear feet and cut depth');
+        notify('info', 'Please specify both linear feet and cut depth');
         return;
       }
 
       if (selectedBlades.length === 0) {
         const itemType = isChainsaw(currentItem) ? 'chain size' : 'blade type';
-        alert(`Please select at least one ${itemType} used`);
+        notify('info', `Please select at least one ${itemType} used`);
         return;
       }
 
@@ -562,21 +457,11 @@ export default function WorkPerformed() {
     return sawingData.cuts.reduce((total, cut) => total + cut.linearFeet, 0);
   };
 
-  // Calculate linear feet from area (perimeter: 2 * length + 2 * width) * quantity
-  const calculateLinearFeetFromArea = (area: CutArea): number => {
-    const perimeter = (2 * area.length) + (2 * area.width);
-    return perimeter * (area.quantity || 1);
-  };
-
-  // Calculate total linear feet from all areas
-  const calculateTotalFromAreas = (areas: CutArea[]): number => {
-    return areas.reduce((total, area) => total + calculateLinearFeetFromArea(area), 0);
-  };
 
   // Add an area to the temporary areas list
   const addArea = () => {
     if (currentArea.length <= 0 || currentArea.width <= 0 || currentArea.depth <= 0) {
-      alert('Please specify length, width, and depth for the area');
+      notify('info', 'Please specify length, width, and depth for the area');
       return;
     }
 
@@ -592,7 +477,7 @@ export default function WorkPerformed() {
   // Quick Entry Modal Functions
   const addQuickEntryCut = () => {
     if (quickEntryNumCuts <= 0 || quickEntryLengthFeet <= 0) {
-      alert('Please specify number of cuts and length');
+      notify('info', 'Please specify number of cuts and length');
       return;
     }
 
@@ -622,7 +507,7 @@ export default function WorkPerformed() {
 
   const applyQuickEntry = () => {
     if (quickEntryCuts.length === 0) {
-      alert('Please add at least one cut entry');
+      notify('info', 'Please add at least one cut entry');
       return;
     }
 
@@ -642,7 +527,7 @@ export default function WorkPerformed() {
   // Chain Saw Quick Entry Functions
   const addChainsawCut = () => {
     if (chainsawNumCuts <= 0 || chainsawLengthInches <= 0) {
-      alert('Please specify number of cuts and length in inches');
+      notify('info', 'Please specify number of cuts and length in inches');
       return;
     }
 
@@ -674,7 +559,7 @@ export default function WorkPerformed() {
 
   const applyChainsawEntry = () => {
     if (chainsawCuts.length === 0) {
-      alert('Please add at least one cut entry');
+      notify('info', 'Please add at least one cut entry');
       return;
     }
 
@@ -694,7 +579,7 @@ export default function WorkPerformed() {
   // Break & Remove Quick Entry Functions
   const addBreakRemoveArea = () => {
     if (breakRemoveLength <= 0 || breakRemoveWidth <= 0 || breakRemoveDepth <= 0) {
-      alert('Please specify length, width, and depth');
+      notify('info', 'Please specify length, width, and depth');
       return;
     }
 
@@ -724,17 +609,17 @@ export default function WorkPerformed() {
 
   const applyBreakRemoveEntry = () => {
     if (breakRemoveAreas.length === 0) {
-      alert('Please add at least one area');
+      notify('info', 'Please add at least one area');
       return;
     }
 
     if (!removalMethod) {
-      alert('Please select a removal method');
+      notify('info', 'Please select a removal method');
       return;
     }
 
     if (removalMethod === 'rigged' && !removalEquipment) {
-      alert('Please specify equipment used for rigging');
+      notify('info', 'Please specify equipment used for rigging');
       return;
     }
 
@@ -757,7 +642,7 @@ export default function WorkPerformed() {
   // Jack Hammering Quick Entry Functions
   const addJackhammerArea = () => {
     if (jackhammerLength <= 0 || jackhammerWidth <= 0) {
-      alert('Please specify length and width');
+      notify('info', 'Please specify length and width');
       return;
     }
 
@@ -785,12 +670,12 @@ export default function WorkPerformed() {
 
   const applyJackhammerEntry = () => {
     if (jackhammerAreas.length === 0) {
-      alert('Please add at least one area');
+      notify('info', 'Please add at least one area');
       return;
     }
 
     if (!jackhammerEquipment) {
-      alert('Please select equipment used');
+      notify('info', 'Please select equipment used');
       return;
     }
 
@@ -813,7 +698,7 @@ export default function WorkPerformed() {
   // Brokk Quick Entry Functions
   const addBrokkArea = () => {
     if (brokkLength <= 0 || brokkWidth <= 0 || brokkThickness <= 0) {
-      alert('Please specify length, width, and thickness');
+      notify('info', 'Please specify length, width, and thickness');
       return;
     }
 
@@ -843,7 +728,7 @@ export default function WorkPerformed() {
 
   const applyBrokkEntry = () => {
     if (brokkAreas.length === 0) {
-      alert('Please add at least one area');
+      notify('info', 'Please add at least one area');
       return;
     }
 
@@ -879,50 +764,6 @@ export default function WorkPerformed() {
     }
   };
 
-  const getBladesForSawType = (itemName: string) => {
-    if (isHandSaw(itemName)) {
-      return ['20" Hand Saw', '24" Hand Saw', '30" Hand Saw'];
-    }
-
-    if (isChainsaw(itemName)) {
-      return ['10" Chain', '15" Chain', '20" Chain', '24" Chain'];
-    }
-
-    if (isWallSaw(itemName)) {
-      return ['32" Diamond', '42" Diamond', '56" Diamond', '62" Diamond', '72" Diamond'];
-    }
-
-    if (isSlabSaw(itemName)) {
-      return [
-        '20" Diamond',
-        '24" Diamond',
-        '26" Diamond',
-        '30" Diamond',
-        '32" Diamond',
-        '36" Diamond',
-        '42" Diamond',
-        '54" Diamond',
-        '62" Diamond',
-        '72" Diamond'
-      ];
-    }
-
-    // Standard blades for other saw types
-    return [
-      '7" Diamond',
-      '9" Diamond',
-      '12" Diamond',
-      '14" Diamond',
-      '16" Diamond',
-      '18" Diamond',
-      '20" Diamond',
-      '24" Diamond',
-      'Abrasive',
-      'Masonry',
-      'Metal Cutting',
-      'Wire Saw'
-    ];
-  };
 
   const handleAddItem = () => {
     const existingIndex = selectedItems.findIndex(item => item.name === currentItem);
@@ -932,13 +773,13 @@ export default function WorkPerformed() {
 
     if (isCoreDrilling(currentItem)) {
       if (coreDrillingData.holes.length === 0) {
-        alert('Please add at least one hole entry with size and depth');
+        notify('info', 'Please add at least one hole entry with size and depth');
         return;
       }
       details = { ...coreDrillingData };
     } else if (isSawing(currentItem)) {
       if (sawingData.cuts.length === 0) {
-        alert('Please add at least one cut entry with linear feet and depth');
+        notify('info', 'Please add at least one cut entry with linear feet and depth');
         return;
       }
       details = { ...sawingData };
@@ -1034,7 +875,7 @@ export default function WorkPerformed() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('Session expired. Please log in again.');
+        notify('error', 'Session expired. Please log in again.');
         return;
       }
 
@@ -1057,13 +898,13 @@ export default function WorkPerformed() {
         // Add to local state
         setEquipmentUsageEntries(prev => [...prev, result.data]);
         setShowEquipmentForm(false);
-        alert('Equipment usage saved successfully!');
+        notify('success', 'Equipment usage saved successfully!');
       } else {
-        alert('Failed to save equipment usage: ' + result.error);
+        notify('error', 'Failed to save equipment usage: ' + result.error);
       }
     } catch (error) {
-      console.error('Error saving equipment usage:', error);
-      alert('Failed to save equipment usage');
+      // Non-blocking error
+      notify('error', 'Failed to save equipment usage');
     } finally {
       setSavingEquipment(false);
     }
@@ -1089,24 +930,19 @@ export default function WorkPerformed() {
 
       if (result.success) {
         setEquipmentUsageEntries(prev => prev.filter(entry => entry.id !== entryId));
-        alert('Equipment usage entry removed');
+        notify('success', 'Equipment usage entry removed');
       } else {
-        alert('Failed to remove entry: ' + result.error);
+        notify('error', 'Failed to remove entry: ' + result.error);
       }
     } catch (error) {
-      console.error('Error removing equipment entry:', error);
-      alert('Failed to remove entry');
+      // Non-blocking error
+      notify('error', 'Failed to remove entry');
     }
-  };
-
-  const showNotification = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 5000);
   };
 
   const handleSubmit = async () => {
     if (selectedItems.length === 0) {
-      showNotification('Please select at least one work item', 'warning');
+      notify('info', 'Please select at least one work item.');
       return;
     }
 
@@ -1114,106 +950,133 @@ export default function WorkPerformed() {
     setShowFeedbackModal(true);
   };
 
-  const handleSubmitWithFeedback = async () => {
-    // Validate feedback ratings
-    if (jobDifficultyRating === 0) {
-      showNotification('Please rate the job difficulty', 'warning');
-      return;
-    }
-
-    if (jobAccessRating === 0) {
-      showNotification('Please rate the job site access', 'warning');
-      return;
-    }
-
+  const handleSubmitWithFeedback = async (feedback: {
+    difficultyRating: number;
+    accessRating: number;
+    difficultyNotes: string;
+    accessNotes: string;
+  }) => {
     try {
-      // Save work performed data
+      // Save to localStorage as backup (always succeeds)
       const workPerformedData = {
         jobId: params.id,
         items: selectedItems,
         timestamp: new Date().toISOString()
       };
-
-      console.log('Submitting work performed:', workPerformedData);
-
-      // Save to localStorage (in real app, send to backend)
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
 
-      // Track blade usage for sawing work
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        const authHeaders = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        };
+
+        // ── 1. Persist work items to database (batch) ──
+        const workItemRows = selectedItems.map((item) => {
+          const row: Record<string, any> = {
+            work_type: item.name,
+            quantity: item.quantity || 1,
+            notes: item.notes || null,
+            operator_id: session.user.id,
+          };
+
+          // Build details_json from the item's detailed data
+          if (item.details) {
+            row.details_json = item.details;
+          }
+
+          // Core drilling specifics
+          if (isCoreDrilling(item.name) && item.details && 'holes' in item.details) {
+            const coreDetails = item.details as CoreDrillingDetails;
+            if (coreDetails.holes.length > 0) {
+              row.core_size = coreDetails.holes[0].bitSize;
+              row.core_depth_inches = coreDetails.holes[0].depthInches;
+              row.core_quantity = coreDetails.holes.reduce((sum, h) => sum + h.quantity, 0);
+            }
+          }
+
+          // Sawing specifics
+          if (isSawing(item.name) && item.details && 'cuts' in item.details) {
+            const sawDetails = item.details as SawingDetails;
+            const totalLF = sawDetails.cuts.reduce((sum, c) => sum + c.linearFeet, 0);
+            row.linear_feet_cut = totalLF;
+            if (sawDetails.cuts.length > 0) {
+              row.cut_depth_inches = sawDetails.cuts[0].cutDepth;
+            }
+            // Attach matched equipment_id if available
+            if (matchedEquipmentId) {
+              row.equipment_id = matchedEquipmentId;
+            }
+          }
+
+          return row;
+        });
+
+        // Save work items to DB
         try {
-          const trackingResponse = await fetch('/api/equipment/track-usage', {
+          await fetch('/api/work-items', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`
-            },
+            headers: authHeaders,
             body: JSON.stringify({
               job_order_id: params.id,
+              items: workItemRows
+            })
+          });
+        } catch (dbError) {
+          console.warn('Work items DB save failed, data safe in localStorage:', dbError);
+        }
+
+        // ── 2. Track blade usage for sawing items ──
+        try {
+          await fetch('/api/equipment/track-usage', {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({
+              job_order_id: params.id,
+              operator_id: session.user.id,
               work_items: selectedItems
             })
           });
-
-          if (trackingResponse.ok) {
-            const trackingData = await trackingResponse.json();
-            console.log('Blade usage tracked:', trackingData);
-          }
-        } catch (trackingError) {
-          console.error('Error tracking blade usage:', trackingError);
-          // Continue even if blade tracking fails
+        } catch (trackError) {
+          console.warn('Blade usage tracking failed:', trackError);
         }
 
-        // Save job feedback ratings — use status API (POST, not PATCH)
-        try {
-          const feedbackResponse = await fetch(`/api/job-orders/${params.id}/status`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify({
-              status: 'in_progress',
-              job_difficulty_rating: jobDifficultyRating,
-              job_access_rating: jobAccessRating,
-              job_difficulty_notes: difficultyNotes,
-              job_access_notes: accessNotes,
-              feedback_submitted_at: new Date().toISOString()
-            })
-          });
+        // ── 3. Save job feedback ratings ──
+        fetch(`/api/job-orders/${params.id}/status`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            status: 'in_progress',
+            job_difficulty_rating: feedback.difficultyRating,
+            job_access_rating: feedback.accessRating,
+            job_difficulty_notes: feedback.difficultyNotes,
+            job_access_notes: feedback.accessNotes,
+            feedback_submitted_at: new Date().toISOString()
+          })
+        }).catch(() => {});
 
-          if (feedbackResponse.ok) {
-            console.log('Job feedback saved successfully');
-          }
-        } catch (feedbackError) {
-          console.error('Error saving job feedback:', feedbackError);
-          // Continue even if feedback saving fails
-        }
-
-        // Update workflow — fire and forget (optional tracking)
+        // ── 4. Update workflow step ──
         fetch('/api/workflow', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
+          headers: authHeaders,
           body: JSON.stringify({
             jobId: params.id,
             completedStep: 'work_performed',
             currentStep: 'pictures',
           })
-        }).catch(err => console.log('Workflow tracking unavailable:', err));
+        }).catch(() => {});
       }
 
-      showNotification('Work performed and feedback saved successfully!', 'success');
+      notify('success', 'Work performed and feedback saved successfully!');
 
       // Navigate to pictures page after a short delay
       setTimeout(() => {
         router.push(`/dashboard/job-schedule/${params.id}/pictures`);
       }, 1500);
     } catch (error) {
-      console.error('Error submitting work performed:', error);
       // Still navigate — work was saved to localStorage
+      notify('error', 'Submission encountered an issue, but your data was saved.');
       router.push(`/dashboard/job-schedule/${params.id}/pictures`);
     }
   };
@@ -1397,72 +1260,7 @@ export default function WorkPerformed() {
             <h2 className="text-xl font-bold text-gray-800 mb-4">Selected Work Items</h2>
 
             {/* Standby Time Summary */}
-            {standbyLogs.length > 0 && (
-              <div className="mb-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-yellow-900 mb-2">⏱️ Standby Time Recorded</h3>
-                    <div className="space-y-2">
-                      {standbyLogs.map((log, index) => {
-                        const start = new Date(log.started_at);
-                        const end = log.ended_at ? new Date(log.ended_at) : null;
-                        const durationMinutes = end ? Math.round((end.getTime() - start.getTime()) / 60000) : 0;
-                        const hours = Math.floor(durationMinutes / 60);
-                        const minutes = durationMinutes % 60;
-
-                        return (
-                          <div key={log.id || index} className="bg-white rounded-lg p-3 border border-yellow-200">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-semibold text-gray-800">
-                                  {start.toLocaleString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: 'numeric',
-                                    minute: '2-digit',
-                                    hour12: true
-                                  })}
-                                  {end && (
-                                    <span className="text-gray-500"> → {end.toLocaleString('en-US', {
-                                      hour: 'numeric',
-                                      minute: '2-digit',
-                                      hour12: true
-                                    })}</span>
-                                  )}
-                                </p>
-                                {log.reason && (
-                                  <p className="text-xs text-gray-600 mt-1">Reason: {log.reason}</p>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <p className="text-lg font-bold text-yellow-700">
-                                  {hours > 0 ? `${hours}h ` : ''}{minutes}m
-                                </p>
-                                <p className="text-xs text-gray-500">Duration</p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-3 pt-3 border-t-2 border-yellow-300">
-                      <div className="flex items-center justify-between">
-                        <p className="font-bold text-yellow-900">Total Standby Time:</p>
-                        <p className="text-2xl font-bold text-yellow-700">
-                          {Math.floor(totalStandbyMinutes / 60) > 0 ? `${Math.floor(totalStandbyMinutes / 60)}h ` : ''}
-                          {totalStandbyMinutes % 60}m
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            <StandbyTimeSummary logs={standbyLogs} totalMinutes={totalStandbyMinutes} />
 
             {selectedItems.length === 0 ? (
               <div className="text-center py-8">
@@ -2529,6 +2327,54 @@ export default function WorkPerformed() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           {isChainsaw(currentItem) ? 'Chain Size Used' : 'Blades Used'} (select all that apply)
                         </label>
+
+                        {/* Assigned Blades Section — show operator's real blades first */}
+                        {(() => {
+                          const assignedBlades = getAssignedBladesForSawType(operatorBlades, currentItem);
+                          if (assignedBlades.length > 0) {
+                            return (
+                              <div className="mb-3">
+                                <label className="block text-xs font-medium text-green-700 mb-1.5">
+                                  Your Assigned {isChainsaw(currentItem) ? 'Chains' : 'Blades'}
+                                </label>
+                                <div className="space-y-1.5">
+                                  {assignedBlades.map((blade) => {
+                                    const label = formatBladeLabel(blade);
+                                    const isSelected = selectedBlades.includes(label) || matchedEquipmentId === blade.equipment_id;
+                                    return (
+                                      <button
+                                        key={blade.equipment_id}
+                                        type="button"
+                                        onClick={() => {
+                                          toggleBladeSelection(label);
+                                          setMatchedEquipmentId(isSelected ? null : blade.equipment_id);
+                                        }}
+                                        className={`w-full px-3 py-2.5 text-xs rounded-lg border-2 transition-all text-left ${
+                                          isSelected
+                                            ? 'bg-green-50 text-green-800 border-green-500 ring-1 ring-green-300'
+                                            : 'bg-white text-gray-700 border-gray-200 hover:border-green-300'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isSelected ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                          <span className="font-medium">{label}</span>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div className="mt-2 border-t border-gray-200 pt-2">
+                                  <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                    Or select a generic size:
+                                  </label>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+
+                        {/* Generic blade options (fallback / additional) */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                           {getBladesForSawType(currentItem).map((blade) => (
                             <button
@@ -2866,136 +2712,11 @@ export default function WorkPerformed() {
 
       {/* Job Feedback Modal */}
       {showFeedbackModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-2xl w-full p-4 sm:p-8 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Job Feedback</h2>
-              <p className="text-gray-600">Help us improve by rating this job</p>
-            </div>
-
-            <div className="space-y-6">
-              {/* Job Difficulty Rating */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  How difficult was this job? *
-                </label>
-                <div className="flex gap-2 justify-between">
-                  {[1, 2, 3, 4, 5].map((rating) => (
-                    <button
-                      key={rating}
-                      type="button"
-                      onClick={() => setJobDifficultyRating(rating)}
-                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
-                        jobDifficultyRating === rating
-                          ? 'bg-blue-500 text-white border-blue-600'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">
-                        {rating === 1 && '😊'}
-                        {rating === 2 && '🙂'}
-                        {rating === 3 && '😐'}
-                        {rating === 4 && '😰'}
-                        {rating === 5 && '😫'}
-                      </div>
-                      <div className="text-xs font-medium">
-                        {rating === 1 && 'Very Easy'}
-                        {rating === 2 && 'Easy'}
-                        {rating === 3 && 'Moderate'}
-                        {rating === 4 && 'Hard'}
-                        {rating === 5 && 'Very Hard'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Difficulty Notes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  What made it {jobDifficultyRating >= 4 ? 'difficult' : jobDifficultyRating >= 3 ? 'challenging' : 'easy'}? (Optional)
-                </label>
-                <textarea
-                  value={difficultyNotes}
-                  onChange={(e) => setDifficultyNotes(e.target.value)}
-                  placeholder="E.g., Steel rebar, tight spaces, complex cuts..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-gray-900"
-                  rows={2}
-                />
-              </div>
-
-              {/* Job Access Rating */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  How was the job site access? *
-                </label>
-                <div className="flex gap-2 justify-between">
-                  {[1, 2, 3, 4, 5].map((rating) => (
-                    <button
-                      key={rating}
-                      type="button"
-                      onClick={() => setJobAccessRating(rating)}
-                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
-                        jobAccessRating === rating
-                          ? 'bg-green-500 text-white border-green-600'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-green-300'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">
-                        {rating === 1 && '✅'}
-                        {rating === 2 && '👍'}
-                        {rating === 3 && '👌'}
-                        {rating === 4 && '⚠️'}
-                        {rating === 5 && '🚫'}
-                      </div>
-                      <div className="text-xs font-medium">
-                        {rating === 1 && 'Excellent'}
-                        {rating === 2 && 'Good'}
-                        {rating === 3 && 'Fair'}
-                        {rating === 4 && 'Poor'}
-                        {rating === 5 && 'Very Poor'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Access Notes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Access details (Optional)
-                </label>
-                <textarea
-                  value={accessNotes}
-                  onChange={(e) => setAccessNotes(e.target.value)}
-                  placeholder="E.g., Narrow stairs, elevator out of service, parking far away..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none text-gray-900"
-                  rows={2}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-8">
-              <button
-                onClick={() => setShowFeedbackModal(false)}
-                className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitWithFeedback}
-                disabled={jobDifficultyRating === 0 || jobAccessRating === 0}
-                className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl ${
-                  jobDifficultyRating === 0 || jobAccessRating === 0
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white'
-                }`}
-              >
-                Submit Work Performed
-              </button>
-            </div>
-          </div>
-        </div>
+        <FeedbackModal
+          onSubmit={handleSubmitWithFeedback}
+          onCancel={() => setShowFeedbackModal(false)}
+          onValidationError={(msg) => notify('info', msg)}
+        />
       )}
 
       {/* Quick Entry Modal */}
@@ -3919,42 +3640,7 @@ export default function WorkPerformed() {
       )}
 
       {/* Notification Toast */}
-      {notification && (
-        <div className="fixed top-4 right-4 z-[60] animate-slide-in">
-          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[300px] ${
-            notification.type === 'success' ? 'bg-green-500 text-white' :
-            notification.type === 'error' ? 'bg-red-500 text-white' :
-            'bg-yellow-500 text-white'
-          }`}>
-            <div className="flex-shrink-0">
-              {notification.type === 'success' && (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-              {notification.type === 'error' && (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-              {notification.type === 'warning' && (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              )}
-            </div>
-            <p className="font-semibold">{notification.message}</p>
-            <button
-              onClick={() => setNotification(null)}
-              className="ml-auto flex-shrink-0 hover:bg-white/20 rounded-lg p-1 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+      {notification && <Notification type={notification.type} message={notification.message} onClose={clearNotification} />}
     </div>
   );
 }
