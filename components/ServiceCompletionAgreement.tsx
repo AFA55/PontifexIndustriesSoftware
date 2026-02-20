@@ -29,6 +29,7 @@ interface ServiceCompletionAgreementProps {
     communicationRating?: number;
     overallRating?: number;
     feedbackComments?: string;
+    completionTime?: string;
   }) => Promise<void>;
   onCancel?: () => void;
 }
@@ -54,6 +55,14 @@ export default function ServiceCompletionAgreement({
   const [communicationRating, setCommunicationRating] = useState<number>(0);
   const [overallRating, setOverallRating] = useState<number>(0);
   const [feedbackComments, setFeedbackComments] = useState('');
+
+  // Completion time — defaults to now, operator can adjust if they finished earlier
+  const [completionTime, setCompletionTime] = useState<string>(() => {
+    const now = new Date();
+    // Format as datetime-local value: YYYY-MM-DDTHH:MM
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  });
 
   const sections = [
     { id: 1, title: 'Work Summary' },
@@ -119,7 +128,8 @@ export default function ServiceCompletionAgreement({
         cleanlinessRating: contactNotOnSite ? undefined : cleanlinessRating,
         communicationRating: contactNotOnSite ? undefined : communicationRating,
         overallRating: contactNotOnSite ? undefined : overallRating,
-        feedbackComments: contactNotOnSite ? undefined : feedbackComments
+        feedbackComments: contactNotOnSite ? undefined : feedbackComments,
+        completionTime: completionTime || undefined,
       });
     } catch (error) {
       console.error('Error submitting signature:', error);
@@ -789,6 +799,29 @@ export default function ServiceCompletionAgreement({
                     />
                   </div>
                 </div>
+
+                {/* Job Completion Time */}
+                <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-900">
+                        When was this job completed?
+                      </label>
+                      <p className="text-xs text-gray-500">
+                        Adjust if work finished earlier than when you&apos;re submitting this ticket
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={completionTime}
+                    onChange={(e) => setCompletionTime(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none text-gray-900 font-medium text-lg"
+                  />
+                </div>
               </>
             ) : (
               <>
@@ -871,6 +904,29 @@ export default function ServiceCompletionAgreement({
                     <span>Liability release and indemnification accepted</span>
                   </li>
                 </ul>
+              </div>
+
+              {/* Job Completion Time */}
+              <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-900">
+                      When was this job completed?
+                    </label>
+                    <p className="text-xs text-gray-500">
+                      Adjust if work finished earlier than when you&apos;re submitting this ticket
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="datetime-local"
+                  value={completionTime}
+                  onChange={(e) => setCompletionTime(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-green-500 focus:outline-none text-gray-900 font-medium text-lg"
+                />
               </div>
 
               <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-600">

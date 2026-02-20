@@ -103,7 +103,8 @@ async function updateJobStatus(
     }
 
     if (status === 'completed' && !existingJob.work_completed_at) {
-      updateData.work_completed_at = now;
+      // Use operator-provided completion time if available, otherwise use now
+      updateData.work_completed_at = additionalFields.work_completed_at || now;
       updateData.work_end_latitude = latitude;
       updateData.work_end_longitude = longitude;
     }
@@ -129,6 +130,8 @@ async function updateJobStatus(
       'job_difficulty_rating', 'job_access_rating',
       'job_difficulty_notes', 'job_access_notes',
       'feedback_submitted_at',
+      // Operator-confirmed completion time
+      'work_completed_at',
     ];
 
     for (const field of allowedExtraFields) {

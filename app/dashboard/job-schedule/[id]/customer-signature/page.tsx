@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import ServiceCompletionAgreement from '@/components/ServiceCompletionAgreement';
+import { useNotification } from '@/hooks/useNotification';
+import Notification from '@/components/Notification';
 
 export default function CustomerSignaturePage() {
   const router = useRouter();
@@ -18,17 +20,12 @@ export default function CustomerSignaturePage() {
   const [showAgreement, setShowAgreement] = useState(false);
   const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
   const [totalStandbyHours, setTotalStandbyHours] = useState<number>(0);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const { notification, notify, clearNotification } = useNotification();
   const [isMultiDayJob, setIsMultiDayJob] = useState<boolean>(false);
 
   useEffect(() => {
     loadJobData();
   }, []);
-
-  const showNotification = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 5000);
-  };
 
   const loadStandbyLogs = async () => {
     try {
@@ -55,14 +52,12 @@ export default function CustomerSignaturePage() {
         }
       }
     } catch (e) {
-      console.error('Error loading standby logs:', e);
+      notify('error', 'Failed to load standby logs.');
     }
   };
 
   const loadJobData = async () => {
     try {
-      console.log('Loading job:', jobId);
-
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         router.push('/login');
@@ -86,8 +81,6 @@ export default function CustomerSignaturePage() {
       const jobResult = await jobResponse.json();
       const data = jobResult.success && jobResult.data?.length > 0 ? jobResult.data[0] : null;
 
-      console.log('Query result:', { data });
-
       if (!data) {
         setError('Job not found in database');
         setLoading(false);
@@ -110,7 +103,6 @@ export default function CustomerSignaturePage() {
           });
         }
       } catch (e) {
-        console.log('No work performed data found in localStorage');
       }
 
       // Load standby logs
@@ -126,7 +118,7 @@ export default function CustomerSignaturePage() {
       setWorkPerformedDetails(workDetails);
       setLoading(false);
     } catch (err: any) {
-      console.error('Error loading job:', err);
+      notify('error', 'Failed to load job data. Please try again.');
       setError(`Error: ${err.message}`);
       setLoading(false);
     }
@@ -136,7 +128,7 @@ export default function CustomerSignaturePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        showNotification('Session expired. Please log in again.', 'error');
+        notify('error', 'Session expired. Please log in again.');
         setTimeout(() => router.push('/login'), 1500);
         return;
       }
@@ -159,12 +151,16 @@ export default function CustomerSignaturePage() {
           customer_communication_rating: signatureData.communicationRating || null,
           customer_overall_rating: signatureData.overallRating || null,
           customer_feedback_comments: signatureData.feedbackComments || null,
+          // Operator-confirmed actual completion time
+          work_completed_at: signatureData.completionTime
+            ? new Date(signatureData.completionTime).toISOString()
+            : new Date().toISOString(),
         })
       });
 
       if (!saveResponse.ok) {
         const errData = await saveResponse.json().catch(() => ({}));
-        showNotification('Error saving signature: ' + (errData.error || 'Unknown error'), 'error');
+        notify('error', 'Error saving signature: ' + (errData.error || 'Unknown error'));
         throw new Error(errData.error || 'Failed to save signature');
       }
 
@@ -188,9 +184,8 @@ export default function CustomerSignaturePage() {
             workPerformedDetails: workPerformedDetails
           })
         });
-        console.log('PDF generated and saved successfully');
       } catch (e) {
-        console.error('PDF generation failed:', e);
+        notify('error', 'PDF generation failed. The signature was saved, but the PDF could not be created.');
       }
 
       // Update operator ratings if ratings were provided
@@ -213,10 +208,9 @@ export default function CustomerSignaturePage() {
                 overallRating: signatureData.overallRating
               })
             });
-            console.log('Operator ratings updated successfully');
           }
         } catch (e) {
-          console.error('Failed to update operator ratings:', e);
+          notify('info', 'Operator ratings could not be updated, but job completion was saved.');
           // Don't block completion if rating update fails
         }
       }
@@ -236,13 +230,12 @@ export default function CustomerSignaturePage() {
           })
         });
       } catch (e) {
-        console.log('Workflow update failed, but signature saved');
+        // Workflow update failed, but signature saved
       }
 
-      showNotification('Service Completion Agreement signed successfully! PDF has been generated and saved.', 'success');
+      notify('success', 'Service Completion Agreement signed successfully! PDF has been generated and saved.');
       setTimeout(() => router.push('/dashboard'), 2000);
     } catch (error) {
-      console.error('Error saving signature:', error);
       // Don't re-throw — the notification already informed the user.
       // Re-throwing would cause the ServiceCompletionAgreement component to also show an alert().
     }
@@ -548,7 +541,7 @@ export default function CustomerSignaturePage() {
                     try {
                       const { data: { session } } = await supabase.auth.getSession();
                       if (!session) {
-                        showNotification('Session expired. Please log in again.', 'error');
+                        notify('error', 'Session expired. Please log in again.');
                         setTimeout(() => router.push('/login'), 1500);
                         return;
                       }
@@ -567,7 +560,6 @@ export default function CustomerSignaturePage() {
                         latitude = position.coords.latitude;
                         longitude = position.coords.longitude;
                       } catch (e) {
-                        console.log('Could not get location:', e);
                       }
 
                       // Submit daily log
@@ -592,15 +584,14 @@ export default function CustomerSignaturePage() {
                         throw new Error(result.error || 'Failed to save daily progress');
                       }
 
-                      showNotification('Daily progress saved! Job has been reset for tomorrow.', 'success');
+                      notify('success', 'Daily progress saved! Job has been reset for tomorrow.');
 
                       // Clear work performed data
                       localStorage.removeItem(`work-performed-${jobId}`);
 
                       setTimeout(() => router.push('/dashboard'), 2000);
                     } catch (error: any) {
-                      console.error('Error saving daily progress:', error);
-                      showNotification('Error saving daily progress: ' + error.message, 'error');
+                      notify('error', 'Error saving daily progress: ' + error.message);
                     }
                   }}
                   className="w-full py-5 rounded-xl font-bold text-lg transition-all duration-200 flex items-center justify-center gap-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] mb-4"
@@ -634,42 +625,7 @@ export default function CustomerSignaturePage() {
         </div>
 
         {/* Notification Toast */}
-        {notification && (
-          <div className="fixed top-4 right-4 z-[60] animate-slide-in">
-            <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[300px] ${
-              notification.type === 'success' ? 'bg-green-500 text-white' :
-              notification.type === 'error' ? 'bg-red-500 text-white' :
-              'bg-yellow-500 text-white'
-            }`}>
-              <div className="flex-shrink-0">
-                {notification.type === 'success' && (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-                {notification.type === 'error' && (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                )}
-                {notification.type === 'warning' && (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                )}
-              </div>
-              <p className="font-semibold">{notification.message}</p>
-              <button
-                onClick={() => setNotification(null)}
-                className="ml-auto flex-shrink-0 hover:bg-white/20 rounded-lg p-1 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
+        {notification && <Notification type={notification.type} message={notification.message} onClose={clearNotification} />}
       </div>
     </div>
   );
