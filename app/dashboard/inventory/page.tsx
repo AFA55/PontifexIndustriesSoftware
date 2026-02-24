@@ -5,6 +5,7 @@ import { getCurrentUser, type User } from '@/lib/auth';
 import { Package, Plus, QrCode, AlertCircle, TrendingDown, History } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 import AddBladeWizard from '@/components/AddBladeWizard';
 import QRScanner from '@/components/QRScanner';
 import AssignEquipmentModal from '@/components/AssignEquipmentModal';
@@ -61,15 +62,21 @@ export default function InventoryManagementPage() {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/inventory');
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/inventory?pageSize=200', {
+        headers: {
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      });
 
       if (!response.ok) {
         console.error('Failed to fetch inventory');
         return;
       }
 
-      const data = await response.json();
-      setInventory(data);
+      const result = await response.json();
+      // API now returns { data: [], pagination: {} }
+      setInventory(Array.isArray(result) ? result : result.data || []);
     } catch (error) {
       console.error('Error fetching inventory:', error);
     } finally {

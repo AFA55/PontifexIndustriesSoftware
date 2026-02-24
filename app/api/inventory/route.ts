@@ -7,17 +7,52 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth(request)
     if (!auth.authorized) return auth.response
 
-    const { data: inventory, error } = await supabaseAdmin
+    // Get query params for pagination and filtering
+    const { searchParams } = new URL(request.url)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const pageSize = Math.max(1, Math.min(100, parseInt(searchParams.get('pageSize') || '50', 10)))
+    const category = searchParams.get('category')
+    const search = searchParams.get('search')
+
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    // Build query with count
+    let query = supabaseAdmin
       .from('inventory')
-      .select('*')
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
+      .range(from, to)
+
+    // Apply optional category filter
+    if (category) {
+      query = query.eq('category', category)
+    }
+
+    // Apply optional text search
+    if (search) {
+      query = query.ilike('name', `%${search}%`)
+    }
+
+    const { data: inventory, count: total, error } = await query
 
     if (error) {
       console.error('Error fetching inventory:', error)
       return NextResponse.json({ error: 'Failed to fetch inventory' }, { status: 500 })
     }
 
-    return NextResponse.json(inventory || [])
+    const totalCount = total ?? 0
+    const totalPages = Math.ceil(totalCount / pageSize)
+
+    return NextResponse.json({
+      data: inventory || [],
+      pagination: {
+        page,
+        pageSize,
+        total: totalCount,
+        totalPages,
+      },
+    })
   } catch (error) {
     console.error('Error in inventory API:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -5,65 +5,52 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
-// GET: Fetch all job orders (admin only)
+// GET: Fetch job orders with pagination (admin only)
 export async function GET(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can view all job orders' },
-        { status: 403 }
-      );
-    }
-
-    // Get query parameters for filtering
+    // Get query parameters for filtering and pagination
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const assignedTo = searchParams.get('assignedTo');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const pageSize = Math.max(1, Math.min(100, parseInt(searchParams.get('pageSize') || '50', 10)));
 
-    // Build query directly from job_orders table
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    // Count query (with same filters) for total
+    let countQuery = supabaseAdmin
+      .from('job_orders')
+      .select('*', { count: 'exact', head: true });
+
+    if (status) countQuery = countQuery.eq('status', status);
+    if (assignedTo) countQuery = countQuery.eq('assigned_to', assignedTo);
+    if (startDate) countQuery = countQuery.gte('scheduled_date', startDate);
+    if (endDate) countQuery = countQuery.lte('scheduled_date', endDate);
+
+    const { count: total, error: countError } = await countQuery;
+
+    if (countError) {
+      console.error('Error counting job orders:', countError);
+      return NextResponse.json(
+        { error: 'Failed to fetch job orders' },
+        { status: 500 }
+      );
+    }
+
+    // Build data query
     let query = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     // Apply filters
     if (status) {
@@ -92,7 +79,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Calculate summary statistics
+    // Calculate summary statistics from current page data
     const totalJobs = jobOrders?.length || 0;
     const statusCounts = jobOrders?.reduce((acc: any, job) => {
       acc[job.status] = (acc[job.status] || 0) + 1;
@@ -101,6 +88,9 @@ export async function GET(request: NextRequest) {
 
     const avgDriveTime = jobOrders?.filter(j => j.drive_time).reduce((sum, j) => sum + (j.drive_time || 0), 0) / (jobOrders?.filter(j => j.drive_time).length || 1);
     const avgProductionTime = jobOrders?.filter(j => j.production_time).reduce((sum, j) => sum + (j.production_time || 0), 0) / (jobOrders?.filter(j => j.production_time).length || 1);
+
+    const totalCount = total ?? 0;
+    const totalPages = Math.ceil(totalCount / pageSize);
 
     return NextResponse.json(
       {
@@ -112,6 +102,12 @@ export async function GET(request: NextRequest) {
             statusCounts,
             avgDriveTimeMinutes: Math.round(avgDriveTime || 0),
             avgProductionTimeMinutes: Math.round(avgProductionTime || 0),
+          },
+          pagination: {
+            page,
+            pageSize,
+            total: totalCount,
+            totalPages,
           },
         },
       },
@@ -129,48 +125,8 @@ export async function GET(request: NextRequest) {
 // POST: Create new job order (admin only)
 export async function POST(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can create job orders' },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -209,7 +165,7 @@ export async function POST(request: NextRequest) {
       job_site_number: body.job_site_number,
       po_number: body.po_number,
       customer_job_number: body.customer_job_number,
-      created_by: user.id,
+      created_by: auth.userId,
     };
 
     // Set assigned_at if assigning to operator

@@ -1,74 +1,42 @@
 /**
  * API Route: GET /api/admin/users
- * Get users by role (admin only)
+ * Get users by role with pagination (admin only)
  * Query params: ?role=operator or ?role=admin or no param for all users
+ *               ?page=1&pageSize=50
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can view users' },
-        { status: 403 }
-      );
-    }
-
-    // Get role filter from query params
+    // Get query params
     const { searchParams } = new URL(request.url);
     const roleFilter = searchParams.get('role');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const pageSize = Math.max(1, Math.min(100, parseInt(searchParams.get('pageSize') || '50', 10)));
 
-    // Build query
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    // Build query with count
     let query = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, email, active')
+      .select('id, full_name, role, email, active', { count: 'exact' })
       .eq('active', true)
-      .order('full_name');
+      .order('full_name')
+      .range(from, to);
 
     // Apply role filter if provided
     if (roleFilter) {
       query = query.eq('role', roleFilter);
     }
 
-    const { data: users, error: fetchError } = await query;
+    const { data: users, count: total, error: fetchError } = await query;
 
     if (fetchError) {
       console.error('Error fetching users:', fetchError);
@@ -78,10 +46,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const totalCount = total ?? 0;
+    const totalPages = Math.ceil(totalCount / pageSize);
+
     return NextResponse.json(
       {
         success: true,
         data: users || [],
+        pagination: {
+          page,
+          pageSize,
+          total: totalCount,
+          totalPages,
+        },
       },
       { status: 200 }
     );

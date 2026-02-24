@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight, Check, Package } from 'lucide-react'
 import QRCode from 'qrcode'
+import { supabase } from '@/lib/supabase'
 
 interface BladeFormData {
   equipmentCategory: 'blade' | 'bit' | ''
@@ -258,10 +259,14 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
         notes: formData.notes || null
       }
 
-      // Submit to inventory API
+      // Submit to inventory API (authenticated)
+      const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch('/api/inventory', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify(inventoryData)
       })
 
