@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -15,26 +15,8 @@ async function updateJobStatus(
     // Await params in Next.js 15+
     const { id: jobId } = await params;
 
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -63,15 +45,8 @@ async function updateJobStatus(
       );
     }
 
-    // Get user's role
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
     // Check permissions: operator can only update their own jobs, admin can update any
-    if (profile?.role !== 'admin' && existingJob.assigned_to !== user.id) {
+    if (auth.role !== 'admin' && existingJob.assigned_to !== auth.userId) {
       return NextResponse.json(
         { error: 'You can only update jobs assigned to you' },
         { status: 403 }
@@ -182,7 +157,7 @@ async function updateJobStatus(
 
     // Also update operator_status_history for tracking
     const historyData: any = {
-      operator_id: user.id,
+      operator_id: auth.userId,
       job_order_id: jobId,
       status: status,
     };

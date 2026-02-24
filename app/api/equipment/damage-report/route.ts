@@ -1,24 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth, requireAdmin } from '@/lib/api-auth';
 
 /**
  * GET /api/equipment/damage-report
  * Get damage reports (operator sees theirs, admin sees all)
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const equipmentId = searchParams.get('equipmentId');
@@ -74,26 +65,16 @@ export async function GET(request: Request) {
  * POST /api/equipment/damage-report
  * Create a new damage report
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Get user profile for full name
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('full_name')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
 
     const body = await request.json();
@@ -127,8 +108,8 @@ export async function POST(request: Request) {
 
     const reportData = {
       equipment_id: equipmentId,
-      reported_by: user.id,
-      reported_by_name: profile?.full_name || user.email,
+      reported_by: auth.userId,
+      reported_by_name: profile?.full_name || auth.userEmail,
       damage_title: damageTitle,
       damage_description: damageDescription,
       severity: severity || 'moderate',
@@ -169,31 +150,17 @@ export async function POST(request: Request) {
  * PATCH /api/equipment/damage-report
  * Update damage report (admin review, assessment, resolution)
  */
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is admin
+    // Get admin profile for full name
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('role, full_name')
-      .eq('id', user.id)
+      .select('full_name')
+      .eq('id', auth.userId)
       .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
 
     const body = await request.json();
     const {
@@ -212,8 +179,8 @@ export async function PATCH(request: Request) {
     }
 
     const updateData: any = {
-      reviewed_by: user.id,
-      reviewed_by_name: profile?.full_name || user.email,
+      reviewed_by: auth.userId,
+      reviewed_by_name: profile?.full_name || auth.userEmail,
       reviewed_at: new Date().toISOString()
     };
 

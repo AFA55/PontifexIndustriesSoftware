@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 
 // GET current clock status
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Get today's clock record (if any)
     const today = new Date();
@@ -25,7 +15,7 @@ export async function GET(request: NextRequest) {
     const { data: clockRecord, error } = await supabaseAdmin
       .from('time_clock')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', auth.userId)
       .gte('clock_in_time', today.toISOString())
       .order('clock_in_time', { ascending: false })
       .limit(1)
@@ -56,18 +46,8 @@ export async function GET(request: NextRequest) {
 // POST clock in/out
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
     const { action, location, notes } = body;
@@ -80,7 +60,7 @@ export async function POST(request: NextRequest) {
       const { data: existingClock, error: checkError } = await supabaseAdmin
         .from('time_clock')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', auth.userId)
         .gte('clock_in_time', today.toISOString())
         .is('clock_out_time', null)
         .single();
@@ -104,7 +84,7 @@ export async function POST(request: NextRequest) {
       const { data: newClock, error } = await supabaseAdmin
         .from('time_clock')
         .insert({
-          user_id: user.id,
+          user_id: auth.userId,
           clock_in_time: new Date().toISOString(),
           clock_in_location: location || null,
           notes: notes || null
@@ -137,7 +117,7 @@ export async function POST(request: NextRequest) {
       const { data: activeClock, error: fetchError } = await supabaseAdmin
         .from('time_clock')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', auth.userId)
         .gte('clock_in_time', today.toISOString())
         .is('clock_out_time', null)
         .single();

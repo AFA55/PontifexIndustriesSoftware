@@ -7,28 +7,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -66,7 +50,7 @@ export async function POST(request: NextRequest) {
       .from('equipment_usage')
       .insert({
         job_order_id,
-        operator_id: user.id,
+        operator_id: auth.userId,
         equipment_type,
         equipment_id,
         linear_feet_cut: linear_feet_cut || 0,
@@ -138,32 +122,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse query parameters
     const { searchParams } = new URL(request.url);
@@ -197,9 +157,9 @@ export async function GET(request: NextRequest) {
 
     if (operatorId) {
       query = query.eq('operator_id', operatorId);
-    } else if (profile?.role !== 'admin') {
+    } else if (auth.role !== 'admin') {
       // Non-admins can only see their own data
-      query = query.eq('operator_id', user.id);
+      query = query.eq('operator_id', auth.userId);
     }
 
     if (equipmentType) {

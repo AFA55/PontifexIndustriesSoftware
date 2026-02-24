@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           applied: false,
-          error: error.message,
+          error: 'Migration check failed',
           message: 'Consent fields do not exist yet. Run POST to this endpoint for migration instructions.',
         },
         { status: 200 }

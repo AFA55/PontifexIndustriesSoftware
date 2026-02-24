@@ -4,33 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS } from '@/lib/geolocation';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
     const { latitude, longitude, accuracy } = body;
@@ -62,7 +43,7 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('full_name, email')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
 
     // Check if user already has an active clock-in (no clock-out yet)
@@ -70,7 +51,7 @@ export async function POST(request: NextRequest) {
     const { data: activeTimecard, error: checkError } = await supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', auth.userId)
       .is('clock_out_time', null)
       .single();
 
@@ -104,7 +85,7 @@ export async function POST(request: NextRequest) {
       .from('timecards')
       .insert([
         {
-          user_id: user.id,
+          user_id: auth.userId,
           clock_in_time: now.toISOString(),
           clock_in_latitude: latitude,
           clock_in_longitude: longitude,
@@ -131,8 +112,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`✅ User ${profile?.full_name || user.email} clocked in at ${now.toLocaleTimeString()}`);
-    console.log(`📍 Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (${locationCheck.distanceFormatted} from shop)`);
+    console.log(`User ${profile?.full_name || auth.userEmail} clocked in at ${now.toLocaleTimeString()}`);
+    console.log(`Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (${locationCheck.distanceFormatted} from shop)`);
 
     return NextResponse.json(
       {

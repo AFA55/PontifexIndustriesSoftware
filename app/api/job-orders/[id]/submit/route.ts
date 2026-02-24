@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 
 export async function PUT(
   request: NextRequest,
@@ -15,26 +15,8 @@ export async function PUT(
     // Await params in Next.js 15+
     const { id: jobId } = await params;
 
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -54,7 +36,7 @@ export async function PUT(
     }
 
     // Check permissions: operator can only submit data for their own jobs
-    if (existingJob.assigned_to !== user.id) {
+    if (existingJob.assigned_to !== auth.userId) {
       return NextResponse.json(
         { error: 'You can only submit data for jobs assigned to you' },
         { status: 403 }
@@ -131,7 +113,7 @@ export async function PUT(
     const { error: statusHistoryError } = await supabaseAdmin
       .from('operator_status_history')
       .insert({
-        user_id: user.id,
+        user_id: auth.userId,
         status: 'job_completed',
         latitude: body.latitude,
         longitude: body.longitude,

@@ -5,29 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -45,11 +28,11 @@ export async function POST(request: NextRequest) {
     const telnyxPhoneNumber = process.env.TELNYX_PHONE_NUMBER;
 
     if (!telnyxApiKey || !telnyxPhoneNumber) {
-      console.log('⚠️ Telnyx not configured. Logging SMS to console instead:');
-      console.log('📱 SMS to send:');
+      console.log('Telnyx not configured. Logging SMS to console instead:');
+      console.log('SMS to send:');
       console.log('To:', to);
       console.log('Message:', message);
-      console.log('From:', user.email);
+      console.log('From:', auth.userEmail);
 
       return NextResponse.json(
         {
@@ -81,12 +64,12 @@ export async function POST(request: NextRequest) {
 
       if (!telnyxResponse.ok) {
         const errorData = await telnyxResponse.json();
-        console.error('❌ Telnyx API error:', errorData);
-        throw new Error(`Telnyx API error: ${errorData.errors?.[0]?.detail || 'Unknown error'}`);
+        console.error('Telnyx API error:', errorData);
+        throw new Error('SMS delivery failed');
       }
 
       const telnyxData = await telnyxResponse.json();
-      console.log('✅ SMS sent successfully via Telnyx');
+      console.log('SMS sent successfully via Telnyx');
       console.log('To:', to);
       console.log('Message:', message);
 
@@ -103,10 +86,10 @@ export async function POST(request: NextRequest) {
         { status: 200 }
       );
     } catch (smsError: any) {
-      console.error('❌ Error sending SMS via Telnyx:', smsError);
+      console.error('Error sending SMS via Telnyx:', smsError);
 
       // Fallback to logging
-      console.log('📱 SMS to send (fallback):');
+      console.log('SMS to send (fallback):');
       console.log('To:', to);
       console.log('Message:', message);
 
@@ -114,7 +97,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           message: 'Failed to send SMS via Telnyx',
-          error: smsError.message,
+          error: 'SMS delivery failed',
           data: {
             to,
             sentAt: new Date().toISOString(),

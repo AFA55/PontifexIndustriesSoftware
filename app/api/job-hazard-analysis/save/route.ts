@@ -5,30 +5,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 import jsPDF from 'jspdf';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user from Supabase session
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -233,7 +216,7 @@ export async function POST(request: NextRequest) {
         file_path: filePath,
         file_url: publicUrl,
         file_size_bytes: pdfBuffer.length,
-        generated_by: user.id,
+        generated_by: auth.userId,
         metadata: {
           crew_leader: formData.crewLeader,
           crew_size: formData.crewMembers.filter((m: string) => m).length,
@@ -243,12 +226,12 @@ export async function POST(request: NextRequest) {
       });
 
     if (pdfDocError) {
-      console.error('⚠️ Failed to track PDF in pdf_documents table:', pdfDocError);
+      console.error('Failed to track PDF in pdf_documents table:', pdfDocError);
     } else {
-      console.log('✅ JHA PDF tracked in pdf_documents table');
+      console.log('JHA PDF tracked in pdf_documents table');
     }
 
-    console.log('✅ JHA saved successfully for job:', jobId);
+    console.log('JHA saved successfully for job:', jobId);
 
     return NextResponse.json(
       {

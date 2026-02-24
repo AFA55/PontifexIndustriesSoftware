@@ -1,24 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 /**
  * GET /api/equipment/maintenance-alerts
  * Get maintenance alerts for current user (operator sees theirs, admin sees all)
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status'); // 'unread', 'unresolved', 'all'
@@ -72,20 +63,10 @@ export async function GET(request: Request) {
  * PATCH /api/equipment/maintenance-alerts
  * Update alert status (mark as read, acknowledge, resolve)
  */
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
     const { alertId, action } = body; // action: 'mark_read', 'acknowledge', 'resolve'

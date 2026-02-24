@@ -5,29 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user from Supabase session
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -69,9 +52,9 @@ export async function POST(request: NextRequest) {
     let publicUrl = '';
 
     if (uploadError) {
-      console.error('⚠️ Storage upload failed, saving metadata without file:', uploadError);
+      console.error('Storage upload failed, saving metadata without file:', uploadError);
       // Continue without file - we'll save the plan data but note that file upload failed
-      publicUrl = `FILE_UPLOAD_FAILED: ${uploadError.message}`;
+      publicUrl = '';
     } else {
       // Get public URL
       const urlResult = supabaseAdmin.storage
@@ -94,7 +77,7 @@ export async function POST(request: NextRequest) {
       safety_concerns: formData.otherSafetyConcerns || '',
       signature: formData.signature,
       signature_date: formData.signatureDate,
-      created_by: user.id,
+      created_by: auth.userId,
     };
 
     // Add PDF URL if upload succeeded, otherwise store base64 as fallback
@@ -150,7 +133,7 @@ export async function POST(request: NextRequest) {
           file_path: filePath,
           file_url: publicUrl,
           file_size_bytes: pdfBuffer.length,
-          generated_by: user.id,
+          generated_by: auth.userId,
           metadata: {
             employee_name: formData.employeeName,
             work_types: formData.workType,

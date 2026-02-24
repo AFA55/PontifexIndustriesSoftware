@@ -6,34 +6,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
 
     // Support batch mode: { job_order_id, items: [...] }
     if (body.items && Array.isArray(body.items)) {
-      return handleBatchInsert(body.job_order_id, body.items, user.id);
+      return handleBatchInsert(body.job_order_id, body.items, auth.userId);
     }
 
     // Legacy single-item mode
@@ -71,8 +55,8 @@ export async function POST(request: NextRequest) {
         notes,
         details_json: details_json || null,
         equipment_id: equipment_id || null,
-        operator_id: operator_id || user.id,
-        created_by: user.id
+        operator_id: operator_id || auth.userId,
+        created_by: auth.userId
       })
       .select()
       .single();
@@ -100,7 +84,7 @@ export async function POST(request: NextRequest) {
           work_area_accessibility_rating: accessibility_rating,
           work_area_accessibility_notes: accessibility_description,
           work_area_accessibility_submitted_at: new Date().toISOString(),
-          work_area_accessibility_submitted_by: user.id
+          work_area_accessibility_submitted_by: auth.userId
         })
         .eq('id', job_order_id);
     }
@@ -190,24 +174,8 @@ async function handleBatchInsert(
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const url = new URL(request.url);
     const jobOrderId = url.searchParams.get('job_order_id');

@@ -1,31 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user from authorization header
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Verify admin
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
+    // Verify admin access
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
     // Get all job orders
     const { data: jobs, error: jobsError } = await supabaseAdmin
@@ -40,7 +21,7 @@ export async function POST(request: NextRequest) {
     const updates: any = {
       checked: jobs?.length || 0,
       updated: 0,
-      errors: []
+      errors: [] as string[]
     };
 
     // Process each job
@@ -85,19 +66,15 @@ export async function POST(request: NextRequest) {
             .eq('id', job.id);
 
           if (updateError) {
-            updates.errors.push({
-              job_number: job.job_number,
-              error: updateError.message
-            });
+            console.error(`Error updating job ${job.job_number}:`, updateError);
+            updates.errors.push(`Job ${job.job_number}: Failed to update status`);
           } else {
             updates.updated++;
           }
         }
       } catch (e: any) {
-        updates.errors.push({
-          job_number: job.job_number,
-          error: e.message
-        });
+        console.error(`Error processing job ${job.job_number}:`, e);
+        updates.errors.push(`Job ${job.job_number}: Processing error`);
       }
     }
 

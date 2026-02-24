@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function PATCH(
   request: NextRequest,
@@ -15,25 +16,8 @@ export async function PATCH(
   try {
     const { id } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Check if user owns this equipment usage entry or is admin
     const { data: existingEntry } = await supabaseAdmin
@@ -49,13 +33,7 @@ export async function PATCH(
       );
     }
 
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (existingEntry.operator_id !== user.id && profile?.role !== 'admin') {
+    if (existingEntry.operator_id !== auth.userId && auth.role !== 'admin') {
       return NextResponse.json(
         { error: 'You can only update your own equipment usage entries' },
         { status: 403 }
@@ -139,25 +117,8 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Check if user owns this equipment usage entry or is admin
     const { data: existingEntry } = await supabaseAdmin
@@ -173,13 +134,7 @@ export async function DELETE(
       );
     }
 
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (existingEntry.operator_id !== user.id && profile?.role !== 'admin') {
+    if (existingEntry.operator_id !== auth.userId && auth.role !== 'admin') {
       return NextResponse.json(
         { error: 'You can only delete your own equipment usage entries' },
         { status: 403 }

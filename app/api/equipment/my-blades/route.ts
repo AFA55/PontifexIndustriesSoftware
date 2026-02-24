@@ -6,24 +6,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Query active blade assignments for this operator, joined with equipment details
     const { data: assignments, error: queryError } = await supabaseAdmin
@@ -46,7 +34,7 @@ export async function GET(request: NextRequest) {
           purchase_price
         )
       `)
-      .eq('operator_id', user.id)
+      .eq('operator_id', auth.userId)
       .eq('status', 'active');
 
     if (queryError) {

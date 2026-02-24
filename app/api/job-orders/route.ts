@@ -5,29 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -36,14 +19,7 @@ export async function GET(request: NextRequest) {
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
     const scheduledDate = searchParams.get('scheduled_date');
 
-    // Check if user is admin
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    const isAdmin = profile?.role === 'admin';
+    const isAdmin = auth.role === 'admin';
 
     // If ID is provided, fetch that specific job
     if (id) {
@@ -69,7 +45,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Check if user has access to this job
-      if (!isAdmin && specificJob.assigned_to !== user.id) {
+      if (!isAdmin && specificJob.assigned_to !== auth.userId) {
         return NextResponse.json(
           { error: 'Unauthorized to view this job' },
           { status: 403 }
@@ -84,7 +60,7 @@ export async function GET(request: NextRequest) {
       const { data: currentUserProfile } = await supabaseAdmin
         .from('profiles')
         .select('full_name, phone_number, email')
-        .eq('id', user.id)
+        .eq('id', auth.userId)
         .single();
 
       operatorProfile = currentUserProfile;
@@ -119,7 +95,7 @@ export async function GET(request: NextRequest) {
 
     // If not admin, only show jobs assigned to this user
     if (!isAdmin) {
-      query = query.eq('assigned_to', user.id);
+      query = query.eq('assigned_to', auth.userId);
     }
 
     // Filter by scheduled_date if provided

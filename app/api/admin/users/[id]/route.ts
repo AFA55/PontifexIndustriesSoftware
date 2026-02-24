@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function PATCH(
   request: NextRequest,
@@ -13,48 +14,9 @@ export async function PATCH(
   try {
     const { id } = await params;
 
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can update users' },
-        { status: 403 }
-      );
-    }
+    // Verify admin access
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const updates = await request.json();
