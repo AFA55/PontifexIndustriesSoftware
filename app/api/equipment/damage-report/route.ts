@@ -60,13 +60,13 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching damage reports:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch damage reports' }, { status: 500 });
     }
 
     return NextResponse.json({ reports });
   } catch (error: any) {
     console.error('Damage reports API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -155,13 +155,13 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating damage report:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create damage report' }, { status: 500 });
     }
 
     return NextResponse.json({ report, message: 'Damage report submitted successfully' });
   } catch (error: any) {
     console.error('Create damage report API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -238,12 +238,12 @@ export async function PATCH(request: Request) {
 
     if (error) {
       console.error('Error updating damage report:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to update damage report' }, { status: 500 });
     }
 
     return NextResponse.json({ report, message: 'Damage report updated successfully' });
   } catch (error: any) {
     console.error('Update damage report API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

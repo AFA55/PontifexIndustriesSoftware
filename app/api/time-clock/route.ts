@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
         });
       }
       console.error('Error fetching clock status:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch clock status' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error in GET /api/time-clock:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
           );
         }
         console.error('Error clocking in:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to clock in' }, { status: 500 });
       }
 
       return NextResponse.json({
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
           );
         }
         console.error('Error clocking out:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to clock out' }, { status: 500 });
       }
 
       return NextResponse.json({
@@ -191,6 +191,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
     console.error('Error in POST /api/time-clock:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

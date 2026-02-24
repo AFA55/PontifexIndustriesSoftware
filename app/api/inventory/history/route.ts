@@ -1,24 +1,18 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
-
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+
     const { searchParams } = new URL(request.url)
     const transactionType = searchParams.get('type')
     const inventoryId = searchParams.get('inventory_id')
     const limit = parseInt(searchParams.get('limit') || '100')
 
-    // Build query - Note: operator_id and performed_by reference auth.users, not profiles
+    // Build query
     let query = supabaseAdmin
       .from('inventory_transactions')
       .select(`
@@ -64,12 +58,12 @@ export async function GET(request: Request) {
     if (error) {
       console.error('Error fetching inventory history:', error)
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Failed to fetch inventory history' },
         { status: 500 }
       )
     }
 
-    // Now fetch operator and performed_by names from profiles
+    // Fetch operator and performed_by names from profiles
     const operatorIds = [...new Set(transactions?.map(t => t.operator_id).filter(Boolean) || [])]
     const performedByIds = [...new Set(transactions?.map(t => t.performed_by).filter(Boolean) || [])]
     const allUserIds = [...new Set([...operatorIds, ...performedByIds])]
@@ -98,10 +92,10 @@ export async function GET(request: Request) {
       data: enrichedData || []
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in history route:', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

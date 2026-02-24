@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+
     const { searchParams } = new URL(request.url)
     const uniqueId = searchParams.get('uniqueId')
 

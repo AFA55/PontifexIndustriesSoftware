@@ -145,24 +145,6 @@ export async function verifyShopLocation(): Promise<{
   distanceFormatted: string;
   error?: string;
 }> {
-  // TESTING MODE: Bypass location check for development
-  // ⚠️ This should NEVER be enabled in production!
-  const bypassLocationCheck = process.env.NEXT_PUBLIC_BYPASS_LOCATION_CHECK === 'true';
-
-  if (bypassLocationCheck) {
-    console.warn('⚠️ TESTING MODE: Location verification bypassed!');
-    return {
-      verified: true,
-      location: {
-        latitude: SHOP_LOCATION.latitude,
-        longitude: SHOP_LOCATION.longitude,
-        accuracy: 0,
-      },
-      distance: 0,
-      distanceFormatted: '0m (bypassed for testing)',
-    };
-  }
-
   try {
     const location = await getCurrentLocation();
     const { isWithinRange, distance, distanceFormatted } = isWithinShopRadius(location);

@@ -58,13 +58,13 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching maintenance alerts:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch maintenance alerts' }, { status: 500 });
     }
 
     return NextResponse.json({ alerts });
   } catch (error: any) {
     console.error('Maintenance alerts API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -119,12 +119,12 @@ export async function PATCH(request: Request) {
 
     if (error) {
       console.error('Error updating alert:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to update maintenance alert' }, { status: 500 });
     }
 
     return NextResponse.json({ alert: data, message: 'Alert updated successfully' });
   } catch (error: any) {
     console.error('Update alert API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

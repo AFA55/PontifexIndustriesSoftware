@@ -55,13 +55,13 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching turn-in requests:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch turn-in requests' }, { status: 500 });
     }
 
     return NextResponse.json({ requests });
   } catch (error: any) {
     console.error('Turn-in requests API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating turn-in request:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create turn-in request' }, { status: 500 });
     }
 
     // If equipment needs maintenance, create maintenance alert
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ request: turnInRequest, message: 'Turn-in request submitted successfully' });
   } catch (error: any) {
     console.error('Create turn-in request API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -209,7 +209,7 @@ export async function PATCH(request: Request) {
 
     if (error) {
       console.error('Error updating turn-in request:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to update turn-in request' }, { status: 500 });
     }
 
     // If approved, update equipment status to maintenance
@@ -247,6 +247,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ request: turnInRequest, message: 'Turn-in request updated successfully' });
   } catch (error: any) {
     console.error('Update turn-in request API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

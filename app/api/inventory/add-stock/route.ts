@@ -1,24 +1,18 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAdmin } from '@/lib/api-auth'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { inventory_id, quantity, notes, user_id } = await request.json()
+    const auth = await requireAdmin(request)
+    if (!auth.authorized) return auth.response
+
+    const { inventory_id, quantity, notes } = await request.json()
 
     // Validate required fields
-    if (!inventory_id || !quantity || !user_id) {
+    if (!inventory_id || !quantity) {
       return NextResponse.json(
-        { error: 'Missing required fields: inventory_id, quantity, user_id' },
+        { error: 'Missing required fields: inventory_id, quantity' },
         { status: 400 }
       )
     }
@@ -27,20 +21,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Quantity must be at least 1' },
         { status: 400 }
-      )
-    }
-
-    // Verify user has permission (admin or inventory_manager)
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user_id)
-      .single()
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'inventory_manager')) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Insufficient permissions' },
-        { status: 403 }
       )
     }
 
@@ -79,20 +59,19 @@ export async function POST(request: Request) {
       )
     }
 
-    // Log transaction
+    // Log transaction using auth.userId from JWT
     const { error: transactionError } = await supabaseAdmin
       .from('inventory_transactions')
       .insert({
         inventory_id: inventory_id,
         transaction_type: 'stock_added',
         quantity: quantity,
-        performed_by: user_id,
+        performed_by: auth.userId,
         notes: notes || `Added ${quantity} units to stock`
       })
 
     if (transactionError) {
       console.error('Error logging transaction:', transactionError)
-      // Don't fail the request if transaction logging fails
     }
 
     return NextResponse.json({
@@ -101,10 +80,10 @@ export async function POST(request: Request) {
       message: `Successfully added ${quantity} units to stock`
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in add-stock route:', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

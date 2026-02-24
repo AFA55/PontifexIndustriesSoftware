@@ -51,13 +51,13 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching maintenance schedules:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch maintenance schedules' }, { status: 500 });
     }
 
     return NextResponse.json({ schedules });
   } catch (error: any) {
     console.error('Maintenance schedules API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -139,13 +139,13 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating maintenance schedule:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create maintenance schedule' }, { status: 500 });
     }
 
     return NextResponse.json({ schedule, message: 'Maintenance schedule created successfully' });
   } catch (error: any) {
     console.error('Create maintenance schedule API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -224,13 +224,13 @@ export async function PATCH(request: Request) {
 
     if (error) {
       console.error('Error updating maintenance schedule:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to update maintenance schedule' }, { status: 500 });
     }
 
     return NextResponse.json({ schedule, message: 'Maintenance schedule updated successfully' });
   } catch (error: any) {
     console.error('Update maintenance schedule API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -278,12 +278,12 @@ export async function DELETE(request: Request) {
 
     if (error) {
       console.error('Error deleting maintenance schedule:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to delete maintenance schedule' }, { status: 500 });
     }
 
     return NextResponse.json({ message: 'Maintenance schedule deleted successfully' });
   } catch (error: any) {
     console.error('Delete maintenance schedule API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

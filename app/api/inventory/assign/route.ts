@@ -1,39 +1,19 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAdmin } from '@/lib/api-auth'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { inventory_id, operator_id, serial_number, notes, assigned_by } = await request.json()
+    const auth = await requireAdmin(request)
+    if (!auth.authorized) return auth.response
+
+    const { inventory_id, operator_id, serial_number, notes } = await request.json()
 
     // Validate required fields
-    if (!inventory_id || !operator_id || !serial_number || !assigned_by) {
+    if (!inventory_id || !operator_id || !serial_number) {
       return NextResponse.json(
-        { error: 'Missing required fields: inventory_id, operator_id, serial_number, assigned_by' },
+        { error: 'Missing required fields: inventory_id, operator_id, serial_number' },
         { status: 400 }
-      )
-    }
-
-    // Verify user has permission (admin or inventory_manager)
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', assigned_by)
-      .single()
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'inventory_manager')) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Insufficient permissions' },
-        { status: 403 }
       )
     }
 
@@ -46,17 +26,18 @@ export async function POST(request: Request) {
 
     if (existingEquipment) {
       return NextResponse.json(
-        { error: `Serial number "${serial_number}" has already been used for ${existingEquipment.name}. Please use a unique serial number.` },
+        { error: 'Serial number has already been used. Please use a unique serial number.' },
         { status: 400 }
       )
     }
 
     // Call the database function to assign equipment
+    // Use auth.userId from JWT token instead of body param
     const { data, error } = await supabaseAdmin.rpc('assign_equipment_from_inventory', {
       p_inventory_id: inventory_id,
       p_operator_id: operator_id,
       p_serial_number: serial_number,
-      p_assigned_by: assigned_by,
+      p_assigned_by: auth.userId,
       p_notes: notes || null
     })
 
@@ -66,33 +47,31 @@ export async function POST(request: Request) {
       // Handle duplicate serial number error
       if (error.code === '23505' && error.message.includes('equipment_serial_number_key')) {
         return NextResponse.json(
-          { error: `Serial number "${serial_number}" has already been used. Please use a unique serial number.` },
+          { error: 'Serial number has already been used. Please use a unique serial number.' },
           { status: 400 }
         )
       }
 
       return NextResponse.json(
-        { error: error.message || 'Failed to assign equipment' },
+        { error: 'Failed to assign equipment' },
         { status: 500 }
       )
     }
 
     // Also create a blade_assignments record so track-usage can find this blade
-    // The RPC only creates the equipment record + updates inventory stock
     if (data) {
       const { error: bladeAssignError } = await supabaseAdmin
         .from('blade_assignments')
         .insert({
           equipment_id: data,
           operator_id,
-          assigned_by,
+          assigned_by: auth.userId,
           assigned_date: new Date().toISOString(),
           status: 'active',
           checkout_notes: notes || 'Assigned from inventory'
         })
 
       if (bladeAssignError) {
-        // Log but don't fail — the equipment was assigned successfully
         console.error('Warning: blade_assignments insert failed:', bladeAssignError)
       }
     }
@@ -103,10 +82,10 @@ export async function POST(request: Request) {
       message: 'Equipment assigned successfully'
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in assign route:', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

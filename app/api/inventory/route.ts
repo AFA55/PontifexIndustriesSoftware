@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth, requireAdmin } from '@/lib/api-auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+
     const { data: inventory, error } = await supabaseAdmin
       .from('inventory')
       .select('*')
@@ -20,8 +24,11 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request)
+    if (!auth.authorized) return auth.response
+
     const inventoryData = await request.json()
 
     const { data: newInventory, error } = await supabaseAdmin
@@ -45,12 +52,11 @@ export async function POST(request: Request) {
         quantity_before: 0,
         quantity_after: inventoryData.quantity_in_stock || 0,
         notes: `Initial stock added: ${inventoryData.quantity_in_stock || 0} units`,
-        performed_by: inventoryData.created_by || null
+        performed_by: auth.userId
       })
 
     if (transactionError) {
       console.error('Error creating transaction record:', transactionError)
-      // Don't fail the request, just log the error
     }
 
     return NextResponse.json(newInventory)

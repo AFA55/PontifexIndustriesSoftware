@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       .order('scheduled_date', { ascending: false });
 
     if (jobsError) {
-      return NextResponse.json({ error: jobsError.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch job orders' }, { status: 500 });
     }
 
     const updates: any = {
@@ -109,6 +109,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Error syncing job statuses:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

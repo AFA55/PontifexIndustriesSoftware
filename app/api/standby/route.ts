@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Standby POST error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -179,7 +179,7 @@ export async function PUT(request: NextRequest) {
   } catch (error: any) {
     console.error('Standby PUT error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -251,7 +251,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Standby GET error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }

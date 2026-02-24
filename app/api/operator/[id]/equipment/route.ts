@@ -1,21 +1,15 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+
     const { id: operatorId } = await params
 
     // Fetch operator info
@@ -56,7 +50,7 @@ export async function GET(
     if (equipmentError) {
       console.error('Error fetching equipment:', equipmentError)
       return NextResponse.json(
-        { error: equipmentError.message },
+        { error: 'Failed to fetch equipment' },
         { status: 500 }
       )
     }
@@ -88,10 +82,10 @@ export async function GET(
       equipment: enrichedEquipment || []
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in operator equipment route:', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

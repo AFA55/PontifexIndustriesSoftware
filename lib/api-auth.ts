@@ -57,7 +57,7 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || profile.role !== 'admin') {
+  if (profileError || !profile || !['admin', 'super_admin'].includes(profile.role)) {
     return {
       authorized: false,
       response: NextResponse.json(

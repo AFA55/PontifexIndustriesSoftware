@@ -60,13 +60,13 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching repair tracking:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch repair tracking records' }, { status: 500 });
     }
 
     return NextResponse.json({ repairs });
   } catch (error: any) {
     console.error('Repair tracking API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating repair tracking:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create repair tracking record' }, { status: 500 });
     }
 
     // Update damage report status if linked
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ repair, message: 'Repair tracking created successfully' });
   } catch (error: any) {
     console.error('Create repair tracking API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -271,7 +271,7 @@ export async function PATCH(request: Request) {
 
     if (error) {
       console.error('Error updating repair tracking:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to update repair tracking record' }, { status: 500 });
     }
 
     // If repair completed, update equipment and damage report
@@ -302,6 +302,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ repair, message: 'Repair tracking updated successfully' });
   } catch (error: any) {
     console.error('Update repair tracking API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
