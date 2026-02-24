@@ -1,7 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 
 export const metadata: Metadata = {
   title: 'Pontifex Industries - Concrete Cutting Management Software',
@@ -69,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head />
       <body className="transition-colors duration-200">
         <ThemeProvider>
-          <GoogleMapsProvider>{children}</GoogleMapsProvider>
+          {children}
         </ThemeProvider>
       </body>
     </html>
