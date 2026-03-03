@@ -145,6 +145,8 @@ export async function POST(request: NextRequest) {
       title: body.title,
       customer_name: body.customer_name,
       customer_contact: body.customer_contact,
+      customer_email: body.customer_email || null,
+      salesperson_email: body.salesperson_email || null,
       job_type: body.job_type,
       location: body.location,
       address: body.address,
@@ -165,6 +167,11 @@ export async function POST(request: NextRequest) {
       job_site_number: body.job_site_number,
       po_number: body.po_number,
       customer_job_number: body.customer_job_number,
+      job_quote: body.job_quote || null,
+      difficulty_rating: body.difficulty_rating || null,
+      truck_distance_to_work: body.truck_parking || null,
+      work_environment: body.work_environment || null,
+      site_cleanliness: body.site_cleanliness || null,
       created_by: auth.userId,
     };
 

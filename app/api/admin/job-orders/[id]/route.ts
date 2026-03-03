@@ -54,9 +54,12 @@ export async function PATCH(
 
     const allowedFields = [
       'arrival_time', 'shop_arrival_time', 'location', 'address',
-      'customer_name', 'foreman_name', 'foreman_phone', 'equipment_needed',
+      'customer_name', 'customer_email', 'salesperson_email',
+      'foreman_name', 'foreman_phone', 'equipment_needed',
       'description', 'assigned_to', 'scheduled_date', 'end_date',
       'estimated_hours', 'operator_name', 'status', 'priority',
+      'job_quote', 'difficulty_rating', 'truck_distance_to_work',
+      'work_environment', 'site_cleanliness',
     ];
 
     allowedFields.forEach(field => {
@@ -86,6 +89,8 @@ export async function PATCH(
         'location',
         'address',
         'customer_name',
+        'customer_email',
+        'salesperson_email',
         'foreman_name',
         'foreman_phone',
         'equipment_needed',
@@ -97,6 +102,11 @@ export async function PATCH(
         'operator_name',
         'status',
         'priority',
+        'job_quote',
+        'difficulty_rating',
+        'truck_distance_to_work',
+        'work_environment',
+        'site_cleanliness',
       ];
 
       fieldsToTrack.forEach(field => {
