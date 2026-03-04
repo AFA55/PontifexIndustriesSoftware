@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, Send, Users, Clock, MapPin, History, LayoutGrid, List, CalendarDays, Filter, Search, Plus, MessageSquare } from 'lucide-react';
+import { Calendar, Send, Users, Clock, MapPin, History, LayoutGrid, List, CalendarDays, Filter, Search, Plus, MessageSquare, Wrench, UserCheck, UserX } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import JobHistoryModal from '@/components/JobHistoryModal';
 import type { JobOrder as SharedJobOrder } from '@/types/job';
@@ -81,39 +81,38 @@ export default function ScheduleBoardPage() {
     checkRole();
   }, []);
 
+  // Fetch all team members for the "Available Helpers" section
+  const fetchAllTeamMembers = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/admin/operator-profiles', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          const ops = json.data.map((op: any) => ({
+            id: op.id,
+            full_name: op.full_name,
+            email: op.email,
+          }));
+          setOperators(ops);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+    }
+  };
+
   useEffect(() => {
-    if (canEdit) fetchOperators(); // Only admins need operator list for edit controls
+    if (canEdit) fetchAllTeamMembers();
     if (viewMode === 'calendar') {
       fetchWeekSchedules();
     } else {
       fetchSchedules();
     }
   }, [selectedDate, viewMode, weekStartDate, canEdit]);
-
-  const fetchOperators = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      // Use server-side API route to bypass RLS restrictions on profiles table
-      const res = await fetch('/api/admin/operator-profiles', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          setOperators(json.data.map((op: any) => ({
-            id: op.id,
-            full_name: op.full_name,
-            email: op.email,
-          })));
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching operators:', error);
-    }
-  };
 
   const fetchSchedules = async () => {
     try {
@@ -550,6 +549,14 @@ export default function ScheduleBoardPage() {
   const totalJobs = schedules.reduce((sum, schedule) => sum + schedule.jobs.length, 0);
   const assignedOperators = schedules.filter(s => s.operator_id !== 'unassigned').length;
 
+  // Compute which operators are assigned to jobs today and who is available
+  const assignedOperatorIds = new Set(
+    schedules
+      .filter(s => s.operator_id !== 'unassigned')
+      .map(s => s.operator_id)
+  );
+  const availableHelpers = operators.filter(op => !assignedOperatorIds.has(op.id));
+
   // Color palette for different operators
   const operatorColors = [
     { border: 'border-purple-500', bg: 'bg-purple-100', text: 'text-purple-700', badge: 'bg-purple-500', hover: 'hover:border-purple-400', icon: 'text-purple-600' },
@@ -718,6 +725,78 @@ export default function ScheduleBoardPage() {
         </div>
       </div>
 
+      {/* Operator Assignments & Available Helpers */}
+      {canEdit && !loading && operators.length > 0 && (
+        <div className="container mx-auto px-4 md:px-6 pb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Assigned Operators */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <UserCheck className="w-5 h-5 text-green-600" />
+                <h3 className="text-sm font-bold text-gray-900">Assigned Operators</h3>
+                <span className="ml-auto px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold">
+                  {assignedOperatorIds.size}
+                </span>
+              </div>
+              {schedules.filter(s => s.operator_id !== 'unassigned').length === 0 ? (
+                <p className="text-sm text-gray-400 italic">No operators assigned yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {schedules
+                    .filter(s => s.operator_id !== 'unassigned')
+                    .map((schedule, idx) => (
+                      <div key={schedule.operator_id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getOperatorColor(idx).bg}`}>
+                            <Users className={`w-4 h-4 ${getOperatorColor(idx).icon}`} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-gray-900">{schedule.operator_name}</p>
+                            <p className="text-xs text-gray-500">
+                              {schedule.jobs.map(j => j.job_type || 'Job').join(', ')}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getOperatorColor(idx).bg} ${getOperatorColor(idx).text}`}>
+                          {schedule.jobs.length} {schedule.jobs.length === 1 ? 'job' : 'jobs'}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Available Helpers */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <UserX className="w-5 h-5 text-amber-600" />
+                <h3 className="text-sm font-bold text-gray-900">Available Helpers</h3>
+                <span className="ml-auto px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
+                  {availableHelpers.length}
+                </span>
+              </div>
+              {availableHelpers.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">All team members are assigned</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {availableHelpers.map(helper => (
+                    <div key={helper.id} className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
+                        <Users className="w-3.5 h-3.5 text-amber-700" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{helper.full_name}</p>
+                        <p className="text-xs text-gray-500">Available</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Schedule Grid */}
       <div className="container mx-auto px-4 md:px-6 pb-6">
         {loading ? (
@@ -834,31 +913,31 @@ export default function ScheduleBoardPage() {
                                       )}
                                     </div>
 
-                                    {/* Time and Location Grid */}
-                                    <div className="grid md:grid-cols-2 gap-3 mb-3">
-                                      {/* Times */}
-                                      <div className="space-y-2">
-                                        {job.shop_arrival_time && (
-                                          <div className="flex items-center gap-2 text-sm">
-                                            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                              <Clock className="w-4 h-4 text-purple-600" />
-                                            </div>
-                                            <div>
-                                              <p className="text-xs text-gray-500">Shop</p>
-                                              <p className="font-bold text-green-700">{formatTime(job.shop_arrival_time)}</p>
-                                            </div>
-                                          </div>
-                                        )}
-                                        <div className="flex items-center gap-2 text-sm">
-                                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                            <Clock className="w-4 h-4 text-blue-600" />
-                                          </div>
-                                          <div>
-                                            <p className="text-xs text-gray-500">Site</p>
-                                            <p className="font-bold text-blue-700">{formatTime(job.arrival_time)}</p>
-                                          </div>
+                                    {/* Time, Job Type, and Location Grid */}
+                                    <div className="grid md:grid-cols-3 gap-3 mb-3">
+                                      {/* Shop Time */}
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                                          <Clock className="w-4 h-4 text-green-600" />
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-gray-500">Shop</p>
+                                          <p className="font-bold text-green-700">{formatTime(job.shop_arrival_time || job.arrival_time)}</p>
                                         </div>
                                       </div>
+
+                                      {/* Job Type */}
+                                      {job.job_type && (
+                                        <div className="flex items-center gap-2 text-sm">
+                                          <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                            <Wrench className="w-4 h-4 text-indigo-600" />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="text-xs text-gray-500">Type</p>
+                                            <p className="font-bold text-indigo-700 truncate">{job.job_type}</p>
+                                          </div>
+                                        </div>
+                                      )}
 
                                       {/* Location */}
                                       <div className="flex items-start gap-2 p-3 bg-orange-50 rounded-xl">
@@ -1015,17 +1094,17 @@ export default function ScheduleBoardPage() {
                                     <p className="text-xs text-gray-500">{job.job_number}</p>
                                   </div>
 
-                                  {job.shop_arrival_time && (
+                                  <div className="flex items-center gap-1 text-xs mb-1">
+                                    <Clock className="w-3 h-3 text-green-600" />
+                                    <span className="text-green-700 font-semibold">{formatTime(job.shop_arrival_time || job.arrival_time)}</span>
+                                  </div>
+
+                                  {job.job_type && (
                                     <div className="flex items-center gap-1 text-xs mb-1">
-                                      <Clock className="w-3 h-3 text-purple-600" />
-                                      <span className="text-green-700 font-semibold">{formatTime(job.shop_arrival_time)}</span>
+                                      <Wrench className="w-3 h-3 text-indigo-600" />
+                                      <span className="text-indigo-700 font-semibold truncate">{job.job_type}</span>
                                     </div>
                                   )}
-
-                                  <div className="flex items-center gap-1 text-xs mb-2">
-                                    <Clock className="w-3 h-3 text-blue-600" />
-                                    <span className="text-blue-700 font-semibold">{formatTime(job.arrival_time)}</span>
-                                  </div>
 
                                   <div className="flex items-start gap-1 text-xs mb-2">
                                     <MapPin className="w-3 h-3 text-orange-600 mt-0.5 flex-shrink-0" />
@@ -1151,16 +1230,16 @@ export default function ScheduleBoardPage() {
                             </div>
 
                             <div className="space-y-2 mb-3">
-                              {job.shop_arrival_time && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <Clock className="w-3.5 h-3.5 text-green-600" />
+                                <span className="font-semibold text-green-700">Shop: {formatTime(job.shop_arrival_time || job.arrival_time)}</span>
+                              </div>
+                              {job.job_type && (
                                 <div className="flex items-center gap-2 text-xs">
-                                  <Clock className="w-3.5 h-3.5 text-purple-600" />
-                                  <span className="font-semibold text-green-700">Shop: {formatTime(job.shop_arrival_time)}</span>
+                                  <Wrench className="w-3.5 h-3.5 text-indigo-600" />
+                                  <span className="font-semibold text-indigo-700 truncate">{job.job_type}</span>
                                 </div>
                               )}
-                              <div className="flex items-center gap-2 text-xs">
-                                <Clock className="w-3.5 h-3.5 text-blue-600" />
-                                <span className="font-semibold text-blue-700">Site: {formatTime(job.arrival_time)}</span>
-                              </div>
                             </div>
 
                             <div className="flex items-start gap-2 mb-3 p-2 bg-orange-50 rounded-lg">
@@ -1330,22 +1409,21 @@ export default function ScheduleBoardPage() {
                         )}
                       </div>
 
-                      <div className="grid md:grid-cols-2 gap-4 mb-4">
-                        {/* Times */}
-                        <div className="space-y-2">
-                          {job.shop_arrival_time && (
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4 text-purple-600" />
-                              <span className="text-sm text-gray-600">Shop:</span>
-                              <span className="text-sm font-bold text-green-700">{formatTime(job.shop_arrival_time)}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm text-gray-600">Site:</span>
-                            <span className="text-sm font-bold text-blue-700">{formatTime(job.arrival_time)}</span>
-                          </div>
+                      <div className="grid md:grid-cols-3 gap-4 mb-4">
+                        {/* Shop Time */}
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-green-600" />
+                          <span className="text-sm text-gray-600">Shop:</span>
+                          <span className="text-sm font-bold text-green-700">{formatTime(job.shop_arrival_time || job.arrival_time)}</span>
                         </div>
+
+                        {/* Job Type */}
+                        {job.job_type && (
+                          <div className="flex items-center gap-2">
+                            <Wrench className="w-4 h-4 text-indigo-600" />
+                            <span className="text-sm font-bold text-indigo-700">{job.job_type}</span>
+                          </div>
+                        )}
 
                         {/* Location */}
                         <div className="flex items-start gap-2">
