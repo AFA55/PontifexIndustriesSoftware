@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
 import type { JobType } from '@/types/job';
-import { commonEquipment } from '@/types/equipment-constants';
 
 interface OperatorInfo {
   id: string;
@@ -45,6 +44,18 @@ const JOB_TYPES: JobType[] = [
   'Other',
 ];
 
+// Patriot equipment abbreviations for quick selection
+const EQUIPMENT_PRESETS: { abbrev: string; label: string }[] = [
+  { abbrev: 'HHS', label: 'Hydraulic Hand Saw' },
+  { abbrev: 'CS', label: 'Core Saw' },
+  { abbrev: 'TS', label: 'Track Saw' },
+  { abbrev: 'WS', label: 'Wall Saw' },
+  { abbrev: 'GPP', label: 'Gas Power Pack' },
+  { abbrev: 'DFS', label: 'Diesel Flat Saw' },
+  { abbrev: 'ECD', label: 'Electric Core Drill' },
+  { abbrev: 'HCD', label: 'Hydraulic Core Drill' },
+];
+
 export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onClose }: QuickAddJobPanelProps) {
   const [submitting, setSubmitting] = useState(false);
   const [customerName, setCustomerName] = useState('');
@@ -55,18 +66,19 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
   const [shopArrivalTime, setShopArrivalTime] = useState('');
   const [selectedOperator, setSelectedOperator] = useState('');
   const [equipment, setEquipment] = useState<string[]>([]);
-  const [equipmentSearch, setEquipmentSearch] = useState('');
-  const [showEquipmentDropdown, setShowEquipmentDropdown] = useState(false);
+  const [customEquipment, setCustomEquipment] = useState('');
   const [location, setLocation] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
-  const filteredEquipment = equipmentSearch
-    ? commonEquipment.filter(e =>
-        e.toLowerCase().includes(equipmentSearch.toLowerCase()) && !equipment.includes(e)
-      )
-    : [];
+  const addCustomEquipment = () => {
+    const trimmed = customEquipment.trim();
+    if (trimmed && !equipment.includes(trimmed)) {
+      setEquipment([...equipment, trimmed]);
+      setCustomEquipment('');
+    }
+  };
 
   const handleSubmit = async () => {
     setError('');
@@ -265,56 +277,70 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
           {/* Equipment */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              Equipment
+              Equipment <span className="font-normal text-gray-400">(tap to add)</span>
             </label>
+
+            {/* Selected equipment chips */}
             {equipment.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-2">
-                {equipment.map(item => (
-                  <span
-                    key={item}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium"
-                  >
-                    {item}
-                    <button
-                      onClick={() => setEquipment(equipment.filter(e => e !== item))}
-                      className="hover:text-purple-900"
+                {equipment.map(item => {
+                  const preset = EQUIPMENT_PRESETS.find(p => p.abbrev === item);
+                  return (
+                    <span
+                      key={item}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium"
+                      title={preset?.label}
                     >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                  </span>
-                ))}
+                      {item}
+                      <button
+                        onClick={() => setEquipment(equipment.filter(e => e !== item))}
+                        className="hover:text-purple-900"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
             )}
-            <div className="relative">
+
+            {/* Preset abbreviation buttons */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {EQUIPMENT_PRESETS.filter(p => !equipment.includes(p.abbrev)).map(preset => (
+                <button
+                  key={preset.abbrev}
+                  onClick={() => setEquipment([...equipment, preset.abbrev])}
+                  title={preset.label}
+                  className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 transition-all flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {preset.abbrev}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom equipment input */}
+            <div className="flex gap-2">
               <input
                 type="text"
-                value={equipmentSearch}
-                onChange={(e) => {
-                  setEquipmentSearch(e.target.value);
-                  setShowEquipmentDropdown(true);
+                value={customEquipment}
+                onChange={(e) => setCustomEquipment(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCustomEquipment();
+                  }
                 }}
-                onFocus={() => setShowEquipmentDropdown(true)}
-                placeholder="Search equipment..."
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900"
+                placeholder="Add other equipment..."
+                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900"
               />
-              {showEquipmentDropdown && filteredEquipment.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto z-20">
-                  {filteredEquipment.slice(0, 10).map(item => (
-                    <button
-                      key={item}
-                      onClick={() => {
-                        setEquipment([...equipment, item]);
-                        setEquipmentSearch('');
-                        setShowEquipmentDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-purple-50 text-sm text-gray-900 flex items-center gap-2"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-purple-500" />
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={addCustomEquipment}
+                className="px-4 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-xl font-bold transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
