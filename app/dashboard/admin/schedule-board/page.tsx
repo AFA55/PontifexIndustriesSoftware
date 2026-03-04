@@ -3,12 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, Send, Users, Clock, MapPin, History, LayoutGrid, List, CalendarDays, Filter, Search } from 'lucide-react';
+import { Calendar, Send, Users, Clock, MapPin, History, LayoutGrid, List, CalendarDays, Filter, Search, Plus, MessageSquare } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import JobHistoryModal from '@/components/JobHistoryModal';
 import type { JobOrder as SharedJobOrder } from '@/types/job';
 import WorkflowProgressBar from '@/components/WorkflowProgressBar';
 import RichEditJobModal from '@/components/RichEditJobModal';
+import QuickAddJobPanel from '@/components/QuickAddJobPanel';
+import type { QuickAddData } from '@/components/QuickAddJobPanel';
+import JobNotesPanel from '@/components/JobNotesPanel';
 
 type ViewMode = 'timeline' | 'calendar' | 'columns';
 
@@ -59,6 +62,8 @@ export default function ScheduleBoardPage() {
   const [operators, setOperators] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
   const [selectedDayView, setSelectedDayView] = useState<{ date: string; jobs: JobOrder[] } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [notesJobId, setNotesJobId] = useState<{ id: string; jobNumber: string } | null>(null);
 
   useEffect(() => {
     fetchOperators();
@@ -389,6 +394,73 @@ export default function ScheduleBoardPage() {
     }
   };
 
+  const handleQuickAdd = async (data: QuickAddData) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert('Session expired. Please log in again.');
+      router.push('/login');
+      return;
+    }
+
+    // Generate a job number
+    const year = new Date().getFullYear();
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    const jobNumber = `JOB-${year}-${rand}`;
+
+    const response = await fetch('/api/admin/job-orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        job_number: jobNumber,
+        title: `${data.job_type} - ${data.customer_name}`,
+        customer_name: data.customer_name,
+        job_type: data.job_type,
+        location: data.location || 'TBD',
+        address: data.address || 'TBD',
+        scheduled_date: data.scheduled_date,
+        end_date: data.end_date || null,
+        arrival_time: data.arrival_time || null,
+        shop_arrival_time: data.shop_arrival_time || null,
+        assigned_to: data.operator_id || null,
+        equipment_needed: data.equipment_needed.length > 0 ? data.equipment_needed : null,
+        priority: 'medium',
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to create job');
+    }
+
+    // If there are notes, create an initial note
+    if (data.notes && result.data?.id) {
+      await fetch('/api/admin/job-notes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          jobOrderId: result.data.id,
+          content: data.notes,
+          noteType: 'manual',
+        }),
+      });
+    }
+
+    setShowQuickAdd(false);
+    // Refresh the board
+    if (viewMode === 'calendar') {
+      await fetchWeekSchedules();
+    } else {
+      await fetchSchedules();
+    }
+  };
+
   const formatTime = (time: string | null) => {
     if (!time) return 'Not set';
     const [hours, minutes] = time.split(':');
@@ -503,14 +575,23 @@ export default function ScheduleBoardPage() {
               </div>
             </div>
 
-            <button
-              onClick={handleSendSchedules}
-              disabled={sending || assignedOperators === 0}
-              className="w-full sm:w-auto px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm md:text-base"
-            >
-              <Send className="w-4 h-4 md:w-5 md:h-5" />
-              {sending ? 'Sending...' : 'Send Out Schedule'}
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => setShowQuickAdd(true)}
+                className="flex-1 sm:flex-initial px-4 md:px-5 py-2 md:py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm md:text-base"
+              >
+                <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                Quick Add
+              </button>
+              <button
+                onClick={handleSendSchedules}
+                disabled={sending || assignedOperators === 0}
+                className="flex-1 sm:flex-initial px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm md:text-base"
+              >
+                <Send className="w-4 h-4 md:w-5 md:h-5" />
+                {sending ? 'Sending...' : 'Send Schedule'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -806,6 +887,13 @@ export default function ScheduleBoardPage() {
                                       >
                                         <History className="w-4 h-4" />
                                         History
+                                      </button>
+                                      <button
+                                        onClick={() => setNotesJobId({ id: job.id, jobNumber: job.job_number })}
+                                        className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
+                                      >
+                                        <MessageSquare className="w-4 h-4" />
+                                        Notes
                                       </button>
                                     </div>
                                   </div>
@@ -1104,6 +1192,12 @@ export default function ScheduleBoardPage() {
                               >
                                 <History className="w-3.5 h-3.5" />
                               </button>
+                              <button
+                                onClick={() => setNotesJobId({ id: job.id, jobNumber: job.job_number })}
+                                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -1280,6 +1374,25 @@ export default function ScheduleBoardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Quick Add Panel */}
+      {showQuickAdd && (
+        <QuickAddJobPanel
+          operators={operators}
+          defaultDate={selectedDate}
+          onSubmit={handleQuickAdd}
+          onClose={() => setShowQuickAdd(false)}
+        />
+      )}
+
+      {/* Notes Panel */}
+      {notesJobId && (
+        <JobNotesPanel
+          jobId={notesJobId.id}
+          jobNumber={notesJobId.jobNumber}
+          onClose={() => setNotesJobId(null)}
+        />
       )}
     </div>
   );

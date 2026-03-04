@@ -169,6 +169,31 @@ export async function PATCH(
         } else {
           console.log('Audit trail logged:', Object.keys(changes));
         }
+
+        // Auto-create a change_log note in job_notes for the schedule board
+        const changeDescriptions = Object.entries(changes).map(([field, { old: oldVal, new: newVal }]) => {
+          const label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          return `${label}: "${oldVal || '(empty)'}" → "${newVal || '(empty)'}"`;
+        });
+
+        const { error: noteError } = await supabaseAdmin
+          .from('job_notes')
+          .insert({
+            job_order_id: id,
+            author_id: user.id,
+            author_name: profile.full_name || user.email || 'System',
+            content: changeDescriptions.join('\n'),
+            note_type: 'change_log',
+            metadata: { changes },
+          });
+
+        if (noteError) {
+          if (isTableNotFoundError(noteError)) {
+            console.log('Change log note skipped: job_notes table not available yet');
+          } else {
+            console.error('Error creating change_log note:', noteError);
+          }
+        }
       }
     }
 
