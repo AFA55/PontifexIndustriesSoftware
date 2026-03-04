@@ -64,15 +64,31 @@ export default function ScheduleBoardPage() {
   const [deleting, setDeleting] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [notesJobId, setNotesJobId] = useState<{ id: string; jobNumber: string } | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
+
+  // Detect user role for view-only vs edit permissions
+  useEffect(() => {
+    async function checkRole() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      setCanEdit(profile?.role === 'admin');
+    }
+    checkRole();
+  }, []);
 
   useEffect(() => {
-    fetchOperators();
+    if (canEdit) fetchOperators(); // Only admins need operator list for edit controls
     if (viewMode === 'calendar') {
       fetchWeekSchedules();
     } else {
       fetchSchedules();
     }
-  }, [selectedDate, viewMode, weekStartDate]);
+  }, [selectedDate, viewMode, weekStartDate, canEdit]);
 
   const fetchOperators = async () => {
     try {
@@ -558,7 +574,7 @@ export default function ScheduleBoardPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3 md:gap-4">
               <Link
-                href="/dashboard/admin"
+                href={canEdit ? '/dashboard/admin' : '/dashboard'}
                 className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all hover:scale-105"
                 title="Back to Dashboard"
               >
@@ -569,29 +585,31 @@ export default function ScheduleBoardPage() {
               <div>
                 <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
                   <Calendar className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />
-                  Admin Dispatch Board
+                  {canEdit ? 'Admin Dispatch Board' : 'My Schedule'}
                 </h1>
-                <p className="text-gray-600 text-xs md:text-sm">Manage job assignments & schedules</p>
+                <p className="text-gray-600 text-xs md:text-sm">{canEdit ? 'Manage job assignments & schedules' : 'View your upcoming jobs'}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => setShowQuickAdd(true)}
-                className="flex-1 sm:flex-initial px-4 md:px-5 py-2 md:py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm md:text-base"
-              >
-                <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                Quick Add
-              </button>
-              <button
-                onClick={handleSendSchedules}
-                disabled={sending || assignedOperators === 0}
-                className="flex-1 sm:flex-initial px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm md:text-base"
-              >
-                <Send className="w-4 h-4 md:w-5 md:h-5" />
-                {sending ? 'Sending...' : 'Send Schedule'}
-              </button>
-            </div>
+            {canEdit && (
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => setShowQuickAdd(true)}
+                  className="flex-1 sm:flex-initial px-4 md:px-5 py-2 md:py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm md:text-base"
+                >
+                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                  Quick Add
+                </button>
+                <button
+                  onClick={handleSendSchedules}
+                  disabled={sending || assignedOperators === 0}
+                  className="flex-1 sm:flex-initial px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm md:text-base"
+                >
+                  <Send className="w-4 h-4 md:w-5 md:h-5" />
+                  {sending ? 'Sending...' : 'Send Schedule'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -867,7 +885,7 @@ export default function ScheduleBoardPage() {
 
                                     {/* Actions */}
                                     <div className="flex gap-2 flex-wrap">
-                                      {isUnassigned && (
+                                      {canEdit && isUnassigned && (
                                         <button
                                           onClick={() => openEditModal(job)}
                                           className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg"
@@ -875,12 +893,14 @@ export default function ScheduleBoardPage() {
                                           Assign Operator
                                         </button>
                                       )}
-                                      <button
-                                        onClick={() => openEditModal(job)}
-                                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg"
-                                      >
-                                        Edit Details
-                                      </button>
+                                      {canEdit && (
+                                        <button
+                                          onClick={() => openEditModal(job)}
+                                          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg"
+                                        >
+                                          Edit Details
+                                        </button>
+                                      )}
                                       <button
                                         onClick={() => setViewingHistory({ jobId: job.id, jobNumber: job.job_number })}
                                         className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
@@ -985,8 +1005,8 @@ export default function ScheduleBoardPage() {
                               jobs.map((job) => (
                                 <div
                                   key={job.id}
-                                  onClick={() => openEditModal(job)}
-                                  className="bg-white rounded-lg p-3 border border-gray-200 hover:border-purple-400 hover:shadow-md transition-all cursor-pointer"
+                                  onClick={() => canEdit && openEditModal(job)}
+                                  className={`bg-white rounded-lg p-3 border border-gray-200 transition-all ${canEdit ? 'hover:border-purple-400 hover:shadow-md cursor-pointer' : ''}`}
                                 >
                                   <div className="mb-2">
                                     <p className="text-xs font-bold text-gray-900 truncate" title={job.customer_name}>
@@ -1172,7 +1192,7 @@ export default function ScheduleBoardPage() {
                             />
 
                             <div className="flex gap-2 flex-wrap">
-                              {isUnassigned && (
+                              {canEdit && isUnassigned && (
                                 <button
                                   onClick={() => openEditModal(job)}
                                   className="flex-1 px-3 py-1.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg"
@@ -1180,12 +1200,14 @@ export default function ScheduleBoardPage() {
                                   Assign
                                 </button>
                               )}
-                              <button
-                                onClick={() => openEditModal(job)}
-                                className="flex-1 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg"
-                              >
-                                Edit
-                              </button>
+                              {canEdit && (
+                                <button
+                                  onClick={() => openEditModal(job)}
+                                  className="flex-1 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg"
+                                >
+                                  Edit
+                                </button>
+                              )}
                               <button
                                 onClick={() => setViewingHistory({ jobId: job.id, jobNumber: job.job_number })}
                                 className="px-3 py-1.5 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg"
@@ -1295,15 +1317,17 @@ export default function ScheduleBoardPage() {
                             <p className="text-sm text-gray-500">{job.job_number}</p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            setSelectedDayView(null);
-                            openEditModal(job);
-                          }}
-                          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg text-sm"
-                        >
-                          Edit Job
-                        </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => {
+                              setSelectedDayView(null);
+                              openEditModal(job);
+                            }}
+                            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg text-sm"
+                          >
+                            Edit Job
+                          </button>
+                        )}
                       </div>
 
                       <div className="grid md:grid-cols-2 gap-4 mb-4">
