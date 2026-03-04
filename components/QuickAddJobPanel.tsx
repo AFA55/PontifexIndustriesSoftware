@@ -20,7 +20,8 @@ interface QuickAddJobPanelProps {
 
 export interface QuickAddData {
   customer_name: string;
-  job_type: string;
+  job_type: string;       // Comma-separated if multiple types selected
+  job_types: string[];    // Array of selected job types
   scheduled_date: string;
   end_date: string;
   arrival_time: string;
@@ -47,7 +48,7 @@ const JOB_TYPES: JobType[] = [
 export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onClose }: QuickAddJobPanelProps) {
   const [submitting, setSubmitting] = useState(false);
   const [customerName, setCustomerName] = useState('');
-  const [jobType, setJobType] = useState('');
+  const [jobTypes, setJobTypes] = useState<string[]>([]);
   const [scheduledDate, setScheduledDate] = useState(defaultDate);
   const [endDate, setEndDate] = useState('');
   const [arrivalTime, setArrivalTime] = useState('');
@@ -74,8 +75,8 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
       setError('Customer/Contractor name is required');
       return;
     }
-    if (!jobType) {
-      setError('Job type is required');
+    if (jobTypes.length === 0) {
+      setError('At least one job type is required');
       return;
     }
     if (!scheduledDate) {
@@ -89,7 +90,8 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
     try {
       await onSubmit({
         customer_name: customerName.trim(),
-        job_type: jobType,
+        job_type: jobTypes.join(', '),
+        job_types: jobTypes,
         scheduled_date: scheduledDate,
         end_date: endDate,
         arrival_time: arrivalTime,
@@ -152,21 +154,41 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
             />
           </div>
 
-          {/* Job Type */}
+          {/* Job Type - Multi-select */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              Job Type *
+              Job Type * <span className="font-normal text-gray-400">(select one or more)</span>
             </label>
-            <select
-              value={jobType}
-              onChange={(e) => setJobType(e.target.value)}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900 text-base bg-white"
-            >
-              <option value="">Select job type...</option>
-              {JOB_TYPES.map(type => (
-                <option key={type} value={type}>{type}</option>
+            {jobTypes.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {jobTypes.map(type => (
+                  <span
+                    key={type}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium"
+                  >
+                    {type}
+                    <button
+                      onClick={() => setJobTypes(jobTypes.filter(t => t !== type))}
+                      className="hover:text-green-900"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {JOB_TYPES.filter(type => !jobTypes.includes(type)).map(type => (
+                <button
+                  key={type}
+                  onClick={() => setJobTypes([...jobTypes, type])}
+                  className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 transition-all flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {type}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
           {/* Date Row */}
