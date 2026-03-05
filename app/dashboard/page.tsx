@@ -76,6 +76,27 @@ export default function Dashboard() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isDemoOperator, setIsDemoOperator] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const [isShopHours, setIsShopHours] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<{
+    gpsStatus: string;
+    latitude: number | null;
+    longitude: number | null;
+    accuracy: number | null;
+    distanceFromShop: string;
+    lastError: string;
+    apiResponse: string;
+    timestamp: string;
+  }>({
+    gpsStatus: 'idle',
+    latitude: null,
+    longitude: null,
+    accuracy: null,
+    distanceFromShop: '-',
+    lastError: '',
+    apiResponse: '',
+    timestamp: '',
+  });
   const router = useRouter();
 
   useEffect(() => {
@@ -366,15 +387,12 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  // Check if card is accessible for demo operators
+  // Lock all cards except Clock In/Out and View Timecard for ALL operators
+  // Building one feature at a time — everything else stays blurred
   const isCardAccessible = (cardName: string) => {
-    if (!isDemoOperator) return true;
-
     const accessibleCards = [
-      'Job Schedule',
       'View Timecard',
     ];
-
     return accessibleCards.includes(cardName);
   };
 
@@ -384,21 +402,30 @@ export default function Dashboard() {
 
     try {
       console.log('📍 Getting location for clock in...');
+      setDebugInfo(prev => ({ ...prev, gpsStatus: 'requesting...', timestamp: new Date().toISOString() }));
 
       // Get Supabase session token
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        setClockMessage({
-          type: 'error',
-          text: 'Session expired. Please log in again.',
-        });
+        setClockMessage({ type: 'error', text: 'Session expired. Please log in again.' });
+        setDebugInfo(prev => ({ ...prev, lastError: 'No session found', gpsStatus: 'error' }));
         setClockLoading(false);
         return;
       }
 
       // Verify location
       const verification = await verifyShopLocation();
+
+      setDebugInfo(prev => ({
+        ...prev,
+        gpsStatus: verification.verified ? 'verified ✅' : 'rejected ❌',
+        latitude: verification.location?.latitude || null,
+        longitude: verification.location?.longitude || null,
+        accuracy: verification.location?.accuracy || null,
+        distanceFromShop: verification.distanceFormatted || '-',
+        lastError: verification.error || '',
+      }));
 
       if (!verification.verified) {
         setClockMessage({
@@ -411,7 +438,7 @@ export default function Dashboard() {
 
       console.log('✅ Location verified:', verification.distanceFormatted, 'from shop');
 
-      // Call clock-in API with auth token
+      // Call clock-in API with auth token + shop hours flag
       const response = await fetch('/api/timecard/clock-in', {
         method: 'POST',
         headers: {
@@ -422,15 +449,22 @@ export default function Dashboard() {
           latitude: verification.location.latitude,
           longitude: verification.location.longitude,
           accuracy: verification.location.accuracy,
+          is_shop_hours: isShopHours,
         }),
       });
 
       const result = await response.json();
 
+      setDebugInfo(prev => ({
+        ...prev,
+        apiResponse: JSON.stringify(result, null, 2).substring(0, 500),
+      }));
+
       if (!response.ok) {
+        const errorDetail = result.details ? `\n${result.details}` : '';
         setClockMessage({
           type: 'error',
-          text: result.error || 'Failed to clock in',
+          text: (result.error || 'Failed to clock in') + errorDetail,
         });
         setClockLoading(false);
         return;
@@ -444,13 +478,22 @@ export default function Dashboard() {
         currentHours: 0,
       });
       setCurrentStatus('clocked_in');
+
+      const flags = [];
+      if (isShopHours) flags.push('🏭 Shop Hours');
+      if (result.data.isNightShift) flags.push('🌙 Night Shift');
+      if (result.data.hourType === 'mandatory_overtime') flags.push('⚠️ Weekend OT');
+
       setClockMessage({
         type: 'success',
-        text: result.message,
+        text: result.message + (flags.length > 0 ? ` (${flags.join(', ')})` : ''),
       });
 
-      // Create initial status entry
-      await fetch('/api/operator/status', {
+      // Reset shop hours checkbox after successful clock-in
+      setIsShopHours(false);
+
+      // Create initial status entry (best-effort, don't block)
+      fetch('/api/operator/status', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -462,12 +505,13 @@ export default function Dashboard() {
           longitude: verification.location.longitude,
           accuracy: verification.location.accuracy,
         }),
-      });
+      }).catch(() => {});
 
       // Hide success message after 5 seconds
       setTimeout(() => setClockMessage(null), 5000);
     } catch (error: any) {
       console.error('Error clocking in:', error);
+      setDebugInfo(prev => ({ ...prev, lastError: error.message, gpsStatus: 'error' }));
       setClockMessage({
         type: 'error',
         text: error.message || 'An error occurred while clocking in',
@@ -483,21 +527,30 @@ export default function Dashboard() {
 
     try {
       console.log('📍 Getting location for clock out...');
+      setDebugInfo(prev => ({ ...prev, gpsStatus: 'requesting...', timestamp: new Date().toISOString() }));
 
       // Get Supabase session token
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        setClockMessage({
-          type: 'error',
-          text: 'Session expired. Please log in again.',
-        });
+        setClockMessage({ type: 'error', text: 'Session expired. Please log in again.' });
+        setDebugInfo(prev => ({ ...prev, lastError: 'No session found', gpsStatus: 'error' }));
         setClockLoading(false);
         return;
       }
 
       // Verify location
       const verification = await verifyShopLocation();
+
+      setDebugInfo(prev => ({
+        ...prev,
+        gpsStatus: verification.verified ? 'verified ✅' : 'rejected ❌',
+        latitude: verification.location?.latitude || null,
+        longitude: verification.location?.longitude || null,
+        accuracy: verification.location?.accuracy || null,
+        distanceFromShop: verification.distanceFormatted || '-',
+        lastError: verification.error || '',
+      }));
 
       if (!verification.verified) {
         setClockMessage({
@@ -526,10 +579,16 @@ export default function Dashboard() {
 
       const result = await response.json();
 
+      setDebugInfo(prev => ({
+        ...prev,
+        apiResponse: JSON.stringify(result, null, 2).substring(0, 500),
+      }));
+
       if (!response.ok) {
+        const errorDetail = result.details ? `\n${result.details}` : '';
         setClockMessage({
           type: 'error',
-          text: result.error || 'Failed to clock out',
+          text: (result.error || 'Failed to clock out') + errorDetail,
         });
         setClockLoading(false);
         return;
@@ -541,13 +600,17 @@ export default function Dashboard() {
       setCurrentHours(0);
       setClockMessage({
         type: 'success',
-        text: `${result.message} Total hours: ${result.data.totalHours}`,
+        text: `${result.message} — Total hours this entry: ${result.data.totalHours}`,
       });
+
+      // Refresh weekly hours
+      fetchWeeklyHours();
 
       // Hide success message after 5 seconds
       setTimeout(() => setClockMessage(null), 5000);
     } catch (error: any) {
       console.error('Error clocking out:', error);
+      setDebugInfo(prev => ({ ...prev, lastError: error.message, gpsStatus: 'error' }));
       setClockMessage({
         type: 'error',
         text: error.message || 'An error occurred while clocking out',
@@ -809,10 +872,12 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Clock In/Out Button */}
+        {/* ═══════════════════════════════════════════════════════
+            HERO CLOCK IN/OUT CARD — Primary Feature
+            ═══════════════════════════════════════════════════════ */}
         <div className="max-w-5xl mx-auto mb-10 animate-fade-in">
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-white/50">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="flex items-center space-x-5">
                 <div className={`w-20 h-20 bg-gradient-to-br ${
                   isClockedIn
@@ -825,7 +890,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                    {isClockedIn ? 'Ready to Clock Out?' : 'Start Your Day'}
+                    {isClockedIn ? 'Ready to Clock Out?' : 'Start Your Shift'}
                   </h3>
                   <p className="text-gray-700 font-semibold text-base">
                     {isClockedIn
@@ -840,33 +905,90 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <button
-                onClick={isClockedIn ? handleClockOut : handleClockIn}
-                disabled={clockLoading}
-                className={`group flex items-center space-x-3 ${
-                  isClockedIn
-                    ? 'bg-gradient-to-r from-rose-600 via-red-600 to-pink-600 hover:from-rose-700 hover:via-red-700 hover:to-pink-700'
-                    : 'bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700'
-                } text-white font-bold py-5 px-10 rounded-2xl transition-all duration-300 hover:scale-105 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
-              >
-                {clockLoading ? (
-                  <>
-                    <div className="animate-spin w-6 h-6 border-3 border-white border-t-transparent rounded-full"></div>
-                    <span className="text-lg">Verifying...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      {isClockedIn ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                      ) : (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      )}
-                    </svg>
-                    <span className="text-lg">{isClockedIn ? 'Clock Out' : 'Clock In'}</span>
-                  </>
+
+              <div className="flex flex-col items-end gap-3 w-full sm:w-auto">
+                {/* Shop Hours Checkbox — only visible when NOT clocked in (for re-clock-in) */}
+                {!isClockedIn && (
+                  <label className="flex items-center gap-3 px-4 py-3 bg-amber-50 border-2 border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100 transition-colors w-full sm:w-auto">
+                    <input
+                      type="checkbox"
+                      checked={isShopHours}
+                      onChange={(e) => setIsShopHours(e.target.checked)}
+                      className="w-5 h-5 rounded border-2 border-amber-400 text-amber-600 focus:ring-amber-500"
+                    />
+                    <div>
+                      <span className="text-sm font-bold text-amber-900">🏭 Shop Hours</span>
+                      <p className="text-xs text-amber-700">Check if working at the shop</p>
+                    </div>
+                  </label>
                 )}
+
+                <button
+                  onClick={isClockedIn ? handleClockOut : handleClockIn}
+                  disabled={clockLoading}
+                  className={`group flex items-center justify-center space-x-3 w-full sm:w-auto ${
+                    isClockedIn
+                      ? 'bg-gradient-to-r from-rose-600 via-red-600 to-pink-600 hover:from-rose-700 hover:via-red-700 hover:to-pink-700'
+                      : 'bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700'
+                  } text-white font-bold py-5 px-10 rounded-2xl transition-all duration-300 hover:scale-105 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
+                >
+                  {clockLoading ? (
+                    <>
+                      <div className="animate-spin w-6 h-6 border-3 border-white border-t-transparent rounded-full"></div>
+                      <span className="text-lg">Verifying Location...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {isClockedIn ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        )}
+                      </svg>
+                      <span className="text-lg">{isClockedIn ? 'Clock Out' : 'Clock In'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Debug Info Toggle */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowDebugPanel(!showDebugPanel)}
+                className="text-xs text-gray-400 hover:text-gray-600 font-mono transition-colors"
+              >
+                {showDebugPanel ? '▼ Hide Debug Info' : '▶ Show Debug Info (GPS & Errors)'}
               </button>
+
+              {showDebugPanel && (
+                <div className="mt-3 bg-gray-900 text-green-400 rounded-xl p-4 font-mono text-xs overflow-x-auto">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>GPS Status:</div><div className="text-white">{debugInfo.gpsStatus}</div>
+                    <div>Your Lat:</div><div className="text-white">{debugInfo.latitude?.toFixed(8) || 'N/A'}</div>
+                    <div>Your Lng:</div><div className="text-white">{debugInfo.longitude?.toFixed(8) || 'N/A'}</div>
+                    <div>GPS Accuracy:</div><div className="text-white">{debugInfo.accuracy ? `${debugInfo.accuracy.toFixed(1)}m` : 'N/A'}</div>
+                    <div>Distance from Shop:</div><div className="text-yellow-300 font-bold">{debugInfo.distanceFromShop}</div>
+                    <div>Shop Lat:</div><div className="text-white">34.76866502</div>
+                    <div>Shop Lng:</div><div className="text-white">-82.43563614</div>
+                    <div>Max Allowed:</div><div className="text-white">6.1m (20 feet)</div>
+                    <div>Timestamp:</div><div className="text-white">{debugInfo.timestamp || 'N/A'}</div>
+                  </div>
+                  {debugInfo.lastError && (
+                    <div className="mt-3 pt-3 border-t border-gray-700">
+                      <div className="text-red-400 font-bold mb-1">Last Error:</div>
+                      <div className="text-red-300 whitespace-pre-wrap">{debugInfo.lastError}</div>
+                    </div>
+                  )}
+                  {debugInfo.apiResponse && (
+                    <div className="mt-3 pt-3 border-t border-gray-700">
+                      <div className="text-blue-400 font-bold mb-1">API Response:</div>
+                      <pre className="text-blue-300 whitespace-pre-wrap text-[10px]">{debugInfo.apiResponse}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -874,50 +996,23 @@ export default function Dashboard() {
         {/* Ultra Modern Card Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
 
-          {/* Job Schedule - Premium Red Card */}
-          <div
-            onClick={() => {
-              if (!isClockedIn) {
-                alert('⏰ Please clock in before accessing the job schedule.');
-                return;
-              }
-              router.push('/dashboard/job-schedule');
-            }}
-            className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 ${
-              isClockedIn ? 'hover:scale-[1.03] cursor-pointer' : 'opacity-60 cursor-not-allowed'
-            } animate-fade-in-up`}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+          {/* Job Schedule - BLURRED (building one feature at a time) */}
+          <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 p-1.5 shadow-2xl animate-fade-in-up blur-sm opacity-50 cursor-not-allowed">
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7">
               <div className="flex items-start justify-between mb-5">
-                <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-red-100 group-hover:ring-white/30">
+                <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-red-100">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <span className="px-4 py-2 bg-gradient-to-r from-red-100 to-rose-100 group-hover:bg-white/20 text-red-700 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 shadow-md">
-                  {activeJobsCount} ACTIVE
-                </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
-                Job Schedule
-              </h3>
-              <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
-                View today's assignments and routes
-              </p>
-              <div className="mt-5 flex items-center text-red-600 group-hover:text-white font-bold transition-colors duration-300">
-                <span>Open Schedule</span>
-                <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Job Schedule</h3>
+              <p className="text-gray-700 font-semibold">View today's assignments and routes</p>
+            </div>
+            <div className="absolute inset-0 bg-black/5 backdrop-blur-sm rounded-3xl flex items-center justify-center">
+              <div className="bg-white/90 px-5 py-2 rounded-full shadow-lg">
+                <p className="text-sm font-semibold text-gray-700">Coming Soon</p>
               </div>
-              {!isClockedIn && (
-                <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px] rounded-3xl flex items-center justify-center">
-                  <div className="bg-white/95 px-6 py-3 rounded-xl shadow-lg">
-                    <p className="text-sm font-bold text-gray-900">⏰ Clock in required</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1056,28 +1151,25 @@ export default function Dashboard() {
                 } rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {isClockedIn ? 'Clock Out' : 'Clock In'}
               </button>
-              <button className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105">
+              <Link
+                href="/dashboard/timecard"
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105"
+              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
-                Notifications
-              </button>
-              <button className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-500 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                View Timecard
+              </Link>
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded-xl text-gray-400 font-medium whitespace-nowrap text-sm">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
-                Reports
-              </button>
-              <button className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                Messages
-              </button>
+                More actions coming soon
+              </div>
             </div>
           </div>
         </div>

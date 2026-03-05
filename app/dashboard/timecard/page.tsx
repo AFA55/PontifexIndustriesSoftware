@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
-import { ArrowLeft, Clock, Calendar, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight, Moon, Factory, Briefcase } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 interface TimecardEntry {
@@ -14,6 +14,10 @@ interface TimecardEntry {
   clock_out_time: string | null;
   total_hours: number | null;
   is_approved: boolean;
+  is_shop_hours: boolean;
+  is_night_shift: boolean;
+  hour_type: string; // 'regular' | 'night_shift' | 'mandatory_overtime'
+  notes: string | null;
 }
 
 interface WeekData {
@@ -21,14 +25,19 @@ interface WeekData {
   weekEnd: Date;
   entries: TimecardEntry[];
   totalHours: number;
-  overtimeHours: number;
+  regularHours: number;
+  weeklyOvertimeHours: number;
+  nightShiftHours: number;
+  mandatoryOvertimeHours: number;
+  shopHours: number;
+  daysWorked: number;
 }
 
 export default function TimecardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [timecards, setTimecards] = useState<TimecardEntry[]>([]);
-  const [currentWeekOffset, setCurrentWeekOffset] = useState(0); // 0 = current week, -1 = last week, etc.
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const [weekData, setWeekData] = useState<WeekData | null>(null);
   const router = useRouter();
 
@@ -45,12 +54,10 @@ export default function TimecardPage() {
 
   const getWeekBounds = (offset: number) => {
     const now = new Date();
-    // Get the Monday of the current week
     const monday = new Date(now);
     monday.setDate(monday.getDate() - monday.getDay() + 1 + (offset * 7));
     monday.setHours(0, 0, 0, 0);
 
-    // Get the Sunday of the current week
     const sunday = new Date(monday);
     sunday.setDate(sunday.getDate() + 6);
     sunday.setHours(23, 59, 59, 999);
@@ -64,7 +71,7 @@ export default function TimecardPage() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
+        console.warn('No active session found. Redirecting to login...');
         localStorage.removeItem('supabase-user');
         localStorage.removeItem('pontifex-user');
         window.location.href = '/login';
@@ -83,22 +90,47 @@ export default function TimecardPage() {
       const result = await response.json();
 
       if (result.success) {
-        const entries = result.data.timecards;
+        const entries: TimecardEntry[] = result.data.timecards;
         setTimecards(entries);
 
-        // Calculate week totals
-        const totalHours = entries.reduce((sum: number, entry: TimecardEntry) => {
-          return sum + (entry.total_hours || 0);
-        }, 0);
+        // Calculate categorized hours
+        const totalHours = entries.reduce((sum, entry) => sum + (entry.total_hours || 0), 0);
 
-        const overtimeHours = Math.max(0, totalHours - 40);
+        // Night shift hours: entries where is_night_shift = true
+        const nightShiftHours = entries
+          .filter(e => e.is_night_shift)
+          .reduce((sum, e) => sum + (e.total_hours || 0), 0);
+
+        // Mandatory overtime hours: entries where hour_type = 'mandatory_overtime' (weekends)
+        const mandatoryOvertimeHours = entries
+          .filter(e => e.hour_type === 'mandatory_overtime')
+          .reduce((sum, e) => sum + (e.total_hours || 0), 0);
+
+        // Shop hours: entries where is_shop_hours = true
+        const shopHours = entries
+          .filter(e => e.is_shop_hours)
+          .reduce((sum, e) => sum + (e.total_hours || 0), 0);
+
+        // Weekly overtime: hours beyond 40 for the week
+        const weeklyOvertimeHours = Math.max(0, totalHours - 40);
+
+        // Regular hours: total minus overtime (capped at 40)
+        const regularHours = Math.min(totalHours, 40);
+
+        // Unique days worked
+        const uniqueDays = new Set(entries.map(e => e.date));
 
         setWeekData({
           weekStart: monday,
           weekEnd: sunday,
           entries,
           totalHours,
-          overtimeHours,
+          regularHours,
+          weeklyOvertimeHours,
+          nightShiftHours,
+          mandatoryOvertimeHours,
+          shopHours,
+          daysWorked: uniqueDays.size,
         });
       }
     } catch (error) {
@@ -114,7 +146,6 @@ export default function TimecardPage() {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
-      year: 'numeric',
     });
   };
 
@@ -134,6 +165,21 @@ export default function TimecardPage() {
   };
 
   const isCurrentWeek = () => currentWeekOffset === 0;
+
+  // Get category badges for an entry
+  const getEntryBadges = (entry: TimecardEntry) => {
+    const badges: { label: string; color: string; icon: string }[] = [];
+    if (entry.is_shop_hours) {
+      badges.push({ label: 'Shop', color: 'bg-amber-100 text-amber-800 border-amber-200', icon: '🏭' });
+    }
+    if (entry.is_night_shift) {
+      badges.push({ label: 'Night', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: '🌙' });
+    }
+    if (entry.hour_type === 'mandatory_overtime') {
+      badges.push({ label: 'Weekend OT', color: 'bg-red-100 text-red-800 border-red-200', icon: '⚠️' });
+    }
+    return badges;
+  };
 
   if (loading) {
     return (
@@ -181,7 +227,7 @@ export default function TimecardPage() {
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors font-medium"
           >
             <ChevronLeft size={20} />
-            Previous Week
+            <span className="hidden sm:inline">Previous Week</span>
           </button>
 
           <div className="text-center">
@@ -200,90 +246,171 @@ export default function TimecardPage() {
                 : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
             }`}
           >
-            Next Week
+            <span className="hidden sm:inline">Next Week</span>
             <ChevronRight size={20} />
           </button>
         </div>
 
-        {/* Weekly Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {/* Total Hours This Week */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between mb-2">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Clock className="text-blue-600" size={24} />
+        {/* ═══════════════════════════════════════════════════════
+            TOTAL HOURS HERO CARD
+            ═══════════════════════════════════════════════════════ */}
+        <div className="mb-6 bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 rounded-2xl p-6 shadow-xl text-white">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <p className="text-blue-200 text-sm font-semibold uppercase tracking-wider mb-1">Total Hours This Week</p>
+              <p className="text-5xl font-bold">
+                {weekData?.totalHours.toFixed(1) || '0.0'}
+                <span className="text-2xl text-blue-300 ml-2">hrs</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold">{weekData?.daysWorked || 0}</p>
+                <p className="text-xs text-blue-300 font-medium">Days Worked</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold">{weekData?.entries.length || 0}</p>
+                <p className="text-xs text-blue-300 font-medium">Entries</p>
               </div>
             </div>
-            <p className="text-3xl font-bold text-gray-800">
-              {weekData?.totalHours.toFixed(1) || '0.0'}
-            </p>
-            <p className="text-sm text-gray-500">Total Hours This Week</p>
           </div>
 
+          {/* Progress bar: 40 hour target */}
+          <div className="mt-4">
+            <div className="flex justify-between text-xs text-blue-300 mb-1">
+              <span>0 hrs</span>
+              <span className="font-bold text-white">40 hrs (Regular)</span>
+              <span>60 hrs</span>
+            </div>
+            <div className="h-3 bg-blue-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  (weekData?.totalHours || 0) > 40
+                    ? 'bg-gradient-to-r from-green-400 via-yellow-400 to-red-500'
+                    : 'bg-gradient-to-r from-green-400 to-emerald-500'
+                }`}
+                style={{ width: `${Math.min(((weekData?.totalHours || 0) / 60) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════
+            CATEGORIZED HOURS BREAKDOWN
+            ═══════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
           {/* Regular Hours */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between mb-2">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <CheckCircle className="text-green-600" size={24} />
-              </div>
+          <div className="bg-white rounded-2xl p-5 shadow-lg border-2 border-green-100">
+            <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mb-3">
+              <CheckCircle className="text-green-600" size={22} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">
-              {Math.min(weekData?.totalHours || 0, 40).toFixed(1)}
+            <p className="text-2xl font-bold text-gray-800">
+              {weekData?.regularHours.toFixed(1) || '0.0'}
             </p>
-            <p className="text-sm text-gray-500">Regular Hours</p>
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mt-1">Regular</p>
           </div>
 
-          {/* Overtime Hours */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between mb-2">
-              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                <AlertTriangle className="text-orange-600" size={24} />
-              </div>
+          {/* Weekly Overtime (>40 hrs) */}
+          <div className={`bg-white rounded-2xl p-5 shadow-lg border-2 ${
+            (weekData?.weeklyOvertimeHours || 0) > 0 ? 'border-orange-200 bg-orange-50' : 'border-gray-100'
+          }`}>
+            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center mb-3">
+              <AlertTriangle className="text-orange-600" size={22} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">
-              {weekData?.overtimeHours.toFixed(1) || '0.0'}
+            <p className="text-2xl font-bold text-gray-800">
+              {weekData?.weeklyOvertimeHours.toFixed(1) || '0.0'}
             </p>
-            <p className="text-sm text-gray-500">Overtime Hours</p>
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mt-1">Weekly OT</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Over 40 hrs</p>
           </div>
 
-          {/* Days Worked */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between mb-2">
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                <Calendar className="text-purple-600" size={24} />
-              </div>
+          {/* Mandatory Overtime (Weekends) */}
+          <div className={`bg-white rounded-2xl p-5 shadow-lg border-2 ${
+            (weekData?.mandatoryOvertimeHours || 0) > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100'
+          }`}>
+            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center mb-3">
+              <Briefcase className="text-red-600" size={22} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">
-              {weekData?.entries.length || 0}
+            <p className="text-2xl font-bold text-gray-800">
+              {weekData?.mandatoryOvertimeHours.toFixed(1) || '0.0'}
             </p>
-            <p className="text-sm text-gray-500">Days Worked</p>
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mt-1">Mandatory OT</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Sat / Sun</p>
+          </div>
+
+          {/* Night Shift Hours */}
+          <div className={`bg-white rounded-2xl p-5 shadow-lg border-2 ${
+            (weekData?.nightShiftHours || 0) > 0 ? 'border-indigo-200 bg-indigo-50' : 'border-gray-100'
+          }`}>
+            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center mb-3">
+              <Moon className="text-indigo-600" size={22} />
+            </div>
+            <p className="text-2xl font-bold text-gray-800">
+              {weekData?.nightShiftHours.toFixed(1) || '0.0'}
+            </p>
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mt-1">Night Shift</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">After 3 PM</p>
+          </div>
+
+          {/* Shop Hours */}
+          <div className={`bg-white rounded-2xl p-5 shadow-lg border-2 ${
+            (weekData?.shopHours || 0) > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-100'
+          }`}>
+            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center mb-3">
+              <Factory className="text-amber-600" size={22} />
+            </div>
+            <p className="text-2xl font-bold text-gray-800">
+              {weekData?.shopHours.toFixed(1) || '0.0'}
+            </p>
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mt-1">Shop Hours</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">In-shop work</p>
           </div>
         </div>
 
         {/* Overtime Alert */}
-        {weekData && weekData.overtimeHours > 0 && (
+        {weekData && weekData.weeklyOvertimeHours > 0 && (
           <div className="mb-6 bg-orange-50 border-2 border-orange-200 rounded-2xl p-6">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-orange-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
                 <AlertTriangle className="text-orange-700" size={20} />
               </div>
               <div>
-                <p className="text-orange-800 font-bold text-lg mb-2">Overtime Detected</p>
+                <p className="text-orange-800 font-bold text-lg mb-2">Weekly Overtime Detected</p>
                 <p className="text-orange-700 font-medium">
-                  You have worked <strong>{weekData.overtimeHours.toFixed(1)} overtime hours</strong> this week.
-                  Hours over 40 per week are considered overtime and may be paid at a different rate according to company policy.
+                  You have worked <strong>{weekData.weeklyOvertimeHours.toFixed(1)} overtime hours</strong> this week
+                  (beyond 40 regular hours). These hours may be paid at overtime rate per company policy.
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Timecard Entries Table */}
+        {/* Mandatory OT Alert */}
+        {weekData && weekData.mandatoryOvertimeHours > 0 && (
+          <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-2xl p-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-red-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                <Briefcase className="text-red-700" size={20} />
+              </div>
+              <div>
+                <p className="text-red-800 font-bold text-lg mb-2">Weekend / Mandatory Overtime</p>
+                <p className="text-red-700 font-medium">
+                  You worked <strong>{weekData.mandatoryOvertimeHours.toFixed(1)} hours</strong> on
+                  Saturday or Sunday. These hours are automatically classified as mandatory overtime.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════
+            DAILY ENTRIES TABLE
+            ═══════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-bold text-gray-800">Daily Entries</h2>
             <p className="text-sm text-gray-500 mt-1">
-              {weekData?.entries.length || 0} {weekData?.entries.length === 1 ? 'entry' : 'entries'} this week
+              {weekData?.entries.length || 0} {(weekData?.entries.length || 0) === 1 ? 'entry' : 'entries'} this week
             </p>
           </div>
 
@@ -312,7 +439,10 @@ export default function TimecardPage() {
                       Clock Out
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Total Hours
+                      Hours
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Category
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Status
@@ -320,61 +450,110 @@ export default function TimecardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {weekData.entries.map((entry) => (
-                    <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <Calendar size={16} className="text-gray-400" />
-                          <span className="text-sm font-medium text-gray-800">
-                            {formatDate(entry.date)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-600">
-                          {formatTime(entry.clock_in_time)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {entry.clock_out_time ? (
+                  {weekData.entries.map((entry) => {
+                    const badges = getEntryBadges(entry);
+                    return (
+                      <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <Calendar size={16} className="text-gray-400" />
+                            <span className="text-sm font-medium text-gray-800">
+                              {formatDate(entry.date)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-gray-600">
-                            {formatTime(entry.clock_out_time)}
+                            {formatTime(entry.clock_in_time)}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                            Active
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {entry.total_hours !== null ? (
-                          <span className="text-sm font-semibold text-gray-800">
-                            {entry.total_hours.toFixed(2)} hrs
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {entry.is_approved ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <CheckCircle size={12} className="mr-1" />
-                            Approved
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            <Clock size={12} className="mr-1" />
-                            Pending
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {entry.clock_out_time ? (
+                            <span className="text-sm text-gray-600">
+                              {formatTime(entry.clock_out_time)}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                              Active
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {entry.total_hours !== null ? (
+                            <span className="text-sm font-semibold text-gray-800">
+                              {entry.total_hours.toFixed(2)} hrs
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1.5">
+                            {badges.length > 0 ? (
+                              badges.map((badge, idx) => (
+                                <span
+                                  key={idx}
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border ${badge.color}`}
+                                >
+                                  <span className="mr-1">{badge.icon}</span>
+                                  {badge.label}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-gray-50 text-gray-600 border-gray-200">
+                                Regular
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {entry.is_approved ? (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <CheckCircle size={12} className="mr-1" />
+                              Approved
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              <Clock size={12} className="mr-1" />
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+
+        {/* Legend */}
+        <div className="mt-6 bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Hour Categories</p>
+          <div className="flex flex-wrap gap-4 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+              <span className="text-gray-600 font-medium">Regular (up to 40 hrs/wk)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 bg-orange-500 rounded-full"></span>
+              <span className="text-gray-600 font-medium">Weekly OT (over 40 hrs)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 bg-red-500 rounded-full"></span>
+              <span className="text-gray-600 font-medium">Mandatory OT (Sat/Sun)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 bg-indigo-500 rounded-full"></span>
+              <span className="text-gray-600 font-medium">Night Shift (after 3 PM)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 bg-amber-500 rounded-full"></span>
+              <span className="text-gray-600 font-medium">Shop Hours (in-shop work)</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

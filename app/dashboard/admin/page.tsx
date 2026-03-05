@@ -201,23 +201,34 @@ export default function AdminDashboard() {
     setShowWalkthrough(false);
   };
 
-  // Check if card should be accessible for demo admin
+  // Super admin email — only super admin sees all cards unblurred
+  const SUPER_ADMIN_EMAIL = 'andres.altamirano1280@gmail.com';
+  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL;
+
+  // Check if card should be accessible
+  // Super admin: sees everything
+  // All other admins: only Timecard Management is unblurred (building one feature at a time)
   const isCardAccessible = (moduleTitle: string) => {
-    if (!isDemoAdmin) return true; // Full access for real admins
+    if (isSuperAdmin) return true; // Super admin sees all
 
     const accessibleCards = [
-      'Dispatch & Scheduling',
-      'Schedule Board',
-      'Completed Job Tickets',
-      'Operator Profiles',
-      'Access Requests',
-      'Team Management'
+      'Timecard Management',
     ];
 
     return accessibleCards.includes(moduleTitle);
   };
 
   const adminModules = [
+    {
+      title: 'Timecard Management',
+      description: 'Review, approve, and edit employee timecards',
+      icon: '⏱️',
+      href: '/dashboard/admin/timecards',
+      bgColor: 'from-emerald-500 to-teal-600',
+      iconBg: 'bg-emerald-500',
+      features: ['Review clock-ins', 'Approve timecards', 'Edit hours', 'Overtime tracking'],
+      status: 'active'
+    },
     {
       title: 'Dispatch & Scheduling',
       description: 'Create and manage job orders for operators',
@@ -414,7 +425,7 @@ export default function AdminDashboard() {
           }).map((module, index) => {
             const isActive = module.status === 'active';
             const isAccessible = isCardAccessible(module.title);
-            const isBlurred = isDemoAdmin && !isAccessible;
+            const isBlurred = !isSuperAdmin && !isAccessible;
 
             const cardContent = (
               <>

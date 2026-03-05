@@ -3,15 +3,15 @@
  * Handles distance calculation and location verification
  */
 
-// Shop location configuration
+// Shop location configuration — Patriot Concrete Cutting
 export const SHOP_LOCATION = {
-  latitude: 33.97121,  // Pontifex Industries Shop location
-  longitude: -84.18066, // Pontifex Industries Shop location
-  name: 'Pontifex Industries Shop',
+  latitude: 34.76866501659961,   // Patriot Concrete Cutting
+  longitude: -82.4356361432207,  // Patriot Concrete Cutting
+  name: 'Patriot Concrete Cutting',
 };
 
-// Allowed radius in meters (100m = ~328 feet)
-export const ALLOWED_RADIUS_METERS = 100;
+// Allowed radius in meters (6.1m ≈ 20 feet)
+export const ALLOWED_RADIUS_METERS = 6.1;
 
 /**
  * Location coordinates interface

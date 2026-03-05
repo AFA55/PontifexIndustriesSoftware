@@ -129,3 +129,13 @@ export const hasRole = (role: string): boolean => {
   const user = getCurrentUser();
   return user?.role === role;
 };
+
+export const isShopUser = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'shop_manager' || user?.role === 'admin' || user?.role === 'operator';
+};
+
+export const isShopManager = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'shop_manager' || user?.role === 'admin';
+};

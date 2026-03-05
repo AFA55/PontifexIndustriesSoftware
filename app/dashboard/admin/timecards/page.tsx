@@ -24,6 +24,9 @@ interface TimecardWithUser {
   clock_out_longitude: number | null;
   is_approved: boolean;
   notes: string | null;
+  is_shop_hours: boolean;
+  is_night_shift: boolean;
+  hour_type: string;
 }
 
 export default function AdminTimecardsPage() {
@@ -183,6 +186,24 @@ export default function AdminTimecardsPage() {
   const totalHours = timecards.reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
   const pendingCount = timecards.filter(tc => !tc.is_approved).length;
   const overtimeCount = timecards.filter(tc => isOvertime(tc.total_hours)).length;
+  const shopHoursTotal = timecards.filter(tc => tc.is_shop_hours).reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
+  const nightShiftTotal = timecards.filter(tc => tc.is_night_shift).reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
+  const mandatoryOTTotal = timecards.filter(tc => tc.hour_type === 'mandatory_overtime').reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
+
+  // Get category badges for an entry
+  const getEntryBadges = (entry: TimecardWithUser) => {
+    const badges: { label: string; color: string; icon: string }[] = [];
+    if (entry.is_shop_hours) {
+      badges.push({ label: 'Shop', color: 'bg-amber-100 text-amber-800', icon: '🏭' });
+    }
+    if (entry.is_night_shift) {
+      badges.push({ label: 'Night', color: 'bg-indigo-100 text-indigo-800', icon: '🌙' });
+    }
+    if (entry.hour_type === 'mandatory_overtime') {
+      badges.push({ label: 'Wknd OT', color: 'bg-red-100 text-red-800', icon: '⚠️' });
+    }
+    return badges;
+  };
 
   if (loading) {
     return (
@@ -223,38 +244,51 @@ export default function AdminTimecardsPage() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-2">
-              <Clock className="text-blue-600" size={24} />
+        {/* Summary Cards — Row 1: Primary */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mb-2">
+              <Clock className="text-blue-600" size={22} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">{totalHours.toFixed(1)}</p>
-            <p className="text-sm text-gray-500">Total Hours</p>
+            <p className="text-2xl font-bold text-gray-800">{totalHours.toFixed(1)}</p>
+            <p className="text-xs text-gray-500 font-semibold">Total Hours</p>
           </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mb-2">
-              <Clock className="text-yellow-600" size={24} />
+          <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
+            <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center mb-2">
+              <Clock className="text-yellow-600" size={22} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">{pendingCount}</p>
-            <p className="text-sm text-gray-500">Pending Approval</p>
+            <p className="text-2xl font-bold text-gray-800">{pendingCount}</p>
+            <p className="text-xs text-gray-500 font-semibold">Pending Approval</p>
           </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-2">
-              <Clock className="text-orange-600" size={24} />
+          <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
+            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center mb-2">
+              <Clock className="text-orange-600" size={22} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">{overtimeCount}</p>
-            <p className="text-sm text-gray-500">Overtime Shifts</p>
+            <p className="text-2xl font-bold text-gray-800">{overtimeCount}</p>
+            <p className="text-xs text-gray-500 font-semibold">OT Shifts (&gt;8hr)</p>
           </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-2">
-              <UserIcon className="text-green-600" size={24} />
+          <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
+            <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mb-2">
+              <UserIcon className="text-green-600" size={22} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">{timecards.length}</p>
-            <p className="text-sm text-gray-500">Total Entries</p>
+            <p className="text-2xl font-bold text-gray-800">{timecards.length}</p>
+            <p className="text-xs text-gray-500 font-semibold">Total Entries</p>
+          </div>
+        </div>
+
+        {/* Summary Cards — Row 2: Hour Categories */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className={`bg-white rounded-2xl p-4 shadow-lg border-2 ${shopHoursTotal > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-100'}`}>
+            <p className="text-lg font-bold text-gray-800">{shopHoursTotal.toFixed(1)} <span className="text-sm font-normal text-gray-500">hrs</span></p>
+            <p className="text-xs text-gray-500 font-semibold">🏭 Shop Hours</p>
+          </div>
+          <div className={`bg-white rounded-2xl p-4 shadow-lg border-2 ${nightShiftTotal > 0 ? 'border-indigo-200 bg-indigo-50' : 'border-gray-100'}`}>
+            <p className="text-lg font-bold text-gray-800">{nightShiftTotal.toFixed(1)} <span className="text-sm font-normal text-gray-500">hrs</span></p>
+            <p className="text-xs text-gray-500 font-semibold">🌙 Night Shift</p>
+          </div>
+          <div className={`bg-white rounded-2xl p-4 shadow-lg border-2 ${mandatoryOTTotal > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100'}`}>
+            <p className="text-lg font-bold text-gray-800">{mandatoryOTTotal.toFixed(1)} <span className="text-sm font-normal text-gray-500">hrs</span></p>
+            <p className="text-xs text-gray-500 font-semibold">⚠️ Mandatory OT (Weekend)</p>
           </div>
         </div>
 
@@ -336,7 +370,8 @@ export default function AdminTimecardsPage() {
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Clock In</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Clock Out</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Total Hours</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Hours</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Category</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Location</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
@@ -376,12 +411,26 @@ export default function AdminTimecardsPage() {
                               {entry.total_hours.toFixed(2)} hrs
                             </span>
                             {isOvertime(entry.total_hours) && (
-                              <span className="px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800">OT</span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800">OT</span>
                             )}
                           </div>
                         ) : (
                           <span className="text-sm text-gray-400">-</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1">
+                          {(() => {
+                            const badges = getEntryBadges(entry);
+                            return badges.length > 0 ? badges.map((badge, idx) => (
+                              <span key={idx} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${badge.color}`}>
+                                <span className="mr-0.5">{badge.icon}</span>{badge.label}
+                              </span>
+                            )) : (
+                              <span className="text-[10px] text-gray-400 font-medium">Regular</span>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         {entry.clock_in_latitude && entry.clock_in_longitude ? (

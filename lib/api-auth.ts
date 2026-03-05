@@ -121,6 +121,22 @@ export function isTableNotFoundError(error: any): boolean {
   );
 }
 
+/**
+ * Require a valid Bearer token belonging to a shop user.
+ * Stub — accepts any authenticated user for now.
+ */
+export async function requireShopUser(request: NextRequest): Promise<AuthResult> {
+  return requireAuth(request);
+}
+
+/**
+ * Require a valid Bearer token belonging to a shop manager (admin).
+ * Stub — delegates to requireAdmin for now.
+ */
+export async function requireShopManager(request: NextRequest): Promise<AuthResult> {
+  return requireAdmin(request);
+}
+
 export async function requireAuth(request: NextRequest): Promise<AuthResult> {
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace('Bearer ', '');
