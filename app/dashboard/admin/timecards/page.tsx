@@ -1,10 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
-import { ArrowLeft, Clock, MapPin, CheckCircle, XCircle, Calendar, User as UserIcon, ExternalLink, Edit } from 'lucide-react';
+import {
+  ArrowLeft, Clock, MapPin, CheckCircle, XCircle, Calendar,
+  User as UserIcon, ExternalLink, Edit, FileText, Download,
+  ChevronLeft, ChevronRight, AlertTriangle, Moon, Factory, Briefcase,
+  Search, Filter, TrendingUp, Users, BarChart3
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getGoogleMapsLink } from '@/lib/geolocation';
 
@@ -29,6 +34,339 @@ interface TimecardWithUser {
   hour_type: string;
 }
 
+// ── Week helpers ──────────────────────────────────────────────
+function getWeekBounds(offset: number) {
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(monday.getDate() - monday.getDay() + 1 + offset * 7);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { monday, sunday };
+}
+
+function formatWeekRange(monday: Date, sunday: Date) {
+  const s = monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const e = sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${s} – ${e}`;
+}
+
+// ── PDF generation (QuickBooks-ready) ─────────────────────────
+async function generateWeeklyPDF(
+  timecards: TimecardWithUser[],
+  monday: Date,
+  sunday: Date,
+  totals: { total: number; regular: number; weeklyOT: number; mandatoryOT: number; nightShift: number; shopHours: number },
+) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  let y = margin;
+
+  // Brand colors
+  const brandBlue = [37, 99, 235] as const;     // #2563eb
+  const brandRed = [220, 38, 38] as const;       // #dc2626
+  const brandDark = [30, 64, 175] as const;      // #1e40af
+  const slate800 = [30, 41, 59] as const;        // #1e293b
+  const slate600 = [71, 85, 105] as const;       // #475569
+  const gray500 = [107, 114, 128] as const;
+  const white = [255, 255, 255] as const;
+  const lightBg = [248, 250, 252] as const;      // slate-50
+
+  // ── Header ──────────────────────────────────────────
+  // Blue header band
+  doc.setFillColor(...brandDark);
+  doc.rect(0, 0, pageW, 26, 'F');
+  // Red accent stripe
+  doc.setFillColor(...brandRed);
+  doc.rect(0, 26, pageW, 1.5, 'F');
+
+  doc.setTextColor(...white);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PONTIFEX INDUSTRIES', margin, 10);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Weekly Timecard Report  |  QuickBooks Payroll', margin, 17);
+
+  const weekRange = formatWeekRange(monday, sunday);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Pay Period: ${weekRange}`, pageW - margin, 10, { align: 'right' });
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`, pageW - margin, 17, { align: 'right' });
+
+  y = 34;
+
+  // ── Summary row ─────────────────────────────────────
+  const boxW = (pageW - margin * 2 - 8 * 5) / 6;
+  const boxH = 16;
+  const summaryItems = [
+    { label: 'TOTAL HOURS', value: totals.total.toFixed(1), color: brandBlue },
+    { label: 'REGULAR', value: totals.regular.toFixed(1), color: [22, 163, 74] as const },
+    { label: 'WEEKLY OT', value: totals.weeklyOT.toFixed(1), color: [234, 88, 12] as const },
+    { label: 'MANDATORY OT', value: totals.mandatoryOT.toFixed(1), color: brandRed },
+    { label: 'NIGHT SHIFT', value: totals.nightShift.toFixed(1), color: [79, 70, 229] as const },
+    { label: 'SHOP HOURS', value: totals.shopHours.toFixed(1), color: [217, 119, 6] as const },
+  ];
+
+  summaryItems.forEach((item, i) => {
+    const x = margin + i * (boxW + 8);
+    doc.setDrawColor(...(item.color as [number, number, number]));
+    doc.setLineWidth(0.5);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(x, y, boxW, boxH, 1.5, 1.5, 'FD');
+
+    // Color bar on top
+    doc.setFillColor(...(item.color as [number, number, number]));
+    doc.rect(x, y, boxW, 2, 'F');
+
+    doc.setTextColor(...(item.color as [number, number, number]));
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text(item.value, x + boxW / 2, y + 9.5, { align: 'center' });
+
+    doc.setTextColor(...gray500);
+    doc.setFontSize(5.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(item.label, x + boxW / 2, y + 14, { align: 'center' });
+  });
+
+  y += boxH + 8;
+
+  // ── Group by employee ───────────────────────────────
+  const grouped: Record<string, TimecardWithUser[]> = {};
+  timecards.forEach((tc) => {
+    const key = tc.full_name || tc.email;
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(tc);
+  });
+
+  const employees = Object.entries(grouped);
+
+  // Generate Mon-Sun day headers for the week
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const weekDates: Date[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    weekDates.push(d);
+  }
+
+  employees.forEach(([name, entries]) => {
+    // Check if we need a new page (need space for header + at least a few rows)
+    if (y > pageH - 55) {
+      doc.addPage();
+      y = margin;
+    }
+
+    // Employee name bar
+    doc.setFillColor(...brandDark);
+    doc.roundedRect(margin, y, pageW - margin * 2, 8, 1.5, 1.5, 'F');
+    doc.setTextColor(...white);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(name.toUpperCase(), margin + 4, y + 5.5);
+
+    const empTotal = entries.reduce((s, e) => s + (e.total_hours || 0), 0);
+    const empWeekday = entries.filter(e => e.hour_type !== 'mandatory_overtime').reduce((s, e) => s + (e.total_hours || 0), 0);
+    const empMandOT = entries.filter(e => e.hour_type === 'mandatory_overtime').reduce((s, e) => s + (e.total_hours || 0), 0);
+    const empRegular = Math.min(empWeekday, 40);
+    const empOT = Math.max(0, empWeekday - 40);
+    doc.setFontSize(8);
+    doc.text(`Total: ${empTotal.toFixed(1)} hrs  |  Regular: ${empRegular.toFixed(1)}  |  Weekly OT: ${empOT.toFixed(1)}  |  Mand OT: ${empMandOT.toFixed(1)}`, pageW - margin - 4, y + 5.5, { align: 'right' });
+
+    y += 11;
+
+    // Table header row
+    const cols = [
+      { label: 'DATE', x: margin + 2, w: 38 },
+      { label: 'DAY', x: margin + 42, w: 18 },
+      { label: 'CLOCK IN', x: margin + 62, w: 28 },
+      { label: 'CLOCK OUT', x: margin + 92, w: 28 },
+      { label: 'HOURS', x: margin + 122, w: 20 },
+      { label: 'TYPE', x: margin + 144, w: 32 },
+      { label: 'CATEGORY', x: margin + 178, w: 30 },
+      { label: 'STATUS', x: margin + 210, w: 22 },
+      { label: 'NOTES', x: margin + 234, w: pageW - margin - 234 },
+    ];
+
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, y, pageW - margin * 2, 6, 'F');
+    doc.setTextColor(...gray500);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    cols.forEach((c) => doc.text(c.label, c.x, y + 4.2));
+    y += 8;
+
+    // Sort entries by date
+    const sortedEntries = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    sortedEntries.forEach((entry, rowIdx) => {
+      if (y > pageH - 16) {
+        doc.addPage();
+        y = margin;
+      }
+
+      if (rowIdx % 2 === 0) {
+        doc.setFillColor(...lightBg);
+        doc.rect(margin, y - 1, pageW - margin * 2, 7, 'F');
+      }
+
+      doc.setTextColor(...slate800);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+
+      const d = new Date(entry.date);
+      // Date
+      doc.text(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), cols[0].x, y + 3.5);
+      // Day
+      doc.text(d.toLocaleDateString('en-US', { weekday: 'short' }), cols[1].x, y + 3.5);
+      // Clock in
+      doc.text(new Date(entry.clock_in_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), cols[2].x, y + 3.5);
+      // Clock out
+      if (entry.clock_out_time) {
+        doc.text(new Date(entry.clock_out_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), cols[3].x, y + 3.5);
+      } else {
+        doc.setTextColor(22, 163, 74);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ACTIVE', cols[3].x, y + 3.5);
+        doc.setTextColor(...slate800);
+        doc.setFont('helvetica', 'normal');
+      }
+      // Hours
+      if (entry.total_hours !== null) {
+        doc.text(`${entry.total_hours.toFixed(2)}`, cols[4].x, y + 3.5);
+      } else {
+        doc.text('-', cols[4].x, y + 3.5);
+      }
+      // Type — based on hour_type field, not daily hours
+      const hrType = entry.hour_type === 'mandatory_overtime' ? 'Wknd OT'
+        : entry.hour_type === 'night_shift' ? 'Night'
+        : 'Regular';
+      if (entry.hour_type === 'mandatory_overtime') {
+        doc.setTextColor(...brandRed);
+        doc.setFont('helvetica', 'bold');
+      }
+      doc.text(hrType, cols[5].x, y + 3.5);
+      doc.setTextColor(...slate800);
+      doc.setFont('helvetica', 'normal');
+      // Category
+      const cats: string[] = [];
+      if (entry.is_shop_hours) cats.push('Shop');
+      if (entry.is_night_shift) cats.push('Night');
+      if (entry.hour_type === 'mandatory_overtime') cats.push('Wknd OT');
+      doc.text(cats.length ? cats.join(', ') : '-', cols[6].x, y + 3.5);
+      // Status
+      if (entry.is_approved) {
+        doc.setTextColor(22, 163, 74);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Approved', cols[7].x, y + 3.5);
+      } else {
+        doc.setTextColor(202, 138, 4);
+        doc.text('Pending', cols[7].x, y + 3.5);
+      }
+      doc.setTextColor(...slate800);
+      doc.setFont('helvetica', 'normal');
+      // Notes
+      if (entry.notes) {
+        const n = entry.notes.length > 35 ? entry.notes.slice(0, 32) + '...' : entry.notes;
+        doc.text(n, cols[8].x, y + 3.5);
+      }
+
+      y += 7;
+    });
+
+    // Employee subtotal line
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageW - margin, y);
+    y += 3;
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...brandDark);
+    doc.text(`Subtotal: ${empTotal.toFixed(2)} hours  (${sortedEntries.length} entries)`, cols[4].x - 10, y + 1);
+
+    // Check if any unapproved
+    const unapproved = entries.filter(e => !e.is_approved).length;
+    if (unapproved > 0) {
+      doc.setTextColor(...brandRed);
+      doc.text(`${unapproved} pending approval`, pageW - margin - 4, y + 1, { align: 'right' });
+    }
+
+    y += 10;
+  });
+
+  // ── Approval / Signature Section ────────────────────
+  if (y > pageH - 50) {
+    doc.addPage();
+    y = margin;
+  }
+
+  y += 5;
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.2);
+  doc.line(margin, y, pageW - margin, y);
+  y += 8;
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...slate800);
+  doc.text('APPROVAL & SIGNATURES', margin, y);
+  y += 8;
+
+  // Two-column signature lines
+  const colW = (pageW - margin * 2 - 20) / 2;
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...gray500);
+
+  // Left column
+  doc.text('Prepared By:', margin, y);
+  doc.line(margin + 25, y + 1, margin + colW, y + 1);
+  doc.text('Date:', margin, y + 10);
+  doc.line(margin + 25, y + 11, margin + colW, y + 11);
+
+  // Right column
+  const rightX = margin + colW + 20;
+  doc.text('Approved By:', rightX, y);
+  doc.line(rightX + 25, y + 1, rightX + colW, y + 1);
+  doc.text('Date:', rightX, y + 10);
+  doc.line(rightX + 25, y + 11, rightX + colW, y + 11);
+
+  // ── Footer ──────────────────────────────────────────
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    // Footer line
+    doc.setDrawColor(...brandDark);
+    doc.setLineWidth(0.4);
+    doc.line(margin, pageH - 10, pageW - margin, pageH - 10);
+
+    doc.setFontSize(6.5);
+    doc.setTextColor(...gray500);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Pontifex Industries  |  Timecard Report  |  ${weekRange}  |  For QuickBooks Payroll`, margin, pageH - 6);
+    doc.text(`Page ${p} of ${totalPages}`, pageW - margin, pageH - 6, { align: 'right' });
+  }
+
+  // Save
+  const filename = `Pontifex_Timecards_${monday.toISOString().split('T')[0]}_to_${sunday.toISOString().split('T')[0]}.pdf`;
+  doc.save(filename);
+}
+
+// ══════════════════════════════════════════════════════════════
+// COMPONENT
+// ══════════════════════════════════════════════════════════════
+
 export default function AdminTimecardsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,9 +379,19 @@ export default function AdminTimecardsPage() {
     clock_out_time: '',
     notes: ''
   });
-  const [filterPeriod, setFilterPeriod] = useState<'week' | 'month' | 'all'>('week');
+  const [weekOffset, setWeekOffset] = useState(0);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pdfLoading, setPdfLoading] = useState(false);
   const router = useRouter();
+  const isRedirecting = useRef(false);
+
+  const redirectToLogin = useCallback(() => {
+    if (isRedirecting.current) return;
+    isRedirecting.current = true;
+    console.warn('Session expired, redirecting to login...');
+    window.location.href = '/login';
+  }, []);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -51,49 +399,54 @@ export default function AdminTimecardsPage() {
       router.push('/dashboard');
       return;
     }
-
     setUser(currentUser);
-    fetchTimecards();
-  }, [router, filterPeriod, filterStatus]);
+  }, [router]);
 
-  const fetchTimecards = async () => {
+  const { monday, sunday } = useMemo(() => getWeekBounds(weekOffset), [weekOffset]);
+
+  const fetchTimecards = useCallback(async () => {
+    if (isRedirecting.current) return;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      setLoading(true);
 
-      // Calculate date range
-      const now = new Date();
-      let startDate = '';
-
-      if (filterPeriod === 'week') {
-        const weekAgo = new Date(now);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        startDate = weekAgo.toISOString().split('T')[0];
-      } else if (filterPeriod === 'month') {
-        const monthAgo = new Date(now);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        startDate = monthAgo.toISOString().split('T')[0];
+      let session;
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error || !data.session) {
+          redirectToLogin();
+          return;
+        }
+        session = data.session;
+      } catch (err) {
+        console.error('Failed to get session:', err);
+        redirectToLogin();
+        return;
       }
 
-      let url = '/api/admin/timecards?limit=200';
-      if (startDate) url += `&startDate=${startDate}`;
+      const startDate = monday.toISOString().split('T')[0];
+      const endDate = sunday.toISOString().split('T')[0];
+
+      let url = `/api/admin/timecards?limit=200&startDate=${startDate}&endDate=${endDate}`;
       if (filterStatus === 'pending') url += '&pending=true';
 
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
+
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
       const result = await response.json();
 
       if (result.success) {
         let cards = result.data.timecards;
-
-        // Filter by approval status
         if (filterStatus === 'approved') {
           cards = cards.filter((tc: TimecardWithUser) => tc.is_approved);
         } else if (filterStatus === 'pending') {
           cards = cards.filter((tc: TimecardWithUser) => !tc.is_approved);
         }
-
         setTimecards(cards);
       }
     } catch (error) {
@@ -101,23 +454,33 @@ export default function AdminTimecardsPage() {
     } finally {
       setLoading(false);
     }
+  }, [monday, sunday, filterStatus, redirectToLogin]);
+
+  useEffect(() => {
+    if (user) fetchTimecards();
+  }, [user, fetchTimecards]);
+
+  // ── Actions ──────────────────────────────────────────
+  const getSessionToken = async (): Promise<string | null> => {
+    if (isRedirecting.current) return null;
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session) { redirectToLogin(); return null; }
+      return data.session.access_token;
+    } catch { redirectToLogin(); return null; }
   };
 
   const handleApprove = async (timecardId: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
+      const token = await getSessionToken();
+      if (!token) return;
       const response = await fetch(`/api/admin/timecards/${timecardId}/approve`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
-
+      if (response.status === 401) { redirectToLogin(); return; }
       if (response.ok) {
-        fetchTimecards(); // Refresh
+        fetchTimecards();
         alert('Timecard approved successfully!');
       }
     } catch (error) {
@@ -137,23 +500,18 @@ export default function AdminTimecardsPage() {
 
   const handleUpdateTimecard = async () => {
     if (!selectedTimecard) return;
-
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
+      const token = await getSessionToken();
+      if (!token) return;
       const response = await fetch(`/api/admin/timecards/${selectedTimecard.id}/update`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(editFormData)
       });
-
+      if (response.status === 401) { redirectToLogin(); return; }
       if (response.ok) {
         setShowEditModal(false);
-        fetchTimecards(); // Refresh
+        fetchTimecards();
         alert('Timecard updated successfully!');
       } else {
         const error = await response.json();
@@ -165,410 +523,534 @@ export default function AdminTimecardsPage() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+  // ── PDF Export ─────────────────────────────────────
+  const handleExportPDF = async () => {
+    setPdfLoading(true);
+    try {
+      const totals = {
+        total: totalHours,
+        regular: Math.min(weekdayHours, 40),
+        weeklyOT: weeklyOTHours,
+        mandatoryOT: mandatoryOTTotal,
+        nightShift: nightShiftTotal,
+        shopHours: shopHoursTotal,
+      };
+      await generateWeeklyPDF(timecards, monday, sunday, totals);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  // ── Helpers ──────────────────────────────────────────
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
-  const isOvertime = (hours: number | null) => hours !== null && hours > 8;
+  const formatTime = (dateString: string) =>
+    new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+  // ── Calculated stats ──────────────────────────────────
+  const filteredTimecards = searchQuery
+    ? timecards.filter(tc =>
+        tc.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tc.email.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : timecards;
 
   const totalHours = timecards.reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
   const pendingCount = timecards.filter(tc => !tc.is_approved).length;
-  const overtimeCount = timecards.filter(tc => isOvertime(tc.total_hours)).length;
+
+  // Mandatory OT = Sat/Sun hours — always overtime, separate from weekly 40hr calc
+  const mandatoryOTTotal = timecards
+    .filter(tc => tc.hour_type === 'mandatory_overtime')
+    .reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
+  const mandatoryOTEntries = timecards.filter(tc => tc.hour_type === 'mandatory_overtime').length;
+
+  // Mon–Fri hours only (exclude mandatory OT / weekend entries)
+  const weekdayHours = timecards
+    .filter(tc => tc.hour_type !== 'mandatory_overtime')
+    .reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
+
+  // Weekly OT = Mon–Fri hours beyond 40 (weekends don't count toward this threshold)
+  const weeklyOTHours = Math.max(0, weekdayHours - 40);
+
   const shopHoursTotal = timecards.filter(tc => tc.is_shop_hours).reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
   const nightShiftTotal = timecards.filter(tc => tc.is_night_shift).reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
-  const mandatoryOTTotal = timecards.filter(tc => tc.hour_type === 'mandatory_overtime').reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
+  const uniqueEmployees = new Set(timecards.map(tc => tc.user_id)).size;
+  const approvedCount = timecards.filter(tc => tc.is_approved).length;
 
-  // Get category badges for an entry
   const getEntryBadges = (entry: TimecardWithUser) => {
-    const badges: { label: string; color: string; icon: string }[] = [];
-    if (entry.is_shop_hours) {
-      badges.push({ label: 'Shop', color: 'bg-amber-100 text-amber-800', icon: '🏭' });
-    }
-    if (entry.is_night_shift) {
-      badges.push({ label: 'Night', color: 'bg-indigo-100 text-indigo-800', icon: '🌙' });
-    }
-    if (entry.hour_type === 'mandatory_overtime') {
-      badges.push({ label: 'Wknd OT', color: 'bg-red-100 text-red-800', icon: '⚠️' });
-    }
+    const badges: { label: string; color: string; icon: React.ReactNode }[] = [];
+    if (entry.is_shop_hours) badges.push({ label: 'Shop', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: <Factory size={10} /> });
+    if (entry.is_night_shift) badges.push({ label: 'Night', color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: <Moon size={10} /> });
+    if (entry.hour_type === 'mandatory_overtime') badges.push({ label: 'Wknd OT', color: 'bg-red-50 text-red-700 border-red-200', icon: <AlertTriangle size={10} /> });
     return badges;
   };
 
-  if (loading) {
+  // ── Loading state ──────────────────────────────────
+  if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading timecards...</p>
+          <div className="w-14 h-14 mx-auto mb-4 relative">
+            <div className="absolute inset-0 rounded-full border-4 border-blue-100"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"></div>
+          </div>
+          <p className="text-slate-500 text-sm font-medium">Loading timecards...</p>
         </div>
       </div>
     );
   }
 
+  // ══════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      {/* Header */}
-      <div className="bg-white border-b-2 border-gray-200 sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/dashboard/admin"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors shadow-md font-medium"
-              >
-                <ArrowLeft size={20} />
-                <span>Back to Admin</span>
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Timecard Management</h1>
-            </div>
+    <div className="min-h-screen bg-[#f8fafc]">
+      {/* ── Header ─────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+        <div className="max-w-[1440px] mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard/admin"
+              className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all text-sm font-medium"
+            >
+              <ArrowLeft size={16} />
+              <span className="hidden sm:inline">Admin</span>
+            </Link>
+            <div className="h-6 w-px bg-slate-200" />
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-sm">
+                <Clock size={16} className="text-white" />
+              </div>
+              Timecard Management
+            </h1>
+          </div>
 
-            <div className="flex items-center gap-3">
-              <div className="bg-gray-100 px-4 py-2 rounded-xl">
-                <p className="text-sm font-bold text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-700 capitalize font-medium">Admin</p>
+          <div className="flex items-center gap-3">
+            {/* PDF Export */}
+            <button
+              onClick={handleExportPDF}
+              disabled={pdfLoading || timecards.length === 0}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                pdfLoading || timecards.length === 0
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white shadow-md hover:shadow-lg'
+              }`}
+            >
+              {pdfLoading ? (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download size={15} />
+                  <span className="hidden sm:inline">Export PDF</span>
+                </>
+              )}
+            </button>
+
+            {/* User avatar */}
+            <div className="hidden sm:flex items-center gap-2.5 pl-3 border-l border-slate-200">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-red-500 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
+                {user?.name?.charAt(0) || 'A'}
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-slate-800 leading-tight">{user?.name}</p>
+                <p className="text-[11px] text-slate-400 font-medium">Admin</p>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Summary Cards — Row 1: Primary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
-            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mb-2">
-              <Clock className="text-blue-600" size={22} />
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{totalHours.toFixed(1)}</p>
-            <p className="text-xs text-gray-500 font-semibold">Total Hours</p>
+      <div className="max-w-[1440px] mx-auto px-6 py-6">
+        {/* ── Week Navigation ───────────────────────────── */}
+        <div className="mb-5 flex items-center justify-between">
+          <button
+            onClick={() => setWeekOffset(weekOffset - 1)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-lg transition-all text-sm font-medium border border-slate-200 shadow-sm hover:shadow"
+          >
+            <ChevronLeft size={16} />
+            <span className="hidden sm:inline">Prev</span>
+          </button>
+
+          <div className="text-center">
+            <p className="text-base font-bold text-slate-900">{formatWeekRange(monday, sunday)}</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {weekOffset === 0 ? 'Current Week' : `${Math.abs(weekOffset)} ${Math.abs(weekOffset) === 1 ? 'week' : 'weeks'} ${weekOffset < 0 ? 'ago' : 'ahead'}`}
+            </p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
-            <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center mb-2">
-              <Clock className="text-yellow-600" size={22} />
+
+          <button
+            onClick={() => setWeekOffset(weekOffset + 1)}
+            disabled={weekOffset >= 0}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all text-sm font-medium border shadow-sm ${
+              weekOffset >= 0
+                ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
+                : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:shadow'
+            }`}
+          >
+            <span className="hidden sm:inline">Next</span>
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        {/* ── Stats Row ─────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+          {/* Total Hours - hero card */}
+          <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp size={15} className="text-blue-200" />
+              <span className="text-xs font-semibold text-blue-200 uppercase tracking-wider">Total Hours</span>
             </div>
-            <p className="text-2xl font-bold text-gray-800">{pendingCount}</p>
-            <p className="text-xs text-gray-500 font-semibold">Pending Approval</p>
+            <p className="text-3xl font-bold tracking-tight">{totalHours.toFixed(1)}</p>
+            <div className="mt-3 h-1.5 bg-white/15 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${
+                  weeklyOTHours > 0 ? 'bg-gradient-to-r from-green-300 via-yellow-300 to-red-400' : 'bg-blue-300'
+                }`}
+                style={{ width: `${Math.min((totalHours / 60) * 100, 100)}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-blue-300 mt-1">{weeklyOTHours > 0 ? `${weeklyOTHours.toFixed(1)} hrs Mon–Fri OT` : `${(40 - weekdayHours).toFixed(1)} Mon–Fri hrs to OT`}</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
-            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center mb-2">
-              <Clock className="text-orange-600" size={22} />
+
+          {/* Employees */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm hover:shadow transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Employees</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <Users size={15} className="text-emerald-600" />
+              </div>
             </div>
-            <p className="text-2xl font-bold text-gray-800">{overtimeCount}</p>
-            <p className="text-xs text-gray-500 font-semibold">OT Shifts (&gt;8hr)</p>
+            <p className="text-2xl font-bold text-slate-900">{uniqueEmployees}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{timecards.length} total entries</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
-            <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mb-2">
-              <UserIcon className="text-green-600" size={22} />
+
+          {/* Pending */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm hover:shadow transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pending</span>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${pendingCount > 0 ? 'bg-amber-50' : 'bg-slate-50'}`}>
+                <Clock size={15} className={pendingCount > 0 ? 'text-amber-600' : 'text-slate-400'} />
+              </div>
             </div>
-            <p className="text-2xl font-bold text-gray-800">{timecards.length}</p>
-            <p className="text-xs text-gray-500 font-semibold">Total Entries</p>
+            <p className={`text-2xl font-bold ${pendingCount > 0 ? 'text-amber-600' : 'text-slate-900'}`}>{pendingCount}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{approvedCount} approved</p>
+          </div>
+
+          {/* Weekly OT */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm hover:shadow transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Weekly OT</span>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${weeklyOTHours > 0 ? 'bg-orange-50' : 'bg-slate-50'}`}>
+                <AlertTriangle size={15} className={weeklyOTHours > 0 ? 'text-orange-500' : 'text-slate-400'} />
+              </div>
+            </div>
+            <p className={`text-2xl font-bold ${weeklyOTHours > 0 ? 'text-orange-600' : 'text-slate-900'}`}>{weeklyOTHours.toFixed(1)}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Mon–Fri hrs over 40</p>
           </div>
         </div>
 
-        {/* Summary Cards — Row 2: Hour Categories */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className={`bg-white rounded-2xl p-4 shadow-lg border-2 ${shopHoursTotal > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-100'}`}>
-            <p className="text-lg font-bold text-gray-800">{shopHoursTotal.toFixed(1)} <span className="text-sm font-normal text-gray-500">hrs</span></p>
-            <p className="text-xs text-gray-500 font-semibold">🏭 Shop Hours</p>
+        {/* ── Category Breakdown ─────────────────────────── */}
+        <div className="grid grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+          {[
+            { label: 'Regular', value: Math.min(weekdayHours, 40).toFixed(1), icon: <CheckCircle size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+            { label: 'Weekly OT', value: weeklyOTHours.toFixed(1), icon: <TrendingUp size={14} />, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+            { label: 'Mandatory OT', value: mandatoryOTTotal.toFixed(1), icon: <Briefcase size={14} />, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+            { label: 'Night Shift', value: nightShiftTotal.toFixed(1), icon: <Moon size={14} />, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
+            { label: 'Shop Hours', value: shopHoursTotal.toFixed(1), icon: <Factory size={14} />, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+          ].map(({ label, value, icon, color, bg, border }) => (
+            <div key={label} className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg border ${border} ${bg}`}>
+              <div className={color}>{icon}</div>
+              <div>
+                <p className={`text-sm font-bold ${color}`}>{value}<span className="text-[10px] font-normal ml-0.5">hrs</span></p>
+                <p className="text-[10px] text-slate-500 font-medium">{label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Filters ────────────────────────────────────── */}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="flex gap-1 bg-white rounded-lg p-1 border border-slate-200/60 shadow-sm">
+            {(['all', 'pending', 'approved'] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  filterStatus === status
+                    ? status === 'pending'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : status === 'approved'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-slate-800 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {status === 'all' ? 'All' : status === 'pending' ? `Pending (${pendingCount})` : 'Approved'}
+              </button>
+            ))}
           </div>
-          <div className={`bg-white rounded-2xl p-4 shadow-lg border-2 ${nightShiftTotal > 0 ? 'border-indigo-200 bg-indigo-50' : 'border-gray-100'}`}>
-            <p className="text-lg font-bold text-gray-800">{nightShiftTotal.toFixed(1)} <span className="text-sm font-normal text-gray-500">hrs</span></p>
-            <p className="text-xs text-gray-500 font-semibold">🌙 Night Shift</p>
-          </div>
-          <div className={`bg-white rounded-2xl p-4 shadow-lg border-2 ${mandatoryOTTotal > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100'}`}>
-            <p className="text-lg font-bold text-gray-800">{mandatoryOTTotal.toFixed(1)} <span className="text-sm font-normal text-gray-500">hrs</span></p>
-            <p className="text-xs text-gray-500 font-semibold">⚠️ Mandatory OT (Weekend)</p>
+
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search employee..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200/60 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all"
+            />
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="mb-6 flex flex-wrap items-center gap-4">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilterPeriod('week')}
-              className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                filterPeriod === 'week' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Last 7 Days
-            </button>
-            <button
-              onClick={() => setFilterPeriod('month')}
-              className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                filterPeriod === 'month' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Last 30 Days
-            </button>
-            <button
-              onClick={() => setFilterPeriod('all')}
-              className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                filterPeriod === 'all' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              All Time
-            </button>
+        {/* ── Timecards Table ────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Employee Timecards</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{filteredTimecards.length} entries</p>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400">
+              <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+              <span>= Weekend/Mandatory OT</span>
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilterStatus('all')}
-              className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                filterStatus === 'all' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              All Status
-            </button>
-            <button
-              onClick={() => setFilterStatus('pending')}
-              className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                filterStatus === 'pending' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Pending Only
-            </button>
-            <button
-              onClick={() => setFilterStatus('approved')}
-              className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                filterStatus === 'approved' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Approved Only
-            </button>
-          </div>
-        </div>
-
-        {/* Timecards Table */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800">All Employee Timecards</h2>
-            <p className="text-sm text-gray-500 mt-1">{timecards.length} entries found</p>
-          </div>
-
-          {timecards.length === 0 ? (
-            <div className="p-12 text-center">
-              <Clock className="w-20 h-20 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 text-lg font-medium">No timecards found</p>
+          {loading ? (
+            <div className="p-16 text-center">
+              <div className="w-10 h-10 mx-auto mb-3 relative">
+                <div className="absolute inset-0 rounded-full border-[3px] border-slate-100"></div>
+                <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-blue-600 animate-spin"></div>
+              </div>
+              <p className="text-slate-400 text-sm">Loading timecards...</p>
+            </div>
+          ) : filteredTimecards.length === 0 ? (
+            <div className="p-16 text-center">
+              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Clock className="text-slate-300" size={28} />
+              </div>
+              <p className="text-slate-600 font-semibold">No timecards found</p>
+              <p className="text-slate-400 text-sm mt-1">Try a different week or filter</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Employee</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Clock In</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Clock Out</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Hours</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Category</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Location</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-100">
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Employee</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clock In</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clock Out</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hours</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Category</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Location</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {timecards.map((entry) => (
-                    <tr key={entry.id} className={`hover:bg-gray-50 transition-colors ${isOvertime(entry.total_hours) ? 'bg-orange-50' : ''}`}>
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="text-sm font-bold text-gray-800">{entry.full_name}</p>
-                          <p className="text-xs text-gray-500">{entry.email}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <Calendar size={14} className="text-gray-400" />
-                          <span className="text-sm text-gray-600">{formatDate(entry.date)}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {formatTime(entry.clock_in_time)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {entry.clock_out_time ? (
-                          <span className="text-sm text-gray-600">{formatTime(entry.clock_out_time)}</span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Active
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {entry.total_hours !== null ? (
-                          <div className="flex items-center gap-2">
-                            <span className={`text-sm font-semibold ${isOvertime(entry.total_hours) ? 'text-orange-600' : 'text-gray-800'}`}>
-                              {entry.total_hours.toFixed(2)} hrs
-                            </span>
-                            {isOvertime(entry.total_hours) && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800">OT</span>
-                            )}
+                <tbody className="divide-y divide-slate-50">
+                  {filteredTimecards.map((entry, idx) => {
+                    const badges = getEntryBadges(entry);
+                    return (
+                      <tr
+                        key={entry.id}
+                        className={`group transition-colors hover:bg-blue-50/40 ${
+                          entry.hour_type === 'mandatory_overtime' ? 'border-l-[3px] border-l-red-400' : 'border-l-[3px] border-l-transparent'
+                        }`}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0 shadow-sm">
+                              {entry.full_name?.charAt(0) || '?'}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800 leading-tight">{entry.full_name}</p>
+                              <p className="text-[10px] text-slate-400">{entry.email}</p>
+                            </div>
                           </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {(() => {
-                            const badges = getEntryBadges(entry);
-                            return badges.length > 0 ? badges.map((badge, idx) => (
-                              <span key={idx} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${badge.color}`}>
-                                <span className="mr-0.5">{badge.icon}</span>{badge.label}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm text-slate-700">{formatDate(entry.date)}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm font-medium text-slate-700 tabular-nums">{formatTime(entry.clock_in_time)}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {entry.clock_out_time ? (
+                            <span className="text-sm font-medium text-slate-700 tabular-nums">{formatTime(entry.clock_out_time)}</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                              Active
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {entry.total_hours !== null ? (
+                            <span className="text-sm font-bold tabular-nums text-slate-800">
+                              {entry.total_hours.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-slate-300">&mdash;</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {badges.length > 0 ? badges.map((badge, bidx) => (
+                              <span key={bidx} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${badge.color}`}>
+                                {badge.icon}{badge.label}
                               </span>
                             )) : (
-                              <span className="text-[10px] text-gray-400 font-medium">Regular</span>
-                            );
-                          })()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {entry.clock_in_latitude && entry.clock_in_longitude ? (
-                          <button
-                            onClick={() => {
-                              setSelectedTimecard(entry);
-                              setShowMapModal(true);
-                            }}
-                            className="flex items-center gap-1 px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors text-sm font-medium"
-                          >
-                            <MapPin size={14} />
-                            View Map
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-400">No location</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {entry.is_approved ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <CheckCircle size={12} className="mr-1" />
-                            Approved
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            <Clock size={12} className="mr-1" />
-                            Pending
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openEditModal(entry)}
-                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                          >
-                            <Edit size={14} />
-                            Edit
-                          </button>
-                          {!entry.is_approved && (
+                              <span className="text-[10px] text-slate-400 font-medium">Regular</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {entry.clock_in_latitude && entry.clock_in_longitude ? (
                             <button
-                              onClick={() => handleApprove(entry.id)}
-                              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                              onClick={() => { setSelectedTimecard(entry); setShowMapModal(true); }}
+                              className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-md transition-colors text-[11px] font-semibold border border-blue-200/60"
                             >
-                              Approve
+                              <MapPin size={11} />
+                              Map
                             </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">No GPS</span>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {entry.is_approved ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                              <CheckCircle size={10} />
+                              Approved
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
+                              <Clock size={10} />
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => openEditModal(entry)}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1"
+                            >
+                              <Edit size={11} />
+                              Edit
+                            </button>
+                            {!entry.is_approved && (
+                              <button
+                                onClick={() => handleApprove(entry.id)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-semibold transition-colors"
+                              >
+                                Approve
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
+
+        {/* ── Legend ──────────────────────────────────────── */}
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 px-2 py-3 text-[11px] text-slate-500">
+          {[
+            { color: 'bg-emerald-500', label: 'Regular (up to 40 hrs/wk)' },
+            { color: 'bg-orange-500', label: 'Weekly OT (over 40 hrs)' },
+            { color: 'bg-red-500', label: 'Mandatory OT (Sat/Sun)' },
+            { color: 'bg-indigo-500', label: 'Night Shift (clock-in after 3 PM)' },
+            { color: 'bg-amber-500', label: 'Shop Hours (in-shop work)' },
+          ].map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 ${color} rounded-full`} />
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Edit Modal */}
+      {/* ══════════════════════════════════════════════════
+          EDIT MODAL
+          ══════════════════════════════════════════════════ */}
       {showEditModal && selectedTimecard && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 animate-scale-in">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Edit Timecard</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  {selectedTimecard.full_name} - {formatDate(selectedTimecard.date)}
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <Edit size={14} className="text-blue-600" />
+                  </div>
+                  Edit Timecard
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 ml-9">
+                  {selectedTimecard.full_name} &middot; {formatDate(selectedTimecard.date)}
                 </p>
               </div>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <XCircle size={24} className="text-gray-600" />
+                <XCircle size={18} className="text-slate-400" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              {/* Clock In Time */}
+            <div className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Clock In Time
-                </label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Clock In Time</label>
                 <input
                   type="datetime-local"
                   value={editFormData.clock_in_time ? new Date(editFormData.clock_in_time).toISOString().slice(0, 16) : ''}
-                  onChange={(e) => setEditFormData({
-                    ...editFormData,
-                    clock_in_time: e.target.value ? new Date(e.target.value).toISOString() : ''
-                  })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(e) => setEditFormData({ ...editFormData, clock_in_time: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-sm text-slate-800 bg-white transition-all"
                 />
               </div>
 
-              {/* Clock Out Time */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Clock Out Time
-                </label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Clock Out Time</label>
                 <input
                   type="datetime-local"
                   value={editFormData.clock_out_time ? new Date(editFormData.clock_out_time).toISOString().slice(0, 16) : ''}
-                  onChange={(e) => setEditFormData({
-                    ...editFormData,
-                    clock_out_time: e.target.value ? new Date(e.target.value).toISOString() : ''
-                  })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(e) => setEditFormData({ ...editFormData, clock_out_time: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-sm text-slate-800 bg-white transition-all"
                 />
               </div>
 
-              {/* Notes */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Notes (Optional)
-                </label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Notes</label>
                 <textarea
                   value={editFormData.notes}
-                  onChange={(e) => setEditFormData({
-                    ...editFormData,
-                    notes: e.target.value
-                  })}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
                   rows={3}
-                  placeholder="Add any notes about this timecard..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  placeholder="Add any notes..."
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-sm text-slate-800 bg-white resize-none placeholder-slate-400 transition-all"
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-2.5 pt-1">
                 <button
                   onClick={() => setShowEditModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-sm transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpdateTimecard}
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold text-sm transition-all shadow-md"
                 >
                   Save Changes
                 </button>
@@ -578,83 +1060,82 @@ export default function AdminTimecardsPage() {
         </div>
       )}
 
-      {/* Map Modal */}
+      {/* ══════════════════════════════════════════════════
+          MAP MODAL
+          ══════════════════════════════════════════════════ */}
       {showMapModal && selectedTimecard && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-auto border border-slate-200 animate-scale-in">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Clock In/Out Locations</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  {selectedTimecard.full_name} - {formatDate(selectedTimecard.date)}
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <MapPin size={14} className="text-blue-600" />
+                  </div>
+                  Clock Locations
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 ml-9">
+                  {selectedTimecard.full_name} &middot; {formatDate(selectedTimecard.date)}
                 </p>
               </div>
               <button
                 onClick={() => setShowMapModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <XCircle size={24} className="text-gray-600" />
+                <XCircle size={18} className="text-slate-400" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Clock In Location */}
+            <div className="p-5 space-y-4">
               {selectedTimecard.clock_in_latitude && selectedTimecard.clock_in_longitude && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                      <MapPin size={16} className="text-white" />
+                <div className="bg-blue-50/60 border border-blue-200/60 rounded-xl p-4">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+                      <MapPin size={14} className="text-white" />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-900">Clock In Location</p>
-                      <p className="text-sm text-gray-600">{formatTime(selectedTimecard.clock_in_time)}</p>
+                      <p className="font-bold text-slate-800 text-sm">Clock In</p>
+                      <p className="text-[11px] text-slate-500">{formatTime(selectedTimecard.clock_in_time)}</p>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-700 mb-3">
-                    📍 {selectedTimecard.clock_in_latitude.toFixed(6)}, {selectedTimecard.clock_in_longitude.toFixed(6)}
+                  <p className="text-xs text-slate-500 mb-3 font-mono bg-white/60 px-2 py-1 rounded">
+                    {selectedTimecard.clock_in_latitude.toFixed(6)}, {selectedTimecard.clock_in_longitude.toFixed(6)}
                   </p>
-
-                  {/* Google Maps removed - will add back later */}
-
                   <a
                     href={getGoogleMapsLink(selectedTimecard.clock_in_latitude, selectedTimecard.clock_in_longitude)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm"
                   >
-                    <ExternalLink size={16} />
+                    <ExternalLink size={12} />
                     Open in Google Maps
                   </a>
                 </div>
               )}
 
-              {/* Clock Out Location */}
               {selectedTimecard.clock_out_latitude && selectedTimecard.clock_out_longitude && (
-                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
-                      <MapPin size={16} className="text-white" />
+                <div className="bg-red-50/60 border border-red-200/60 rounded-xl p-4">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center shadow-sm">
+                      <MapPin size={14} className="text-white" />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-900">Clock Out Location</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="font-bold text-slate-800 text-sm">Clock Out</p>
+                      <p className="text-[11px] text-slate-500">
                         {selectedTimecard.clock_out_time ? formatTime(selectedTimecard.clock_out_time) : 'Still active'}
                       </p>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-700 mb-3">
-                    📍 {selectedTimecard.clock_out_latitude.toFixed(6)}, {selectedTimecard.clock_out_longitude.toFixed(6)}
+                  <p className="text-xs text-slate-500 mb-3 font-mono bg-white/60 px-2 py-1 rounded">
+                    {selectedTimecard.clock_out_latitude.toFixed(6)}, {selectedTimecard.clock_out_longitude.toFixed(6)}
                   </p>
-
-                  {/* Google Maps removed - will add back later */}
-
                   <a
                     href={getGoogleMapsLink(selectedTimecard.clock_out_latitude, selectedTimecard.clock_out_longitude)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm"
                   >
-                    <ExternalLink size={16} />
+                    <ExternalLink size={12} />
                     Open in Google Maps
                   </a>
                 </div>

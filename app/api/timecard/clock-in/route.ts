@@ -2,11 +2,12 @@
  * API Route: POST /api/timecard/clock-in
  * Clock in with location verification
  *
- * Supports:
- * - Multiple clock-ins per day (clock out then clock back in)
- * - Shop hours flag (checkbox on re-clock-in)
- * - Night shift detection (after 3 PM)
- * - Mandatory overtime detection (Saturday/Sunday)
+ * Hour categorization rules:
+ * - REGULAR:          Mon–Fri, clock-in before 3 PM, non-shop
+ * - NIGHT SHIFT:      Mon–Fri, clock-in at or after 3 PM, JOB only (NOT shop hours)
+ * - MANDATORY OT:     Saturday or Sunday — always overtime regardless of weekly total
+ * - WEEKLY OT:        Calculated at display time when Mon–Fri hours exceed 40
+ * - SHOP HOURS:       Flagged separately; never classified as night shift
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -116,11 +117,12 @@ export async function POST(request: NextRequest) {
     const currentHour = now.getHours();
     const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
 
-    // Night shift: clocking in at or after 3 PM
-    const isNightShift = currentHour >= NIGHT_SHIFT_START_HOUR;
-
-    // Mandatory overtime: Saturday (6) or Sunday (0)
+    // Mandatory overtime: Saturday (6) or Sunday (0) — always overtime
     const isMandatoryOvertime = dayOfWeek === 0 || dayOfWeek === 6;
+
+    // Night shift: clock-in at or after 3 PM, for JOB work only (NOT shop hours).
+    // Shop hours are never classified as night shift even if clocked in after 3 PM.
+    const isNightShift = !isMandatoryOvertime && !is_shop_hours && currentHour >= NIGHT_SHIFT_START_HOUR;
 
     // Determine hour_type
     let hourType = 'regular';
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
     } else if (isNightShift) {
       hourType = 'night_shift';
     }
-    // Note: weekly overtime (>40 hrs) is calculated at display time, not at clock-in
+    // Note: weekly overtime (Mon–Fri hours > 40) is calculated at display time, not at clock-in
 
     // Create new timecard entry
     const { data: timecard, error: insertError } = await supabaseAdmin
