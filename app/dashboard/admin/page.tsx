@@ -213,6 +213,7 @@ export default function AdminDashboard() {
 
     const accessibleCards = [
       'Timecard Management',
+      'Schedule Form',
     ];
 
     return accessibleCards.includes(moduleTitle);
@@ -230,13 +231,13 @@ export default function AdminDashboard() {
       status: 'active'
     },
     {
-      title: 'Dispatch & Scheduling',
-      description: 'Create and manage job orders for operators',
-      icon: '🚚',
-      href: '/dashboard/admin/dispatch-scheduling',
+      title: 'Schedule Form',
+      description: '8-step job scheduling wizard for detailed job setup',
+      icon: '📋',
+      href: '/dashboard/admin/schedule-form',
       bgColor: 'from-orange-500 to-red-600',
       iconBg: 'bg-orange-500',
-      features: ['Create job orders', 'Assign operators', 'Schedule jobs', 'Equipment tracking'],
+      features: ['8-step job wizard', 'Jobsite conditions', 'Site compliance', 'Equipment tracking'],
       status: 'active'
     },
     {

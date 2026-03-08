@@ -1,722 +1,614 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, Send, Users, Clock, MapPin, History, LayoutGrid, List, CalendarDays, Filter, Search, Plus, MessageSquare, Wrench, UserCheck, UserX } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import JobHistoryModal from '@/components/JobHistoryModal';
-import type { JobOrder as SharedJobOrder } from '@/types/job';
-import WorkflowProgressBar from '@/components/WorkflowProgressBar';
-import RichEditJobModal from '@/components/RichEditJobModal';
-import QuickAddJobPanel from '@/components/QuickAddJobPanel';
-import type { QuickAddData } from '@/components/QuickAddJobPanel';
-import JobNotesPanel from '@/components/JobNotesPanel';
+import {
+  Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
+  LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
+  UserCheck, UserX, Eye, FolderOpen, Timer
+} from 'lucide-react';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
+import OperatorRow from './_components/OperatorRow';
+import PendingQueueSidebar from './_components/PendingQueueSidebar';
+import Toast from './_components/Toast';
+import ApprovalModal from './_components/ApprovalModal';
+import MissingInfoModal from './_components/MissingInfoModal';
+import AssignOperatorModal from './_components/AssignOperatorModal';
+import EditJobPanel from './_components/EditJobPanel';
+import ChangeRequestModal from './_components/ChangeRequestModal';
+import NotesDrawer, { getNotesForJob } from './_components/NotesDrawer';
+import QuickAddModal from './_components/QuickAddModal';
+import type { JobCardData } from './_components/JobCard';
+import type { PendingJob } from './_components/PendingQueueSidebar';
+import type { ToastData } from './_components/Toast';
+import type { NoteData } from './_components/NotesDrawer';
 
-type ViewMode = 'timeline' | 'calendar' | 'columns';
+// ─── Operator color palette ─────────────────────────────────────────────
+const OPERATOR_COLORS = [
+  { border: 'border-purple-500', bg: 'bg-purple-100', text: 'text-purple-700', badge: 'bg-purple-500', icon: 'text-purple-600' },
+  { border: 'border-blue-500', bg: 'bg-blue-100', text: 'text-blue-700', badge: 'bg-blue-500', icon: 'text-blue-600' },
+  { border: 'border-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-700', badge: 'bg-emerald-500', icon: 'text-emerald-600' },
+  { border: 'border-rose-500', bg: 'bg-rose-100', text: 'text-rose-700', badge: 'bg-rose-500', icon: 'text-rose-600' },
+  { border: 'border-indigo-500', bg: 'bg-indigo-100', text: 'text-indigo-700', badge: 'bg-indigo-500', icon: 'text-indigo-600' },
+  { border: 'border-cyan-500', bg: 'bg-cyan-100', text: 'text-cyan-700', badge: 'bg-cyan-500', icon: 'text-cyan-600' },
+  { border: 'border-amber-600', bg: 'bg-amber-100', text: 'text-amber-700', badge: 'bg-amber-600', icon: 'text-amber-600' },
+  { border: 'border-pink-500', bg: 'bg-pink-100', text: 'text-pink-700', badge: 'bg-pink-500', icon: 'text-pink-600' },
+];
 
-/**
- * Schedule Board uses the full SharedJobOrder (API returns select('*'))
- * plus operator_email/phone for SMS dispatch and contact.
- */
-type JobOrder = SharedJobOrder & {
-  operator_email: string;
-  operator_phone: string | null;
+// ─── OPERATORS LIST ──────────────────────────────────────────────────────
+const OPERATORS = [
+  { name: 'Mike Rodriguez', helper: 'Carlos Mendez' },
+  { name: 'Juan Salazar', helper: 'David Torres' },
+  { name: 'Tony Martinez', helper: 'Alex Reyes' },
+  { name: 'Eddie Lopez', helper: 'Marco Flores' },
+  { name: 'Chris Johnson', helper: 'Ryan Mitchell' },
+  { name: 'Robert Garcia', helper: 'Luis Hernandez' },
+  { name: 'James Wilson', helper: 'Daniel Ortiz' },
+  { name: 'Steven Kim', helper: 'Kevin Nguyen' },
+];
+
+// Mock salesmen
+const SALESMEN = ['Robert Altamirano', 'Michael Chen'];
+
+// ─── INITIAL MOCK DATA ──────────────────────────────────────────────────
+
+const INITIAL_OPERATOR_JOBS: Record<number, JobCardData[]> = {
+  0: [
+    {
+      id: '1', job_number: 'JOB-2026-100234', customer_name: 'Memorial Hospital', job_type: 'Core Drilling',
+      location: 'Memorial Hermann - TMC', address: '6411 Fannin St, Houston TX', equipment_needed: ['HCD', 'CS-14', 'DPP'],
+      description: '12 cores for new HVAC penetrations, floors 3-5', scheduled_date: '2026-03-10', end_date: '2026-03-12',
+      arrival_time: '06:00', is_will_call: false, difficulty_rating: 6, notes_count: 3, change_requests_count: 0,
+      helper_names: ['Carlos Mendez'], po_number: 'MH-2026-4412', day_label: 'Day 2 of 3',
+    },
+  ],
+  1: [
+    {
+      id: '3', job_number: 'JOB-2026-100240', customer_name: 'TxDOT - HWY 59 Bridge', job_type: 'Slab Sawing',
+      location: 'HWY 59 Overpass at Shepherd', address: 'US-59 at Shepherd Dr, Houston TX', equipment_needed: ['DFS', 'DPP', 'GPP'],
+      description: 'Full depth cuts for bridge deck replacement - 850 linear ft', scheduled_date: '2026-03-08', end_date: '2026-03-14',
+      arrival_time: '05:30', is_will_call: false, difficulty_rating: 9, notes_count: 7, change_requests_count: 1,
+      helper_names: ['David Torres'], po_number: 'DOT-HWY59-2026', day_label: 'Day 3 of 7',
+    },
+  ],
+  2: [],
+  3: [],
+  4: [
+    {
+      id: '5', job_number: 'JOB-2026-100260', customer_name: 'Hensel Phelps', job_type: 'Core Drilling, GPR Scanning',
+      location: 'NRG Stadium - Suite Level', address: '1 NRG Pkwy, Houston TX', equipment_needed: ['ECD', 'GPR'],
+      description: 'GPR scan and core 8 locations for new suite electrical', scheduled_date: '2026-03-10', end_date: '2026-03-11',
+      arrival_time: '06:30', is_will_call: false, difficulty_rating: 7, notes_count: 2, change_requests_count: 0,
+      helper_names: ['Ryan Mitchell'], po_number: 'HP-NRG-449', day_label: 'Day 1 of 2',
+    },
+  ],
+  5: [
+    {
+      id: '6', job_number: 'JOB-2026-100265', customer_name: 'McCarthy Building', job_type: 'Wire Sawing',
+      location: 'Texas Children\'s Hospital Expansion', address: '6621 Fannin St, Houston TX', equipment_needed: ['WS', 'HHS', 'DPP'],
+      description: 'Wire saw column removal in new wing - structural concrete', scheduled_date: '2026-03-10', end_date: '2026-03-13',
+      arrival_time: '06:00', is_will_call: false, difficulty_rating: 10, notes_count: 5, change_requests_count: 0,
+      helper_names: ['Luis Hernandez'], po_number: 'MCB-TCH-2026', day_label: 'Day 1 of 4',
+    },
+  ],
+  6: [
+    {
+      id: '7', job_number: 'JOB-2026-100270', customer_name: 'Skanska USA', job_type: 'Hand Sawing',
+      location: 'MD Anderson - Pickens Tower', address: '1515 Holcombe Blvd, Houston TX', equipment_needed: ['HHS', 'ECD'],
+      description: 'Precision hand saw cuts in existing patient rooms - night shift only', scheduled_date: '2026-03-10', end_date: null,
+      arrival_time: '20:00', is_will_call: false, difficulty_rating: 8, notes_count: 4, change_requests_count: 1,
+      helper_names: ['Daniel Ortiz'], po_number: 'SK-MDA-116', day_label: undefined,
+    },
+  ],
+  7: [],
 };
 
-interface OperatorSchedule {
-  operator_id: string;
-  operator_name: string;
-  operator_email: string;
-  operator_phone: string | null;
-  jobs: JobOrder[];
+const INITIAL_UNASSIGNED: JobCardData[] = [
+  {
+    id: '8', job_number: 'JOB-2026-100275', customer_name: 'Office Park Renovation', job_type: 'Slab Sawing',
+    location: 'Greenway Plaza - Building 9', address: '3831 Richmond Ave, Houston TX', equipment_needed: ['DFS', 'DPP'],
+    description: 'Expansion joint cuts throughout parking garage', scheduled_date: '2026-03-10', end_date: null,
+    arrival_time: null, is_will_call: false, difficulty_rating: 5, notes_count: 0, change_requests_count: 0,
+    helper_names: [], po_number: 'OPR-GP9-221', day_label: undefined,
+  },
+  {
+    id: '9', job_number: 'JOB-2026-100278', customer_name: 'Strip Mall Demolition', job_type: 'Wall Sawing, Demolition',
+    location: 'Westheimer Strip Center', address: '8900 Westheimer Rd, Houston TX', equipment_needed: ['WS', 'TS', 'HHS'],
+    description: 'Remove load-bearing wall sections for tenant renovation', scheduled_date: '2026-03-10', end_date: null,
+    arrival_time: null, is_will_call: false, difficulty_rating: 6, notes_count: 0, change_requests_count: 0,
+    helper_names: [], po_number: null, day_label: undefined,
+  },
+];
+
+const INITIAL_PENDING: PendingJob[] = [
+  { id: 'p1', job_number: 'SF-2026-0089', customer_name: 'Turner Construction', job_type: 'Core Drilling', location: 'UH Medical Center', equipment_needed: ['HCD', 'ECD', 'DPP'], description: '24 cores for MEP rough-in, multiple floors', submitted_by: 'Robert Altamirano', submitted_at: '2026-03-09T14:30:00', difficulty_rating: 7, is_will_call: false, scheduled_date: '2026-03-15' },
+  { id: 'p2', job_number: 'SF-2026-0090', customer_name: 'Brasfield & Gorrie', job_type: 'Slab Sawing', location: 'Post Oak Blvd Development', equipment_needed: ['DFS', 'GPP'], description: 'Control joints for new retail space - 2000 sq ft', submitted_by: 'Michael Chen', submitted_at: '2026-03-09T16:15:00', difficulty_rating: 4, is_will_call: false, scheduled_date: '2026-03-17' },
+  { id: 'p3', job_number: 'SF-2026-0091', customer_name: 'Clark Construction', job_type: 'GPR Scanning', location: 'Memorial City Mall Expansion', equipment_needed: ['GPR'], description: 'Full GPR survey of existing slab for rebar mapping', submitted_by: 'Robert Altamirano', submitted_at: '2026-03-10T08:00:00', difficulty_rating: 3, is_will_call: true, scheduled_date: null },
+  { id: 'p4', job_number: 'SF-2026-0092', customer_name: 'DPR Construction', job_type: 'Wall Sawing, Core Drilling', location: 'Shell Tower - Downtown', equipment_needed: ['WS', 'ECD', 'TS'], description: 'New elevator shaft opening + core penetrations in existing tower', submitted_by: 'Michael Chen', submitted_at: '2026-03-10T09:45:00', difficulty_rating: 9, is_will_call: false, scheduled_date: '2026-03-18' },
+  { id: 'p5', job_number: 'SF-2026-0093', customer_name: 'Tellepsen Builders', job_type: 'Demolition', location: 'HISD Elementary School', equipment_needed: ['HHS', 'DPP'], description: 'Selective demo of concrete partitions for classroom expansion', submitted_by: 'Robert Altamirano', submitted_at: '2026-03-10T10:30:00', difficulty_rating: 5, is_will_call: false, scheduled_date: '2026-03-19' },
+];
+
+const INITIAL_WILL_CALL: JobCardData[] = [
+  { id: 'wc1', job_number: 'JOB-2026-100245', customer_name: 'Cadence McShane', job_type: 'Core Drilling', location: 'Heights Mixed-Use Project', address: '1200 Yale St, Houston TX', equipment_needed: ['ECD', 'CS-14'], description: 'Utility penetrations for new mixed-use building', scheduled_date: '2026-03-14', end_date: null, arrival_time: null, is_will_call: true, difficulty_rating: 4, notes_count: 1, change_requests_count: 0, helper_names: [], po_number: 'CMS-HTS-901', day_label: undefined },
+  { id: 'wc2', job_number: 'JOB-2026-100248', customer_name: 'Swinerton', job_type: 'Slab Sawing', location: 'The Woodlands Town Center', address: '9400 Grogans Mill Rd, The Woodlands TX', equipment_needed: ['DFS'], description: 'Trench cuts for underground conduit', scheduled_date: '2026-03-16', end_date: null, arrival_time: null, is_will_call: true, difficulty_rating: 3, notes_count: 0, change_requests_count: 0, helper_names: [], po_number: null, day_label: undefined },
+  { id: 'wc3', job_number: 'JOB-2026-100252', customer_name: 'Vaughn Construction', job_type: 'Hand Sawing', location: 'Rice University - Science Building', address: '6100 Main St, Houston TX', equipment_needed: ['HHS'], description: 'Precision cuts in lab spaces - dust containment required', scheduled_date: '2026-03-18', end_date: null, arrival_time: null, is_will_call: true, difficulty_rating: 6, notes_count: 2, change_requests_count: 0, helper_names: [], po_number: 'VC-RICE-330', day_label: undefined },
+  { id: 'wc4', job_number: 'JOB-2026-100258', customer_name: 'Balfour Beatty', job_type: 'Wire Sawing', location: 'Hobby Airport - Terminal Expansion', address: '7800 Airport Blvd, Houston TX', equipment_needed: ['WS', 'DPP'], description: 'Large opening cuts for new jet bridge connections', scheduled_date: '2026-03-20', end_date: '2026-03-22', arrival_time: null, is_will_call: true, difficulty_rating: 8, notes_count: 0, change_requests_count: 0, helper_names: [], po_number: 'BB-HOU-AIR', day_label: undefined },
+];
+
+// Will call items track when they were added
+const WILL_CALL_ADDED: Record<string, string> = {
+  wc1: '2026-03-02',
+  wc2: '2026-03-04',
+  wc3: '2026-03-06',
+  wc4: '2026-03-07',
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────
+function parseLocalDate(dateString: string) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
+function toDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatDisplayDate(dateString: string) {
+  const date = parseLocalDate(dateString);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const dateOnly = new Date(date); dateOnly.setHours(0, 0, 0, 0);
+  if (dateOnly.getTime() === today.getTime()) return 'Today';
+  if (dateOnly.getTime() === tomorrow.getTime()) return 'Tomorrow';
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function daysAgo(dateString: string) {
+  const added = parseLocalDate(dateString);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  return Math.floor((now.getTime() - added.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+let nextId = 100;
+const genId = () => `gen-${nextId++}`;
+
+// ─── Main Component ─────────────────────────────────────────────────────
 export default function ScheduleBoardPage() {
   const router = useRouter();
-  const [schedules, setSchedules] = useState<OperatorSchedule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const y = tomorrow.getFullYear();
-    const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
-    const d = String(tomorrow.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  });
-  const [weekStartDate, setWeekStartDate] = useState(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const y = tomorrow.getFullYear();
-    const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
-    const d = String(tomorrow.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  });
-  const [allJobsForWeek, setAllJobsForWeek] = useState<{ [date: string]: JobOrder[] }>({});
-  const [editingJob, setEditingJob] = useState<JobOrder | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [viewingHistory, setViewingHistory] = useState<{ jobId: string; jobNumber: string } | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('timeline');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [operators, setOperators] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
-  const [selectedDayView, setSelectedDayView] = useState<{ date: string; jobs: JobOrder[] } | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [notesJobId, setNotesJobId] = useState<{ id: string; jobNumber: string } | null>(null);
-  const [canEdit, setCanEdit] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('2026-03-10');
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [canEdit, setCanEdit] = useState(true);
 
-  // Detect user role for view-only vs edit permissions
+  // ═══ DATA STATE (mock — will become API calls) ═══
+  const [operatorJobs, setOperatorJobs] = useState<Record<number, JobCardData[]>>(INITIAL_OPERATOR_JOBS);
+  const [unassignedJobs, setUnassignedJobs] = useState<JobCardData[]>(INITIAL_UNASSIGNED);
+  const [pendingJobs, setPendingJobs] = useState<PendingJob[]>(INITIAL_PENDING);
+  const [willCallJobs, setWillCallJobs] = useState<JobCardData[]>(INITIAL_WILL_CALL);
+  const [willCallDates, setWillCallDates] = useState<Record<string, string>>(WILL_CALL_ADDED);
+  const [jobNotes, setJobNotes] = useState<Record<string, NoteData[]>>({});
+
+  // ═══ UI STATE ═══
+  const [showPendingQueue, setShowPendingQueue] = useState(false);
+  const [showWillCall, setShowWillCall] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [toasts, setToasts] = useState<ToastData[]>([]);
+
+  // Modal states
+  const [approvalTarget, setApprovalTarget] = useState<PendingJob | null>(null);
+  const [missingInfoTarget, setMissingInfoTarget] = useState<PendingJob | null>(null);
+  const [assignTarget, setAssignTarget] = useState<{ job: JobCardData; source: 'unassigned' | 'willcall' } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ job: JobCardData; operatorIndex: number | null } | null>(null);
+  const [changeRequestTarget, setChangeRequestTarget] = useState<JobCardData | null>(null);
+  const [notesTarget, setNotesTarget] = useState<JobCardData | null>(null);
+
+  // Auth guard
   useEffect(() => {
-    async function checkRole() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
-      setCanEdit(profile?.role === 'admin');
-    }
-    checkRole();
+    const currentUser = getCurrentUser();
+    if (!currentUser) { router.push('/login'); return; }
+    if (!isAdmin()) { router.push('/dashboard'); return; }
+  }, [router]);
+
+  // ═══ TOAST HELPER ═══
+  const addToast = useCallback((type: ToastData['type'], title: string, message?: string) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts(prev => [...prev, { id, type, title, message }]);
   }, []);
 
-  // Fetch all team members for the "Available Helpers" section
-  const fetchAllTeamMembers = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const res = await fetch('/api/admin/operator-profiles', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          const ops = json.data.map((op: any) => ({
-            id: op.id,
-            full_name: op.full_name,
-            email: op.email,
-          }));
-          setOperators(ops);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching team members:', error);
-    }
-  };
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
 
-  useEffect(() => {
-    if (canEdit) fetchAllTeamMembers();
-    if (viewMode === 'calendar') {
-      fetchWeekSchedules();
-    } else {
-      fetchSchedules();
-    }
-  }, [selectedDate, viewMode, weekStartDate, canEdit]);
+  // ═══ COMPUTED ═══
+  const totalJobs = Object.values(operatorJobs).reduce((sum, jobs) => sum + jobs.length, 0) + unassignedJobs.length;
+  const activeOperators = Object.entries(operatorJobs).filter(([, jobs]) => jobs.length > 0).length;
+  const availableOperators = Object.entries(operatorJobs).filter(([, jobs]) => jobs.length === 0).length;
+  const changeRequestCount = Object.values(operatorJobs).flat().reduce((sum, j) => sum + j.change_requests_count, 0);
 
-  const fetchSchedules = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-        return;
-      }
+  const getOperatorJobCounts = () => OPERATORS.map((op, idx) => ({
+    name: op.name,
+    helper: op.helper,
+    jobCount: (operatorJobs[idx] || []).length,
+  }));
 
-      console.log('Fetching schedules for date:', selectedDate);
-      const response = await fetch(`/api/job-orders?scheduled_date=${selectedDate}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Fetched job orders:', result.data);
-        if (result.success) {
-          // Group jobs by operator
-          const grouped = groupJobsByOperator(result.data);
-          console.log('Grouped schedules:', grouped);
-          setSchedules(grouped);
-        }
-      } else {
-        console.error('Failed to fetch schedules:', await response.text());
-      }
-    } catch (error) {
-      console.error('Error fetching schedules:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchWeekSchedules = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-
-      setLoading(true);
-      const weekJobs: { [date: string]: JobOrder[] } = {};
-
-      // Fetch jobs for 6 days starting from weekStartDate
-      for (let i = 0; i < 6; i++) {
-        const date = parseLocalDate(weekStartDate);
-        date.setDate(date.getDate() + i);
-        const dateString = toDateString(date);
-
-        const response = await fetch(`/api/job-orders?scheduled_date=${dateString}`, {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            weekJobs[dateString] = result.data;
-          }
-        }
-      }
-
-      setAllJobsForWeek(weekJobs);
-    } catch (error) {
-      console.error('Error fetching week schedules:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const groupJobsByOperator = (jobs: JobOrder[]): OperatorSchedule[] => {
-    const grouped = new Map<string, OperatorSchedule>();
-
-    jobs.forEach(job => {
-      // Handle unassigned jobs separately
-      const operatorId = job.assigned_to || 'unassigned';
-      const operatorName = job.assigned_to ? (job.operator_name || 'Unknown') : 'Unassigned';
-      const operatorEmail = job.assigned_to ? (job.operator_email || '') : '';
-      // Phone not available in profiles table yet — default to null
-      const operatorPhone: string | null = null;
-
-      if (!grouped.has(operatorId)) {
-        grouped.set(operatorId, {
-          operator_id: operatorId,
-          operator_name: operatorName,
-          operator_email: operatorEmail,
-          operator_phone: operatorPhone,
-          jobs: []
-        });
-      }
-
-      grouped.get(operatorId)!.jobs.push(job);
-    });
-
-    // Sort jobs within each operator by shop_arrival_time
-    grouped.forEach(schedule => {
-      schedule.jobs.sort((a, b) => {
-        const timeA = a.shop_arrival_time || a.arrival_time || '';
-        const timeB = b.shop_arrival_time || b.arrival_time || '';
-        return timeA.localeCompare(timeB);
-      });
-    });
-
-    // Convert to array and sort: unassigned first, then by operator name
-    const schedulesArray = Array.from(grouped.values());
-    return schedulesArray.sort((a, b) => {
-      if (a.operator_id === 'unassigned') return -1;
-      if (b.operator_id === 'unassigned') return 1;
-      return a.operator_name.localeCompare(b.operator_name);
-    });
-  };
-
-  const handleSendSchedules = async () => {
-    const assignedSchedules = schedules.filter(s => s.operator_id !== 'unassigned');
-
-    if (assignedSchedules.length === 0) {
-      alert('No assigned schedules to send for this date');
-      return;
-    }
-
-    const confirmSend = confirm(
-      `Send schedule notifications to ${assignedSchedules.length} operator(s) for ${parseLocalDate(selectedDate).toLocaleDateString()}?`
-    );
-
-    if (!confirmSend) return;
-
-    setSending(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Session expired. Please log in again.');
-        router.push('/login');
-        return;
-      }
-
-      const response = await fetch('/api/admin/send-schedule', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          scheduled_date: selectedDate,
-          operator_schedules: assignedSchedules
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert(`✅ Schedule sent to ${result.sent_count} operator(s)!`);
-      } else {
-        alert(result.error || 'Failed to send schedules');
-      }
-    } catch (error) {
-      console.error('Error sending schedules:', error);
-      alert('Failed to send schedules. Please try again.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const openEditModal = (job: JobOrder) => {
-    setEditingJob(job);
-  };
-
-  const closeEditModal = () => {
-    setEditingJob(null);
-  };
-
-  const handleDeleteJob = async () => {
-    if (!editingJob) return;
-
-    setDeleting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Session expired. Please log in again.');
-        return;
-      }
-
-      const response = await fetch(`/api/admin/job-orders/${editingJob.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
-
-      if (response.ok) {
-        alert('✅ Job deleted successfully!');
-        closeEditModal();
-        await fetchSchedules();
-        if (viewMode === 'calendar') {
-          await fetchWeekSchedules();
-        }
-      } else {
-        const error = await response.json();
-        alert(`Failed to delete job: ${error.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Error deleting job:', error);
-      alert('Failed to delete job. Please try again.');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleSaveJob = async () => {
-    if (!editingJob) return;
-
-    setSaving(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Session expired. Please log in again.');
-        router.push('/login');
-        return;
-      }
-
-      const response = await fetch(`/api/admin/job-orders/${editingJob.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          scheduled_date: editingJob.scheduled_date,
-          end_date: editingJob.end_date || null,
-          arrival_time: editingJob.arrival_time,
-          shop_arrival_time: editingJob.shop_arrival_time,
-          location: editingJob.location,
-          address: editingJob.address,
-          customer_name: editingJob.customer_name,
-          foreman_name: editingJob.foreman_name,
-          foreman_phone: editingJob.foreman_phone,
-          equipment_needed: editingJob.equipment_needed,
-          description: editingJob.description,
-          assigned_to: editingJob.assigned_to || null
-        })
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        alert('✅ Job updated successfully!');
-        closeEditModal();
-        await fetchSchedules();
-      } else {
-        alert(result.error || 'Failed to update job');
-      }
-    } catch (error) {
-      console.error('Error updating job:', error);
-      alert('Failed to update job. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const deleteJob = async (jobId: string, jobTitle: string) => {
-    if (!confirm(`Are you sure you want to delete "${jobTitle}"?\n\nThis action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Session expired. Please log in again.');
-        router.push('/login');
-        return;
-      }
-
-      const response = await fetch(`/api/job-orders/${jobId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        alert('✅ Job deleted successfully!');
-        await fetchSchedules();
-      } else {
-        alert(result.error || 'Failed to delete job');
-      }
-    } catch (error) {
-      console.error('Error deleting job:', error);
-      alert('Failed to delete job. Please try again.');
-    }
-  };
-
-  const handleQuickAdd = async (data: QuickAddData) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      alert('Session expired. Please log in again.');
-      router.push('/login');
-      return;
-    }
-
-    // Generate a job number
-    const year = new Date().getFullYear();
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    const jobNumber = `JOB-${year}-${rand}`;
-
-    const response = await fetch('/api/admin/job-orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        job_number: jobNumber,
-        title: `${data.job_type} - ${data.customer_name}`,
-        customer_name: data.customer_name,
-        job_type: data.job_type,
-        location: data.location || 'TBD',
-        address: data.address || 'TBD',
-        scheduled_date: data.scheduled_date,
-        end_date: data.end_date || null,
-        arrival_time: data.arrival_time || null,
-        shop_arrival_time: data.shop_arrival_time || null,
-        assigned_to: data.operator_id || null,
-        equipment_needed: data.equipment_needed.length > 0 ? data.equipment_needed : null,
-        priority: 'medium',
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.error || 'Failed to create job');
-    }
-
-    // If there are notes, create an initial note
-    if (data.notes && result.data?.id) {
-      await fetch('/api/admin/job-notes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          jobOrderId: result.data.id,
-          content: data.notes,
-          noteType: 'manual',
-        }),
-      });
-    }
-
-    setShowQuickAdd(false);
-    // Refresh the board
-    if (viewMode === 'calendar') {
-      await fetchWeekSchedules();
-    } else {
-      await fetchSchedules();
-    }
-  };
-
-  const formatTime = (time: string | null) => {
-    if (!time) return 'Not set';
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
-
-  // Format a local Date to YYYY-MM-DD string
-  const toDateString = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
-
+  // ═══ DATE NAVIGATION ═══
   const goToPreviousDay = () => {
-    const currentDate = parseLocalDate(selectedDate);
-    currentDate.setDate(currentDate.getDate() - 1);
-    setSelectedDate(toDateString(currentDate));
+    const d = parseLocalDate(selectedDate);
+    d.setDate(d.getDate() - 1);
+    setSelectedDate(toDateString(d));
   };
-
   const goToNextDay = () => {
-    const currentDate = parseLocalDate(selectedDate);
-    currentDate.setDate(currentDate.getDate() + 1);
-    setSelectedDate(toDateString(currentDate));
+    const d = parseLocalDate(selectedDate);
+    d.setDate(d.getDate() + 1);
+    setSelectedDate(toDateString(d));
   };
 
-  const goToPreviousWeek = () => {
-    const currentDate = parseLocalDate(weekStartDate);
-    currentDate.setDate(currentDate.getDate() - 6);
-    setWeekStartDate(toDateString(currentDate));
-  };
+  // ═══ ACTION HANDLERS ═══
 
-  const goToNextWeek = () => {
-    const currentDate = parseLocalDate(weekStartDate);
-    currentDate.setDate(currentDate.getDate() + 6);
-    setWeekStartDate(toDateString(currentDate));
-  };
+  // --- Pending: Approve ---
+  const handleApprove = (data: { scheduledDate: string }) => {
+    if (!approvalTarget) return;
+    const job = approvalTarget;
 
-  // Parse YYYY-MM-DD as local date (not UTC) to avoid timezone offset bugs
-  const parseLocalDate = (dateString: string) => {
-    const [year, month, day] = dateString.split('-').map(Number);
-    return new Date(year, month - 1, day);
-  };
+    const newJob: JobCardData = {
+      id: genId(),
+      job_number: job.job_number.replace('SF-', 'JOB-'),
+      customer_name: job.customer_name,
+      job_type: job.job_type,
+      location: job.location,
+      address: '',
+      equipment_needed: job.equipment_needed,
+      description: job.description,
+      scheduled_date: data.scheduledDate,
+      end_date: null,
+      arrival_time: null,
+      is_will_call: job.is_will_call,
+      difficulty_rating: job.difficulty_rating,
+      notes_count: 0,
+      change_requests_count: 0,
+      helper_names: [],
+      po_number: null,
+      day_label: undefined,
+    };
 
-  const formatDisplayDate = (dateString: string) => {
-    const date = parseLocalDate(dateString);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    // Remove from pending
+    setPendingJobs(prev => prev.filter(p => p.id !== job.id));
 
-    const dateOnly = new Date(date);
-    dateOnly.setHours(0, 0, 0, 0);
-
-    if (dateOnly.getTime() === today.getTime()) {
-      return 'Today';
-    } else if (dateOnly.getTime() === tomorrow.getTime()) {
-      return 'Tomorrow';
-    } else if (dateOnly.getTime() === yesterday.getTime()) {
-      return 'Yesterday';
+    if (job.is_will_call) {
+      // Salesman marked as will call → goes to Will Call folder
+      setWillCallJobs(prev => [...prev, newJob]);
+      setWillCallDates(prev => ({ ...prev, [newJob.id]: toDateString(new Date()) }));
+      addToast('success', `${job.customer_name} → Will Call`, 'Approved and added to Will Call folder');
     } else {
-      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      // Regular approval → unassigned (operator assigned 2-3 days before)
+      setUnassignedJobs(prev => [...prev, newJob]);
+      addToast('success', `${job.customer_name} → Approved`, 'Added to schedule — assign operator closer to start date');
+    }
+
+    setApprovalTarget(null);
+    if (pendingJobs.length <= 1) setShowPendingQueue(false);
+  };
+
+  // --- Pending: Missing Info ---
+  const handleMissingInfo = (missingItems: string[], customNote: string) => {
+    if (!missingInfoTarget) return;
+    setPendingJobs(prev => prev.filter(p => p.id !== missingInfoTarget.id));
+    const itemList = missingItems.join(', ');
+    addToast('info', `${missingInfoTarget.customer_name} — Missing Info`, `Salesman notified: ${itemList}`);
+    setMissingInfoTarget(null);
+    if (pendingJobs.length <= 1) setShowPendingQueue(false);
+  };
+
+  // --- Will Call: Move to Schedule ---
+  const handleMoveWillCallToSchedule = (job: JobCardData) => {
+    setWillCallJobs(prev => prev.filter(wc => wc.id !== job.id));
+    const movedJob = { ...job, is_will_call: false, scheduled_date: selectedDate };
+    setUnassignedJobs(prev => [...prev, movedJob]);
+    addToast('success', `${job.customer_name} → Scheduled`, `Moved to ${formatDisplayDate(selectedDate)} (unassigned)`);
+  };
+
+  // --- Assign Operator (from unassigned or will-call) ---
+  const handleAssignOperator = (operatorIndex: number) => {
+    if (!assignTarget) return;
+    const { job, source } = assignTarget;
+
+    const assignedJob = {
+      ...job,
+      is_will_call: false,
+      helper_names: [OPERATORS[operatorIndex].helper],
+      scheduled_date: job.scheduled_date || selectedDate,
+    };
+
+    if (source === 'unassigned') {
+      setUnassignedJobs(prev => prev.filter(u => u.id !== job.id));
+    } else {
+      setWillCallJobs(prev => prev.filter(wc => wc.id !== job.id));
+    }
+
+    setOperatorJobs(prev => ({
+      ...prev,
+      [operatorIndex]: [...(prev[operatorIndex] || []), assignedJob],
+    }));
+
+    addToast('success', `${job.customer_name} → ${OPERATORS[operatorIndex].name}`, 'Operator assigned successfully');
+    setAssignTarget(null);
+  };
+
+  // --- Edit Job: Save ---
+  const handleEditSave = (updates: Partial<JobCardData> & { operatorIndex?: number | null }) => {
+    if (!editTarget) return;
+    const { job, operatorIndex: currentOpIdx } = editTarget;
+    const newOpIdx = updates.operatorIndex;
+
+    if (newOpIdx !== undefined && newOpIdx !== currentOpIdx) {
+      if (currentOpIdx !== null) {
+        setOperatorJobs(prev => ({
+          ...prev,
+          [currentOpIdx]: (prev[currentOpIdx] || []).filter(j => j.id !== job.id),
+        }));
+      } else {
+        setUnassignedJobs(prev => prev.filter(u => u.id !== job.id));
+      }
+
+      const updatedJob = {
+        ...job,
+        ...updates,
+        helper_names: newOpIdx !== null ? [OPERATORS[newOpIdx].helper] : [],
+      };
+      delete (updatedJob as any).operatorIndex;
+
+      if (newOpIdx !== null) {
+        setOperatorJobs(prev => ({
+          ...prev,
+          [newOpIdx]: [...(prev[newOpIdx] || []), updatedJob],
+        }));
+        addToast('success', 'Job Updated', `${job.customer_name} moved to ${OPERATORS[newOpIdx].name}`);
+      } else {
+        setUnassignedJobs(prev => [...prev, updatedJob]);
+        addToast('success', 'Job Updated', `${job.customer_name} moved to unassigned`);
+      }
+    } else {
+      const updatedJob = { ...job, ...updates };
+      delete (updatedJob as any).operatorIndex;
+
+      if (currentOpIdx !== null) {
+        setOperatorJobs(prev => ({
+          ...prev,
+          [currentOpIdx]: (prev[currentOpIdx] || []).map(j => j.id === job.id ? updatedJob : j),
+        }));
+      } else {
+        setUnassignedJobs(prev => prev.map(j => j.id === job.id ? updatedJob : j));
+      }
+      addToast('success', 'Job Updated', `${job.customer_name} changes saved`);
+    }
+
+    setEditTarget(null);
+  };
+
+  // --- Change Request (salesman) ---
+  const handleChangeRequest = (data: { type: string; description: string }) => {
+    if (!changeRequestTarget) return;
+    const jobId = changeRequestTarget.id;
+    const updateJobInPlace = (jobs: JobCardData[]) =>
+      jobs.map(j => j.id === jobId ? { ...j, change_requests_count: j.change_requests_count + 1 } : j);
+
+    for (const opIdx of Object.keys(operatorJobs)) {
+      const idx = parseInt(opIdx);
+      if (operatorJobs[idx]?.some(j => j.id === jobId)) {
+        setOperatorJobs(prev => ({ ...prev, [idx]: updateJobInPlace(prev[idx]) }));
+        break;
+      }
+    }
+
+    addToast('success', 'Change Request Submitted', `${changeRequestTarget.customer_name} — Ops Manager will review`);
+    setChangeRequestTarget(null);
+  };
+
+  // --- Notes ---
+  const handleViewNotes = (job: JobCardData) => {
+    if (!jobNotes[job.id]) {
+      setJobNotes(prev => ({ ...prev, [job.id]: getNotesForJob(job.id) }));
+    }
+    setNotesTarget(job);
+  };
+
+  const handleAddNote = (text: string) => {
+    if (!notesTarget) return;
+    const newNote: NoteData = {
+      id: `note-${Date.now()}`,
+      author: 'You',
+      text,
+      timestamp: new Date().toISOString(),
+    };
+    setJobNotes(prev => ({
+      ...prev,
+      [notesTarget.id]: [...(prev[notesTarget.id] || []), newNote],
+    }));
+
+    const updateCount = (jobs: JobCardData[]) =>
+      jobs.map(j => j.id === notesTarget.id ? { ...j, notes_count: j.notes_count + 1 } : j);
+    for (const opIdx of Object.keys(operatorJobs)) {
+      const idx = parseInt(opIdx);
+      if (operatorJobs[idx]?.some(j => j.id === notesTarget.id)) {
+        setOperatorJobs(prev => ({ ...prev, [idx]: updateCount(prev[idx]) }));
+        break;
+      }
+    }
+    setUnassignedJobs(prev => updateCount(prev));
+
+    addToast('success', 'Note Added', `Added to ${notesTarget.customer_name}`);
+  };
+
+  // --- Remove from schedule ---
+  const handleRemoveFromSchedule = () => {
+    if (!editTarget) return;
+    const { job, operatorIndex } = editTarget;
+    if (operatorIndex !== null) {
+      setOperatorJobs(prev => ({
+        ...prev,
+        [operatorIndex]: (prev[operatorIndex] || []).filter(j => j.id !== job.id),
+      }));
+    } else {
+      setUnassignedJobs(prev => prev.filter(u => u.id !== job.id));
+    }
+    addToast('info', `${job.customer_name} — Removed`, 'Job removed from schedule');
+    setEditTarget(null);
+  };
+
+  // --- Make will call ---
+  const handleMakeWillCall = () => {
+    if (!editTarget) return;
+    const { job, operatorIndex } = editTarget;
+    if (operatorIndex !== null) {
+      setOperatorJobs(prev => ({
+        ...prev,
+        [operatorIndex]: (prev[operatorIndex] || []).filter(j => j.id !== job.id),
+      }));
+    } else {
+      setUnassignedJobs(prev => prev.filter(u => u.id !== job.id));
+    }
+    setWillCallJobs(prev => [...prev, { ...job, is_will_call: true }]);
+    setWillCallDates(prev => ({ ...prev, [job.id]: toDateString(new Date()) }));
+    addToast('success', `${job.customer_name} → Will Call`, 'Moved to Will Call folder');
+    setEditTarget(null);
+  };
+
+  // --- Assign job to available operator ---
+  const handleAssignToAvailableOperator = (operatorIndex: number) => {
+    if (unassignedJobs.length > 0) {
+      setAssignTarget({ job: unassignedJobs[0], source: 'unassigned' });
+    } else if (willCallJobs.length > 0) {
+      setAssignTarget({ job: willCallJobs[0], source: 'willcall' });
+    } else {
+      addToast('info', 'No Jobs Available', 'No unassigned or will-call jobs to assign');
     }
   };
 
-  const totalJobs = schedules.reduce((sum, schedule) => sum + schedule.jobs.length, 0);
-  const assignedOperators = schedules.filter(s => s.operator_id !== 'unassigned').length;
-
-  // Compute which operators are assigned to jobs today and who is available
-  const assignedOperatorIds = new Set(
-    schedules
-      .filter(s => s.operator_id !== 'unassigned')
-      .map(s => s.operator_id)
-  );
-  const availableHelpers = operators.filter(op => !assignedOperatorIds.has(op.id));
-
-  // Color palette for different operators
-  const operatorColors = [
-    { border: 'border-purple-500', bg: 'bg-purple-100', text: 'text-purple-700', badge: 'bg-purple-500', hover: 'hover:border-purple-400', icon: 'text-purple-600' },
-    { border: 'border-pink-500', bg: 'bg-pink-100', text: 'text-pink-700', badge: 'bg-pink-500', hover: 'hover:border-pink-400', icon: 'text-pink-600' },
-    { border: 'border-blue-500', bg: 'bg-blue-100', text: 'text-blue-700', badge: 'bg-blue-500', hover: 'hover:border-blue-400', icon: 'text-blue-600' },
-    { border: 'border-indigo-500', bg: 'bg-indigo-100', text: 'text-indigo-700', badge: 'bg-indigo-500', hover: 'hover:border-indigo-400', icon: 'text-indigo-600' },
-    { border: 'border-violet-500', bg: 'bg-violet-100', text: 'text-violet-700', badge: 'bg-violet-500', hover: 'hover:border-violet-400', icon: 'text-violet-600' },
-    { border: 'border-fuchsia-500', bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', badge: 'bg-fuchsia-500', hover: 'hover:border-fuchsia-400', icon: 'text-fuchsia-600' },
-    { border: 'border-rose-500', bg: 'bg-rose-100', text: 'text-rose-700', badge: 'bg-rose-500', hover: 'hover:border-rose-400', icon: 'text-rose-600' },
-    { border: 'border-cyan-500', bg: 'bg-cyan-100', text: 'text-cyan-700', badge: 'bg-cyan-500', hover: 'hover:border-cyan-400', icon: 'text-cyan-600' },
-  ];
-
-  const getOperatorColor = (index: number) => {
-    return operatorColors[index % operatorColors.length];
+  // --- Quick Add ---
+  const handleQuickAdd = (data: { salesmanName: string; startDate: string; contractorName: string }) => {
+    const newPending: PendingJob = {
+      id: `qa-${genId()}`,
+      job_number: `QA-2026-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+      customer_name: data.contractorName,
+      job_type: 'TBD',
+      location: 'TBD',
+      equipment_needed: [],
+      description: null,
+      submitted_by: data.salesmanName,
+      submitted_at: new Date().toISOString(),
+      difficulty_rating: null,
+      is_will_call: false,
+      scheduled_date: data.startDate,
+    };
+    setPendingJobs(prev => [...prev, newPending]);
+    addToast('success', `Quick Add: ${data.contractorName}`, `Pending — reminder sent to ${data.salesmanName} to fill full form`);
+    setShowQuickAdd(false);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50">
-      {/* Header */}
-      <div className="backdrop-blur-xl bg-white/90 border-b border-gray-200 sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 md:px-6 py-3 md:py-4">
+
+      {/* ═══ STICKY HEADER ════════════════════════════════════════════════ */}
+      <div className="backdrop-blur-xl bg-white/90 border-b border-gray-200 sticky top-0 z-30 shadow-lg">
+        <div className="container mx-auto px-4 md:px-6 py-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3 md:gap-4">
-              <Link
-                href={canEdit ? '/dashboard/admin' : '/dashboard'}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all hover:scale-105"
-                title="Back to Dashboard"
-              >
-                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
+            <div className="flex items-center gap-3">
+              <Link href="/dashboard/admin" className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all hover:scale-105">
+                <ChevronLeft className="w-5 h-5 text-gray-700" />
               </Link>
               <div>
                 <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />
-                  {canEdit ? 'Admin Dispatch Board' : 'My Schedule'}
+                  <Calendar className="w-5 h-5 text-purple-600" />
+                  {canEdit ? 'Operations Schedule Board' : 'Schedule Board'}
                 </h1>
-                <p className="text-gray-600 text-xs md:text-sm">{canEdit ? 'Manage job assignments & schedules' : 'View your upcoming jobs'}</p>
+                <p className="text-gray-500 text-xs">
+                  {canEdit ? 'Manage assignments, approvals & dispatch' : 'View scheduled jobs'}
+                </p>
               </div>
             </div>
 
-            {canEdit && (
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  onClick={() => setShowQuickAdd(true)}
-                  className="flex-1 sm:flex-initial px-4 md:px-5 py-2 md:py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm md:text-base"
-                >
-                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                  Quick Add
-                </button>
-                <button
-                  onClick={handleSendSchedules}
-                  disabled={sending || assignedOperators === 0}
-                  className="flex-1 sm:flex-initial px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm md:text-base"
-                >
-                  <Send className="w-4 h-4 md:w-5 md:h-5" />
-                  {sending ? 'Sending...' : 'Send Schedule'}
-                </button>
-              </div>
-            )}
+            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+              <button onClick={() => setShowPendingQueue(true)} className="relative px-3 py-2 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl text-orange-700 text-sm font-semibold transition-all flex items-center gap-2">
+                <Bell className="w-4 h-4" /> Pending
+                {pendingJobs.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{pendingJobs.length}</span>
+                )}
+              </button>
+
+              <button onClick={() => setShowWillCall(!showWillCall)} className={`px-3 py-2 border rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${showWillCall ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700'}`}>
+                <FolderOpen className="w-4 h-4" /> Will Call
+                <span className="px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-bold">{willCallJobs.length}</span>
+              </button>
+
+              <button className="relative px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-blue-700 text-sm font-semibold transition-all flex items-center gap-2">
+                <FileText className="w-4 h-4" /> Changes
+                {changeRequestCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{changeRequestCount}</span>
+                )}
+              </button>
+
+              {canEdit && (
+                <>
+                  <button
+                    onClick={() => setShowQuickAdd(true)}
+                    className="px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
+                  >
+                    <Plus className="w-4 h-4" /> Quick Add
+                  </button>
+                  <button className="px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md">
+                    <Send className="w-4 h-4" /> Send
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Date Selector & Stats */}
+      {/* ═══ DATE NAVIGATION + STATS ═════════════════════════════════════ */}
       <div className="container mx-auto px-4 md:px-6 py-4">
-        <div className="bg-white rounded-xl md:rounded-2xl shadow-xl border border-gray-100 p-4 md:p-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6">
-            {/* Left Side: Date Navigation */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-4 md:p-5">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <button
-                onClick={goToPreviousDay}
-                className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all hover:scale-105"
-                title="Previous Day"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-
+              <button onClick={goToPreviousDay} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all hover:scale-105"><ChevronLeft className="w-5 h-5 text-gray-700" /></button>
               <div className="flex items-center gap-3 bg-gray-50 px-5 py-3 rounded-xl border border-gray-200">
                 <Calendar className="w-5 h-5 text-purple-600" />
                 <div>
-                  <div className="text-xs font-semibold text-gray-600 uppercase">Viewing</div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-gray-900">{formatDisplayDate(selectedDate)}</span>
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="px-2 py-1 rounded-lg border border-gray-300 focus:border-purple-500 focus:outline-none text-sm font-medium cursor-pointer hover:border-purple-400 text-gray-900"
-                      style={{ colorScheme: 'light' }}
-                    />
-                  </div>
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Viewing</div>
+                  <span className="text-lg font-bold text-gray-900">{formatDisplayDate(selectedDate)}</span>
                 </div>
               </div>
+              <button onClick={goToNextDay} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all hover:scale-105"><ChevronRight className="w-5 h-5 text-gray-700" /></button>
+            </div>
 
-              <button
-                onClick={goToNextDay}
-                className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all hover:scale-105"
-                title="Next Day"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                </svg>
+            <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl">
+              <button onClick={() => setViewMode('day')} className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${viewMode === 'day' ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg' : 'text-gray-600 hover:bg-white hover:text-gray-900'}`}>
+                <LayoutGrid className="w-4 h-4" /> Day View
+              </button>
+              <button onClick={() => setViewMode('week')} className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${viewMode === 'week' ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg' : 'text-gray-600 hover:bg-white hover:text-gray-900'}`}>
+                <CalendarDays className="w-4 h-4" /> Week View
               </button>
             </div>
 
-            {/* Center: View Mode Toggle */}
-            <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200">
-              <button
-                onClick={() => setViewMode('timeline')}
-                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
-                  viewMode === 'timeline'
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900'
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-                Timeline
-              </button>
-              <button
-                onClick={() => setViewMode('calendar')}
-                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
-                  viewMode === 'calendar'
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900'
-                }`}
-              >
-                <CalendarDays className="w-4 h-4" />
-                Calendar
-              </button>
-              <button
-                onClick={() => setViewMode('columns')}
-                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
-                  viewMode === 'columns'
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                Columns
-              </button>
-            </div>
-
-            {/* Right Side: Stats */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-4 py-2 bg-purple-50 rounded-xl border border-purple-200">
-                <Users className="w-5 h-5 text-purple-600" />
+              <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 rounded-xl border border-purple-200">
+                <UserCheck className="w-4 h-4 text-purple-600" />
                 <div>
-                  <div className="text-xs font-semibold text-purple-600">Operators</div>
-                  <div className="text-lg font-bold text-gray-900">{assignedOperators}</div>
+                  <div className="text-[10px] font-bold text-purple-500 uppercase">Active</div>
+                  <div className="text-lg font-bold text-gray-900">{activeOperators}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl border border-blue-200">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-xl border border-green-200">
+                <UserX className="w-4 h-4 text-green-600" />
                 <div>
-                  <div className="text-xs font-semibold text-blue-600">Jobs</div>
+                  <div className="text-[10px] font-bold text-green-500 uppercase">Available</div>
+                  <div className="text-lg font-bold text-gray-900">{availableOperators}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-xl border border-blue-200">
+                <Package className="w-4 h-4 text-blue-600" />
+                <div>
+                  <div className="text-[10px] font-bold text-blue-500 uppercase">Jobs</div>
                   <div className="text-lg font-bold text-gray-900">{totalJobs}</div>
                 </div>
               </div>
@@ -725,777 +617,224 @@ export default function ScheduleBoardPage() {
         </div>
       </div>
 
-      {/* Operator Assignments & Available Helpers */}
-      {canEdit && !loading && operators.length > 0 && (
+      {/* ═══ WILL CALL FOLDER ══════════════════════════════════════════════ */}
+      {showWillCall && (
         <div className="container mx-auto px-4 md:px-6 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Assigned Operators */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <UserCheck className="w-5 h-5 text-green-600" />
-                <h3 className="text-sm font-bold text-gray-900">Assigned Operators</h3>
-                <span className="ml-auto px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold">
-                  {assignedOperatorIds.size}
-                </span>
+          <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-2xl border-2 border-amber-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-amber-600" />
+                <h3 className="font-bold text-gray-900">Will Call Folder</h3>
+                <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-bold">{willCallJobs.length} jobs</span>
               </div>
-              {schedules.filter(s => s.operator_id !== 'unassigned').length === 0 ? (
-                <p className="text-sm text-gray-400 italic">No operators assigned yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {schedules
-                    .filter(s => s.operator_id !== 'unassigned')
-                    .map((schedule, idx) => (
-                      <div key={schedule.operator_id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getOperatorColor(idx).bg}`}>
-                            <Users className={`w-4 h-4 ${getOperatorColor(idx).icon}`} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-gray-900">{schedule.operator_name}</p>
-                            <p className="text-xs text-gray-500">
-                              {schedule.jobs.map(j => j.job_type || 'Job').join(', ')}
-                            </p>
-                          </div>
-                        </div>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getOperatorColor(idx).bg} ${getOperatorColor(idx).text}`}>
-                          {schedule.jobs.length} {schedule.jobs.length === 1 ? 'job' : 'jobs'}
+              <p className="text-xs text-amber-600">Jobs waiting for an open slot — schedule when availability opens up</p>
+            </div>
+            {willCallJobs.length === 0 ? (
+              <div className="text-center py-8 text-amber-500">
+                <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="font-semibold">No will-call jobs</p>
+                <p className="text-xs">Salesmen can mark jobs as will-call when submitting the schedule form</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {willCallJobs.map((job) => {
+                  const daysWaiting = willCallDates[job.id] ? daysAgo(willCallDates[job.id]) : 0;
+                  return (
+                    <div key={job.id} className="bg-white rounded-xl border-2 border-amber-300 p-3 hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between mb-1">
+                        <h4 className="font-bold text-gray-900 text-sm">{job.customer_name}</h4>
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold whitespace-nowrap">📞 WILL CALL</span>
+                      </div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mb-1">{job.job_type}</span>
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><MapPin className="w-3 h-3" /> {job.location}</p>
+
+                      {/* Days waiting badge */}
+                      <div className="flex items-center justify-between mt-2 mb-2">
+                        <span className="text-xs text-gray-400">
+                          Tentative: {parseLocalDate(job.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          daysWaiting >= 7 ? 'bg-red-100 text-red-700' : daysWaiting >= 3 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          <Timer className="w-3 h-3" />
+                          {daysWaiting === 0 ? 'Today' : `${daysWaiting}d waiting`}
                         </span>
                       </div>
-                    ))}
-                </div>
-              )}
-            </div>
 
-            {/* Available Helpers */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <UserX className="w-5 h-5 text-amber-600" />
-                <h3 className="text-sm font-bold text-gray-900">Available Helpers</h3>
-                <span className="ml-auto px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
-                  {availableHelpers.length}
-                </span>
-              </div>
-              {availableHelpers.length === 0 ? (
-                <p className="text-sm text-gray-400 italic">All team members are assigned</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {availableHelpers.map(helper => (
-                    <div key={helper.id} className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                      <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
-                        <Users className="w-3.5 h-3.5 text-amber-700" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">{helper.full_name}</p>
-                        <p className="text-xs text-gray-500">Available</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Schedule Grid */}
-      <div className="container mx-auto px-4 md:px-6 pb-6">
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading schedules...</p>
-          </div>
-        ) : schedules.length === 0 && viewMode !== 'calendar' ? (
-          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-12 text-center">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Calendar className="w-10 h-10 text-purple-600" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No Jobs Scheduled</h3>
-            <p className="text-gray-600 mb-6">No jobs scheduled for {parseLocalDate(selectedDate).toLocaleDateString()}</p>
-            <Link
-              href="/dashboard/admin/dispatch-scheduling"
-              className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl transition-all font-bold shadow-lg hover:shadow-xl hover:scale-[1.02]"
-            >
-              Create Job Order
-            </Link>
-          </div>
-        ) : (
-          <>
-            {/* Timeline View */}
-            {viewMode === 'timeline' && (
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                {/* Timeline Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-pink-500 p-6 text-white">
-                  <h2 className="text-xl font-bold">Timeline View - Daily Dispatch</h2>
-                  <p className="text-purple-100 text-sm">Jobs organized by time and operator</p>
-                </div>
-
-                {/* Timeline Grid */}
-                <div className="p-6 overflow-x-auto">
-                  <div className="space-y-6">
-                    {schedules.map((schedule, operatorIndex) => {
-                      const isUnassigned = schedule.operator_id === 'unassigned';
-                      const colors = isUnassigned ? null : getOperatorColor(operatorIndex);
-                      return (
-                        <div key={schedule.operator_id} className={`border-l-4 pl-6 ${isUnassigned ? 'border-orange-500' : colors?.border}`}>
-                          {/* Operator Header */}
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                                isUnassigned
-                                  ? 'bg-orange-100 animate-pulse'
-                                  : colors?.bg
-                              }`}>
-                                {isUnassigned ? (
-                                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                ) : (
-                                  <Users className={`w-6 h-6 ${colors?.icon}`} />
-                                )}
-                              </div>
-                              <div>
-                                <h3 className="text-lg font-bold text-gray-900">{schedule.operator_name}</h3>
-                                <p className="text-sm text-gray-600">{isUnassigned ? 'Needs assignment' : schedule.operator_email}</p>
-                              </div>
-                            </div>
-                            <div className={`px-4 py-2 rounded-full font-bold text-sm ${
-                              isUnassigned
-                                ? 'bg-orange-100 text-orange-700'
-                                : `${colors?.bg} ${colors?.text}`
-                            }`}>
-                              {schedule.jobs.length} {schedule.jobs.length === 1 ? 'Job' : 'Jobs'}
-                            </div>
-                          </div>
-
-                          {/* Jobs Timeline */}
-                          <div className="space-y-3">
-                            {schedule.jobs.map((job, index) => (
-                              <div
-                                key={job.id}
-                                className={`group bg-gray-50 hover:bg-white rounded-xl p-4 border-2 transition-all hover:shadow-lg ${
-                                  isUnassigned
-                                    ? 'border-orange-200 hover:border-orange-400'
-                                    : `border-gray-200 ${colors?.hover}`
-                                }`}
-                              >
-                                <div className="flex items-start gap-4">
-                                  {/* Job Number Badge */}
-                                  <div className="flex-shrink-0">
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                                      isUnassigned
-                                        ? 'bg-orange-500 text-white'
-                                        : `${colors?.badge} text-white`
-                                    }`}>
-                                      #{index + 1}
-                                    </div>
-                                  </div>
-
-                                  {/* Job Content */}
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between gap-4 mb-3">
-                                      <div className="flex-1 min-w-0">
-                                        <h4 className="font-bold text-gray-900 text-base mb-1 truncate">{job.customer_name}</h4>
-                                        <p className="text-xs text-gray-500">{job.job_number}</p>
-                                      </div>
-                                      {isUnassigned && (
-                                        <span className="px-3 py-1 bg-orange-500 text-white rounded-full text-xs font-bold whitespace-nowrap">
-                                          UNASSIGNED
-                                        </span>
-                                      )}
-                                      {job.priority && job.priority !== 'medium' && (
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                                          job.priority === 'urgent' ? 'bg-red-500 text-white' :
-                                          job.priority === 'high' ? 'bg-orange-500 text-white' :
-                                          'bg-blue-500 text-white'
-                                        }`}>
-                                          {job.priority.toUpperCase()}
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {/* Time, Job Type, and Location Grid */}
-                                    <div className="grid md:grid-cols-3 gap-3 mb-3">
-                                      {/* Shop Time */}
-                                      <div className="flex items-center gap-2 text-sm">
-                                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                          <Clock className="w-4 h-4 text-green-600" />
-                                        </div>
-                                        <div>
-                                          <p className="text-xs text-gray-500">Shop</p>
-                                          <p className="font-bold text-green-700">{formatTime(job.shop_arrival_time || job.arrival_time)}</p>
-                                        </div>
-                                      </div>
-
-                                      {/* Job Type */}
-                                      {job.job_type && (
-                                        <div className="flex items-center gap-2 text-sm">
-                                          <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                                            <Wrench className="w-4 h-4 text-indigo-600" />
-                                          </div>
-                                          <div className="min-w-0">
-                                            <p className="text-xs text-gray-500">Type</p>
-                                            <p className="font-bold text-indigo-700 truncate">{job.job_type}</p>
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      {/* Location */}
-                                      <div className="flex items-start gap-2 p-3 bg-orange-50 rounded-xl">
-                                        <MapPin className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
-                                        <div className="min-w-0">
-                                          <p className="text-sm font-bold text-gray-900 mb-1 truncate">{job.location}</p>
-                                          <p className="text-xs text-gray-600 truncate">{job.customer_name}</p>
-                                          {job.foreman_name && (
-                                            <p className="text-xs text-gray-500 mt-1 truncate">
-                                              Contact: {job.foreman_name}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Workflow Progress */}
-                                    <WorkflowProgressBar
-                                      job={job}
-                                      operatorName={schedule.operator_name !== 'Unassigned' ? schedule.operator_name : null}
-                                      operatorPhone={schedule.operator_phone}
-                                      operatorEmail={schedule.operator_email || null}
-                                    />
-
-                                    {/* Actions */}
-                                    <div className="flex gap-2 flex-wrap">
-                                      {canEdit && isUnassigned && (
-                                        <button
-                                          onClick={() => openEditModal(job)}
-                                          className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg"
-                                        >
-                                          Assign Operator
-                                        </button>
-                                      )}
-                                      {canEdit && (
-                                        <button
-                                          onClick={() => openEditModal(job)}
-                                          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg"
-                                        >
-                                          Edit Details
-                                        </button>
-                                      )}
-                                      <button
-                                        onClick={() => setViewingHistory({ jobId: job.id, jobNumber: job.job_number })}
-                                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
-                                      >
-                                        <History className="w-4 h-4" />
-                                        History
-                                      </button>
-                                      <button
-                                        onClick={() => setNotesJobId({ id: job.id, jobNumber: job.job_number })}
-                                        className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
-                                      >
-                                        <MessageSquare className="w-4 h-4" />
-                                        Notes
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Calendar View */}
-            {viewMode === 'calendar' && (
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                {/* Header with Week Navigation */}
-                <div className="bg-gradient-to-r from-purple-600 to-pink-500 p-4 md:p-6 text-white">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-                    <div>
-                      <h2 className="text-lg md:text-xl font-bold">6-Day Calendar View</h2>
-                      <p className="text-purple-100 text-xs md:text-sm">Weekly schedule overview</p>
-                    </div>
-                    <div className="flex items-center gap-2 md:gap-3">
-                      <button
-                        onClick={goToPreviousWeek}
-                        className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all"
-                        title="Previous 6 Days"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={goToNextWeek}
-                        className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all"
-                        title="Next 6 Days"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 6-Day Grid */}
-                <div className="p-4 md:p-6 overflow-x-auto">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
-                    {Array.from({ length: 6 }).map((_, dayIndex) => {
-                      const date = parseLocalDate(weekStartDate);
-                      date.setDate(date.getDate() + dayIndex);
-                      const dateString = toDateString(date);
-                      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-                      const dayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                      const jobs = allJobsForWeek[dateString] || [];
-                      const isToday = dateString === toDateString(new Date());
-
-                      return (
-                        <div key={dateString} className={`flex flex-col border-2 rounded-xl overflow-hidden ${
-                          isToday ? 'border-purple-500 shadow-lg' : 'border-gray-200'
-                        }`}>
-                          {/* Day Header - Clickable */}
-                          <div
-                            onClick={() => setSelectedDayView({ date: dateString, jobs })}
-                            className={`p-3 md:p-4 text-center cursor-pointer transition-all hover:opacity-90 ${
-                              isToday
-                                ? 'bg-gradient-to-br from-purple-600 to-pink-500 text-white hover:from-purple-700 hover:to-pink-600'
-                                : 'bg-gray-50 text-gray-900 hover:bg-gray-100'
-                            }`}
-                            title="Click to view all jobs for this day"
+                      {canEdit && (
+                        <div className="flex gap-2 mt-1">
+                          <button
+                            onClick={() => handleMoveWillCallToSchedule(job)}
+                            className="flex-1 py-1.5 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
                           >
-                            <div className="text-xs font-bold uppercase mb-1">{dayName}</div>
-                            <div className="text-base md:text-lg font-bold">{dayDate}</div>
-                            <div className="text-xs mt-1 opacity-80">{jobs.length} jobs</div>
-                            <div className="text-xs mt-1 opacity-70">Tap to view all</div>
-                          </div>
-
-                          {/* Jobs List */}
-                          <div className="flex-1 p-2 space-y-2 bg-gray-50 overflow-y-auto max-h-[400px] md:max-h-[600px]">
-                            {jobs.length === 0 ? (
-                              <div className="text-center py-8 text-gray-400">
-                                <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                <p className="text-xs">No jobs</p>
-                              </div>
-                            ) : (
-                              jobs.map((job) => (
-                                <div
-                                  key={job.id}
-                                  onClick={() => canEdit && openEditModal(job)}
-                                  className={`bg-white rounded-lg p-3 border border-gray-200 transition-all ${canEdit ? 'hover:border-purple-400 hover:shadow-md cursor-pointer' : ''}`}
-                                >
-                                  <div className="mb-2">
-                                    <p className="text-xs font-bold text-gray-900 truncate" title={job.customer_name}>
-                                      {job.customer_name}
-                                    </p>
-                                    <p className="text-xs text-gray-500">{job.job_number}</p>
-                                  </div>
-
-                                  <div className="flex items-center gap-1 text-xs mb-1">
-                                    <Clock className="w-3 h-3 text-green-600" />
-                                    <span className="text-green-700 font-semibold">{formatTime(job.shop_arrival_time || job.arrival_time)}</span>
-                                  </div>
-
-                                  {job.job_type && (
-                                    <div className="flex items-center gap-1 text-xs mb-1">
-                                      <Wrench className="w-3 h-3 text-indigo-600" />
-                                      <span className="text-indigo-700 font-semibold truncate">{job.job_type}</span>
-                                    </div>
-                                  )}
-
-                                  <div className="flex items-start gap-1 text-xs mb-2">
-                                    <MapPin className="w-3 h-3 text-orange-600 mt-0.5 flex-shrink-0" />
-                                    <span className="text-gray-600 truncate">{job.location}</span>
-                                  </div>
-
-                                  {job.operator_name && (
-                                    <div className="flex items-center gap-1 text-xs">
-                                      <Users className="w-3 h-3 text-purple-600" />
-                                      <span className="text-purple-700 font-medium truncate">{job.operator_name}</span>
-                                    </div>
-                                  )}
-
-                                  {!job.assigned_to && (
-                                    <div className="mt-2">
-                                      <span className="px-2 py-1 bg-orange-500 text-white rounded text-xs font-bold">
-                                        UNASSIGNED
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {job.priority && job.priority !== 'medium' && (
-                                    <div className="mt-2">
-                                      <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                        job.priority === 'urgent' ? 'bg-red-500 text-white' :
-                                        job.priority === 'high' ? 'bg-orange-500 text-white' :
-                                        'bg-blue-500 text-white'
-                                      }`}>
-                                        {job.priority.toUpperCase()}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {/* Compact Workflow Progress */}
-                                  <WorkflowProgressBar job={job} compact />
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Columns View (Original) */}
-            {viewMode === 'columns' && (
-              <div className="flex gap-4 overflow-x-auto pb-4">
-                {schedules.map((schedule, operatorIndex) => {
-                  const isUnassigned = schedule.operator_id === 'unassigned';
-                  const colors = isUnassigned ? null : getOperatorColor(operatorIndex);
-                  // Create gradient from badge color
-                  const gradientClass = isUnassigned
-                    ? 'bg-gradient-to-br from-orange-500 to-amber-600'
-                    : colors?.badge === 'bg-purple-500' ? 'bg-gradient-to-br from-purple-500 to-purple-600' :
-                      colors?.badge === 'bg-pink-500' ? 'bg-gradient-to-br from-pink-500 to-pink-600' :
-                      colors?.badge === 'bg-blue-500' ? 'bg-gradient-to-br from-blue-500 to-blue-600' :
-                      colors?.badge === 'bg-indigo-500' ? 'bg-gradient-to-br from-indigo-500 to-indigo-600' :
-                      colors?.badge === 'bg-violet-500' ? 'bg-gradient-to-br from-violet-500 to-violet-600' :
-                      colors?.badge === 'bg-fuchsia-500' ? 'bg-gradient-to-br from-fuchsia-500 to-fuchsia-600' :
-                      colors?.badge === 'bg-rose-500' ? 'bg-gradient-to-br from-rose-500 to-rose-600' :
-                      'bg-gradient-to-br from-cyan-500 to-cyan-600';
-                  return (
-                    <div
-                      key={schedule.operator_id}
-                      className={`flex-shrink-0 w-80 rounded-2xl shadow-xl overflow-hidden ${
-                        isUnassigned ? 'border-2 border-orange-300' : 'border border-gray-200'
-                      }`}
-                      style={{ minWidth: '320px' }}
-                    >
-                      <div className={`p-4 ${gradientClass}`}>
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/20">
-                            {isUnassigned ? (
-                              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            ) : (
-                              <Users className="w-5 h-5 text-white" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-white font-bold text-lg truncate">{schedule.operator_name}</h3>
-                            {!isUnassigned && (
-                              <p className="text-white/80 text-xs truncate">{schedule.operator_email}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="px-3 py-1 rounded-full text-sm font-bold bg-white/20 text-white">
-                            {schedule.jobs.length} {schedule.jobs.length === 1 ? 'Job' : 'Jobs'}
-                          </span>
-                          {isUnassigned && (
-                            <span className="px-2 py-1 bg-white/20 text-white text-xs font-bold rounded-full animate-pulse">
-                              UNASSIGNED
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className={`p-3 space-y-3 min-h-[200px] max-h-[calc(100vh-300px)] overflow-y-auto ${
-                        isUnassigned ? 'bg-gradient-to-br from-orange-50 to-amber-50' : 'bg-gray-50'
-                      }`}>
-                        {schedule.jobs.map((job) => (
-                          <div
-                            key={job.id}
-                            className={`bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 ${
-                              isUnassigned ? 'border-orange-200 hover:border-orange-300' : `border-gray-200 ${colors?.hover}`
-                            }`}
+                            Schedule Now →
+                          </button>
+                          <button
+                            onClick={() => setAssignTarget({ job, source: 'willcall' })}
+                            className="py-1.5 px-2.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors"
                           >
-                            <div className="mb-3">
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <h4 className="font-bold text-gray-900 text-sm leading-tight">{job.customer_name}</h4>
-                                {isUnassigned && (
-                                  <span className="px-2 py-0.5 bg-orange-500 text-white rounded-full text-xs font-bold whitespace-nowrap">
-                                    UNASSIGNED
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-gray-500">{job.job_number}</p>
-                            </div>
-
-                            <div className="space-y-2 mb-3">
-                              <div className="flex items-center gap-2 text-xs">
-                                <Clock className="w-3.5 h-3.5 text-green-600" />
-                                <span className="font-semibold text-green-700">Shop: {formatTime(job.shop_arrival_time || job.arrival_time)}</span>
-                              </div>
-                              {job.job_type && (
-                                <div className="flex items-center gap-2 text-xs">
-                                  <Wrench className="w-3.5 h-3.5 text-indigo-600" />
-                                  <span className="font-semibold text-indigo-700 truncate">{job.job_type}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-start gap-2 mb-3 p-2 bg-orange-50 rounded-lg">
-                              <MapPin className="w-3.5 h-3.5 text-orange-600 mt-0.5 flex-shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-xs font-semibold text-gray-900 truncate">{job.location}</p>
-                                <p className="text-xs text-gray-600 truncate">{job.customer_name}</p>
-                              </div>
-                            </div>
-
-                            {job.priority && job.priority !== 'medium' && (
-                              <div className="mb-3">
-                                <span className={`px-2 py-1 rounded-md text-xs font-bold ${
-                                  job.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                                  job.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                                  'bg-blue-100 text-blue-700'
-                                }`}>
-                                  {job.priority.toUpperCase()}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Workflow Progress */}
-                            <WorkflowProgressBar
-                              job={job}
-                              operatorName={schedule.operator_name !== 'Unassigned' ? schedule.operator_name : null}
-                              operatorPhone={schedule.operator_phone}
-                              operatorEmail={schedule.operator_email || null}
-                            />
-
-                            <div className="flex gap-2 flex-wrap">
-                              {canEdit && isUnassigned && (
-                                <button
-                                  onClick={() => openEditModal(job)}
-                                  className="flex-1 px-3 py-1.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg"
-                                >
-                                  Assign
-                                </button>
-                              )}
-                              {canEdit && (
-                                <button
-                                  onClick={() => openEditModal(job)}
-                                  className="flex-1 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg"
-                                >
-                                  Edit
-                                </button>
-                              )}
-                              <button
-                                onClick={() => setViewingHistory({ jobId: job.id, jobNumber: job.job_number })}
-                                className="px-3 py-1.5 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg"
-                              >
-                                <History className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => setNotesJobId({ id: job.id, jobNumber: job.job_number })}
-                                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-
-                        {schedule.jobs.length === 0 && (
-                          <div className="text-center py-8 text-gray-400">
-                            <p className="text-sm">No jobs assigned</p>
-                          </div>
-                        )}
-                      </div>
+                            <Users className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
-          </>
-        )}
-      </div>
-
-      {/* Edit Modal (shared component) */}
-      {editingJob && (
-        <RichEditJobModal
-          job={editingJob}
-          operators={operators}
-          saving={saving}
-          deleting={deleting}
-          onJobChange={(j) => setEditingJob(j as JobOrder)}
-          onSave={handleSaveJob}
-          onDelete={handleDeleteJob}
-          onClose={closeEditModal}
-        />
-      )}
-
-      {/* History Modal */}
-      {viewingHistory && (
-        <JobHistoryModal
-          jobId={viewingHistory.jobId}
-          jobNumber={viewingHistory.jobNumber}
-          isOpen={true}
-          onClose={() => setViewingHistory(null)}
-        />
-      )}
-
-      {/* Day View Modal */}
-      {selectedDayView && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-500 text-white p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold mb-1">
-                    {parseLocalDate(selectedDayView.date).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </h2>
-                  <p className="text-purple-100">{selectedDayView.jobs.length} jobs scheduled</p>
-                </div>
-                <button
-                  onClick={() => setSelectedDayView(null)}
-                  className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
-              {selectedDayView.jobs.length === 0 ? (
-                <div className="text-center py-12">
-                  <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">No Jobs Scheduled</h3>
-                  <p className="text-gray-600">There are no jobs scheduled for this day.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {selectedDayView.jobs.map((job, index) => (
-                    <div
-                      key={job.id}
-                      className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-purple-400 transition-all shadow-sm hover:shadow-md"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-pink-500 text-white font-bold flex items-center justify-center text-lg">
-                            #{index + 1}
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900">{job.customer_name}</h3>
-                            <p className="text-sm text-gray-500">{job.job_number}</p>
-                          </div>
-                        </div>
-                        {canEdit && (
-                          <button
-                            onClick={() => {
-                              setSelectedDayView(null);
-                              openEditModal(job);
-                            }}
-                            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg text-sm"
-                          >
-                            Edit Job
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="grid md:grid-cols-3 gap-4 mb-4">
-                        {/* Shop Time */}
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-green-600" />
-                          <span className="text-sm text-gray-600">Shop:</span>
-                          <span className="text-sm font-bold text-green-700">{formatTime(job.shop_arrival_time || job.arrival_time)}</span>
-                        </div>
-
-                        {/* Job Type */}
-                        {job.job_type && (
-                          <div className="flex items-center gap-2">
-                            <Wrench className="w-4 h-4 text-indigo-600" />
-                            <span className="text-sm font-bold text-indigo-700">{job.job_type}</span>
-                          </div>
-                        )}
-
-                        {/* Location */}
-                        <div className="flex items-start gap-2">
-                          <MapPin className="w-4 h-4 text-orange-600 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-bold text-gray-900">{job.location}</p>
-                            <p className="text-xs text-gray-600">{job.address}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Operator */}
-                      {job.operator_name && (
-                        <div className="flex items-center gap-2 mb-3 p-3 bg-purple-50 rounded-lg">
-                          <Users className="w-4 h-4 text-purple-600" />
-                          <span className="text-sm text-gray-600">Operator:</span>
-                          <span className="text-sm font-bold text-purple-700">{job.operator_name}</span>
-                        </div>
-                      )}
-
-                      {!job.assigned_to && (
-                        <div className="mb-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                          <span className="text-sm font-bold text-orange-700">⚠️ UNASSIGNED - No operator assigned</span>
-                        </div>
-                      )}
-
-                      {/* Priority */}
-                      {job.priority && job.priority !== 'medium' && (
-                        <div className="mb-3">
-                          <span className={`px-3 py-1 rounded-lg text-sm font-bold ${
-                            job.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                            job.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                            'bg-blue-100 text-blue-700'
-                          }`}>
-                            {job.priority.toUpperCase()} PRIORITY
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Description */}
-                      {job.description && (
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-700">{job.description}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}
 
-      {/* Quick Add Panel */}
+      {/* ═══ DAY VIEW — OPERATOR ROWS ════════════════════════════════════ */}
+      <div className="container mx-auto px-4 md:px-6 pb-6 space-y-4">
+        {OPERATORS.map((op, idx) => (
+          <OperatorRow
+            key={idx}
+            operatorName={op.name}
+            helperName={op.helper}
+            jobs={operatorJobs[idx] || []}
+            colorScheme={OPERATOR_COLORS[idx % OPERATOR_COLORS.length]}
+            canEdit={canEdit}
+            isAvailable={(operatorJobs[idx] || []).length === 0}
+            onEditJob={(job) => canEdit ? setEditTarget({ job, operatorIndex: idx }) : setChangeRequestTarget(job)}
+            onRequestChange={(job) => setChangeRequestTarget(job)}
+            onViewNotes={(job) => handleViewNotes(job)}
+            onAssignJob={() => handleAssignToAvailableOperator(idx)}
+          />
+        ))}
+
+        {/* ═══ UNASSIGNED SECTION ═══════════════════════════════════════ */}
+        {unassignedJobs.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-lg border-2 border-dashed border-orange-300 overflow-hidden">
+            <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-5 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-white">
+                  <AlertCircle className="w-5 h-5" />
+                  <h3 className="font-bold">Unassigned Jobs for This Date</h3>
+                  <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">{unassignedJobs.length}</span>
+                </div>
+                <p className="text-orange-100 text-xs hidden sm:block">Approved but no operator assigned yet</p>
+              </div>
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {unassignedJobs.map((job) => (
+                  <div key={job.id} className="rounded-xl border-2 border-orange-200 bg-orange-50/50 p-4 hover:shadow-md transition-all">
+                    <h4 className="font-bold text-gray-900 text-sm mb-1">{job.customer_name}</h4>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mb-2">{job.job_type?.split(',')[0]?.trim()}</span>
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mb-2"><MapPin className="w-3 h-3 text-gray-400" /> {job.location}</p>
+                    {job.equipment_needed.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {job.equipment_needed.map(eq => (
+                          <span key={eq} className="px-2 py-0.5 bg-indigo-50 rounded text-xs text-indigo-600 font-medium">{eq}</span>
+                        ))}
+                      </div>
+                    )}
+                    {canEdit && (
+                      <button
+                        onClick={() => setAssignTarget({ job, source: 'unassigned' })}
+                        className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md"
+                      >
+                        <Users className="w-3.5 h-3.5 inline mr-1.5" /> Assign Operator
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ PENDING QUEUE SIDEBAR ══════════════════════════════════════ */}
+      <PendingQueueSidebar
+        open={showPendingQueue}
+        onClose={() => setShowPendingQueue(false)}
+        pendingJobs={pendingJobs}
+        onApprove={(job) => { setShowPendingQueue(false); setApprovalTarget(job); }}
+        onMissingInfo={(job) => { setShowPendingQueue(false); setMissingInfoTarget(job); }}
+      />
+
+      {/* ═══ MODALS ════════════════════════════════════════════════════ */}
+
+      {approvalTarget && (
+        <ApprovalModal
+          job={approvalTarget}
+          onConfirm={handleApprove}
+          onClose={() => setApprovalTarget(null)}
+        />
+      )}
+
+      {missingInfoTarget && (
+        <MissingInfoModal
+          job={missingInfoTarget}
+          onConfirm={handleMissingInfo}
+          onClose={() => setMissingInfoTarget(null)}
+        />
+      )}
+
+      {assignTarget && (
+        <AssignOperatorModal
+          job={assignTarget.job}
+          operators={getOperatorJobCounts()}
+          onConfirm={handleAssignOperator}
+          onClose={() => setAssignTarget(null)}
+        />
+      )}
+
+      {editTarget && (
+        <EditJobPanel
+          job={editTarget.job}
+          canEdit={canEdit}
+          operators={OPERATORS}
+          currentOperatorIndex={editTarget.operatorIndex}
+          onSave={handleEditSave}
+          onClose={() => setEditTarget(null)}
+          onViewNotes={() => { setEditTarget(null); handleViewNotes(editTarget.job); }}
+          onMakeWillCall={handleMakeWillCall}
+          onRemoveFromSchedule={handleRemoveFromSchedule}
+        />
+      )}
+
+      {changeRequestTarget && (
+        <ChangeRequestModal
+          job={changeRequestTarget}
+          onSubmit={handleChangeRequest}
+          onClose={() => setChangeRequestTarget(null)}
+        />
+      )}
+
+      {notesTarget && (
+        <NotesDrawer
+          job={notesTarget}
+          notes={jobNotes[notesTarget.id] || getNotesForJob(notesTarget.id)}
+          onAddNote={handleAddNote}
+          onClose={() => setNotesTarget(null)}
+        />
+      )}
+
       {showQuickAdd && (
-        <QuickAddJobPanel
-          operators={operators}
-          defaultDate={selectedDate}
+        <QuickAddModal
+          salesmen={SALESMEN}
           onSubmit={handleQuickAdd}
           onClose={() => setShowQuickAdd(false)}
         />
       )}
 
-      {/* Notes Panel */}
-      {notesJobId && (
-        <JobNotesPanel
-          jobId={notesJobId.id}
-          jobNumber={notesJobId.jobNumber}
-          onClose={() => setNotesJobId(null)}
-        />
-      )}
+      {/* ═══ TOASTS ═══════════════════════════════════════════════════ */}
+      <Toast toasts={toasts} onRemove={removeToast} />
+
+      {/* ═══ ROLE TOGGLE ══════════════════════════════════════════════ */}
+      <div className="fixed bottom-4 left-4 z-50">
+        <button
+          onClick={() => setCanEdit(!canEdit)}
+          className={`px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all ${canEdit ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white' : 'bg-gray-200 text-gray-700'}`}
+        >
+          <Eye className="w-4 h-4 inline mr-1.5" />
+          {canEdit ? 'Super Admin View' : 'Salesman View (Read-Only)'}
+        </button>
+      </div>
     </div>
   );
 }

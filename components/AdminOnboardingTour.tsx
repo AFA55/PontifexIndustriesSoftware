@@ -25,9 +25,9 @@ const ADMIN_STEPS: OnboardingStep[] = [
     ),
   },
   {
-    id: 'dispatch',
-    title: 'Dispatch & Scheduling',
-    description: 'Create and manage job orders with powerful scheduling tools.',
+    id: 'schedule-form',
+    title: 'Schedule Form',
+    description: 'Create detailed job orders with an 8-step scheduling wizard.',
     badge: 'Core Feature',
     badgeColor: 'bg-orange-100 text-orange-700',
     icon: (
@@ -36,10 +36,10 @@ const ADMIN_STEPS: OnboardingStep[] = [
       </svg>
     ),
     features: [
-      'Create job orders with detailed specifications',
-      'Assign operators and equipment',
-      'Schedule jobs with calendar integration',
-      'Track job status in real-time'
+      'Create job orders with 8-step wizard',
+      'Jobsite conditions and equipment tracking',
+      'Site compliance and scheduling flexibility',
+      'Auto-saves to Schedule Board'
     ],
   },
   {

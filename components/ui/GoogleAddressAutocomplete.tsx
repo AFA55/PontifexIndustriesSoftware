@@ -122,7 +122,7 @@ export function GoogleAddressAutocomplete({
   return (
     <div className="relative">
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
         <input
           ref={inputRef}
           type="text"
@@ -132,7 +132,7 @@ export function GoogleAddressAutocomplete({
           placeholder={ready ? placeholder : 'Loading...'}
           required={required}
           autoComplete="off"
-          className={`w-full pl-10 pr-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none transition-colors ${
+          className={`w-full pl-12 pr-4 py-3.5 sm:py-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none hover:border-slate-300 transition-all duration-200 ${
             !ready ? 'bg-gray-100 cursor-not-allowed' : ''
           } ${className}`}
         />
