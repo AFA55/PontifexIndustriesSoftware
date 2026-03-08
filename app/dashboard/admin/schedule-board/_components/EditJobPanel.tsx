@@ -13,9 +13,13 @@ const EQUIPMENT_OPTIONS = ['HCD', 'CS-14', 'DPP', 'DFS', 'GPP', 'ECD', 'GPR', 'W
 interface EditJobPanelProps {
   job: JobCardData;
   canEdit: boolean;
-  operators: { name: string; helper: string }[];
-  currentOperatorIndex: number | null;
-  onSave: (updates: Partial<JobCardData> & { operatorIndex?: number | null }) => void;
+  allOperators: string[];
+  allHelpers: string[];
+  currentOperatorName: string | null;
+  currentHelperName: string | null;
+  busyOperators: Record<string, string>;
+  busyHelpers: Record<string, string>;
+  onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null }) => void;
   onClose: () => void;
   onViewNotes: () => void;
   onMakeWillCall?: () => void;
@@ -23,7 +27,9 @@ interface EditJobPanelProps {
 }
 
 export default function EditJobPanel({
-  job, canEdit, operators, currentOperatorIndex,
+  job, canEdit, allOperators, allHelpers,
+  currentOperatorName, currentHelperName,
+  busyOperators, busyHelpers,
   onSave, onClose, onViewNotes, onMakeWillCall, onRemoveFromSchedule,
 }: EditJobPanelProps) {
   const [scheduledDate, setScheduledDate] = useState(job.scheduled_date || '');
@@ -31,7 +37,8 @@ export default function EditJobPanel({
   const [endDate, setEndDate] = useState(job.end_date || '');
   const [equipment, setEquipment] = useState<string[]>([...job.equipment_needed]);
   const [newEquipment, setNewEquipment] = useState('');
-  const [selectedOperator, setSelectedOperator] = useState<number | null>(currentOperatorIndex);
+  const [selectedOperator, setSelectedOperator] = useState<string>(currentOperatorName || '');
+  const [selectedHelper, setSelectedHelper] = useState<string>(currentHelperName || '');
   const [hasChanges, setHasChanges] = useState(false);
 
   const markChanged = () => setHasChanges(true);
@@ -50,8 +57,12 @@ export default function EditJobPanel({
     markChanged();
   };
 
-  // Filter suggestions to ones not already added
   const suggestions = EQUIPMENT_OPTIONS.filter(eq => !equipment.includes(eq));
+
+  const operatorBusy = selectedOperator && selectedOperator !== currentOperatorName
+    ? busyOperators[selectedOperator] : null;
+  const helperBusy = selectedHelper && selectedHelper !== currentHelperName
+    ? busyHelpers[selectedHelper] : null;
 
   return (
     <>
@@ -115,7 +126,6 @@ export default function EditJobPanel({
             </label>
             {canEdit ? (
               <>
-                {/* Current equipment with remove buttons */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {equipment.map(eq => (
                     <span key={eq} className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 rounded-lg text-sm text-indigo-700 font-semibold border border-indigo-200">
@@ -133,7 +143,6 @@ export default function EditJobPanel({
                     <span className="text-sm text-gray-400 italic">No equipment added</span>
                   )}
                 </div>
-                {/* Add equipment input */}
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -151,7 +160,6 @@ export default function EditJobPanel({
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
-                {/* Quick-add suggestions */}
                 {suggestions.length > 0 && (
                   <div className="mt-2">
                     <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Quick Add:</p>
@@ -245,18 +253,56 @@ export default function EditJobPanel({
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1.5">
                   <Users className="w-4 h-4 inline mr-1" />
-                  Assigned Operator & Helper
+                  Operator
                 </label>
                 <select
-                  value={selectedOperator ?? -1}
-                  onChange={(e) => { setSelectedOperator(e.target.value === '-1' ? null : parseInt(e.target.value)); markChanged(); }}
+                  value={selectedOperator}
+                  onChange={(e) => { setSelectedOperator(e.target.value); markChanged(); }}
                   className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 bg-white"
                 >
-                  <option value={-1}>Unassigned</option>
-                  {operators.map((op, idx) => (
-                    <option key={idx} value={idx}>{op.name} + {op.helper}</option>
+                  <option value="">Unassigned</option>
+                  {allOperators.map(name => (
+                    <option key={name} value={name}>
+                      {name}{busyOperators[name] && name !== currentOperatorName ? ` — On: ${busyOperators[name]}` : ''}
+                    </option>
                   ))}
                 </select>
+                {operatorBusy && (
+                  <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1.5 bg-amber-50 rounded-lg border border-amber-200">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                    <p className="text-xs text-amber-700">
+                      Already assigned to <span className="font-bold">{operatorBusy}</span> — conflict will be resolved on save
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Assign Helper */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                  <Users className="w-4 h-4 inline mr-1" />
+                  Helper <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <select
+                  value={selectedHelper}
+                  onChange={(e) => { setSelectedHelper(e.target.value); markChanged(); }}
+                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 bg-white"
+                >
+                  <option value="">No Helper</option>
+                  {allHelpers.map(name => (
+                    <option key={name} value={name}>
+                      {name}{busyHelpers[name] && name !== currentHelperName ? ` — On: ${busyHelpers[name]}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {helperBusy && (
+                  <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1.5 bg-amber-50 rounded-lg border border-amber-200">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                    <p className="text-xs text-amber-700">
+                      Already assigned to <span className="font-bold">{helperBusy}</span>
+                    </p>
+                  </div>
+                )}
                 <p className="text-xs text-gray-400 mt-1">Typically assigned 2-3 days before the start date</p>
               </div>
             </>
@@ -331,7 +377,8 @@ export default function EditJobPanel({
                 end_date: endDate || null,
                 arrival_time: arrivalTime || null,
                 equipment_needed: equipment,
-                operatorIndex: selectedOperator,
+                newOperatorName: selectedOperator || null,
+                newHelperName: selectedHelper || null,
               })}
               disabled={!hasChanges}
               className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -19,6 +19,7 @@ import EditJobPanel from './_components/EditJobPanel';
 import ChangeRequestModal from './_components/ChangeRequestModal';
 import NotesDrawer, { getNotesForJob } from './_components/NotesDrawer';
 import QuickAddModal from './_components/QuickAddModal';
+import ConflictModal from './_components/ConflictModal';
 import type { JobCardData } from './_components/JobCard';
 import type { PendingJob } from './_components/PendingQueueSidebar';
 import type { ToastData } from './_components/Toast';
@@ -36,16 +37,29 @@ const OPERATOR_COLORS = [
   { border: 'border-pink-500', bg: 'bg-pink-100', text: 'text-pink-700', badge: 'bg-pink-500', icon: 'text-pink-600' },
 ];
 
-// ─── OPERATORS LIST ──────────────────────────────────────────────────────
-const OPERATORS = [
-  { name: 'Mike Rodriguez', helper: 'Carlos Mendez' },
-  { name: 'Juan Salazar', helper: 'David Torres' },
-  { name: 'Tony Martinez', helper: 'Alex Reyes' },
-  { name: 'Eddie Lopez', helper: 'Marco Flores' },
-  { name: 'Chris Johnson', helper: 'Ryan Mitchell' },
-  { name: 'Robert Garcia', helper: 'Luis Hernandez' },
-  { name: 'James Wilson', helper: 'Daniel Ortiz' },
-  { name: 'Steven Kim', helper: 'Kevin Nguyen' },
+// ─── CREW ROSTER — operators and helpers are independently selectable ───
+const ALL_OPERATORS = [
+  'Mike Rodriguez', 'Juan Salazar', 'Tony Martinez', 'Eddie Lopez',
+  'Chris Johnson', 'Robert Garcia', 'James Wilson', 'Steven Kim',
+];
+
+const ALL_HELPERS = [
+  'Carlos Mendez', 'David Torres', 'Alex Reyes', 'Marco Flores',
+  'Ryan Mitchell', 'Luis Hernandez', 'Daniel Ortiz', 'Kevin Nguyen',
+];
+
+const NUM_ROWS = 8;
+
+// Default pairings (can be changed via dropdowns)
+const INITIAL_ROW_ASSIGNMENTS: { operator: string | null; helper: string | null }[] = [
+  { operator: 'Mike Rodriguez', helper: 'Carlos Mendez' },
+  { operator: 'Juan Salazar', helper: 'David Torres' },
+  { operator: 'Tony Martinez', helper: 'Alex Reyes' },
+  { operator: 'Eddie Lopez', helper: 'Marco Flores' },
+  { operator: 'Chris Johnson', helper: 'Ryan Mitchell' },
+  { operator: 'Robert Garcia', helper: 'Luis Hernandez' },
+  { operator: 'James Wilson', helper: 'Daniel Ortiz' },
+  { operator: 'Steven Kim', helper: 'Kevin Nguyen' },
 ];
 
 // Mock salesmen
@@ -136,7 +150,6 @@ const INITIAL_WILL_CALL: JobCardData[] = [
   { id: 'wc4', job_number: 'JOB-2026-100258', customer_name: 'Balfour Beatty', job_type: 'Wire Sawing', location: 'Hobby Airport - Terminal Expansion', address: '7800 Airport Blvd, Houston TX', equipment_needed: ['WS', 'DPP'], description: 'Large opening cuts for new jet bridge connections', scheduled_date: '2026-03-20', end_date: '2026-03-22', arrival_time: null, is_will_call: true, difficulty_rating: 8, notes_count: 0, change_requests_count: 0, helper_names: [], po_number: 'BB-HOU-AIR', day_label: undefined },
 ];
 
-// Will call items track when they were added
 const WILL_CALL_ADDED: Record<string, string> = {
   wc1: '2026-03-02',
   wc2: '2026-03-04',
@@ -173,6 +186,17 @@ function daysAgo(dateString: string) {
 let nextId = 100;
 const genId = () => `gen-${nextId++}`;
 
+// ─── Conflict data type ─────────────────────────────────────────────────
+interface ConflictData {
+  personName: string;
+  personRole: 'operator' | 'helper';
+  currentJobName: string;
+  newJob: JobCardData;
+  newJobSource: 'unassigned' | 'willcall';
+  targetRowIndex: number;
+  helperName: string | null;
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────
 export default function ScheduleBoardPage() {
   const router = useRouter();
@@ -188,6 +212,9 @@ export default function ScheduleBoardPage() {
   const [willCallDates, setWillCallDates] = useState<Record<string, string>>(WILL_CALL_ADDED);
   const [jobNotes, setJobNotes] = useState<Record<string, NoteData[]>>({});
 
+  // ═══ ROW ASSIGNMENTS — who's in which crew row ═══
+  const [rowAssignments, setRowAssignments] = useState(INITIAL_ROW_ASSIGNMENTS);
+
   // ═══ UI STATE ═══
   const [showPendingQueue, setShowPendingQueue] = useState(false);
   const [showWillCall, setShowWillCall] = useState(false);
@@ -198,9 +225,10 @@ export default function ScheduleBoardPage() {
   const [approvalTarget, setApprovalTarget] = useState<PendingJob | null>(null);
   const [missingInfoTarget, setMissingInfoTarget] = useState<PendingJob | null>(null);
   const [assignTarget, setAssignTarget] = useState<{ job: JobCardData; source: 'unassigned' | 'willcall' } | null>(null);
-  const [editTarget, setEditTarget] = useState<{ job: JobCardData; operatorIndex: number | null } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ job: JobCardData; rowIndex: number | null } | null>(null);
   const [changeRequestTarget, setChangeRequestTarget] = useState<JobCardData | null>(null);
   const [notesTarget, setNotesTarget] = useState<JobCardData | null>(null);
+  const [conflictData, setConflictData] = useState<ConflictData | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -219,17 +247,36 @@ export default function ScheduleBoardPage() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // ═══ COMPUTED ═══
+  // ═══ COMPUTED: who's busy (has jobs) ═══
+  const busyOperators = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (let i = 0; i < NUM_ROWS; i++) {
+      const jobs = operatorJobs[i] || [];
+      const op = rowAssignments[i]?.operator;
+      if (jobs.length > 0 && op) {
+        map[op] = jobs[0].customer_name;
+      }
+    }
+    return map;
+  }, [operatorJobs, rowAssignments]);
+
+  const busyHelpers = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (let i = 0; i < NUM_ROWS; i++) {
+      const jobs = operatorJobs[i] || [];
+      const helper = rowAssignments[i]?.helper;
+      if (jobs.length > 0 && helper) {
+        map[helper] = jobs[0].customer_name;
+      }
+    }
+    return map;
+  }, [operatorJobs, rowAssignments]);
+
+  // ═══ COMPUTED STATS ═══
   const totalJobs = Object.values(operatorJobs).reduce((sum, jobs) => sum + jobs.length, 0) + unassignedJobs.length;
   const activeOperators = Object.entries(operatorJobs).filter(([, jobs]) => jobs.length > 0).length;
   const availableOperators = Object.entries(operatorJobs).filter(([, jobs]) => jobs.length === 0).length;
   const changeRequestCount = Object.values(operatorJobs).flat().reduce((sum, j) => sum + j.change_requests_count, 0);
-
-  const getOperatorJobCounts = () => OPERATORS.map((op, idx) => ({
-    name: op.name,
-    helper: op.helper,
-    jobCount: (operatorJobs[idx] || []).length,
-  }));
 
   // ═══ DATE NAVIGATION ═══
   const goToPreviousDay = () => {
@@ -271,16 +318,13 @@ export default function ScheduleBoardPage() {
       day_label: undefined,
     };
 
-    // Remove from pending
     setPendingJobs(prev => prev.filter(p => p.id !== job.id));
 
     if (job.is_will_call) {
-      // Salesman marked as will call → goes to Will Call folder
       setWillCallJobs(prev => [...prev, newJob]);
       setWillCallDates(prev => ({ ...prev, [newJob.id]: toDateString(new Date()) }));
       addToast('success', `${job.customer_name} → Will Call`, 'Approved and added to Will Call folder');
     } else {
-      // Regular approval → unassigned (operator assigned 2-3 days before)
       setUnassignedJobs(prev => [...prev, newJob]);
       addToast('success', `${job.customer_name} → Approved`, 'Added to schedule — assign operator closer to start date');
     }
@@ -307,15 +351,33 @@ export default function ScheduleBoardPage() {
     addToast('success', `${job.customer_name} → Scheduled`, `Moved to ${formatDisplayDate(selectedDate)} (unassigned)`);
   };
 
-  // --- Assign Operator (from unassigned or will-call) ---
-  const handleAssignOperator = (operatorIndex: number) => {
-    if (!assignTarget) return;
-    const { job, source } = assignTarget;
+  // ═══ ASSIGNMENT WITH CONFLICT DETECTION ═══
 
+  // Helper: find the row for a given operator, or pick an empty row
+  const findRowForOperator = (operatorName: string): number => {
+    // Check if operator is already in a row
+    const existingRow = rowAssignments.findIndex(r => r.operator === operatorName);
+    if (existingRow !== -1) return existingRow;
+
+    // Find first empty row (no operator and no jobs)
+    for (let i = 0; i < NUM_ROWS; i++) {
+      if (!rowAssignments[i].operator && (operatorJobs[i] || []).length === 0) return i;
+    }
+
+    // Fallback: find any row with no jobs
+    for (let i = 0; i < NUM_ROWS; i++) {
+      if ((operatorJobs[i] || []).length === 0) return i;
+    }
+
+    return -1; // all rows busy
+  };
+
+  // Assign job directly (no conflict)
+  const proceedWithAssignment = (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null) => {
     const assignedJob = {
       ...job,
       is_will_call: false,
-      helper_names: [OPERATORS[operatorIndex].helper],
+      helper_names: helperName ? [helperName] : [],
       scheduled_date: job.scheduled_date || selectedDate,
     };
 
@@ -327,54 +389,169 @@ export default function ScheduleBoardPage() {
 
     setOperatorJobs(prev => ({
       ...prev,
-      [operatorIndex]: [...(prev[operatorIndex] || []), assignedJob],
+      [rowIndex]: [...(prev[rowIndex] || []), assignedJob],
     }));
 
-    addToast('success', `${job.customer_name} → ${OPERATORS[operatorIndex].name}`, 'Operator assigned successfully');
+    const opName = rowAssignments[rowIndex]?.operator || 'Operator';
+    addToast('success', `${job.customer_name} → ${opName}`, 'Operator assigned successfully');
+  };
+
+  // Main assignment handler (from AssignOperatorModal)
+  const handleAssignOperator = (operatorName: string, helperName: string | null) => {
+    if (!assignTarget) return;
+    const { job, source } = assignTarget;
+
+    const targetRow = findRowForOperator(operatorName);
+    if (targetRow === -1) {
+      addToast('error', 'No Available Rows', 'All crew rows are full — remove a job first');
+      setAssignTarget(null);
+      return;
+    }
+
+    // Ensure this operator is set in the target row
+    if (rowAssignments[targetRow].operator !== operatorName) {
+      setRowAssignments(prev => prev.map((r, i) =>
+        i === targetRow ? { operator: operatorName, helper: helperName } : r
+      ));
+    } else if (helperName && rowAssignments[targetRow].helper !== helperName) {
+      setRowAssignments(prev => prev.map((r, i) =>
+        i === targetRow ? { ...r, helper: helperName } : r
+      ));
+    }
+
+    // Check conflict: does this operator already have jobs?
+    const existingJobs = operatorJobs[targetRow] || [];
+    if (existingJobs.length > 0) {
+      // CONFLICT — show modal
+      setConflictData({
+        personName: operatorName,
+        personRole: 'operator',
+        currentJobName: existingJobs[0].customer_name,
+        newJob: job,
+        newJobSource: source,
+        targetRowIndex: targetRow,
+        helperName,
+      });
+      setAssignTarget(null);
+      return;
+    }
+
+    // No conflict — assign directly
+    proceedWithAssignment(targetRow, job, source, helperName);
     setAssignTarget(null);
   };
 
-  // --- Edit Job: Save ---
-  const handleEditSave = (updates: Partial<JobCardData> & { operatorIndex?: number | null }) => {
-    if (!editTarget) return;
-    const { job, operatorIndex: currentOpIdx } = editTarget;
-    const newOpIdx = updates.operatorIndex;
+  // Conflict: Add as 2nd job
+  const handleConflictAddSecondJob = () => {
+    if (!conflictData) return;
+    const { targetRowIndex, newJob, newJobSource, helperName } = conflictData;
+    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName);
+    setConflictData(null);
+  };
 
-    if (newOpIdx !== undefined && newOpIdx !== currentOpIdx) {
-      if (currentOpIdx !== null) {
+  // Conflict: Move operator to new job (old jobs → unassigned)
+  const handleConflictMoveToJob = () => {
+    if (!conflictData) return;
+    const { targetRowIndex, newJob, newJobSource, helperName } = conflictData;
+
+    // Move existing jobs from this row to unassigned
+    const existingJobs = operatorJobs[targetRowIndex] || [];
+    if (existingJobs.length > 0) {
+      setUnassignedJobs(prev => [...prev, ...existingJobs.map(j => ({ ...j, helper_names: [] }))]);
+      setOperatorJobs(prev => ({ ...prev, [targetRowIndex]: [] }));
+    }
+
+    // Now assign the new job
+    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName);
+    setConflictData(null);
+  };
+
+  // --- Edit Job: Save ---
+  const handleEditSave = (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null }) => {
+    if (!editTarget) return;
+    const { job, rowIndex: currentRowIdx } = editTarget;
+    const newOpName = updates.newOperatorName;
+    const newHelperName = updates.newHelperName;
+
+    // Clean operator fields from the job updates
+    const jobUpdates = { ...updates };
+    delete (jobUpdates as any).newOperatorName;
+    delete (jobUpdates as any).newHelperName;
+
+    // Check if operator changed
+    const currentOp = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.operator : null;
+    const operatorChanged = newOpName !== undefined && newOpName !== currentOp;
+
+    if (operatorChanged) {
+      // Remove from current row
+      if (currentRowIdx !== null) {
         setOperatorJobs(prev => ({
           ...prev,
-          [currentOpIdx]: (prev[currentOpIdx] || []).filter(j => j.id !== job.id),
+          [currentRowIdx]: (prev[currentRowIdx] || []).filter(j => j.id !== job.id),
         }));
       } else {
         setUnassignedJobs(prev => prev.filter(u => u.id !== job.id));
       }
 
-      const updatedJob = {
-        ...job,
-        ...updates,
-        helper_names: newOpIdx !== null ? [OPERATORS[newOpIdx].helper] : [],
-      };
-      delete (updatedJob as any).operatorIndex;
+      if (newOpName) {
+        // Moving to a named operator
+        const targetRow = findRowForOperator(newOpName);
+        if (targetRow !== -1) {
+          // Ensure operator is set in row
+          if (rowAssignments[targetRow].operator !== newOpName) {
+            setRowAssignments(prev => prev.map((r, i) =>
+              i === targetRow ? { operator: newOpName, helper: newHelperName ?? r.helper } : r
+            ));
+          }
 
-      if (newOpIdx !== null) {
-        setOperatorJobs(prev => ({
-          ...prev,
-          [newOpIdx]: [...(prev[newOpIdx] || []), updatedJob],
-        }));
-        addToast('success', 'Job Updated', `${job.customer_name} moved to ${OPERATORS[newOpIdx].name}`);
+          const updatedJob = {
+            ...job,
+            ...jobUpdates,
+            helper_names: newHelperName ? [newHelperName] : [],
+          };
+
+          // Check for conflict
+          const existingJobs = operatorJobs[targetRow] || [];
+          if (existingJobs.length > 0 && targetRow !== currentRowIdx) {
+            // Conflict — for edit, just add as 2nd job (simpler flow)
+            setOperatorJobs(prev => ({
+              ...prev,
+              [targetRow]: [...(prev[targetRow] || []), updatedJob],
+            }));
+            addToast('info', 'Job Updated', `${job.customer_name} added as 2nd job for ${newOpName}`);
+          } else {
+            setOperatorJobs(prev => ({
+              ...prev,
+              [targetRow]: [...(prev[targetRow] || []), updatedJob],
+            }));
+            addToast('success', 'Job Updated', `${job.customer_name} moved to ${newOpName}`);
+          }
+        }
       } else {
+        // Moving to unassigned
+        const updatedJob = { ...job, ...jobUpdates, helper_names: [] };
         setUnassignedJobs(prev => [...prev, updatedJob]);
         addToast('success', 'Job Updated', `${job.customer_name} moved to unassigned`);
       }
     } else {
-      const updatedJob = { ...job, ...updates };
-      delete (updatedJob as any).operatorIndex;
+      // No operator change — update in place
+      const updatedJob = {
+        ...job,
+        ...jobUpdates,
+        helper_names: newHelperName !== undefined ? (newHelperName ? [newHelperName] : []) : job.helper_names,
+      };
 
-      if (currentOpIdx !== null) {
+      // Update helper in row assignment if changed
+      if (newHelperName !== undefined && currentRowIdx !== null) {
+        setRowAssignments(prev => prev.map((r, i) =>
+          i === currentRowIdx ? { ...r, helper: newHelperName } : r
+        ));
+      }
+
+      if (currentRowIdx !== null) {
         setOperatorJobs(prev => ({
           ...prev,
-          [currentOpIdx]: (prev[currentOpIdx] || []).map(j => j.id === job.id ? updatedJob : j),
+          [currentRowIdx]: (prev[currentRowIdx] || []).map(j => j.id === job.id ? updatedJob : j),
         }));
       } else {
         setUnassignedJobs(prev => prev.map(j => j.id === job.id ? updatedJob : j));
@@ -392,8 +569,7 @@ export default function ScheduleBoardPage() {
     const updateJobInPlace = (jobs: JobCardData[]) =>
       jobs.map(j => j.id === jobId ? { ...j, change_requests_count: j.change_requests_count + 1 } : j);
 
-    for (const opIdx of Object.keys(operatorJobs)) {
-      const idx = parseInt(opIdx);
+    for (let idx = 0; idx < NUM_ROWS; idx++) {
       if (operatorJobs[idx]?.some(j => j.id === jobId)) {
         setOperatorJobs(prev => ({ ...prev, [idx]: updateJobInPlace(prev[idx]) }));
         break;
@@ -427,8 +603,7 @@ export default function ScheduleBoardPage() {
 
     const updateCount = (jobs: JobCardData[]) =>
       jobs.map(j => j.id === notesTarget.id ? { ...j, notes_count: j.notes_count + 1 } : j);
-    for (const opIdx of Object.keys(operatorJobs)) {
-      const idx = parseInt(opIdx);
+    for (let idx = 0; idx < NUM_ROWS; idx++) {
       if (operatorJobs[idx]?.some(j => j.id === notesTarget.id)) {
         setOperatorJobs(prev => ({ ...prev, [idx]: updateCount(prev[idx]) }));
         break;
@@ -442,11 +617,11 @@ export default function ScheduleBoardPage() {
   // --- Remove from schedule ---
   const handleRemoveFromSchedule = () => {
     if (!editTarget) return;
-    const { job, operatorIndex } = editTarget;
-    if (operatorIndex !== null) {
+    const { job, rowIndex } = editTarget;
+    if (rowIndex !== null) {
       setOperatorJobs(prev => ({
         ...prev,
-        [operatorIndex]: (prev[operatorIndex] || []).filter(j => j.id !== job.id),
+        [rowIndex]: (prev[rowIndex] || []).filter(j => j.id !== job.id),
       }));
     } else {
       setUnassignedJobs(prev => prev.filter(u => u.id !== job.id));
@@ -458,11 +633,11 @@ export default function ScheduleBoardPage() {
   // --- Make will call ---
   const handleMakeWillCall = () => {
     if (!editTarget) return;
-    const { job, operatorIndex } = editTarget;
-    if (operatorIndex !== null) {
+    const { job, rowIndex } = editTarget;
+    if (rowIndex !== null) {
       setOperatorJobs(prev => ({
         ...prev,
-        [operatorIndex]: (prev[operatorIndex] || []).filter(j => j.id !== job.id),
+        [rowIndex]: (prev[rowIndex] || []).filter(j => j.id !== job.id),
       }));
     } else {
       setUnassignedJobs(prev => prev.filter(u => u.id !== job.id));
@@ -474,7 +649,7 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Assign job to available operator ---
-  const handleAssignToAvailableOperator = (operatorIndex: number) => {
+  const handleAssignToAvailableOperator = (rowIndex: number) => {
     if (unassignedJobs.length > 0) {
       setAssignTarget({ job: unassignedJobs[0], source: 'unassigned' });
     } else if (willCallJobs.length > 0) {
@@ -482,6 +657,20 @@ export default function ScheduleBoardPage() {
     } else {
       addToast('info', 'No Jobs Available', 'No unassigned or will-call jobs to assign');
     }
+  };
+
+  // --- Row dropdown: change operator ---
+  const handleChangeRowOperator = (rowIndex: number, newOperator: string | null) => {
+    setRowAssignments(prev => prev.map((r, i) =>
+      i === rowIndex ? { ...r, operator: newOperator } : r
+    ));
+  };
+
+  // --- Row dropdown: change helper ---
+  const handleChangeRowHelper = (rowIndex: number, newHelper: string | null) => {
+    setRowAssignments(prev => prev.map((r, i) =>
+      i === rowIndex ? { ...r, helper: newHelper } : r
+    ));
   };
 
   // --- Quick Add ---
@@ -643,12 +832,11 @@ export default function ScheduleBoardPage() {
                     <div key={job.id} className="bg-white rounded-xl border-2 border-amber-300 p-3 hover:shadow-md transition-all">
                       <div className="flex items-start justify-between mb-1">
                         <h4 className="font-bold text-gray-900 text-sm">{job.customer_name}</h4>
-                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold whitespace-nowrap">📞 WILL CALL</span>
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold whitespace-nowrap">WILL CALL</span>
                       </div>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mb-1">{job.job_type}</span>
                       <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><MapPin className="w-3 h-3" /> {job.location}</p>
 
-                      {/* Days waiting badge */}
                       <div className="flex items-center justify-between mt-2 mb-2">
                         <span className="text-xs text-gray-400">
                           Tentative: {parseLocalDate(job.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -667,7 +855,7 @@ export default function ScheduleBoardPage() {
                             onClick={() => handleMoveWillCallToSchedule(job)}
                             className="flex-1 py-1.5 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
                           >
-                            Schedule Now →
+                            Schedule Now
                           </button>
                           <button
                             onClick={() => setAssignTarget({ job, source: 'willcall' })}
@@ -688,19 +876,26 @@ export default function ScheduleBoardPage() {
 
       {/* ═══ DAY VIEW — OPERATOR ROWS ════════════════════════════════════ */}
       <div className="container mx-auto px-4 md:px-6 pb-6 space-y-4">
-        {OPERATORS.map((op, idx) => (
+        {Array.from({ length: NUM_ROWS }).map((_, idx) => (
           <OperatorRow
             key={idx}
-            operatorName={op.name}
-            helperName={op.helper}
+            rowIndex={idx}
+            operatorName={rowAssignments[idx]?.operator ?? null}
+            helperName={rowAssignments[idx]?.helper ?? null}
             jobs={operatorJobs[idx] || []}
             colorScheme={OPERATOR_COLORS[idx % OPERATOR_COLORS.length]}
             canEdit={canEdit}
             isAvailable={(operatorJobs[idx] || []).length === 0}
-            onEditJob={(job) => canEdit ? setEditTarget({ job, operatorIndex: idx }) : setChangeRequestTarget(job)}
+            allOperators={ALL_OPERATORS}
+            allHelpers={ALL_HELPERS}
+            busyOperators={busyOperators}
+            busyHelpers={busyHelpers}
+            onEditJob={(job) => canEdit ? setEditTarget({ job, rowIndex: idx }) : setChangeRequestTarget(job)}
             onRequestChange={(job) => setChangeRequestTarget(job)}
             onViewNotes={(job) => handleViewNotes(job)}
             onAssignJob={() => handleAssignToAvailableOperator(idx)}
+            onChangeOperator={(name) => handleChangeRowOperator(idx, name)}
+            onChangeHelper={(name) => handleChangeRowHelper(idx, name)}
           />
         ))}
 
@@ -777,7 +972,10 @@ export default function ScheduleBoardPage() {
       {assignTarget && (
         <AssignOperatorModal
           job={assignTarget.job}
-          operators={getOperatorJobCounts()}
+          allOperators={ALL_OPERATORS}
+          allHelpers={ALL_HELPERS}
+          busyOperators={busyOperators}
+          busyHelpers={busyHelpers}
           onConfirm={handleAssignOperator}
           onClose={() => setAssignTarget(null)}
         />
@@ -787,8 +985,12 @@ export default function ScheduleBoardPage() {
         <EditJobPanel
           job={editTarget.job}
           canEdit={canEdit}
-          operators={OPERATORS}
-          currentOperatorIndex={editTarget.operatorIndex}
+          allOperators={ALL_OPERATORS}
+          allHelpers={ALL_HELPERS}
+          currentOperatorName={editTarget.rowIndex !== null ? rowAssignments[editTarget.rowIndex]?.operator ?? null : null}
+          currentHelperName={editTarget.rowIndex !== null ? rowAssignments[editTarget.rowIndex]?.helper ?? null : null}
+          busyOperators={busyOperators}
+          busyHelpers={busyHelpers}
           onSave={handleEditSave}
           onClose={() => setEditTarget(null)}
           onViewNotes={() => { setEditTarget(null); handleViewNotes(editTarget.job); }}
@@ -819,6 +1021,19 @@ export default function ScheduleBoardPage() {
           salesmen={SALESMEN}
           onSubmit={handleQuickAdd}
           onClose={() => setShowQuickAdd(false)}
+        />
+      )}
+
+      {/* ═══ CONFLICT MODAL ════════════════════════════════════════════ */}
+      {conflictData && (
+        <ConflictModal
+          personName={conflictData.personName}
+          personRole={conflictData.personRole}
+          currentJobName={conflictData.currentJobName}
+          newJobName={conflictData.newJob.customer_name}
+          onAddSecondJob={handleConflictAddSecondJob}
+          onMoveToJob={handleConflictMoveToJob}
+          onClose={() => setConflictData(null)}
         />
       )}
 

@@ -1,18 +1,27 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Users, MapPin, UserCheck } from 'lucide-react';
+import { X, Users, MapPin, UserCheck, AlertTriangle } from 'lucide-react';
 import type { JobCardData } from './JobCard';
 
 interface AssignOperatorModalProps {
   job: JobCardData;
-  operators: { name: string; helper: string; jobCount: number }[];
-  onConfirm: (operatorIndex: number) => void;
+  allOperators: string[];
+  allHelpers: string[];
+  busyOperators: Record<string, string>; // name → current job customer_name
+  busyHelpers: Record<string, string>;
+  onConfirm: (operatorName: string, helperName: string | null) => void;
   onClose: () => void;
 }
 
-export default function AssignOperatorModal({ job, operators, onConfirm, onClose }: AssignOperatorModalProps) {
-  const [selected, setSelected] = useState<number | null>(null);
+export default function AssignOperatorModal({
+  job, allOperators, allHelpers, busyOperators, busyHelpers, onConfirm, onClose,
+}: AssignOperatorModalProps) {
+  const [selectedOperator, setSelectedOperator] = useState<string>('');
+  const [selectedHelper, setSelectedHelper] = useState<string>('');
+
+  const operatorBusy = selectedOperator ? busyOperators[selectedOperator] : null;
+  const helperBusy = selectedHelper ? busyHelpers[selectedHelper] : null;
 
   return (
     <>
@@ -50,46 +59,60 @@ export default function AssignOperatorModal({ job, operators, onConfirm, onClose
               )}
             </div>
 
-            {/* Operator list */}
+            {/* Operator dropdown */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
                 <Users className="w-4 h-4 inline mr-1.5" />
-                Available Operators
+                Operator
               </label>
-              <div className="space-y-1.5 max-h-72 overflow-y-auto">
-                {operators.map((op, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelected(idx)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm transition-all ${
-                      selected === idx
-                        ? 'border-purple-500 bg-purple-50 shadow-md'
-                        : 'border-gray-200 hover:border-gray-300 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-bold text-gray-900">{op.name}</span>
-                        <p className="text-xs text-gray-400 mt-0.5">+ {op.helper} (Helper)</p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                          op.jobCount === 0
-                            ? 'bg-green-100 text-green-700'
-                            : op.jobCount >= 2
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {op.jobCount} {op.jobCount === 1 ? 'job' : 'jobs'}
-                        </span>
-                        {op.jobCount === 0 && (
-                          <p className="text-[10px] text-green-600 font-semibold mt-0.5">Available</p>
-                        )}
-                      </div>
-                    </div>
-                  </button>
+              <select
+                value={selectedOperator}
+                onChange={(e) => setSelectedOperator(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white transition-all"
+              >
+                <option value="">Select Operator...</option>
+                {allOperators.map(name => (
+                  <option key={name} value={name}>
+                    {name}{busyOperators[name] ? ` — On: ${busyOperators[name]}` : ''}
+                  </option>
                 ))}
-              </div>
+              </select>
+              {operatorBusy && (
+                <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1.5 bg-amber-50 rounded-lg border border-amber-200">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                  <p className="text-xs text-amber-700">
+                    Already assigned to <span className="font-bold">{operatorBusy}</span> today
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Helper dropdown */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                <Users className="w-4 h-4 inline mr-1.5" />
+                Helper <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <select
+                value={selectedHelper}
+                onChange={(e) => setSelectedHelper(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white transition-all"
+              >
+                <option value="">No Helper</option>
+                {allHelpers.map(name => (
+                  <option key={name} value={name}>
+                    {name}{busyHelpers[name] ? ` — On: ${busyHelpers[name]}` : ''}
+                  </option>
+                ))}
+              </select>
+              {helperBusy && (
+                <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1.5 bg-amber-50 rounded-lg border border-amber-200">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                  <p className="text-xs text-amber-700">
+                    Already assigned to <span className="font-bold">{helperBusy}</span> today
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
@@ -101,11 +124,11 @@ export default function AssignOperatorModal({ job, operators, onConfirm, onClose
                 Cancel
               </button>
               <button
-                onClick={() => selected !== null && onConfirm(selected)}
-                disabled={selected === null}
+                onClick={() => selectedOperator && onConfirm(selectedOperator, selectedHelper || null)}
+                disabled={!selectedOperator}
                 className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                ✓ Assign Operator
+                ✓ Assign
               </button>
             </div>
           </div>
