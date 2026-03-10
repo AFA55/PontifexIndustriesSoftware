@@ -18,48 +18,6 @@ interface NotesDrawerProps {
   onClose: () => void;
 }
 
-// Mock notes for demo
-const MOCK_NOTES_MAP: Record<string, NoteData[]> = {
-  '1': [
-    { id: 'n1', author: 'Robert Altamirano', text: 'Client confirmed 12 cores total. Floors 3, 4, and 5.', timestamp: '2026-03-08T09:00:00' },
-    { id: 'n2', author: 'Mike Rodriguez', text: 'Checked out equipment — HCD and CS-14 loaded on truck.', timestamp: '2026-03-09T16:30:00' },
-    { id: 'n3', author: 'Admin', text: 'Hospital security needs 24hr advance notice for access badges.', timestamp: '2026-03-09T08:15:00' },
-  ],
-  '2': [
-    { id: 'n4', author: 'Michael Chen', text: 'Receiving area is in the back. Use dock entrance.', timestamp: '2026-03-09T11:00:00' },
-  ],
-  '3': [
-    { id: 'n5', author: 'Admin', text: 'TxDOT requires traffic control plan before starting each day.', timestamp: '2026-03-07T14:00:00' },
-    { id: 'n6', author: 'Juan Salazar', text: 'Day 1 complete. 120 LF cut. Blade wearing fast on rebar.', timestamp: '2026-03-08T17:00:00' },
-    { id: 'n7', author: 'Admin', text: 'Ordered new blades. Will arrive by morning.', timestamp: '2026-03-08T18:30:00' },
-    { id: 'n8', author: 'Juan Salazar', text: 'Day 2 done. 140 LF with new blade. Much better.', timestamp: '2026-03-09T17:00:00' },
-    { id: 'n9', author: 'Robert Altamirano', text: 'DOT inspector will be on site Thursday for progress check.', timestamp: '2026-03-09T09:00:00' },
-    { id: 'n10', author: 'Admin', text: 'Night work approved for Thursday/Friday if needed to meet deadline.', timestamp: '2026-03-09T15:00:00' },
-    { id: 'n11', author: 'Juan Salazar', text: 'Need extra water supply - hydrant access on west side only.', timestamp: '2026-03-10T06:00:00' },
-  ],
-  '5': [
-    { id: 'n12', author: 'Michael Chen', text: 'Suite level access through Gate C only.', timestamp: '2026-03-09T10:00:00' },
-    { id: 'n13', author: 'Admin', text: 'GPR scan first, then core per findings.', timestamp: '2026-03-09T14:00:00' },
-  ],
-  '6': [
-    { id: 'n14', author: 'Robert Altamirano', text: 'Wire saw setup must be approved by structural engineer on site.', timestamp: '2026-03-08T11:00:00' },
-    { id: 'n15', author: 'Admin', text: 'Columns are 36" diameter. Heavy reinforcement.', timestamp: '2026-03-08T13:00:00' },
-    { id: 'n16', author: 'Robert Garcia', text: 'Equipment checked, wire measured and loaded. Ready.', timestamp: '2026-03-09T16:00:00' },
-    { id: 'n17', author: 'Admin', text: 'Crane support available if needed. Call site super.', timestamp: '2026-03-09T17:30:00' },
-    { id: 'n18', author: 'Michael Chen', text: 'Dust containment system required — active patient areas nearby.', timestamp: '2026-03-10T07:00:00' },
-  ],
-  '7': [
-    { id: 'n19', author: 'Admin', text: 'NIGHT SHIFT ONLY — 8pm to 6am. No daytime work allowed.', timestamp: '2026-03-08T14:00:00' },
-    { id: 'n20', author: 'Robert Altamirano', text: 'Patient rooms must be cleared before cutting starts each night.', timestamp: '2026-03-09T09:00:00' },
-    { id: 'n21', author: 'James Wilson', text: 'Hand saw only — no power saws in patient areas per hospital rules.', timestamp: '2026-03-09T20:00:00' },
-    { id: 'n22', author: 'Admin', text: 'Noise complaint from last project. Keep it under control.', timestamp: '2026-03-10T08:00:00' },
-  ],
-};
-
-export function getNotesForJob(jobId: string): NoteData[] {
-  return MOCK_NOTES_MAP[jobId] || [];
-}
-
 export default function NotesDrawer({ job, notes, onAddNote, onClose }: NotesDrawerProps) {
   const [newNote, setNewNote] = useState('');
 

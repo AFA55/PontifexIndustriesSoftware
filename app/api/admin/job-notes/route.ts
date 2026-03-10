@@ -5,12 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireScheduleBoardAccess } from '@/lib/api-auth';
 
 // GET: Fetch notes for a specific job order
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(request.url);
@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       .from('job_notes')
       .select('*')
       .eq('job_order_id', jobOrderId)
+      .neq('note_type', 'change_log')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
 // POST: Create a new note on a job order
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();

@@ -88,7 +88,7 @@ export default function CompletedJobDetailsPage() {
       const userStr = localStorage.getItem('pontifex-user');
       if (userStr) {
         const user = JSON.parse(userStr);
-        if (user.role !== 'admin') {
+        if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(user.role)) {
           router.push('/dashboard');
         }
       }

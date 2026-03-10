@@ -3,356 +3,277 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import {
+  ChevronLeft, User, Mail, Phone, Calendar, Shield, Save,
+  Loader2, CheckCircle, Camera
+} from 'lucide-react';
+import { getCurrentUser } from '@/lib/auth';
 
-interface OperatorMetrics {
-  total_jobs_completed: number;
-  total_linear_feet_cut: number;
-  total_hours_worked: number;
-  avg_linear_feet_per_hour: number;
-  safety_score: number;
-  customer_satisfaction_avg: number;
-  total_customer_ratings: number;
-  jobs_on_budget: number;
-  jobs_over_budget: number;
-}
-
-interface OperatorSkill {
-  work_type: string;
-  proficiency_level: number;
-  jobs_completed: number;
-  avg_productivity: number;
-  avg_customer_rating: number;
-}
-
-interface JobHistory {
+interface MyProfile {
   id: string;
-  job_date: string;
-  work_type: string;
-  linear_feet_cut: number;
-  hours_worked: number;
-  productivity_rate: number;
-  customer_rating: number;
+  full_name: string;
+  nickname: string | null;
+  email: string;
+  phone: string | null;
+  phone_number: string | null;
+  date_of_birth: string | null;
+  role: string;
+  profile_picture_url: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
 }
 
-export default function MyProfile() {
+async function apiFetch(url: string, opts?: RequestInit) {
+  const stored = typeof window !== 'undefined' ? localStorage.getItem('supabase-user') : null;
+  const token = stored ? JSON.parse(stored).session?.access_token : null;
+  return fetch(url, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...opts?.headers,
+    },
+  });
+}
+
+export default function MyProfilePage() {
   const router = useRouter();
+  const [profile, setProfile] = useState<MyProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [operatorName, setOperatorName] = useState('');
-  const [metrics, setMetrics] = useState<OperatorMetrics | null>(null);
-  const [skills, setSkills] = useState<OperatorSkill[]>([]);
-  const [recentJobs, setRecentJobs] = useState<JobHistory[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Editable fields
+  const [nickname, setNickname] = useState('');
+  const [phone, setPhone] = useState('');
+  const [dob, setDob] = useState('');
+  const [profilePicUrl, setProfilePicUrl] = useState('');
+  const [ecName, setEcName] = useState('');
+  const [ecPhone, setEcPhone] = useState('');
+  const [ecRelationship, setEcRelationship] = useState('');
 
   useEffect(() => {
-    loadOperatorData();
+    const currentUser = getCurrentUser();
+    if (!currentUser) { router.push('/login'); return; }
+  }, [router]);
+
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const res = await apiFetch('/api/my-profile');
+        if (res.ok) {
+          const json = await res.json();
+          const p = json.data;
+          setProfile(p);
+          setNickname(p.nickname || '');
+          setPhone(p.phone_number || p.phone || '');
+          setDob(p.date_of_birth || '');
+          setProfilePicUrl(p.profile_picture_url || '');
+          setEcName(p.emergency_contact_name || '');
+          setEcPhone(p.emergency_contact_phone || '');
+          setEcRelationship(p.emergency_contact_relationship || '');
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProfile();
   }, []);
 
-  const loadOperatorData = async () => {
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-        return;
+      const res = await apiFetch('/api/my-profile', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          nickname: nickname || null,
+          phone_number: phone || null,
+          date_of_birth: dob || null,
+          profile_picture_url: profilePicUrl || null,
+          emergency_contact_name: ecName || null,
+          emergency_contact_phone: ecPhone || null,
+          emergency_contact_relationship: ecRelationship || null,
+        }),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
       }
-
-      // Get operator profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('first_name, last_name')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profile) {
-        setOperatorName(`${profile.first_name} ${profile.last_name}`);
-      }
-
-      // Get performance metrics
-      const { data: metricsData } = await supabase
-        .from('operator_performance_metrics')
-        .select('*')
-        .eq('operator_id', session.user.id)
-        .single();
-
-      if (metricsData) {
-        setMetrics(metricsData);
-      }
-
-      // Get skills
-      const { data: skillsData } = await supabase
-        .from('operator_skills')
-        .select('*')
-        .eq('operator_id', session.user.id)
-        .order('avg_productivity', { ascending: false });
-
-      if (skillsData) {
-        setSkills(skillsData);
-      }
-
-      // Get recent job history
-      const { data: jobsData } = await supabase
-        .from('operator_job_history')
-        .select('*')
-        .eq('operator_id', session.user.id)
-        .order('job_date', { ascending: false })
-        .limit(10);
-
-      if (jobsData) {
-        setRecentJobs(jobsData);
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Error loading operator data:', error);
-      setLoading(false);
+    } catch (err) {
+      console.error('Failed to save profile:', err);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const getProficiencyLabel = (level: number) => {
-    switch (level) {
-      case 1: return 'Beginner';
-      case 2: return 'Intermediate';
-      case 3: return 'Advanced';
-      case 4: return 'Expert';
-      case 5: return 'Master';
-      default: return 'Unknown';
-    }
-  };
-
-  const formatWorkType = (workType: string) => {
-    return workType
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading your profile...</p>
-        </div>
-      </div>
-    );
-  }
+  const roleName = profile?.role === 'apprentice' ? 'Helper' : profile?.role === 'operator' ? 'Operator' : profile?.role || '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      {/* Header */}
-      <div className="backdrop-blur-xl bg-white/90 border-b border-gray-200 sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/dashboard"
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold text-gray-800">My Performance Profile</h1>
-                <p className="text-sm text-gray-600">{operatorName}</p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      <div className="container mx-auto px-4 md:px-6 py-6 max-w-2xl">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/dashboard" className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+            <ChevronLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <User className="w-6 h-6 text-purple-400" />
+              My Profile
+            </h1>
+            <p className="text-sm text-gray-400">View and edit your information</p>
           </div>
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
-        {/* Overall Performance Stats */}
-        {metrics ? (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              {/* Jobs Completed */}
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                  </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+          </div>
+        ) : profile ? (
+          <div className="space-y-6">
+            {/* Profile Header Card */}
+            <div className="bg-white/5 rounded-2xl border border-white/10 p-6 flex items-center gap-5">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 relative">
+                {profile.profile_picture_url ? (
+                  <img src={profile.profile_picture_url} alt="" className="w-full h-full rounded-2xl object-cover" />
+                ) : (
+                  <span className="text-white font-bold text-2xl">
+                    {profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center border-2 border-slate-900">
+                  <Camera className="w-3 h-3" />
                 </div>
-                <h3 className="text-3xl font-bold text-gray-900">{metrics.total_jobs_completed}</h3>
-                <p className="text-sm text-gray-600 font-medium">Jobs Completed</p>
               </div>
-
-              {/* Productivity Rate */}
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="text-3xl font-bold text-gray-900">{metrics.avg_linear_feet_per_hour.toFixed(1)}</h3>
-                <p className="text-sm text-gray-600 font-medium">LF/Hour Avg</p>
-              </div>
-
-              {/* Safety Score */}
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="text-3xl font-bold text-gray-900">{metrics.safety_score.toFixed(0)}</h3>
-                <p className="text-sm text-gray-600 font-medium">Safety Score</p>
-              </div>
-
-              {/* Customer Rating */}
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="text-3xl font-bold text-gray-900">
-                  {metrics.total_customer_ratings > 0 ? metrics.customer_satisfaction_avg.toFixed(1) : 'N/A'}
-                </h3>
-                <p className="text-sm text-gray-600 font-medium">
-                  Customer Rating {metrics.total_customer_ratings > 0 && `(${metrics.total_customer_ratings})`}
-                </p>
+              <div>
+                <h2 className="text-xl font-bold">{profile.full_name}</h2>
+                <span className={`inline-flex px-3 py-0.5 rounded-full text-xs font-bold mt-1 ${
+                  profile.role === 'operator' ? 'bg-purple-500/20 text-purple-300' : 'bg-cyan-500/20 text-cyan-300'
+                }`}>
+                  {roleName}
+                </span>
+                <p className="text-sm text-gray-400 mt-1">{profile.email}</p>
               </div>
             </div>
 
-            {/* Additional Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                <h4 className="text-sm font-semibold text-gray-600 mb-2">Total Production</h4>
-                <p className="text-2xl font-bold text-gray-900">{metrics.total_linear_feet_cut.toFixed(0)} LF</p>
-                <p className="text-xs text-gray-500 mt-1">Linear feet cut total</p>
+            {/* Editable Fields */}
+            <div className="bg-white/5 rounded-2xl border border-white/10 p-6 space-y-5">
+              <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider">Personal Info</h3>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-400 mb-1">Nickname</label>
+                <input
+                  type="text"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  placeholder="What do people call you?"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                />
               </div>
 
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                <h4 className="text-sm font-semibold text-gray-600 mb-2">Total Hours</h4>
-                <p className="text-2xl font-bold text-gray-900">{metrics.total_hours_worked.toFixed(1)} hrs</p>
-                <p className="text-xs text-gray-500 mt-1">Hours worked total</p>
+              <div>
+                <label className="block text-sm font-semibold text-gray-400 mb-1">Phone Number</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(555) 123-4567"
+                    className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  />
+                </div>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                <h4 className="text-sm font-semibold text-gray-600 mb-2">Budget Performance</h4>
-                <p className="text-2xl font-bold text-gray-900">
-                  {metrics.total_jobs_completed > 0
-                    ? ((metrics.jobs_on_budget / metrics.total_jobs_completed) * 100).toFixed(0)
-                    : 0}%
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {metrics.jobs_on_budget} on budget, {metrics.jobs_over_budget} over
-                </p>
+              <div>
+                <label className="block text-sm font-semibold text-gray-400 mb-1">Date of Birth</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <input
+                    type="date"
+                    value={dob}
+                    onChange={(e) => setDob(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-400 mb-1">Profile Picture URL</label>
+                <input
+                  type="url"
+                  value={profilePicUrl}
+                  onChange={(e) => setProfilePicUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                />
               </div>
             </div>
-          </>
+
+            {/* Emergency Contact */}
+            <div className="bg-white/5 rounded-2xl border border-white/10 p-6 space-y-5">
+              <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                <Shield className="w-4 h-4 text-red-400" />
+                Emergency Contact
+              </h3>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-400 mb-1">Contact Name</label>
+                <input
+                  type="text"
+                  value={ecName}
+                  onChange={(e) => setEcName(e.target.value)}
+                  placeholder="Full name"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-400 mb-1">Contact Phone</label>
+                <input
+                  type="tel"
+                  value={ecPhone}
+                  onChange={(e) => setEcPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-400 mb-1">Relationship</label>
+                <input
+                  type="text"
+                  value={ecRelationship}
+                  onChange={(e) => setEcRelationship(e.target.value)}
+                  placeholder="e.g. Spouse, Parent, Sibling"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+              ) : saved ? (
+                <><CheckCircle className="w-4 h-4" /> Saved!</>
+              ) : (
+                <><Save className="w-4 h-4" /> Save Changes</>
+              )}
+            </button>
+          </div>
         ) : (
-          <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-8 mb-6 text-center">
-            <svg className="w-16 h-16 text-blue-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">No Performance Data Yet</h3>
-            <p className="text-gray-600">
-              Complete your first job to start tracking your performance metrics!
-            </p>
-          </div>
-        )}
-
-        {/* Skills by Work Type */}
-        {skills.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Skills by Work Type</h2>
-            <div className="space-y-4">
-              {skills.map((skill) => (
-                <div key={skill.work_type} className="border-2 border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{formatWorkType(skill.work_type)}</h3>
-                      <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold mt-1">
-                        {getProficiencyLabel(skill.proficiency_level)}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-gray-900">{skill.avg_productivity.toFixed(1)}</p>
-                      <p className="text-xs text-gray-600">LF/Hour</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-600">Jobs</p>
-                      <p className="font-bold text-gray-900">{skill.jobs_completed}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Avg Rating</p>
-                      <p className="font-bold text-gray-900">
-                        {skill.avg_customer_rating > 0 ? skill.avg_customer_rating.toFixed(1) : 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Productivity</p>
-                      <p className="font-bold text-gray-900">{skill.avg_productivity.toFixed(1)} LF/hr</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recent Job History */}
-        {recentJobs.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent Jobs</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b-2 border-gray-200">
-                    <th className="text-left py-3 px-2 text-sm font-semibold text-gray-700">Date</th>
-                    <th className="text-left py-3 px-2 text-sm font-semibold text-gray-700">Work Type</th>
-                    <th className="text-right py-3 px-2 text-sm font-semibold text-gray-700">Linear Feet</th>
-                    <th className="text-right py-3 px-2 text-sm font-semibold text-gray-700">Hours</th>
-                    <th className="text-right py-3 px-2 text-sm font-semibold text-gray-700">LF/Hour</th>
-                    <th className="text-right py-3 px-2 text-sm font-semibold text-gray-700">Rating</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentJobs.map((job) => (
-                    <tr key={job.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-2 text-sm text-gray-900">
-                        {new Date(job.job_date).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 px-2 text-sm text-gray-900">
-                        {job.work_type ? formatWorkType(job.work_type) : 'N/A'}
-                      </td>
-                      <td className="py-3 px-2 text-sm text-gray-900 text-right">
-                        {job.linear_feet_cut?.toFixed(1) || '0.0'}
-                      </td>
-                      <td className="py-3 px-2 text-sm text-gray-900 text-right">
-                        {job.hours_worked?.toFixed(1) || '0.0'}
-                      </td>
-                      <td className="py-3 px-2 text-sm font-bold text-gray-900 text-right">
-                        {job.productivity_rate?.toFixed(1) || '0.0'}
-                      </td>
-                      <td className="py-3 px-2 text-sm text-gray-900 text-right">
-                        {job.customer_rating ? (
-                          <span className="inline-flex items-center">
-                            {job.customer_rating}
-                            <svg className="w-4 h-4 text-yellow-500 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          </span>
-                        ) : (
-                          'N/A'
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="text-center py-20 text-gray-400">
+            <User className="w-12 h-12 mx-auto mb-3 text-gray-600" />
+            <p>Could not load profile</p>
           </div>
         )}
       </div>

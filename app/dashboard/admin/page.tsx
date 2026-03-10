@@ -79,8 +79,8 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (currentUser.role !== 'admin') {
-      console.log('🚫 User is not admin, redirecting to operator dashboard...');
+    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(currentUser.role)) {
+      console.log('🚫 User does not have admin dashboard access, redirecting to operator dashboard...');
       router.push('/dashboard');
       return;
     }
@@ -201,19 +201,20 @@ export default function AdminDashboard() {
     setShowWalkthrough(false);
   };
 
-  // Super admin email — only super admin sees all cards unblurred
-  const SUPER_ADMIN_EMAIL = 'andres.altamirano1280@gmail.com';
-  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL;
+  // Role checks — role-based, not email-based
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isOpsManager = user?.role === 'operations_manager';
 
   // Check if card should be accessible
-  // Super admin: sees everything
-  // All other admins: only Timecard Management is unblurred (building one feature at a time)
+  // Super admin & operations_manager: sees everything
+  // All other admins: only core cards are unblurred
   const isCardAccessible = (moduleTitle: string) => {
-    if (isSuperAdmin) return true; // Super admin sees all
+    if (isSuperAdmin || isOpsManager) return true; // Full access
 
     const accessibleCards = [
       'Timecard Management',
       'Schedule Form',
+      'Schedule Board',
     ];
 
     return accessibleCards.includes(moduleTitle);
@@ -329,6 +330,16 @@ export default function AdminDashboard() {
       iconBg: 'bg-purple-500',
       features: ['View all equipment', 'Search by operator', 'Equipment status', 'Assignment tracking'],
       status: 'active'
+    },
+    {
+      title: 'Operations Hub',
+      description: 'System diagnostics, security monitoring, and audit trail',
+      icon: '🛡️',
+      href: '/dashboard/admin/ops-hub',
+      bgColor: 'from-slate-600 to-slate-800',
+      iconBg: 'bg-slate-600',
+      features: ['API Health Checks', 'Login Audit Trail', 'Error Monitoring', 'Database Stats'],
+      status: 'active'
     }
   ];
 
@@ -358,7 +369,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-white">{user?.name || 'Admin'}</p>
-                  <p className="text-xs text-blue-200 capitalize font-medium">Super Admin</p>
+                  <p className="text-xs text-blue-200 capitalize font-medium">{user?.role?.replace('_', ' ') || 'Admin'}</p>
                 </div>
               </div>
 
@@ -426,7 +437,7 @@ export default function AdminDashboard() {
           }).map((module, index) => {
             const isActive = module.status === 'active';
             const isAccessible = isCardAccessible(module.title);
-            const isBlurred = !isSuperAdmin && !isAccessible;
+            const isBlurred = !isSuperAdmin && !isOpsManager && !isAccessible;
 
             const cardContent = (
               <>

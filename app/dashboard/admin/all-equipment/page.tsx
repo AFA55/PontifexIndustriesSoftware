@@ -324,7 +324,7 @@ export default function AllEquipmentPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {(user?.role === 'admin' || user?.role === 'inventory_manager') && (
+            {(['admin', 'super_admin', 'operations_manager', 'inventory_manager'].includes(user?.role || '')) && (
               <Link href="/dashboard/inventory">
                 <button className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center gap-2">
                   <Package className="w-5 h-5" />
@@ -332,7 +332,7 @@ export default function AllEquipmentPage() {
                 </button>
               </Link>
             )}
-            {user?.role === 'admin' && (
+            {['admin', 'super_admin', 'operations_manager'].includes(user?.role || '') && (
               <button
                 onClick={() => setShowAddModal(true)}
                 className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center gap-2"
@@ -343,7 +343,7 @@ export default function AllEquipmentPage() {
                 Add Equipment
               </button>
             )}
-            {user?.role === 'admin' && (
+            {['admin', 'super_admin', 'operations_manager'].includes(user?.role || '') && (
               <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg">
                 👑 ADMIN VIEW
               </div>
@@ -611,9 +611,9 @@ export default function AllEquipmentPage() {
               return (
                 <div
                   key={item.id}
-                  onClick={() => user?.role === 'admin' && handleOpenManageModal(item)}
+                  onClick={() => ['admin', 'super_admin', 'operations_manager'].includes(user?.role || '') && handleOpenManageModal(item)}
                   className={`bg-white rounded-2xl border-2 border-gray-200 p-6 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] ${
-                    user?.role === 'admin' ? 'cursor-pointer' : ''
+                    ['admin', 'super_admin', 'operations_manager'].includes(user?.role || '') ? 'cursor-pointer' : ''
                   }`}
                 >
                   {/* Header */}

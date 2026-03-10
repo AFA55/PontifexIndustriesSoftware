@@ -68,7 +68,7 @@ export default function AssignOperatorModal({
               <select
                 value={selectedOperator}
                 onChange={(e) => setSelectedOperator(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
               >
                 <option value="">Select Operator...</option>
                 {allOperators.map(name => (
@@ -96,7 +96,7 @@ export default function AssignOperatorModal({
               <select
                 value={selectedHelper}
                 onChange={(e) => setSelectedHelper(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
               >
                 <option value="">No Helper</option>
                 {allHelpers.map(name => (

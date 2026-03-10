@@ -85,7 +85,7 @@ export default function CompletedJobsArchivePage() {
       .eq('id', session.user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(profile?.role || '')) {
       router.push('/dashboard');
     }
   };

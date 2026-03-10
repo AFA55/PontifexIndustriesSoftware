@@ -57,7 +57,7 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || profile.role !== 'admin') {
+  if (profileError || !profile || !['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
     return {
       authorized: false,
       response: NextResponse.json(
@@ -73,6 +73,48 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
     userEmail: user.email || '',
     role: profile.role,
   };
+}
+
+/**
+ * Require the request to have a valid Bearer token belonging to a super_admin user.
+ * Returns 401 if no/invalid token, 403 if not super_admin.
+ */
+export async function requireSuperAdmin(request: NextRequest): Promise<AuthResult> {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth;
+
+  if (auth.role !== 'super_admin') {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Super admin access required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return auth;
+}
+
+/**
+ * Require the request to have a valid Bearer token belonging to an admin, super_admin, or salesman.
+ * Used for Schedule Board access where all three roles can view.
+ */
+export async function requireScheduleBoardAccess(request: NextRequest): Promise<AuthResult> {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth;
+
+  if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(auth.role)) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Schedule board access required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return auth;
 }
 
 /**
@@ -163,16 +205,47 @@ export async function requireAuth(request: NextRequest): Promise<AuthResult> {
     };
   }
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single();
 
+  if (profileError || !profile || !profile.role) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. User profile not found or incomplete.' },
+        { status: 403 }
+      ),
+    };
+  }
+
   return {
     authorized: true,
     userId: user.id,
     userEmail: user.email || '',
-    role: profile?.role || 'operator',
+    role: profile.role,
   };
+}
+
+/**
+ * Require the request to have a valid Bearer token belonging to a super_admin or operations_manager.
+ * Used for the Operations Hub diagnostics dashboard.
+ */
+export async function requireOpsManager(request: NextRequest): Promise<AuthResult> {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth;
+
+  if (!['super_admin', 'operations_manager'].includes(auth.role)) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Operations manager or super admin access required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return auth;
 }

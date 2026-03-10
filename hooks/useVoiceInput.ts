@@ -262,9 +262,13 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
 
       let errorMessage: string;
       switch (event.error) {
-        case 'not-allowed':
-          errorMessage = 'Microphone access denied. Please allow microphone access and try again.';
+        case 'not-allowed': {
+          const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+          errorMessage = isSafari
+            ? 'Microphone not supported in Safari. Please use Chrome or Edge for voice input.'
+            : 'Microphone access denied. Please allow microphone access in your browser settings and try again.';
           break;
+        }
         case 'no-speech':
           // In accumulate mode, no-speech after some accumulated text = done talking
           if (accumulateResults && accumulatedRef.current.trim()) {

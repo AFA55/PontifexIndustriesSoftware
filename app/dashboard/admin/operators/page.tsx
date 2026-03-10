@@ -58,7 +58,7 @@ export default function OperatorsMonitoringPage() {
       return;
     }
 
-    if (currentUser.role !== 'admin') {
+    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(currentUser.role)) {
       router.push('/dashboard');
       return;
     }

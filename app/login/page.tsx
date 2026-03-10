@@ -75,8 +75,8 @@ export default function LoginPage() {
       console.log('💾 User stored in localStorage');
 
       // Redirect based on user role
-      if (result.user.role === 'admin') {
-        console.log('🔑 Admin user, redirecting to admin dashboard...');
+      if (['admin', 'super_admin', 'salesman', 'operations_manager'].includes(result.user.role)) {
+        console.log(`🔑 ${result.user.role} user, redirecting to admin dashboard...`);
         router.push('/dashboard/admin');
       } else if (result.user.role === 'operator' || result.user.role === 'apprentice') {
         console.log('👤 Operator/Apprentice user, redirecting to operator dashboard...');
@@ -88,7 +88,11 @@ export default function LoginPage() {
       // Keep loading state true during navigation - it will unmount anyway
     } catch (err: any) {
       console.error('💥 Unexpected login error:', err);
-      setError('An unexpected error occurred');
+      if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+        setError('Cannot connect to server. Please check your connection or try again.');
+      } else {
+        setError('An unexpected error occurred');
+      }
       setLoading(false);
     }
   };

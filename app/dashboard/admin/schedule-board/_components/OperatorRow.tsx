@@ -167,7 +167,7 @@ export default function OperatorRow({
               ) : (
                 <div>
                   <h3 className="font-bold text-gray-900 text-sm sm:text-base">
-                    {operatorName || 'Unassigned Crew'}
+                    {operatorName || 'Available'}
                   </h3>
                   {helperName && (
                     <p className="text-xs text-gray-500">+ {helperName}</p>
@@ -211,15 +211,16 @@ export default function OperatorRow({
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center py-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-            <p className="text-sm text-gray-400">
-              No jobs assigned
+          <div className="flex items-center justify-center py-3 bg-green-50/50 rounded-lg border-2 border-dashed border-green-200">
+            <p className="text-sm text-green-500 font-medium flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-400 rounded-full" />
+              Available
               {canEdit && (
                 <button
                   onClick={onAssignJob}
-                  className="ml-2 text-purple-600 hover:text-purple-800 font-semibold hover:underline"
+                  className="ml-1 text-purple-600 hover:text-purple-800 font-semibold hover:underline"
                 >
-                  + Assign Job
+                  + Assign
                 </button>
               )}
             </p>

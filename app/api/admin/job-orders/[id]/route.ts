@@ -53,8 +53,8 @@ export async function PATCH(
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin or super_admin
+    if (!['admin', 'super_admin'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can update job orders' },
         { status: 403 }
@@ -87,8 +87,9 @@ export async function PATCH(
     const allowedFields = [
       'arrival_time', 'shop_arrival_time', 'location', 'address',
       'customer_name', 'foreman_name', 'foreman_phone', 'equipment_needed',
-      'description', 'assigned_to', 'scheduled_date', 'end_date',
-      'estimated_hours', 'operator_name', 'status', 'priority',
+      'description', 'assigned_to', 'helper_assigned_to', 'scheduled_date', 'end_date',
+      'estimated_hours', 'estimated_cost', 'operator_name', 'status', 'priority',
+      'is_will_call', 'difficulty_rating',
     ];
 
     allowedFields.forEach(field => {
@@ -265,8 +266,8 @@ export async function DELETE(
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin or super_admin
+    if (!['admin', 'super_admin'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can delete job orders' },
         { status: 403 }

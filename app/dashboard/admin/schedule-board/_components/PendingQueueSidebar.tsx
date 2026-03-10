@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Clock, MapPin, Wrench, CheckCircle, Phone, AlertCircle, User } from 'lucide-react';
+import { X, Clock, MapPin, Wrench, CheckCircle, Phone, AlertCircle, User, DollarSign, CalendarDays } from 'lucide-react';
 
 export interface PendingJob {
   id: string;
@@ -15,6 +15,9 @@ export interface PendingJob {
   difficulty_rating: number | null;
   is_will_call: boolean;
   scheduled_date: string | null;
+  end_date: string | null;
+  estimated_cost: number | null;
+  address: string;
 }
 
 interface PendingQueueSidebarProps {
@@ -77,7 +80,7 @@ export default function PendingQueueSidebar({
                 className="bg-white rounded-xl border-2 border-orange-200 hover:border-orange-300 shadow-sm hover:shadow-md transition-all"
               >
                 <div className="p-4">
-                  {/* Customer + Job type */}
+                  {/* Customer + Job type + Quoted */}
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h3 className="font-bold text-gray-900">{job.customer_name}</h3>
@@ -85,13 +88,34 @@ export default function PendingQueueSidebar({
                         {job.job_type?.split(',')[0]?.trim()}
                       </span>
                     </div>
-                    {job.is_will_call && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-300">
-                        <Phone className="w-3 h-3 inline mr-1" />
-                        Will Call
-                      </span>
-                    )}
+                    <div className="flex flex-col items-end gap-1">
+                      {job.estimated_cost && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200 flex items-center gap-0.5">
+                          <DollarSign className="w-3 h-3" />
+                          {Number(job.estimated_cost).toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                        </span>
+                      )}
+                      {job.is_will_call && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-300">
+                          <Phone className="w-3 h-3 inline mr-1" />
+                          Will Call
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Date range */}
+                  {(job.scheduled_date || job.end_date) && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                      <CalendarDays className="w-3.5 h-3.5 text-gray-400" />
+                      <span>
+                        {job.scheduled_date ? new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
+                        {job.end_date && job.end_date !== job.scheduled_date && (
+                          <> &rarr; {new Date(job.end_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>
+                        )}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Location */}
                   {job.location && (

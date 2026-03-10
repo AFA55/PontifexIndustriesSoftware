@@ -1,11 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Plus, Calendar, User, Building2, Send } from 'lucide-react';
+import { X, Plus, Calendar, User, Building2, Send, Clock, FileText } from 'lucide-react';
+
+export interface QuickAddData {
+  salesmanName: string;
+  startDate: string;
+  contractorName: string;
+  durationDays: number;
+  scope: string;
+}
 
 interface QuickAddModalProps {
   salesmen: string[];
-  onSubmit: (data: { salesmanName: string; startDate: string; contractorName: string }) => void;
+  onSubmit: (data: QuickAddData) => void;
   onClose: () => void;
 }
 
@@ -13,8 +21,19 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
   const [salesmanName, setSalesmanName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [contractorName, setContractorName] = useState('');
+  const [durationDays, setDurationDays] = useState(1);
+  const [scope, setScope] = useState('');
 
   const isValid = salesmanName.trim() && startDate && contractorName.trim();
+
+  // Block weekends from date picker
+  const handleDateChange = (val: string) => {
+    if (!val) { setStartDate(''); return; }
+    const d = new Date(val + 'T00:00:00');
+    const day = d.getDay(); // 0=Sun 6=Sat
+    if (day === 0 || day === 6) return; // silently reject weekends
+    setStartDate(val);
+  };
 
   return (
     <>
@@ -89,8 +108,56 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => handleDateChange(e.target.value)}
                 className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 text-sm text-gray-900 bg-white transition-all"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">Weekends are excluded by default</p>
+            </div>
+
+            {/* Duration */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                <Clock className="w-4 h-4 inline mr-1.5" />
+                Duration (days)
+              </label>
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 5, 7, 10].map(d => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDurationDays(d)}
+                    className={`px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+                      durationDays === d
+                        ? 'bg-green-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={durationDays}
+                  onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-16 px-2 py-2 border-2 border-gray-300 rounded-xl text-sm text-center focus:border-green-500 focus:ring-2 focus:ring-green-200"
+                />
+              </div>
+            </div>
+
+            {/* Scope of work */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                <FileText className="w-4 h-4 inline mr-1.5" />
+                Brief Scope of Work <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <textarea
+                value={scope}
+                onChange={(e) => setScope(e.target.value)}
+                placeholder="e.g. Core drill 8 holes in concrete slab, 6 inch diameter..."
+                rows={2}
+                className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 text-sm text-gray-900 bg-white placeholder:text-gray-400 transition-all resize-none"
               />
             </div>
 
@@ -103,7 +170,7 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
                 Cancel
               </button>
               <button
-                onClick={() => isValid && onSubmit({ salesmanName, startDate, contractorName })}
+                onClick={() => isValid && onSubmit({ salesmanName, startDate, contractorName, durationDays, scope })}
                 disabled={!isValid}
                 className="flex-1 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >

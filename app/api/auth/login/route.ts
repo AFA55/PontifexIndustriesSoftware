@@ -7,9 +7,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { logAuditEvent } from '@/lib/audit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
+
+// Fire-and-forget login attempt logging
+function logLoginAttempt(params: {
+  email: string;
+  success: boolean;
+  failureReason?: string;
+  userId?: string;
+  request: NextRequest;
+}) {
+  const ipAddress = params.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || params.request.headers.get('x-real-ip')
+    || null;
+  const userAgent = params.request.headers.get('user-agent') || null;
+
+  Promise.resolve(
+    supabaseAdmin
+      .from('login_attempts')
+      .insert({
+        email: params.email,
+        success: params.success,
+        failure_reason: params.failureReason || null,
+        user_id: params.userId || null,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+      })
+  )
+    .then(({ error }) => {
+      if (error) console.error('[login-audit] Failed to log attempt:', error.message);
+    })
+    .catch(() => { /* silent */ });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,6 +66,7 @@ export async function POST(request: NextRequest) {
 
     if (authError || !authData.user) {
       console.error('Auth error for', email, ':', authError?.message || 'No user returned');
+      logLoginAttempt({ email, success: false, failureReason: 'invalid_credentials', request });
       return NextResponse.json(
         { error: authError?.message === 'Invalid login credentials'
             ? 'Invalid email or password. Please check your credentials and try again.'
@@ -51,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     if (profileError || !profile) {
       console.error('Profile fetch error:', profileError);
-      // Sign out the user
+      logLoginAttempt({ email, success: false, failureReason: 'profile_not_found', userId: authData.user.id, request });
       await supabase.auth.signOut();
       return NextResponse.json(
         { error: 'Profile not found' },
@@ -60,12 +93,24 @@ export async function POST(request: NextRequest) {
     }
 
     if (!profile.active) {
+      logLoginAttempt({ email, success: false, failureReason: 'inactive_account', userId: authData.user.id, request });
       await supabase.auth.signOut();
       return NextResponse.json(
         { error: 'Account is inactive' },
         { status: 403 }
       );
     }
+
+    // Log successful login
+    logLoginAttempt({ email, success: true, userId: profile.id, request });
+    logAuditEvent({
+      userId: profile.id,
+      userEmail: email,
+      userRole: profile.role,
+      action: 'login',
+      resourceType: 'auth',
+      request,
+    });
 
     // Return success with session and profile
     return NextResponse.json(

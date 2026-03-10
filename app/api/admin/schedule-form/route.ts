@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
       return NextResponse.json({ error: 'Only administrators can create schedule forms' }, { status: 403 });
     }
 
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       // ── Auto-generated ──────────────────────────────────────
       job_number: jobNumber,
       title: `${body.customer_name} - ${body.job_type?.split(',')[0]?.trim() || 'Job'}`,
-      status: 'scheduled',
+      status: profile.role === 'super_admin' ? 'scheduled' : 'pending_approval',
       priority: 'medium',
       created_by: user.id,
       created_via: 'schedule_form',

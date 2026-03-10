@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin
-    if (profile.role !== 'admin') {
+    if (!['admin', 'super_admin'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view all job orders' },
         { status: 403 }
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is admin
-    if (profile.role !== 'admin') {
+    if (!['admin', 'super_admin'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can create job orders' },
         { status: 403 }

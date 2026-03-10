@@ -117,7 +117,22 @@ export const isAuthenticated = (): boolean => {
 
 export const isAdmin = (): boolean => {
   const user = getCurrentUser();
-  return user?.role === 'admin';
+  return user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'operations_manager';
+};
+
+export const isOpsManager = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'operations_manager';
+};
+
+export const isSuperAdmin = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'super_admin';
+};
+
+export const isSalesman = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'salesman';
 };
 
 export const isOperator = (): boolean => {
