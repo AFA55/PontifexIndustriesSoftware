@@ -8,6 +8,7 @@ import {
   RefreshCw, Loader2, Users, Database, Clock, Globe, Lock, Server
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 
 interface ApiHealthItem {
   endpoint: string;
@@ -56,8 +57,8 @@ interface OpsHubData {
 }
 
 async function apiFetch(url: string) {
-  const stored = typeof window !== 'undefined' ? localStorage.getItem('supabase-user') : null;
-  const token = stored ? JSON.parse(stored).session?.access_token : null;
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
   return fetch(url, {
     headers: {
       'Content-Type': 'application/json',
