@@ -1,42 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Clock, MapPin, Calendar, ArrowRight, User } from 'lucide-react';
+import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import DayNavigator from './_components/DayNavigator';
+import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
+import NotificationBanner from './_components/NotificationBanner';
 
-interface JobOrder {
-  id: string;
-  job_number: string;
-  title: string;
-  customer_name: string;
-  job_type: string;
-  location: string;
-  address: string;
-  status: string;
-  priority: string;
-  scheduled_date: string;
-  arrival_time: string;
-  estimated_hours: number;
-  foreman_name: string;
-  foreman_phone: string;
-  readable_status: string;
-  drive_hours: number;
-  production_hours: number;
+function toDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function parseDate(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 export default function MyJobsPage() {
   const router = useRouter();
-  const [jobs, setJobs] = useState<JobOrder[]>([]);
+  const [selectedDate, setSelectedDate] = useState(toDateString(new Date()));
+  const [jobs, setJobs] = useState<JobTicketData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [userRole, setUserRole] = useState<string>('operator');
+  const [userId, setUserId] = useState<string>('');
+  const [hasLongDurationJob, setHasLongDurationJob] = useState(false);
 
-  useEffect(() => {
-    fetchJobs();
-  }, [activeTab]);
+  const isHelper = userRole === 'apprentice';
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async (date: string) => {
+    setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -44,251 +38,159 @@ export default function MyJobsPage() {
         return;
       }
 
-      const includeCompleted = activeTab === 'completed';
-      const response = await fetch(`/api/job-orders?includeCompleted=${includeCompleted}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
+      // Fetch jobs for the selected date (including completed for lookback)
+      const res = await fetch(
+        `/api/job-orders?scheduled_date=${date}&include_helper_jobs=true&includeCompleted=true`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          // Filter based on tab
-          let filteredJobs = result.data;
-          if (activeTab === 'active') {
-            filteredJobs = result.data.filter((job: JobOrder) => job.status !== 'completed');
-          } else {
-            filteredJobs = result.data.filter((job: JobOrder) => job.status === 'completed');
-          }
-          setJobs(filteredJobs);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          // Mark jobs where current user is the helper (not the operator)
+          const uid = session.user.id;
+          setUserId(uid);
+          const enriched = (json.data || []).map((j: any) => ({
+            ...j,
+            isHelper: j.helper_assigned_to === uid && j.assigned_to !== uid,
+          }));
+          setJobs(enriched);
+          if (json.user_role) setUserRole(json.user_role);
         }
       }
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
+    } catch (err) {
+      console.error('Error fetching schedule:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'scheduled':
-      case 'assigned':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'in_route':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'in_progress':
-        return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'completed':
-        return 'bg-green-100 text-green-700 border-green-200';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
+  // Check for long-duration jobs (>3 days) for 7-day lookahead
+  const checkLongDurationJobs = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const today = toDateString(new Date());
+      const weekAhead = new Date();
+      weekAhead.setDate(weekAhead.getDate() + 7);
+      const weekStr = toDateString(weekAhead);
+
+      const res = await fetch(
+        `/api/job-orders?date_from=${today}&date_to=${weekStr}&include_helper_jobs=true&includeCompleted=false`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
+
+      if (res.ok) {
+        const json = await res.json();
+        const hasLong = (json.data || []).some((j: any) => {
+          if (!j.end_date || !j.scheduled_date) return false;
+          const start = parseDate(j.scheduled_date);
+          const end = parseDate(j.end_date);
+          const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          return days > 3;
+        });
+        setHasLongDurationJob(hasLong);
+      }
+    } catch {
+      // silent
     }
-  };
+  }, []);
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-        return 'bg-red-100 text-red-700';
-      case 'high':
-        return 'bg-orange-100 text-orange-700';
-      case 'medium':
-        return 'bg-blue-100 text-blue-700';
-      case 'low':
-        return 'bg-gray-100 text-gray-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
+  useEffect(() => {
+    fetchJobs(selectedDate);
+  }, [selectedDate, fetchJobs]);
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'Not scheduled';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  useEffect(() => {
+    checkLongDurationJobs();
+  }, [checkLongDurationJobs]);
 
-  if (loading) {
+
+  if (loading && jobs.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading your jobs...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg font-medium">Loading your schedule...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Professional Header */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-50 shadow-2xl">
+        <div className="container mx-auto px-4 py-4 max-w-lg">
+          <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
-              className="p-3 bg-white rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
+              className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <ArrowLeft className="w-5 h-5" />
             </Link>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-                <span className="text-5xl">📋</span>
-                My Job Orders
-              </h1>
-              <p className="text-gray-600 font-medium mt-1">View and manage your assigned work orders</p>
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
+              <Briefcase className="w-5 h-5" />
             </div>
+            <div className="flex-1">
+              <h1 className="text-lg font-bold">
+                {isHelper ? 'My Schedule' : 'My Schedule'}
+              </h1>
+              <p className="text-blue-200 text-xs">
+                {isHelper ? 'Team member duties for the day' : 'Dispatched job tickets'}
+              </p>
+            </div>
+            {isHelper && (
+              <span className="text-xs px-2.5 py-1 bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 rounded-lg font-semibold">
+                Team Member
+              </span>
+            )}
           </div>
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab('active')}
-            className={`px-6 py-3 rounded-xl font-semibold transition-all ${
-              activeTab === 'active'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            Active Jobs
-          </button>
-          <button
-            onClick={() => setActiveTab('completed')}
-            className={`px-6 py-3 rounded-xl font-semibold transition-all ${
-              activeTab === 'completed'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            Completed Jobs
-          </button>
+      <div className="container mx-auto px-4 py-5 max-w-lg">
+        {/* Notification Banner */}
+        <NotificationBanner />
+
+        {/* Day Navigator */}
+        <div className="mb-5">
+          <DayNavigator
+            selectedDate={selectedDate}
+            onChange={setSelectedDate}
+            hasLongDurationJob={hasLongDurationJob}
+          />
         </div>
 
-        {/* Jobs Grid */}
-        {jobs.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-12 text-center">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+        {/* Job Tickets */}
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          </div>
+        ) : jobs.length === 0 ? (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-10 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Inbox className="w-8 h-8 text-gray-400" />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">
-              {activeTab === 'active' ? 'No active jobs' : 'No completed jobs'}
-            </h3>
-            <p className="text-gray-600">
-              {activeTab === 'active'
-                ? 'New job assignments will appear here'
-                : 'Completed jobs will appear here'}
+            <h3 className="text-lg font-bold text-gray-700 mb-2">No jobs for this day</h3>
+            <p className="text-sm text-gray-500">
+              {selectedDate === toDateString(new Date())
+                ? 'Check back later — your schedule may not be dispatched yet.'
+                : 'No jobs are scheduled for this date.'}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
             {jobs.map((job) => (
-              <Link
-                key={job.id}
-                href={`/dashboard/my-jobs/${job.id}`}
-                className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-bold text-gray-500">#{job.job_number}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getPriorityColor(job.priority)}`}>
-                        {job.priority.toUpperCase()}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800 mb-1">{job.title}</h3>
-                    <p className="text-sm text-gray-600">{job.customer_name}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold border-2 ${getStatusColor(job.status)}`}>
-                    {job.readable_status}
-                  </span>
-                </div>
-
-                {/* Job Type Badge */}
-                <div className="mb-4">
-                  <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-semibold">
-                    {job.job_type}
-                  </span>
-                </div>
-
-                {/* Details */}
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-700">{job.location}</p>
-                      <p className="text-xs text-gray-500">{job.address}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">
-                      {formatDate(job.scheduled_date)}
-                      {job.arrival_time && <span className="text-gray-500"> at {job.arrival_time}</span>}
-                    </span>
-                  </div>
-
-                  {job.estimated_hours && (
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-700">
-                        Estimated: {job.estimated_hours} hours
-                      </span>
-                    </div>
-                  )}
-
-                  {job.foreman_name && (
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-700">
-                        Foreman: {job.foreman_name}
-                        {job.foreman_phone && <span className="text-gray-500"> • {job.foreman_phone}</span>}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Time Tracking (for completed jobs) */}
-                {job.status === 'completed' && (job.drive_hours || job.production_hours) && (
-                  <div className="border-t border-gray-200 pt-4 mt-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      {job.drive_hours > 0 && (
-                        <div>
-                          <p className="text-gray-500 text-xs">Drive Time</p>
-                          <p className="font-bold text-gray-800">{job.drive_hours.toFixed(2)} hrs</p>
-                        </div>
-                      )}
-                      {job.production_hours > 0 && (
-                        <div>
-                          <p className="text-gray-500 text-xs">Production Time</p>
-                          <p className="font-bold text-gray-800">{job.production_hours.toFixed(2)} hrs</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Button */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">
-                      {job.status === 'completed' ? 'View Details' : 'Open Job'}
-                    </span>
-                    <ArrowRight className="w-5 h-5 text-blue-600" />
-                  </div>
-                </div>
-              </Link>
+              <JobTicketCard key={job.id} job={job} />
             ))}
+          </div>
+        )}
+
+        {/* Job Count */}
+        {jobs.length > 0 && (
+          <div className="mt-4 text-center text-sm text-gray-400 font-medium">
+            {jobs.length} job{jobs.length !== 1 ? 's' : ''} for this day
           </div>
         )}
       </div>

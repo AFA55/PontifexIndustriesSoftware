@@ -112,19 +112,94 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build query from active_job_orders view
+    // Additional query params for schedule view
+    const dateFrom = searchParams.get('date_from');
+    const dateTo = searchParams.get('date_to');
+    const includeHelperJobs = searchParams.get('include_helper_jobs') === 'true';
+    const dispatchedOnly = searchParams.get('dispatched_only') === 'true';
+
+    const isAdminRole = ['admin', 'super_admin', 'operations_manager', 'salesman', 'supervisor'].includes(profile?.role || '');
+    const isFieldWorker = ['operator', 'apprentice'].includes(profile?.role || '');
+
+    // For operators/helpers: use OR filter (assigned_to OR helper_assigned_to)
+    if (!isAdminRole && (includeHelperJobs || isFieldWorker)) {
+      // Need two separate queries and merge results
+      let operatorQuery = supabaseAdmin.from('active_job_orders').select('*').eq('assigned_to', user.id);
+      let helperQuery = supabaseAdmin.from('active_job_orders').select('*').eq('helper_assigned_to', user.id);
+
+      // Apply shared filters
+      if (scheduledDate) {
+        operatorQuery = operatorQuery.eq('scheduled_date', scheduledDate);
+        helperQuery = helperQuery.eq('scheduled_date', scheduledDate);
+      }
+      if (dateFrom) {
+        operatorQuery = operatorQuery.gte('scheduled_date', dateFrom);
+        helperQuery = helperQuery.gte('scheduled_date', dateFrom);
+      }
+      if (dateTo) {
+        operatorQuery = operatorQuery.lte('scheduled_date', dateTo);
+        helperQuery = helperQuery.lte('scheduled_date', dateTo);
+      }
+      if (status) {
+        operatorQuery = operatorQuery.eq('status', status);
+        helperQuery = helperQuery.eq('status', status);
+      }
+      if (!includeCompleted) {
+        operatorQuery = operatorQuery.neq('status', 'completed');
+        helperQuery = helperQuery.neq('status', 'completed');
+      }
+      if (dispatchedOnly) {
+        operatorQuery = operatorQuery.not('dispatched_at', 'is', null);
+        helperQuery = helperQuery.not('dispatched_at', 'is', null);
+      }
+
+      operatorQuery = operatorQuery.order('scheduled_date', { ascending: true });
+      helperQuery = helperQuery.order('scheduled_date', { ascending: true });
+
+      const [opResult, helperResult] = await Promise.all([operatorQuery, helperQuery]);
+
+      if (opResult.error) {
+        console.error('Error fetching operator jobs:', opResult.error);
+        return NextResponse.json({ error: 'Failed to fetch job orders' }, { status: 500 });
+      }
+
+      // Merge and deduplicate by id
+      const allJobs = [...(opResult.data || [])];
+      const seenIds = new Set(allJobs.map((j: any) => j.id));
+      for (const job of (helperResult.data || [])) {
+        if (!seenIds.has(job.id)) {
+          allJobs.push(job);
+          seenIds.add(job.id);
+        }
+      }
+
+      // Strip sensitive fields for field workers
+      const sanitized = isFieldWorker
+        ? allJobs.map((j: any) => { const { difficulty_rating, estimated_cost, ...rest } = j; return rest; })
+        : allJobs;
+
+      return NextResponse.json({ success: true, data: sanitized, user_role: profile?.role }, { status: 200 });
+    }
+
+    // Standard admin/single-role query
     let query = supabaseAdmin
       .from('active_job_orders')
       .select('*');
 
     // If not admin, only show jobs assigned to this user
-    if (!isAdmin) {
+    if (!isAdminRole) {
       query = query.eq('assigned_to', user.id);
     }
 
     // Filter by scheduled_date if provided
     if (scheduledDate) {
       query = query.eq('scheduled_date', scheduledDate);
+    }
+    if (dateFrom) {
+      query = query.gte('scheduled_date', dateFrom);
+    }
+    if (dateTo) {
+      query = query.lte('scheduled_date', dateTo);
     }
 
     query = query.order('scheduled_date', { ascending: true });
@@ -139,6 +214,10 @@ export async function GET(request: NextRequest) {
       query = query.neq('status', 'completed');
     }
 
+    if (dispatchedOnly) {
+      query = query.not('dispatched_at', 'is', null);
+    }
+
     const { data: jobOrders, error: fetchError } = await query;
 
     if (fetchError) {
@@ -149,19 +228,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Returning job orders with shop_arrival_time:',
-      (jobOrders || []).map((j: any) => ({
-        id: j.id,
-        job_number: j.job_number,
-        shop_arrival_time: j.shop_arrival_time,
-        arrival_time: j.arrival_time
-      }))
-    );
+    // Strip sensitive fields for field workers
+    const sanitized = isFieldWorker
+      ? (jobOrders || []).map((j: any) => { const { difficulty_rating, estimated_cost, ...rest } = j; return rest; })
+      : (jobOrders || []);
 
     return NextResponse.json(
       {
         success: true,
-        data: jobOrders || [],
+        data: sanitized,
+        user_role: profile?.role,
       },
       { status: 200 }
     );

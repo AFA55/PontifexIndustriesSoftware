@@ -1,23 +1,24 @@
 /**
  * API Route: GET /api/card-permissions/me
  * Get the current authenticated user's dashboard card permissions.
+ * Returns: { role: string, permissions: Record<string, PermissionLevel> }
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import type { PermissionLevel } from '@/lib/rbac';
 
-// GET: Current user's card permissions
+// GET: Current user's card permissions as a map
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
-    const { data: permissions, error } = await supabaseAdmin
+    const { data: rows, error } = await supabaseAdmin
       .from('user_card_permissions')
-      .select('*')
-      .eq('user_id', auth.userId)
-      .order('card_key', { ascending: true });
+      .select('card_key, permission_level')
+      .eq('user_id', auth.userId);
 
     if (error) {
       console.error('[card-permissions/me GET] Fetch error:', error);
@@ -27,9 +28,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Convert rows into a Record<string, PermissionLevel> map
+    const permMap: Record<string, PermissionLevel> = {};
+    (rows || []).forEach((r: { card_key: string; permission_level: string }) => {
+      permMap[r.card_key] = r.permission_level as PermissionLevel;
+    });
+
     return NextResponse.json({
       success: true,
-      data: permissions || [],
+      role: auth.role,
+      permissions: permMap,
     });
   } catch (error: any) {
     console.error('[card-permissions/me GET] Error:', error);

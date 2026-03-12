@@ -26,6 +26,7 @@ interface OperatorRowProps {
   onEditJob?: (job: JobCardData) => void;
   onRequestChange?: (job: JobCardData) => void;
   onViewNotes?: (job: JobCardData) => void;
+  onPreviewJob?: (job: JobCardData) => void;
   onAssignJob?: () => void;
   onChangeOperator?: (name: string | null) => void;
   onChangeHelper?: (name: string | null) => void;
@@ -125,6 +126,7 @@ export default function OperatorRow({
   onEditJob,
   onRequestChange,
   onViewNotes,
+  onPreviewJob,
   onAssignJob,
   onChangeOperator,
   onChangeHelper,
@@ -197,17 +199,22 @@ export default function OperatorRow({
         {jobs.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {jobs.map((job) => (
-              <JobCard
+              <div
                 key={job.id}
-                job={job}
-                colorScheme={colorScheme}
-                canEdit={canEdit}
-                assignedOperator={operatorName}
-                assignedHelper={helperName}
-                onEdit={onEditJob}
-                onRequestChange={onRequestChange}
-                onViewNotes={onViewNotes}
-              />
+                onClick={() => onPreviewJob?.(job)}
+                className={onPreviewJob ? 'cursor-pointer' : ''}
+              >
+                <JobCard
+                  job={job}
+                  colorScheme={colorScheme}
+                  canEdit={canEdit}
+                  assignedOperator={operatorName}
+                  assignedHelper={helperName}
+                  onEdit={onEditJob}
+                  onRequestChange={onRequestChange}
+                  onViewNotes={onViewNotes}
+                />
+              </div>
             ))}
           </div>
         ) : (

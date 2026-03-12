@@ -6,7 +6,8 @@ import Link from 'next/link';
 import {
   Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
-  UserCheck, UserX, Eye, FolderOpen, Timer, Loader2, Settings, Search, X
+  UserCheck, UserX, Eye, FolderOpen, Timer, Loader2, Settings, Search, X,
+  Megaphone, CheckCircle2
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -28,6 +29,7 @@ import type { JobCardData } from './_components/JobCard';
 import type { PendingJob } from './_components/PendingQueueSidebar';
 import type { ToastData } from './_components/Toast';
 import type { NoteData } from './_components/NotesDrawer';
+import JobPreviewPanel from './_components/JobPreviewPanel';
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
@@ -179,6 +181,11 @@ export default function ScheduleBoardPage() {
   const [showCapacitySettings, setShowCapacitySettings] = useState(false);
   const [toasts, setToasts] = useState<ToastData[]>([]);
 
+  // Dispatch state
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [dispatchLoading, setDispatchLoading] = useState(false);
+  const [dispatchInfo, setDispatchInfo] = useState<{ total: number; dispatched: number; undispatched: number } | null>(null);
+
   // Modal states
   const [approvalTarget, setApprovalTarget] = useState<PendingJob | null>(null);
   const [missingInfoTarget, setMissingInfoTarget] = useState<PendingJob | null>(null);
@@ -188,6 +195,7 @@ export default function ScheduleBoardPage() {
   const [notesTarget, setNotesTarget] = useState<JobCardData | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
+  const [previewJob, setPreviewJob] = useState<{ job: JobCardData; operatorName?: string | null; helperName?: string | null } | null>(null);
 
   // ═══ TOAST HELPER ═══
   const addToast = useCallback((type: ToastData['type'], title: string, message?: string) => {
@@ -198,6 +206,39 @@ export default function ScheduleBoardPage() {
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
+
+  // ═══ DISPATCH HELPERS ═══
+  const fetchDispatchStatus = useCallback(async (date: string) => {
+    try {
+      const res = await apiFetch(`/api/admin/schedule-board/dispatch?date=${date}`);
+      if (res.ok) {
+        const json = await res.json();
+        setDispatchInfo({ total: json.total, dispatched: json.dispatched, undispatched: json.undispatched });
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleDispatchJobs = useCallback(async (targetDate: string) => {
+    setDispatchLoading(true);
+    try {
+      const res = await apiFetch('/api/admin/schedule-board/dispatch', {
+        method: 'POST',
+        body: JSON.stringify({ target_date: targetDate }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        addToast('success', 'Jobs Dispatched', json.message);
+        setShowDispatchModal(false);
+        fetchDispatchStatus(targetDate);
+      } else {
+        addToast('error', 'Dispatch Failed', json.error || 'Unknown error');
+      }
+    } catch {
+      addToast('error', 'Dispatch Failed', 'Network error occurred.');
+    } finally {
+      setDispatchLoading(false);
+    }
+  }, [addToast, fetchDispatchStatus]);
 
   // ═══ AUTH GUARD ═══
   useEffect(() => {
@@ -304,7 +345,8 @@ export default function ScheduleBoardPage() {
 
   useEffect(() => {
     fetchScheduleData(selectedDate);
-  }, [selectedDate, fetchScheduleData]);
+    fetchDispatchStatus(selectedDate);
+  }, [selectedDate, fetchScheduleData, fetchDispatchStatus]);
 
   // ═══ FETCH DAILY NOTES ═══
   useEffect(() => {
@@ -1117,8 +1159,17 @@ export default function ScheduleBoardPage() {
                   >
                     <Plus className="w-4 h-4" /> Quick Add
                   </button>
-                  <button className="px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md">
-                    <Send className="w-4 h-4" /> Send
+                  <button
+                    onClick={() => {
+                      fetchDispatchStatus(selectedDate);
+                      setShowDispatchModal(true);
+                    }}
+                    className="relative px-3 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
+                  >
+                    <Megaphone className="w-4 h-4" /> Push Tickets
+                    {dispatchInfo && dispatchInfo.undispatched > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex items-center justify-center">{dispatchInfo.undispatched}</span>
+                    )}
                   </button>
                 </>
               )}
@@ -1281,6 +1332,7 @@ export default function ScheduleBoardPage() {
             onEditJob={(job) => canEdit ? setEditTarget({ job, rowIndex: idx }) : setChangeRequestTarget(job)}
             onRequestChange={(job) => setChangeRequestTarget(job)}
             onViewNotes={(job) => handleViewNotes(job)}
+            onPreviewJob={(job) => setPreviewJob({ job, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
             onAssignJob={() => handleAssignToAvailableOperator(idx)}
             onChangeOperator={(name) => handleChangeRowOperator(idx, name)}
             onChangeHelper={(name) => handleChangeRowHelper(idx, name)}
@@ -1405,6 +1457,16 @@ export default function ScheduleBoardPage() {
         />
       )}
 
+      {/* ═══ JOB PREVIEW PANEL ════════════════════════════════════════ */}
+      {previewJob && (
+        <JobPreviewPanel
+          job={previewJob.job}
+          operatorName={previewJob.operatorName}
+          helperName={previewJob.helperName}
+          onClose={() => setPreviewJob(null)}
+        />
+      )}
+
       {/* ═══ NEXT AVAILABLE DATE BANNER ════════════════════════════════ */}
       {nextAvailableDate && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
@@ -1435,6 +1497,95 @@ export default function ScheduleBoardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ═══ DISPATCH CONFIRMATION MODAL ═══════════════════════════════ */}
+      {showDispatchModal && (
+        <>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={() => !dispatchLoading && setShowDispatchModal(false)} />
+          <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200">
+              <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-t-2xl text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      <Megaphone className="w-5 h-5" />
+                      Push Job Tickets
+                    </h2>
+                    <p className="text-orange-100 text-sm">Dispatch tickets for {formatDisplayDate(selectedDate)}</p>
+                  </div>
+                  <button onClick={() => !dispatchLoading && setShowDispatchModal(false)} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {dispatchInfo ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center p-3 bg-gray-50 rounded-xl">
+                        <div className="text-2xl font-bold text-gray-900">{dispatchInfo.total}</div>
+                        <div className="text-xs text-gray-500 font-medium">Total Jobs</div>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded-xl border border-green-200">
+                        <div className="text-2xl font-bold text-green-700">{dispatchInfo.dispatched}</div>
+                        <div className="text-xs text-green-600 font-medium">Dispatched</div>
+                      </div>
+                      <div className="text-center p-3 bg-orange-50 rounded-xl border border-orange-200">
+                        <div className="text-2xl font-bold text-orange-700">{dispatchInfo.undispatched}</div>
+                        <div className="text-xs text-orange-600 font-medium">Ready to Push</div>
+                      </div>
+                    </div>
+
+                    {dispatchInfo.undispatched === 0 ? (
+                      <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+                        <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-bold text-green-800">All jobs dispatched!</p>
+                          <p className="text-xs text-green-600">All assigned jobs for this date have been pushed to operators.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                        <AlertCircle className="w-6 h-6 text-orange-600 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-bold text-orange-800">{dispatchInfo.undispatched} job(s) ready to dispatch</p>
+                          <p className="text-xs text-orange-600">This will notify all assigned operators and helpers.</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setShowDispatchModal(false)}
+                    disabled={dispatchLoading}
+                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl text-gray-700 font-semibold hover:bg-gray-50 transition-all disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDispatchJobs(selectedDate)}
+                    disabled={dispatchLoading || !dispatchInfo || dispatchInfo.undispatched === 0}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {dispatchLoading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Dispatching...</>
+                    ) : (
+                      <><Megaphone className="w-4 h-4" /> Push {dispatchInfo?.undispatched || 0} Tickets</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* ═══ CAPACITY SETTINGS MODAL (Super Admin only) ═════════════════ */}

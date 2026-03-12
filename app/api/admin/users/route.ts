@@ -1,71 +1,48 @@
 /**
  * API Route: GET /api/admin/users
- * Get users by role (admin only)
- * Query params: ?role=operator or ?role=admin or no param for all users
+ * Get users by role (admin access required).
+ * Query params:
+ *   ?role=operator — filter by single role
+ *   ?roles=admin,supervisor,salesman — filter by multiple roles (comma-separated)
+ *   ?active=true|false — filter by active status (default: all)
+ *   no params — return all users
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can view users' },
-        { status: 403 }
-      );
-    }
-
-    // Get role filter from query params
     const { searchParams } = new URL(request.url);
     const roleFilter = searchParams.get('role');
+    const rolesFilter = searchParams.get('roles');
+    const activeFilter = searchParams.get('active');
 
     // Build query
     let query = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, email, active')
-      .eq('active', true)
+      .select('id, full_name, role, email, active, phone_number, created_at')
       .order('full_name');
 
-    // Apply role filter if provided
+    // Apply role filters
     if (roleFilter) {
       query = query.eq('role', roleFilter);
+    } else if (rolesFilter) {
+      const roleList = rolesFilter.split(',').map(r => r.trim()).filter(Boolean);
+      if (roleList.length > 0) {
+        query = query.in('role', roleList);
+      }
+    }
+
+    // Apply active filter if provided
+    if (activeFilter === 'true') {
+      query = query.eq('active', true);
+    } else if (activeFilter === 'false') {
+      query = query.eq('active', false);
     }
 
     const { data: users, error: fetchError } = await query;

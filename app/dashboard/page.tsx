@@ -78,6 +78,11 @@ export default function Dashboard() {
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isShopHours, setIsShopHours] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [clockOutBlock, setClockOutBlock] = useState<{
+    show: boolean;
+    blockType: string;
+    incompleteJobs: { id: string; job_number: string; customer_name: string }[];
+  }>({ show: false, blockType: '', incompleteJobs: [] });
   const [debugInfo, setDebugInfo] = useState<{
     gpsStatus: string;
     latitude: number | null;
@@ -585,6 +590,17 @@ export default function Dashboard() {
       }));
 
       if (!response.ok) {
+        // Check for work-performed block
+        if (response.status === 403 && result.block_type) {
+          setClockOutBlock({
+            show: true,
+            blockType: result.block_type,
+            incompleteJobs: result.incomplete_jobs || [],
+          });
+          setClockLoading(false);
+          return;
+        }
+
         const errorDetail = result.details ? `\n${result.details}` : '';
         setClockMessage({
           type: 'error',
@@ -639,6 +655,60 @@ export default function Dashboard() {
           userId={user.id}
           onComplete={() => setShowOnboarding(false)}
         />
+      )}
+
+      {/* Clock-Out Block Modal */}
+      {clockOutBlock.show && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Cannot Clock Out</h3>
+              <p className="text-gray-600 text-sm">
+                {clockOutBlock.blockType === 'work_performed_required'
+                  ? 'You must complete work performed for all dispatched jobs before clocking out.'
+                  : 'You must submit a work log for all dispatched jobs before clocking out.'}
+              </p>
+            </div>
+
+            <div className="space-y-2 mb-6">
+              <p className="text-sm font-semibold text-gray-700">Incomplete jobs:</p>
+              {clockOutBlock.incompleteJobs.map((job) => (
+                <button
+                  key={job.id}
+                  onClick={() => {
+                    setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] });
+                    if (clockOutBlock.blockType === 'work_performed_required') {
+                      router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
+                    } else {
+                      router.push('/dashboard/my-jobs');
+                    }
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition-all text-left"
+                >
+                  <div>
+                    <span className="text-sm font-bold text-gray-900">#{job.job_number}</span>
+                    <span className="text-sm text-gray-600 ml-2">{job.customer_name}</span>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] })}
+              className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Demo Operator Walkthrough */}
@@ -996,25 +1066,26 @@ export default function Dashboard() {
         {/* Ultra Modern Card Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
 
-          {/* Job Schedule - BLURRED (building one feature at a time) */}
-          <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 p-1.5 shadow-2xl animate-fade-in-up blur-sm opacity-50 cursor-not-allowed">
+          {/* My Schedule - ACTIVE */}
+          <Link href="/dashboard/my-jobs" className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 p-1.5 shadow-2xl animate-fade-in-up hover:shadow-3xl transition-all duration-300 hover:scale-[1.02] text-left">
             <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7">
               <div className="flex items-start justify-between mb-5">
-                <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-red-100">
+                <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-red-100 group-hover:ring-red-200 transition-all">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
+                {activeJobsCount > 0 && (
+                  <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-bold border border-red-200">
+                    {activeJobsCount} Active
+                  </span>
+                )}
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Job Schedule</h3>
-              <p className="text-gray-700 font-semibold">View today's assignments and routes</p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-red-700 transition-colors">My Schedule</h3>
+              <p className="text-gray-700 font-semibold">View today&apos;s dispatched job tickets</p>
+              <p className="text-sm text-gray-500 mt-1">Equipment checklists, routes, work logs</p>
             </div>
-            <div className="absolute inset-0 bg-black/5 backdrop-blur-sm rounded-3xl flex items-center justify-center">
-              <div className="bg-white/90 px-5 py-2 rounded-full shadow-lg">
-                <p className="text-sm font-semibold text-gray-700">Coming Soon</p>
-              </div>
-            </div>
-          </div>
+          </Link>
 
           {/* View Timecard - Premium Indigo Card */}
           <Link

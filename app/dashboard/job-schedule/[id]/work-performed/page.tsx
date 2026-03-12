@@ -1200,21 +1200,35 @@ export default function WorkPerformed() {
           body: JSON.stringify({
             jobId: params.id,
             completedStep: 'work_performed',
-            currentStep: 'pictures',
+            currentStep: 'completed',
           })
         }).catch(err => console.log('Workflow tracking unavailable:', err));
+
+        // Mark job as completed (sets work_completed_at automatically)
+        try {
+          await fetch(`/api/job-orders/${params.id}/status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ status: 'completed' })
+          });
+        } catch (completeErr) {
+          console.log('Job completion status update failed, continuing:', completeErr);
+        }
       }
 
-      showNotification('Work performed and feedback saved successfully!', 'success');
+      showNotification('Work performed saved! Job marked as completed.', 'success');
 
-      // Navigate to pictures page after a short delay
+      // Navigate back to schedule view after a short delay
       setTimeout(() => {
-        router.push(`/dashboard/job-schedule/${params.id}/pictures`);
+        router.push('/dashboard/my-jobs');
       }, 1500);
     } catch (error) {
       console.error('Error submitting work performed:', error);
       // Still navigate — work was saved to localStorage
-      router.push(`/dashboard/job-schedule/${params.id}/pictures`);
+      router.push('/dashboard/my-jobs');
     }
   };
 

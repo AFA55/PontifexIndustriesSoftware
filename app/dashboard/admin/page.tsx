@@ -7,6 +7,13 @@ import { LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
 import AdminOnboardingTour from '@/components/AdminOnboardingTour';
+import {
+  ADMIN_CARDS,
+  ADMIN_DASHBOARD_ROLES,
+  BYPASS_ROLES,
+  getCardPermission,
+  type PermissionLevel,
+} from '@/lib/rbac';
 
 // Pontifex Industries Logo Component
 function PontifexLogo({ className = "h-8" }: { className?: string }) {
@@ -68,6 +75,7 @@ export default function AdminDashboard() {
   });
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isDemoAdmin, setIsDemoAdmin] = useState(false);
+  const [userPermissions, setUserPermissions] = useState<Record<string, PermissionLevel> | null>(null);
 
   useEffect(() => {
     console.log('🔍 Checking admin access...');
@@ -79,7 +87,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(currentUser.role)) {
+    if (!ADMIN_DASHBOARD_ROLES.includes(currentUser.role)) {
       console.log('🚫 User does not have admin dashboard access, redirecting to operator dashboard...');
       router.push('/dashboard');
       return;
@@ -87,6 +95,9 @@ export default function AdminDashboard() {
 
     console.log('✅ Admin access granted');
     setUser(currentUser);
+
+    // Fetch card permissions for this user
+    fetchCardPermissions();
 
     // Check if this is demo admin account
     const isDemo = currentUser.email?.toLowerCase().includes('demo') ||
@@ -179,6 +190,25 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchCardPermissions = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch('/api/card-permissions/me', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.permissions) {
+          setUserPermissions(json.permissions);
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching card permissions:', e);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
@@ -201,147 +231,16 @@ export default function AdminDashboard() {
     setShowWalkthrough(false);
   };
 
-  // Role checks — role-based, not email-based
-  const isSuperAdmin = user?.role === 'super_admin';
-  const isOpsManager = user?.role === 'operations_manager';
-
-  // Check if card should be accessible
-  // Super admin & operations_manager: sees everything
-  // All other admins: only core cards are unblurred
-  const isCardAccessible = (moduleTitle: string) => {
-    if (isSuperAdmin || isOpsManager) return true; // Full access
-
-    const accessibleCards = [
-      'Timecard Management',
-      'Schedule Form',
-      'Schedule Board',
-    ];
-
-    return accessibleCards.includes(moduleTitle);
+  // Resolve permission for each card using the RBAC system
+  const getPermission = (cardKey: string): PermissionLevel => {
+    return getCardPermission(userPermissions, cardKey, user?.role || 'operator');
   };
 
-  const adminModules = [
-    {
-      title: 'Timecard Management',
-      description: 'Review, approve, and edit employee timecards',
-      icon: '⏱️',
-      href: '/dashboard/admin/timecards',
-      bgColor: 'from-emerald-500 to-teal-600',
-      iconBg: 'bg-emerald-500',
-      features: ['Review clock-ins', 'Approve timecards', 'Edit hours', 'Overtime tracking'],
-      status: 'active'
-    },
-    {
-      title: 'Schedule Form',
-      description: '8-step job scheduling wizard for detailed job setup',
-      icon: '📋',
-      href: '/dashboard/admin/schedule-form',
-      bgColor: 'from-orange-500 to-red-600',
-      iconBg: 'bg-orange-500',
-      features: ['8-step job wizard', 'Jobsite conditions', 'Site compliance', 'Equipment tracking'],
-      status: 'active'
-    },
-    {
-      title: 'Schedule Board',
-      description: 'View operator schedules and send schedule notifications',
-      icon: '📅',
-      href: '/dashboard/admin/schedule-board',
-      bgColor: 'from-purple-500 to-indigo-600',
-      iconBg: 'bg-purple-500',
-      features: ['View all schedules', 'Send email notifications', 'Shop arrival times', 'Daily overview'],
-      status: 'active'
-    },
-    {
-      title: 'Team Management',
-      description: 'Create accounts and manage team member access permissions',
-      icon: '👥',
-      href: '/dashboard/admin/team-management',
-      bgColor: 'from-blue-500 to-blue-600',
-      iconBg: 'bg-blue-500',
-      features: ['Create user accounts', 'Role-based access', 'Permission settings', 'Team directory'],
-      status: 'active'
-    },
-    {
-      title: 'Access Requests',
-      description: 'Review and approve user access requests',
-      icon: '🔐',
-      href: '/dashboard/admin/access-requests',
-      bgColor: 'from-cyan-500 to-blue-600',
-      iconBg: 'bg-cyan-500',
-      features: ['Pending requests', 'Approve/Deny access', 'Role assignment', 'Request history'],
-      status: 'active'
-    },
-    {
-      title: 'Analytics & Reports',
-      description: 'Comprehensive business analytics and reporting',
-      icon: '📈',
-      href: '/dashboard/admin/analytics',
-      bgColor: 'from-purple-500 to-purple-600',
-      iconBg: 'bg-purple-500',
-      features: ['Project P&L tracking', 'Operator performance', 'Financial KPIs', 'Production metrics'],
-      status: 'active'
-    },
-    {
-      title: 'Equipment Performance',
-      description: 'Track equipment usage, production rates, and resource efficiency',
-      icon: '🔧',
-      href: '/dashboard/admin/equipment-performance',
-      bgColor: 'from-teal-500 to-cyan-600',
-      iconBg: 'bg-teal-500',
-      features: ['Production rates', 'Difficulty analysis', 'Resource tracking', 'Operator rankings'],
-      status: 'active'
-    },
-    {
-      title: 'Operator Profiles',
-      description: 'Manage operator skills, costs, and certifications',
-      icon: '👤',
-      href: '/dashboard/admin/operator-profiles',
-      bgColor: 'from-blue-500 to-indigo-600',
-      iconBg: 'bg-blue-500',
-      features: ['Set hourly rates', 'Track skills & certifications', 'Production analytics', 'Task qualifications'],
-      status: 'active'
-    },
-    {
-      title: 'Completed Job Tickets',
-      description: 'View completed jobs with customer signatures and documents',
-      icon: '✅',
-      href: '/dashboard/admin/completed-job-tickets',
-      bgColor: 'from-green-500 to-emerald-600',
-      iconBg: 'bg-green-500',
-      features: ['Signed job tickets', 'Customer feedback', 'Legal documents', 'Job analytics'],
-      status: 'active'
-    },
-    {
-      title: 'Blade & Bit Management',
-      description: 'Track blade/bit stock levels and assign to operators',
-      icon: '🔪',
-      href: '/dashboard/inventory',
-      bgColor: 'from-indigo-500 to-purple-600',
-      iconBg: 'bg-indigo-500',
-      features: ['Stock tracking', 'QR code scanning', 'Assign to operators', 'Low stock alerts'],
-      status: 'active'
-    },
-    {
-      title: 'Tools & Equipment',
-      description: 'View all equipment across operators and manage inventory',
-      icon: '⚙️',
-      href: '/dashboard/admin/all-equipment',
-      bgColor: 'from-purple-500 to-pink-600',
-      iconBg: 'bg-purple-500',
-      features: ['View all equipment', 'Search by operator', 'Equipment status', 'Assignment tracking'],
-      status: 'active'
-    },
-    {
-      title: 'Operations Hub',
-      description: 'System diagnostics, security monitoring, and audit trail',
-      icon: '🛡️',
-      href: '/dashboard/admin/ops-hub',
-      bgColor: 'from-slate-600 to-slate-800',
-      iconBg: 'bg-slate-600',
-      features: ['API Health Checks', 'Login Audit Trail', 'Error Monitoring', 'Database Stats'],
-      status: 'active'
-    }
-  ];
+  // Build card list from centralized ADMIN_CARDS, sorted: full → view → none
+  const sortedCards = [...ADMIN_CARDS].sort((a, b) => {
+    const order: Record<PermissionLevel, number> = { full: 0, view: 1, none: 2 };
+    return order[getPermission(a.key)] - order[getPermission(b.key)];
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -428,49 +327,38 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Admin Modules Grid — accessible cards first, blurred cards at bottom */}
+        {/* Admin Modules Grid — sorted by permission: full → view → none */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">
-          {[...adminModules].sort((a, b) => {
-            const aAccessible = isCardAccessible(a.title) ? 0 : 1;
-            const bAccessible = isCardAccessible(b.title) ? 0 : 1;
-            return aAccessible - bAccessible;
-          }).map((module, index) => {
-            const isActive = module.status === 'active';
-            const isAccessible = isCardAccessible(module.title);
-            const isBlurred = !isSuperAdmin && !isOpsManager && !isAccessible;
+          {sortedCards.map((card, index) => {
+            const perm = getPermission(card.key);
 
-            const cardContent = (
+            const cardInner = (
               <>
-                <div className={`absolute inset-0 bg-gradient-to-br ${module.bgColor} opacity-0 ${isActive ? 'group-hover:opacity-100' : ''} transition-opacity duration-500 rounded-3xl`}></div>
-                <div className={`relative bg-white rounded-[22px] p-6 ${isActive ? 'group-hover:bg-transparent' : ''} transition-colors duration-500`}>
+                <div className={`absolute inset-0 bg-gradient-to-br ${card.bgColor} opacity-0 ${perm !== 'none' ? 'group-hover:opacity-100' : ''} transition-opacity duration-500 rounded-3xl`}></div>
+                <div className={`relative bg-white rounded-[22px] p-6 ${perm !== 'none' ? 'group-hover:bg-transparent' : ''} transition-colors duration-500`}>
                   <div className="flex items-start justify-between mb-4">
-                    <div className={`w-14 h-14 bg-gradient-to-br ${module.bgColor} rounded-2xl flex items-center justify-center shadow-lg ${isActive ? 'group-hover:shadow-xl transform group-hover:rotate-6' : ''} transition-all duration-300`}>
-                      <span className="text-3xl">{module.icon}</span>
+                    <div className={`w-14 h-14 bg-gradient-to-br ${card.bgColor} rounded-2xl flex items-center justify-center shadow-lg ${perm !== 'none' ? 'group-hover:shadow-xl transform group-hover:rotate-6' : ''} transition-all duration-300`}>
+                      <span className="text-3xl">{card.icon}</span>
                     </div>
-                    <span className={`px-3 py-1 ${
-                      module.status === 'coming-soon'
-                        ? 'bg-gray-100 text-gray-600'
-                        : `${module.iconBg.replace('bg-', 'bg-')}/10 text-${module.iconBg.split('-')[1]}-600`
-                    } ${isActive ? 'group-hover:bg-white/20 group-hover:text-white' : ''} text-xs font-bold rounded-full transition-all duration-300`}>
-                      {module.status === 'coming-soon' ? 'COMING SOON' : 'ACTIVE'}
-                    </span>
+                    {perm === 'view' ? (
+                      <span className="px-3 py-1 bg-yellow-100 text-yellow-700 group-hover:bg-white/20 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 border border-yellow-200">
+                        VIEW ONLY
+                      </span>
+                    ) : perm === 'full' ? (
+                      <span className={`px-3 py-1 ${card.iconBg}/10 text-xs font-bold rounded-full group-hover:bg-white/20 group-hover:text-white transition-all duration-300`}>
+                        ACTIVE
+                      </span>
+                    ) : null}
                   </div>
-                  <h3 className={`text-2xl font-bold text-gray-800 ${isActive ? 'group-hover:text-white' : ''} mb-2 transition-colors duration-300`}>
-                    {module.title}
+                  <h3 className={`text-2xl font-bold text-gray-800 ${perm !== 'none' ? 'group-hover:text-white' : ''} mb-2 transition-colors duration-300`}>
+                    {card.title}
                   </h3>
-                  <p className={`text-gray-600 ${isActive ? 'group-hover:text-white/90' : ''} font-medium transition-colors duration-300 mb-4`}>
-                    {module.description}
+                  <p className={`text-gray-600 ${perm !== 'none' ? 'group-hover:text-white/90' : ''} font-medium transition-colors duration-300 mb-4`}>
+                    {card.description}
                   </p>
-                  {isActive && (
-                    <div className={`flex items-center ${
-                      module.bgColor === 'from-orange-500 to-red-600' ? 'text-orange-600' :
-                      module.bgColor === 'from-red-500 to-red-600' ? 'text-red-600' :
-                      module.bgColor === 'from-blue-500 to-blue-600' ? 'text-blue-600' :
-                      module.bgColor === 'from-green-500 to-emerald-600' ? 'text-green-600' :
-                      module.bgColor === 'from-purple-500 to-purple-600' ? 'text-purple-600' :
-                      'text-gray-600'
-                    } group-hover:text-white font-semibold transition-colors duration-300`}>
-                      <span>Open Module</span>
+                  {perm !== 'none' && (
+                    <div className="flex items-center text-gray-600 group-hover:text-white font-semibold transition-colors duration-300">
+                      <span>{perm === 'view' ? 'View Module' : 'Open Module'}</span>
                       <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                       </svg>
@@ -480,50 +368,33 @@ export default function AdminDashboard() {
               </>
             );
 
-            // Only render active modules
-            if (!isActive) return null;
-
-            // If accessible, render as clickable link
-            if (isAccessible) {
+            // Full or View: render as clickable link
+            if (perm === 'full' || perm === 'view') {
               return (
                 <Link
-                  key={index}
-                  href={module.href}
-                  className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white ${
-                    module.bgColor === 'from-orange-500 to-red-600' ? 'to-red-50' :
-                    module.bgColor === 'from-gray-500 to-gray-600' ? 'to-gray-50' :
-                    module.bgColor === 'from-red-500 to-red-600' ? 'to-red-50' :
-                    module.bgColor === 'from-blue-500 to-blue-600' ? 'to-blue-50' :
-                    module.bgColor === 'from-green-500 to-emerald-600' ? 'to-green-50' :
-                    module.bgColor === 'from-purple-500 to-purple-600' ? 'to-purple-50' :
-                    'to-gray-50'
-                  } p-1 shadow-xl hover:shadow-2xl hover:scale-[1.02] cursor-pointer animate-fade-in-up transition-all duration-500`}
+                  key={card.key}
+                  href={card.href}
+                  className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-gray-50 p-1 shadow-xl hover:shadow-2xl hover:scale-[1.02] cursor-pointer animate-fade-in-up transition-all duration-500 ${
+                    perm === 'view' ? 'ring-1 ring-yellow-200' : ''
+                  }`}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  {cardContent}
+                  {cardInner}
                 </Link>
               );
             }
 
-            // If not accessible (blurred for demo), render as non-clickable div
+            // None: render as blurred, non-clickable div
             return (
               <div
-                key={index}
-                className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white ${
-                  module.bgColor === 'from-orange-500 to-red-600' ? 'to-red-50' :
-                  module.bgColor === 'from-gray-500 to-gray-600' ? 'to-gray-50' :
-                  module.bgColor === 'from-red-500 to-red-600' ? 'to-red-50' :
-                  module.bgColor === 'from-blue-500 to-blue-600' ? 'to-blue-50' :
-                  module.bgColor === 'from-green-500 to-emerald-600' ? 'to-green-50' :
-                  module.bgColor === 'from-purple-500 to-purple-600' ? 'to-purple-50' :
-                  'to-gray-50'
-                } p-1 shadow-xl blur-sm opacity-50 cursor-not-allowed animate-fade-in-up transition-all duration-500`}
+                key={card.key}
+                className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-gray-50 p-1 shadow-xl blur-[2px] opacity-40 cursor-not-allowed animate-fade-in-up transition-all duration-500"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
-                {cardContent}
+                {cardInner}
                 <div className="absolute inset-0 flex items-center justify-center bg-black/5 backdrop-blur-sm rounded-3xl">
                   <div className="bg-white/90 px-4 py-2 rounded-full shadow-lg">
-                    <p className="text-sm font-semibold text-gray-700">Available in Full Version</p>
+                    <p className="text-sm font-semibold text-gray-600">No Access</p>
                   </div>
                 </div>
               </div>

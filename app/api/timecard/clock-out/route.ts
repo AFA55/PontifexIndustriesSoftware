@@ -67,6 +67,85 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check for incomplete dispatched jobs (work-performed hard block)
+    const { data: userProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const userRole = userProfile?.role || '';
+    const today = new Date().toISOString().split('T')[0];
+
+    if (['operator', 'apprentice'].includes(userRole)) {
+      // For operators: check if any dispatched jobs are not completed
+      if (userRole === 'operator') {
+        const { data: incompleteJobs } = await supabaseAdmin
+          .from('job_orders')
+          .select('id, job_number, customer_name')
+          .eq('assigned_to', user.id)
+          .eq('scheduled_date', today)
+          .not('dispatched_at', 'is', null)
+          .is('work_completed_at', null)
+          .neq('status', 'cancelled');
+
+        if (incompleteJobs && incompleteJobs.length > 0) {
+          return NextResponse.json(
+            {
+              error: 'You must complete work performed for all dispatched jobs before clocking out.',
+              block_type: 'work_performed_required',
+              incomplete_jobs: incompleteJobs.map((j: any) => ({
+                id: j.id,
+                job_number: j.job_number,
+                customer_name: j.customer_name,
+              })),
+            },
+            { status: 403 }
+          );
+        }
+      }
+
+      // For helpers/apprentices: check if work log is submitted for dispatched jobs
+      if (userRole === 'apprentice') {
+        const { data: helperJobs } = await supabaseAdmin
+          .from('job_orders')
+          .select('id, job_number, customer_name')
+          .eq('helper_assigned_to', user.id)
+          .eq('scheduled_date', today)
+          .not('dispatched_at', 'is', null)
+          .neq('status', 'cancelled');
+
+        if (helperJobs && helperJobs.length > 0) {
+          // Check which jobs have work logs
+          const jobIds = helperJobs.map((j: any) => j.id);
+          const { data: workLogs } = await supabaseAdmin
+            .from('helper_work_logs')
+            .select('job_order_id')
+            .eq('helper_id', user.id)
+            .eq('log_date', today)
+            .in('job_order_id', jobIds);
+
+          const loggedJobIds = new Set((workLogs || []).map((l: any) => l.job_order_id));
+          const missingLogs = helperJobs.filter((j: any) => !loggedJobIds.has(j.id));
+
+          if (missingLogs.length > 0) {
+            return NextResponse.json(
+              {
+                error: 'You must submit a work log for all dispatched jobs before clocking out.',
+                block_type: 'helper_work_log_required',
+                incomplete_jobs: missingLogs.map((j: any) => ({
+                  id: j.id,
+                  job_number: j.job_number,
+                  customer_name: j.customer_name,
+                })),
+              },
+              { status: 403 }
+            );
+          }
+        }
+      }
+    }
+
     // Find active timecard (clocked in but not clocked out)
     const { data: activeTimecard, error: fetchError } = await supabaseAdmin
       .from('timecards')

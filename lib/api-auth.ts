@@ -57,7 +57,7 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || !['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
+  if (profileError || !profile || !['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(profile.role)) {
     return {
       authorized: false,
       response: NextResponse.json(
@@ -104,7 +104,7 @@ export async function requireScheduleBoardAccess(request: NextRequest): Promise<
   const auth = await requireAuth(request);
   if (!auth.authorized) return auth;
 
-  if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(auth.role)) {
+  if (!['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor'].includes(auth.role)) {
     return {
       authorized: false,
       response: NextResponse.json(
