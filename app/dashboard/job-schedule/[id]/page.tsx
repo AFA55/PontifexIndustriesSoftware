@@ -650,7 +650,7 @@ export default function JobDetail() {
                           </div>
                         </div>
                         <Link
-                          href={`/dashboard/job-schedule/${params.id}/silica-exposure`}
+                          href={`/dashboard/job-schedule/${params.id}/work-performed`}
                           className="px-4 py-2 bg-green-200 text-green-800 rounded-lg hover:bg-green-300 font-medium text-sm transition-colors"
                         >
                           View Document
@@ -662,7 +662,7 @@ export default function JobDetail() {
                     return (
                       <Link
                         key={idx}
-                        href={`/dashboard/job-schedule/${params.id}/silica-exposure`}
+                        href={`/dashboard/job-schedule/${params.id}/work-performed`}
                         className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 border-2 border-blue-200 hover:border-blue-300 rounded-xl transition-all duration-200 group"
                       >
                         <div className="flex items-center gap-3">

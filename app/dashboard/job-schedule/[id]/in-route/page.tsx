@@ -92,16 +92,9 @@ export default function InRoutePage() {
         if (result.success && result.data) {
           const workflow = result.data;
 
-          // If they've moved past in_route step, redirect them forward
+          // If they've moved past in_route step, redirect them to work-performed
           if (workflow.current_step && workflow.current_step !== 'in_route' && workflow.current_step !== 'equipment_checklist') {
-            // They've already started - redirect to appropriate page
-            if (workflow.current_step === 'work_performed') {
-              router.push(`/dashboard/job-schedule/${jobId}/work-performed`);
-            } else if (workflow.current_step === 'liability_release') {
-              router.push(`/dashboard/job-schedule/${jobId}/liability-release`);
-            } else if (workflow.current_step === 'silica_form') {
-              router.push(`/dashboard/job-schedule/${jobId}/silica-exposure`);
-            }
+            router.push(`/dashboard/job-schedule/${jobId}/work-performed`);
           }
         }
       }
@@ -130,11 +123,8 @@ export default function InRoutePage() {
         if (result.success && result.data) {
           const workflow = result.data;
 
-          // If equipment checklist NOT completed, redirect back
-          if (!workflow.equipment_checklist_completed) {
-            router.replace(`/dashboard/job-schedule/${jobId}/equipment-checklist`);
-            return;
-          }
+          // Equipment is now handled in my-jobs page before operator reaches in-route
+          // No redirect needed — operator already confirmed equipment
 
           setEquipmentChecklistComplete(true);
         } else if (result.success && !result.data) {
