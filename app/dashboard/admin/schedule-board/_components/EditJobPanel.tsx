@@ -6,9 +6,7 @@ import {
   AlertTriangle, MessageSquare, ChevronRight, Plus, Users
 } from 'lucide-react';
 import type { JobCardData } from './JobCard';
-
-// Common equipment codes for quick-add suggestions
-const EQUIPMENT_OPTIONS = ['HCD', 'CS-14', 'DPP', 'DFS', 'GPP', 'ECD', 'GPR', 'WS', 'HHS', 'TS', 'HWS'];
+import { EQUIPMENT_ABBREVIATIONS, getDisplayName } from '@/lib/equipment-map';
 
 interface EditJobPanelProps {
   job: JobCardData;
@@ -57,7 +55,7 @@ export default function EditJobPanel({
     markChanged();
   };
 
-  const suggestions = EQUIPMENT_OPTIONS.filter(eq => !equipment.includes(eq));
+  const suggestions = EQUIPMENT_ABBREVIATIONS.filter(eq => !equipment.includes(eq));
 
   const operatorBusy = selectedOperator && selectedOperator !== currentOperatorName
     ? busyOperators[selectedOperator] : null;
@@ -129,7 +127,7 @@ export default function EditJobPanel({
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {equipment.map(eq => (
                     <span key={eq} className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 rounded-lg text-sm text-indigo-700 font-semibold border border-indigo-200">
-                      {eq}
+                      {eq} — {getDisplayName(eq)}
                       <button
                         onClick={() => removeEquipment(eq)}
                         className="ml-0.5 p-0.5 hover:bg-indigo-200 rounded-full transition-colors"
@@ -181,7 +179,7 @@ export default function EditJobPanel({
               <div className="flex flex-wrap gap-1.5">
                 {job.equipment_needed.map(eq => (
                   <span key={eq} className="px-3 py-1 bg-indigo-50 rounded-lg text-sm text-indigo-700 font-medium border border-indigo-200">
-                    {eq}
+                    {getDisplayName(eq)}
                   </span>
                 ))}
               </div>

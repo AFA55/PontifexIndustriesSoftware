@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
 import type { JobType } from '@/types/job';
+import { EQUIPMENT_PRESETS } from '@/lib/equipment-map';
 
 interface OperatorInfo {
   id: string;
@@ -44,17 +45,7 @@ const JOB_TYPES: JobType[] = [
   'Other',
 ];
 
-// Patriot equipment abbreviations for quick selection
-const EQUIPMENT_PRESETS: { abbrev: string; label: string }[] = [
-  { abbrev: 'HHS', label: 'Hydraulic Hand Saw' },
-  { abbrev: 'CS', label: 'Core Saw' },
-  { abbrev: 'TS', label: 'Track Saw' },
-  { abbrev: 'WS', label: 'Wall Saw' },
-  { abbrev: 'GPP', label: 'Gas Power Pack' },
-  { abbrev: 'DFS', label: 'Diesel Flat Saw' },
-  { abbrev: 'ECD', label: 'Electric Core Drill' },
-  { abbrev: 'HCD', label: 'Hydraulic Core Drill' },
-];
+// EQUIPMENT_PRESETS imported from @/lib/equipment-map (single source of truth)
 
 export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onClose }: QuickAddJobPanelProps) {
   const [submitting, setSubmitting] = useState(false);
@@ -289,7 +280,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                     <span
                       key={item}
                       className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium"
-                      title={preset?.label}
+                      title={preset?.full}
                     >
                       {item}
                       <button
@@ -310,7 +301,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                 <button
                   key={preset.abbrev}
                   onClick={() => setEquipment([...equipment, preset.abbrev])}
-                  title={preset.label}
+                  title={preset.full}
                   className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 transition-all flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />

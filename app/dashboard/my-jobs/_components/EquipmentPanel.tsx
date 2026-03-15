@@ -1,7 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import { CheckCircle2, Circle, Star, Wrench } from 'lucide-react';
+import {
+  getDisplayName,
+  isMandatoryComplete,
+  isItemMandatory,
+  countCheckedMandatory,
+} from '@/lib/equipment-map';
 
 interface EquipmentPanelProps {
   equipmentNeeded: string[];
@@ -20,13 +25,12 @@ export default function EquipmentPanel({
   onToggle,
   disabled = false,
 }: EquipmentPanelProps) {
-  const mandatorySet = new Set(mandatoryEquipment || []);
   const allItems = equipmentNeeded || [];
   const totalItems = allItems.length;
   const checkedCount = allItems.filter(item => checkedItems[item]).length;
-  const mandatoryComplete = mandatoryEquipment.every(item => checkedItems[item]);
-  const allMandatory = mandatoryEquipment.length;
-  const checkedMandatory = mandatoryEquipment.filter(item => checkedItems[item]).length;
+  const mandatoryComplete = isMandatoryComplete(mandatoryEquipment, checkedItems);
+  const allMandatory = (mandatoryEquipment || []).length;
+  const checkedMandatory = countCheckedMandatory(mandatoryEquipment, checkedItems);
 
   return (
     <div className="space-y-3">
@@ -54,7 +58,7 @@ export default function EquipmentPanel({
       {/* Equipment List */}
       <div className="space-y-2 mt-3">
         {allItems.map((item) => {
-          const isMandatory = mandatorySet.has(item);
+          const isMandatory = isItemMandatory(item, mandatoryEquipment);
           const isChecked = checkedItems[item] || false;
           return (
             <button
@@ -74,7 +78,7 @@ export default function EquipmentPanel({
               ) : (
                 <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
               )}
-              <span className="text-sm font-medium flex-1 text-left">{item}</span>
+              <span className="text-sm font-medium flex-1 text-left">{getDisplayName(item)}</span>
               {isMandatory && (
                 <Star className={`w-4 h-4 flex-shrink-0 ${isChecked ? 'text-green-500' : 'text-amber-500'} fill-current`} />
               )}

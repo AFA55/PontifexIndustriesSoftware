@@ -1,6 +1,8 @@
 'use client';
 
-import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, Edit3, FileText, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, Edit3, FileText, Users, CheckCircle2 } from 'lucide-react';
+import { getDisplayName } from '@/lib/equipment-map';
 
 export interface JobCardData {
   id: string;
@@ -21,6 +23,7 @@ export interface JobCardData {
   helper_names: string[];
   po_number: string | null;
   day_label?: string; // e.g. "Day 2 of 5"
+  status?: string;
 }
 
 interface JobCardProps {
@@ -40,6 +43,9 @@ interface JobCardProps {
 }
 
 export default function JobCard({ job, colorScheme, canEdit, assignedOperator, assignedHelper, onEdit, onRequestChange, onViewNotes }: JobCardProps) {
+  const router = useRouter();
+  const isCompleted = job.status === 'completed';
+
   const formatTime = (time: string | null) => {
     if (!time) return null;
     const [hours, minutes] = time.split(':');
@@ -49,17 +55,33 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
+  const handleClick = () => {
+    if (isCompleted) {
+      // Completed jobs → read-only detail view
+      router.push(`/dashboard/admin/completed-job-tickets/${job.id}`);
+    } else {
+      canEdit ? onEdit?.(job) : onRequestChange?.(job);
+    }
+  };
+
   return (
     <div
       className={`relative group rounded-xl border-2 transition-all duration-200 hover:shadow-lg hover:scale-[1.01] cursor-pointer ${
-        job.is_will_call
-          ? 'border-amber-400 bg-amber-50/50'
-          : `${colorScheme.border} bg-white`
+        isCompleted
+          ? 'border-green-400 bg-green-50/70'
+          : job.is_will_call
+            ? 'border-amber-400 bg-amber-50/50'
+            : `${colorScheme.border} bg-white`
       }`}
-      onClick={() => canEdit ? onEdit?.(job) : onRequestChange?.(job)}
+      onClick={handleClick}
     >
+      {/* Completed indicator stripe */}
+      {isCompleted && (
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 to-emerald-500 rounded-t-xl" />
+      )}
+
       {/* Will Call indicator stripe */}
-      {job.is_will_call && (
+      {!isCompleted && job.is_will_call && (
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-t-xl" />
       )}
 
@@ -74,7 +96,13 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${colorScheme.bg} ${colorScheme.text}`}>
                 {job.job_type?.split(',')[0]?.trim()}
               </span>
-              {job.is_will_call && (
+              {isCompleted && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-300">
+                  <CheckCircle2 className="w-3 h-3" />
+                  COMPLETED
+                </span>
+              )}
+              {job.is_will_call && !isCompleted && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-300">
                   <Phone className="w-3 h-3" />
                   WILL CALL
@@ -88,8 +116,8 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
             </div>
           </div>
 
-          {/* Action icons */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Action icons — hidden for completed jobs */}
+          {!isCompleted && <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {canEdit ? (
               <button
                 onClick={(e) => { e.stopPropagation(); onEdit?.(job); }}
@@ -107,7 +135,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
                 <FileText className="w-4 h-4" />
               </button>
             )}
-          </div>
+          </div>}
         </div>
 
         {/* Location row */}
@@ -153,7 +181,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
           {job.equipment_needed && job.equipment_needed.length > 0 && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 rounded-md text-xs text-indigo-600">
               <Wrench className="w-3 h-3" />
-              {job.equipment_needed.slice(0, 2).join(', ')}
+              {job.equipment_needed.slice(0, 2).map(getDisplayName).join(', ')}
               {job.equipment_needed.length > 2 && ` +${job.equipment_needed.length - 2}`}
             </span>
           )}

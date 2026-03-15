@@ -91,33 +91,28 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // TEMPORARILY DISABLED due to RLS policy issues
-      // Will be re-enabled once RLS policies are fixed
-      console.log('Standby status check temporarily disabled');
-      return;
+      const response = await fetch(`/api/standby?jobId=${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
 
-      // Check if there's an active standby log (ended_at is null)
-      // const { data, error } = await supabase
-      //   .from('standby_logs')
-      //   .select('*')
-      //   .eq('job_order_id', jobId)
-      //   .eq('operator_id', session.user.id)
-      //   .is('ended_at', null)
-      //   .maybeSingle();
-
-      // if (error) {
-      //   console.warn('Could not check standby status (RLS policy):', error.message);
-      //   // Continue without standby status - user can still use the feature
-      //   return;
-      // }
-
-      // if (data) {
-      //   setIsOnStandby(true);
-      //   setCurrentStandbyLog(data);
-      //   if (onStandbyChange) {
-      //     onStandbyChange(true);
-      //   }
-      // }
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          // Find an active standby log (no ended_at) for this operator
+          const activeLog = result.data.find(
+            (log: any) => !log.ended_at && log.operator_id === session.user.id
+          );
+          if (activeLog) {
+            setIsOnStandby(true);
+            setCurrentStandbyLog(activeLog);
+            if (onStandbyChange) {
+              onStandbyChange(true);
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('Error checking standby status:', error);
     }

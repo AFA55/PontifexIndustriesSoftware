@@ -1,6 +1,7 @@
 'use client';
 
 import { X, Clock, MapPin, Wrench, CheckCircle, Phone, AlertCircle, User, DollarSign, CalendarDays } from 'lucide-react';
+import { getDisplayName } from '@/lib/equipment-map';
 
 export interface PendingJob {
   id: string;
@@ -131,7 +132,7 @@ export default function PendingQueueSidebar({
                       {job.equipment_needed.map((eq) => (
                         <span key={eq} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 rounded-md text-xs text-indigo-600">
                           <Wrench className="w-3 h-3" />
-                          {eq}
+                          {getDisplayName(eq)}
                         </span>
                       ))}
                     </div>

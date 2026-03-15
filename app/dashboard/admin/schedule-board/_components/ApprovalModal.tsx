@@ -6,6 +6,7 @@ import {
   AlertTriangle, XCircle, Loader2, ArrowRight, CalendarDays
 } from 'lucide-react';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
+import { getDisplayName } from '@/lib/equipment-map';
 import type { PendingJob } from './PendingQueueSidebar';
 
 interface CapacityInfo {
@@ -202,7 +203,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                 <div className="flex flex-wrap gap-1 mt-2">
                   {job.equipment_needed.map(eq => (
                     <span key={eq} className="px-2 py-0.5 bg-indigo-50 rounded text-xs text-indigo-600 font-medium">
-                      <Wrench className="w-3 h-3 inline mr-0.5" />{eq}
+                      <Wrench className="w-3 h-3 inline mr-0.5" />{getDisplayName(eq)}
                     </span>
                   ))}
                 </div>

@@ -12,6 +12,7 @@ import EquipmentPanel from './EquipmentPanel';
 import NotesPanel from './NotesPanel';
 import SiteConditionsPanel from './SiteConditionsPanel';
 import HelperWorkLog from './HelperWorkLog';
+import { isMandatoryComplete } from '@/lib/equipment-map';
 
 interface JobTicketDetailProps {
   job: JobTicketData;
@@ -43,7 +44,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
   // Check if mandatory equipment is complete
   const mandatoryItems = job.mandatory_equipment || [];
   const allEquipment = job.equipment_needed || [];
-  const mandatoryComplete = mandatoryItems.length === 0 || mandatoryItems.every(item => checkedItems[item]);
+  const mandatoryComplete = isMandatoryComplete(mandatoryItems, checkedItems);
   const allEquipmentChecked = allEquipment.length === 0 || allEquipment.every(item => checkedItems[item]);
 
   // For multi-day continuation, skip checklist requirement

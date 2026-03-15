@@ -2,6 +2,8 @@
 
 import { X, MapPin, Wrench, FileText, Clock, User, Phone, ExternalLink } from 'lucide-react';
 import type { JobCardData } from './JobCard';
+import { getDisplayName } from '@/lib/equipment-map';
+import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
 
 interface JobPreviewPanelProps {
   job: JobCardData;
@@ -94,6 +96,14 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
             </div>
           )}
 
+          {/* Scope Details */}
+          {(job as any).scope_details && Object.keys((job as any).scope_details).length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Scope Quantities</h3>
+              <ScopeDetailsDisplay scopeDetails={(job as any).scope_details} />
+            </div>
+          )}
+
           {/* Crew */}
           <div>
             <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Crew</h3>
@@ -124,7 +134,7 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
               <div className="flex flex-wrap gap-1.5">
                 {job.equipment_needed.map((item, i) => (
                   <span key={i} className="px-2 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium">
-                    {item}
+                    {getDisplayName(item)}
                   </span>
                 ))}
               </div>

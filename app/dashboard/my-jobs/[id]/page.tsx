@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -8,9 +8,13 @@ import {
   ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import EquipmentPanel from '../_components/EquipmentPanel';
+import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
 import HelperWorkLog from '../_components/HelperWorkLog';
 import type { JobTicketData } from '../_components/JobTicketCard';
+import { isMandatoryComplete } from '@/lib/equipment-map';
+import { unifyEquipmentSelections, allItemsConfirmed as checkAllConfirmed } from '@/lib/equipment-unifier';
+import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
+import { PhotoViewer } from '@/components/PhotoUploader';
 
 function toDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -103,27 +107,36 @@ export default function JobDetailPage() {
     setCheckedItems(prev => ({ ...prev, [item]: !prev[item] }));
   };
 
-  // Equipment logic
+  // Equipment logic — unified panel
   const mandatoryItems = job?.mandatory_equipment || [];
   const allEquipment = job?.equipment_needed || [];
-  const mandatoryComplete = mandatoryItems.length === 0 || mandatoryItems.every(item => checkedItems[item]);
+  const mandatoryComplete = isMandatoryComplete(mandatoryItems, checkedItems);
 
-  // Multi-day continuation detection
-  const isMultiDayContinuation = (): boolean => {
-    if (!job) return false;
-    if (!job.end_date || job.end_date === job.scheduled_date) return false;
-    if (job.route_started_at) {
-      const routeDate = new Date(job.route_started_at).toISOString().split('T')[0];
-      const today = toDateString(new Date());
-      if (routeDate < today) return true;
-    }
-    const todayStr = toDateString(new Date());
-    if (job.scheduled_date < todayStr) return true;
-    return false;
+  // Unified equipment items (deduplicated, categorized)
+  const unifiedItems = useMemo(
+    () => unifyEquipmentSelections(job?.equipment_selections, job?.equipment_needed, job?.mandatory_equipment),
+    [job?.equipment_selections, job?.equipment_needed, job?.mandatory_equipment],
+  );
+
+  const hasEquipmentSelections = !!(job?.equipment_selections &&
+    Object.keys(job.equipment_selections).length > 0);
+
+  // Per-operator equipment confirmation check
+  // Skip checklist if this operator has already confirmed equipment for this job
+  const hasOperatorConfirmedEquipment = (): boolean => {
+    if (!job || !userId) return false;
+    const confirmedBy = job.equipment_confirmed_by || [];
+    return confirmedBy.includes(userId);
   };
 
-  const multiDayContinuation = job ? isMultiDayContinuation() : false;
-  const canStartRoute = multiDayContinuation || mandatoryComplete;
+  const equipmentAlreadyConfirmed = job ? hasOperatorConfirmedEquipment() : false;
+
+  // New-style jobs (schedule form): ALL items must be confirmed
+  // Old-style jobs (quick add): only mandatory items gate the button
+  const canStartRoute = equipmentAlreadyConfirmed ||
+    (hasEquipmentSelections
+      ? checkAllConfirmed(unifiedItems, checkedItems)
+      : mandatoryComplete);
   const isCompleted = job?.status === 'completed';
   const isInProgress = job ? ['in_route', 'in_progress'].includes(job.status) : false;
   const jobIsHelper = job?.isHelper || isHelper;
@@ -135,13 +148,23 @@ export default function JobDetailPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // Build the updated equipment_confirmed_by array
+      // Append current userId if not already present
+      const currentConfirmed = job.equipment_confirmed_by || [];
+      const updatedConfirmed = currentConfirmed.includes(userId)
+        ? currentConfirmed
+        : [...currentConfirmed, userId];
+
       await fetch(`/api/job-orders/${job.id}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ status: 'in_route' }),
+        body: JSON.stringify({
+          status: 'in_route',
+          equipment_confirmed_by: updatedConfirmed,
+        }),
       });
 
       // Navigate to jobsite page
@@ -226,11 +249,11 @@ export default function JobDetailPage() {
 
       <div className="container mx-auto px-4 py-5 max-w-lg space-y-4">
 
-        {/* Multi-day continuation banner */}
-        {multiDayContinuation && (
+        {/* Equipment already confirmed banner */}
+        {equipmentAlreadyConfirmed && (
           <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
-            Continuing from previous day — equipment checklist not required
+            Equipment already confirmed — checklist not required
           </div>
         )}
 
@@ -329,6 +352,21 @@ export default function JobDetailPage() {
                   {job.description || 'No description provided'}
                 </p>
               </div>
+              {/* Scope Details (quantities) */}
+              {job.scope_details && Object.keys(job.scope_details).length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Scope Quantities</p>
+                  <ScopeDetailsDisplay scopeDetails={job.scope_details} />
+                </div>
+              )}
+              {/* Scope Reference Photos */}
+              {job.scope_photo_urls && job.scope_photo_urls.length > 0 && (
+                <PhotoViewer photos={job.scope_photo_urls} label="Scope Reference Photos" />
+              )}
+              {/* Site Compliance Attachments */}
+              {job.site_compliance?.attachment_urls && job.site_compliance.attachment_urls.length > 0 && (
+                <PhotoViewer photos={job.site_compliance.attachment_urls} label="Compliance Documents" />
+              )}
               {(job.salesman_name || job.created_by_name) && (
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <User className="w-3.5 h-3.5" />
@@ -339,8 +377,8 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        {/* Equipment Required Panel */}
-        {allEquipment.length > 0 && (
+        {/* Equipment Confirmation Panel */}
+        {unifiedItems.length > 0 && (
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
             <button
               onClick={() => setEquipmentOpen(!equipmentOpen)}
@@ -348,12 +386,12 @@ export default function JobDetailPage() {
             >
               <div className="flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-bold text-gray-800">Equipment Required</span>
-                {!multiDayContinuation && !isCompleted && (
+                <span className="text-sm font-bold text-gray-800">Equipment Confirmation</span>
+                {!equipmentAlreadyConfirmed && !isCompleted && (
                   <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                    mandatoryComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                    canStartRoute ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                   }`}>
-                    {mandatoryComplete ? 'Ready' : 'Required'}
+                    {canStartRoute ? 'Ready' : 'Confirm All'}
                   </span>
                 )}
               </div>
@@ -361,13 +399,14 @@ export default function JobDetailPage() {
             </button>
             {equipmentOpen && (
               <div className="px-4 pb-4">
-                <EquipmentPanel
+                <UnifiedEquipmentPanel
+                  equipmentSelections={job.equipment_selections}
                   equipmentNeeded={allEquipment}
                   mandatoryEquipment={mandatoryItems}
                   specialEquipment={job.special_equipment}
                   checkedItems={checkedItems}
                   onToggle={toggleEquipment}
-                  disabled={isCompleted || multiDayContinuation}
+                  disabled={isCompleted || equipmentAlreadyConfirmed}
                 />
               </div>
             )}

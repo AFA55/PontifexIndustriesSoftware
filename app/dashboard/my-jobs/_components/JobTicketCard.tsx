@@ -40,6 +40,16 @@ export interface JobTicketData {
   work_completed_at: string | null;
   scheduling_flexibility: string | null;
   readable_status: string;
+  // Per-operator equipment confirmation tracking
+  equipment_confirmed_by: string[];
+  // Schedule form structured data
+  equipment_selections?: Record<string, Record<string, string>> | null;
+  scope_details?: Record<string, Record<string, string>> | null;
+  scope_photo_urls?: string[] | null;
+  site_compliance?: Record<string, any> | null;
+  special_equipment_notes?: string | null;
+  site_contact_phone?: string | null;
+  additional_info?: string | null;
   // isHelper indicates the current user is the helper, not the operator
   isHelper?: boolean;
 }

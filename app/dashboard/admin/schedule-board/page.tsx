@@ -104,6 +104,7 @@ function toJobCard(job: any): JobCardData {
     helper_names: job.helper_name ? [job.helper_name] : [],
     po_number: job.po_number || null,
     day_label: computeDayLabel(job),
+    status: job.status || null,
   };
 }
 
