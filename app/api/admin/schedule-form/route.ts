@@ -84,9 +84,12 @@ export async function POST(request: NextRequest) {
       description: body.description || null,
       job_type: body.job_type,
       estimated_cost: body.estimated_cost || null,
+      scope_details: body.scope_details || {},
+      scope_photo_urls: body.scope_photo_urls || [],
 
       // ── Step 4: Equipment Requirements ──────────────────────
       equipment_needed: body.equipment_needed || [],
+      equipment_selections: body.equipment_selections || {},
       special_equipment: body.special_equipment ? [body.special_equipment] : [],  // legacy array format
       special_equipment_notes: body.special_equipment || null,  // clean text format
       equipment_rentals: body.equipment_rentals || [],
@@ -123,6 +126,52 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Schedule Form job created: ${jobNumber} by ${profile.full_name}`);
+
+    // ── Smart Learning: Record scope→equipment pairings ────────
+    try {
+      const serviceTypes = body.job_type?.split(',').map((s: string) => s.trim()).filter(Boolean) || [];
+      const equipmentItems = body.equipment_needed || [];
+      const equipmentDetails = body.equipment_details || {};
+
+      // Collect all equipment items (from presets + from recommended details)
+      const allEquipment = new Set<string>(equipmentItems);
+      for (const [key, detail] of Object.entries(equipmentDetails)) {
+        const d = detail as any;
+        if (d?.selected) {
+          // key format: "ScopeCode_itemKey" — extract the item label
+          const parts = key.split('_');
+          if (parts.length >= 2) {
+            allEquipment.add(parts.slice(1).join('_'));
+          }
+        }
+      }
+
+      // Upsert scope→equipment pairings
+      if (serviceTypes.length > 0 && allEquipment.size > 0) {
+        const upsertRows = [];
+        for (const scope of serviceTypes) {
+          for (const item of allEquipment) {
+            upsertRows.push({
+              scope_type: scope,
+              equipment_item: item,
+              co_occurrence_count: 1,
+              last_used_at: new Date().toISOString(),
+            });
+          }
+        }
+
+        // Upsert with increment via database function
+        for (const row of upsertRows) {
+          await supabaseAdmin.rpc('upsert_equipment_recommendation', {
+            p_scope_type: row.scope_type,
+            p_equipment_item: row.equipment_item,
+          });
+        }
+      }
+    } catch (learnError) {
+      // Non-critical: log but don't fail the job creation
+      console.warn('Smart learning recording failed (non-critical):', learnError);
+    }
 
     return NextResponse.json(
       {

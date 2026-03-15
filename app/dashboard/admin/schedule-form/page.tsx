@@ -11,21 +11,18 @@ import {
   MapPin, Wrench, HardHat, Calendar, ShieldCheck, BarChart3,
   Building2, ChevronRight, Loader2, CheckCircle, AlertTriangle,
   ChevronDown, Phone, FileText, DollarSign, Zap, Clock,
-  Clipboard, Star, Droplets, Plug, Wind, Scissors, Truck, Mic
+  Clipboard, Star, Droplets, Plug, Wind, Scissors, Truck, Mic, Plus, Trash2
 } from 'lucide-react';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { VoiceMicButton } from '@/components/ui/VoiceMicButton';
+// Equipment presets no longer displayed as grid; now using SERVICE_EQUIPMENT config
+import PhotoUploader from '@/components/PhotoUploader';
+import {
+  type EquipmentDetail,
+} from '@/lib/equipment-recommendations';
 
 // ── Constants ─────────────────────────────────────────────────
-const SALESMEN = [
-  'Andres A',
-  'Adam I',
-  'Jey Y',
-  'Doug R',
-  'David S',
-];
-
 const STEPS = [
   { num: 1, title: 'Request Info', icon: ClipboardList, color: 'from-blue-500 to-blue-600' },
   { num: 2, title: 'Customer & Location', icon: MapPin, color: 'from-indigo-500 to-purple-600' },
@@ -38,27 +35,225 @@ const STEPS = [
 ];
 
 const SERVICE_TYPES = [
-  { code: 'CD', label: 'Core Drilling', gradient: 'from-blue-500 to-indigo-600', lightBg: 'bg-blue-50 border-blue-200 text-blue-700' },
+  { code: 'ECD', label: 'Electric Core Drilling', gradient: 'from-pink-500 to-rose-600', lightBg: 'bg-pink-50 border-pink-200 text-pink-700' },
+  { code: 'HFCD', label: 'High Frequency Core Drilling', gradient: 'from-blue-500 to-indigo-600', lightBg: 'bg-blue-50 border-blue-200 text-blue-700' },
+  { code: 'HCD', label: 'Hydraulic Core Drilling', gradient: 'from-teal-500 to-cyan-600', lightBg: 'bg-teal-50 border-teal-200 text-teal-700' },
   { code: 'DFS', label: 'Diesel Floor Sawing', gradient: 'from-violet-500 to-purple-600', lightBg: 'bg-violet-50 border-violet-200 text-violet-700' },
   { code: 'WS/TS', label: 'Wall/Track Sawing', gradient: 'from-orange-500 to-red-500', lightBg: 'bg-orange-50 border-orange-200 text-orange-700' },
   { code: 'CS', label: 'Chain Sawing', gradient: 'from-amber-500 to-orange-600', lightBg: 'bg-amber-50 border-amber-200 text-amber-700' },
-  { code: 'HHS', label: 'Handheld Sawing', gradient: 'from-emerald-500 to-teal-600', lightBg: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+  { code: 'HHS/PS', label: 'Handheld / Push Sawing', gradient: 'from-emerald-500 to-teal-600', lightBg: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
   { code: 'WireSaw', label: 'Wire Sawing', gradient: 'from-cyan-500 to-blue-600', lightBg: 'bg-cyan-50 border-cyan-200 text-cyan-700' },
   { code: 'GPR', label: 'GPR Scanning', gradient: 'from-rose-500 to-pink-600', lightBg: 'bg-rose-50 border-rose-200 text-rose-700' },
   { code: 'Demo', label: 'Selective Demo', gradient: 'from-slate-600 to-slate-800', lightBg: 'bg-slate-50 border-slate-300 text-slate-700' },
+  { code: 'Brokk', label: 'Brokk', gradient: 'from-stone-500 to-stone-700', lightBg: 'bg-stone-50 border-stone-300 text-stone-700' },
   { code: 'Other', label: 'Other', gradient: 'from-gray-500 to-gray-700', lightBg: 'bg-gray-50 border-gray-200 text-gray-700' },
 ];
 
-const EQUIPMENT_PRESETS = [
-  { abbrev: 'HHS', full: 'Hydraulic Hand Saw', gradient: 'from-emerald-500 to-teal-600' },
-  { abbrev: 'DPP', full: 'Diesel Power Pack', gradient: 'from-blue-500 to-indigo-600' },
-  { abbrev: 'TS', full: 'Track Saw', gradient: 'from-orange-500 to-red-500' },
-  { abbrev: 'WS', full: 'Wall Saw', gradient: 'from-violet-500 to-purple-600' },
-  { abbrev: 'GPP', full: 'Gas Power Pack', gradient: 'from-amber-500 to-orange-600' },
-  { abbrev: 'DFS', full: 'Diesel Floor Saw', gradient: 'from-cyan-500 to-blue-600' },
-  { abbrev: 'ECD', full: 'Electric Core Drill', gradient: 'from-rose-500 to-pink-600' },
-  { abbrev: 'HCD', full: 'Hydraulic Core Drill', gradient: 'from-sky-500 to-blue-600' },
-];
+// Service types that support flexible input modes (linear vs areas)
+const FLEXIBLE_SCOPE_TYPES = ['WS/TS', 'DFS', 'HHS/PS'];
+
+// Equipment presets config moved to SERVICE_EQUIPMENT
+
+// ── Scope fields per service type (quantity inputs for Step 3) ──
+interface ScopeField { key: string; label: string; placeholder: string; type: string; suffix?: string; fullWidth?: boolean }
+interface ScopeConfig {
+  label: string;
+  fields: ScopeField[];
+  altFields?: ScopeField[];
+  altLabel?: string;
+  hasDynamicHoles?: boolean; // Core drilling: dynamic qty + bit size + depth rows
+  hasDynamicCuts?: boolean;  // Sawing linear mode: dynamic LF + depth + # cuts rows
+  hasDynamicAreas?: boolean; // Sawing areas mode: dynamic L×W×thickness×qty rows
+}
+const SCOPE_FIELDS: Record<string, ScopeConfig> = {
+  'ECD': {
+    label: 'Electric Core Drilling Details',
+    hasDynamicHoles: true,
+    fields: [],
+  },
+  'HFCD': {
+    label: 'High Frequency Core Drilling Details',
+    hasDynamicHoles: true,
+    fields: [],
+  },
+  'HCD': {
+    label: 'Hydraulic Core Drilling Details',
+    hasDynamicHoles: true,
+    fields: [],
+  },
+  'DFS': {
+    label: 'Floor Sawing Details',
+    hasDynamicCuts: true,
+    hasDynamicAreas: true,
+    fields: [],
+    altLabel: 'Areas + Thickness',
+    altFields: [],
+  },
+  'WS/TS': {
+    label: 'Wall/Track Sawing Details',
+    hasDynamicCuts: true,
+    hasDynamicAreas: true,
+    fields: [],
+    altLabel: 'Areas + Thickness',
+    altFields: [],
+  },
+  'CS': {
+    label: 'Chain Sawing Details',
+    hasDynamicCuts: true,
+    fields: [],
+  },
+  'HHS/PS': {
+    label: 'Handheld / Push Sawing Details',
+    hasDynamicCuts: true,
+    hasDynamicAreas: true,
+    fields: [],
+    altLabel: 'Areas + Thickness',
+    altFields: [],
+  },
+  'WireSaw': {
+    label: 'Wire Sawing Details',
+    hasDynamicCuts: true,
+    fields: [],
+  },
+  'GPR': {
+    label: 'GPR Scanning Details',
+    fields: [
+      { key: 'area_sqft', label: 'Area', placeholder: '0', type: 'number', suffix: 'sq ft' },
+      { key: 'num_scans', label: 'Number of Scans', placeholder: '0', type: 'number' },
+    ],
+  },
+  'Demo': {
+    label: 'Selective Demo Details',
+    fields: [
+      { key: 'description', label: 'Description of Demo Work', placeholder: 'Describe the selective demolition work...', type: 'textarea', fullWidth: true },
+    ],
+  },
+  'Brokk': {
+    label: 'Brokk Details',
+    hasDynamicAreas: true,
+    fields: [],
+  },
+};
+
+// ── Smart Equipment Recommendations per Service Type (Step 4) ──
+interface EquipItem {
+  id: string;
+  label: string;
+  type: 'toggle' | 'qty' | 'option';
+  qtyUnit?: string;
+  options?: string[];
+  showWhen?: string; // sub-option value filter
+}
+interface ServiceEquipConfig {
+  subOption?: { label: string; choices: { value: string; label: string }[] };
+  items: EquipItem[];
+  getDynamicItems?: (scopeData: Record<string, string>) => EquipItem[];
+}
+
+// Helper: extract unique bit sizes from scope holes JSON, add +/- 1" recommendations
+function getCoreBitItems(scopeData: Record<string, string>): EquipItem[] {
+  const holesRaw = scopeData?.holes;
+  if (!holesRaw) return [];
+  let holes: { qty: string; bit_size: string; depth: string }[] = [];
+  try { holes = JSON.parse(holesRaw); } catch { return []; }
+
+  // Collect unique numeric bit sizes
+  const rawSizes = holes.map(h => parseFloat(h.bit_size)).filter(n => !isNaN(n) && n > 0);
+  if (rawSizes.length === 0) return [];
+
+  // Build expanded set: each size + 1" above + 1" below
+  const allSizes = new Set<number>();
+  for (const size of rawSizes) {
+    if (size - 1 > 0) allSizes.add(size - 1);
+    allSizes.add(size);
+    allSizes.add(size + 1);
+  }
+  const sorted = [...allSizes].sort((a, b) => a - b);
+
+  return sorted.map(size => ({
+    id: `core_bit_${size}`,
+    label: `${size}" Core Bit`,
+    type: 'qty' as const,
+  }));
+}
+
+const SERVICE_EQUIPMENT: Record<string, ServiceEquipConfig> = {
+  'ECD': {
+    items: [
+      { id: 'ecd_machine', label: 'ECD', type: 'toggle' },
+      { id: 'pump_can', label: 'Pump Can', type: 'toggle' },
+      { id: 'slurry_ring', label: 'Slurry Ring', type: 'toggle' },
+    ],
+    getDynamicItems: getCoreBitItems,
+  },
+  'HFCD': {
+    items: [
+      { id: 'hfcd_machine', label: 'HFCD', type: 'toggle' },
+      { id: 'pump_can', label: 'Pump Can', type: 'toggle' },
+      { id: 'slurry_ring', label: 'Slurry Ring', type: 'toggle' },
+    ],
+    getDynamicItems: getCoreBitItems,
+  },
+  'HCD': {
+    items: [
+      { id: 'hydraulic_hose', label: 'Hydraulic Hose', type: 'qty' },
+      { id: 'dpp', label: 'Diesel Power Pack', type: 'toggle' },
+      { id: 'hcd_stand', label: 'HCD Stand', type: 'toggle' },
+    ],
+    getDynamicItems: getCoreBitItems,
+  },
+  'DFS': {
+    items: [
+      { id: 'slurry_drums', label: 'Slurry Drums', type: 'qty' },
+      { id: 'extra_vacuum_head', label: 'Extra Vacuum Head', type: 'toggle' },
+      { id: 'backup_saw', label: 'Backup Saw', type: 'toggle' },
+      { id: 'chalk_line', label: 'Chalk Line', type: 'toggle' },
+      { id: 'clear_spray', label: 'Clear Spray', type: 'toggle' },
+    ],
+  },
+  'WS/TS': {
+    subOption: {
+      label: 'System Type',
+      choices: [
+        { value: 'pentruder', label: 'Pentruder' },
+        { value: 'pbg', label: 'Track Saw (PBG)' },
+      ],
+    },
+    items: [
+      // Pentruder-specific
+      { id: '480_cord', label: '480 Cord', type: 'qty', showWhen: 'pentruder' },
+      { id: '32_guard', label: '32" Guard', type: 'toggle', showWhen: 'pentruder' },
+      { id: '42_guard', label: '42" Guard', type: 'toggle', showWhen: 'pentruder' },
+      { id: '63_backup', label: '63 Backup System', type: 'toggle', showWhen: 'pentruder' },
+      { id: 'dpp', label: 'Diesel Power Pack', type: 'toggle', showWhen: 'pentruder' },
+      { id: 'track_pent', label: 'Track', type: 'qty', qtyUnit: 'ft', showWhen: 'pentruder' },
+      { id: 'boots_pent', label: 'Boots', type: 'qty', showWhen: 'pentruder' },
+      // PBG-specific
+      { id: 'generator', label: 'Generator', type: 'toggle', showWhen: 'pbg' },
+      { id: 'hydraulic_hose', label: 'Hydraulic Hose', type: 'qty', showWhen: 'pbg' },
+      { id: 'backup_track_saw', label: 'Backup Track Saw', type: 'toggle', showWhen: 'pbg' },
+      { id: 'track_pbg', label: 'Track', type: 'qty', qtyUnit: 'ft', showWhen: 'pbg' },
+      { id: 'guards_pbg', label: 'Guards', type: 'toggle', showWhen: 'pbg' },
+      { id: 'boots_pbg', label: 'Boots', type: 'qty', showWhen: 'pbg' },
+      { id: 'slurry_drums_pbg', label: 'Slurry Drums', type: 'qty', showWhen: 'pbg' },
+      // Common items (both)
+      { id: 'plastic', label: 'Plastic', type: 'toggle' },
+      { id: 'duct_tape', label: 'Duct Tape', type: 'toggle' },
+      { id: 'clear_spray', label: 'Clear Spray', type: 'toggle' },
+      { id: 'chalk_line', label: 'Chalk Line', type: 'toggle' },
+      { id: 'apron', label: 'Apron', type: 'toggle' },
+      { id: 'chain_saw', label: 'Chain Saw', type: 'option', options: ["15'", "20'"] },
+      { id: 'spray_paint', label: 'Spray Paint', type: 'toggle' },
+    ],
+  },
+  'CS': {
+    items: [
+      { id: '15_bar_chain', label: '15" Bar & Chain', type: 'toggle' },
+      { id: '20_bar_chain', label: '20" Bar & Chain', type: 'toggle' },
+      { id: 'hydraulic_hose', label: 'Hydraulic Hose', type: 'qty' },
+    ],
+  },
+};
 
 // ── Form state type ──────────────────────────────────────────
 interface FormData {
@@ -76,8 +271,16 @@ interface FormData {
   description: string;
   service_types: string[];
   estimated_cost: string;
+  scope_details: Record<string, Record<string, string>>;
+  scope_input_modes: Record<string, 'linear' | 'areas'>;
+  removal_needed: boolean;
+  removal_method: 'dumpster_on_site' | 'our_dump_truck' | '';
+  removal_equipment: string[];
+  scope_photo_urls: string[];
   // Step 4
   equipment_needed: string[];
+  equipment_details: Record<string, EquipmentDetail>;
+  equipment_selections: Record<string, Record<string, string>>; // per service type: { _sub: 'pentruder', item_id: 'qty_or_yes', ... }
   special_equipment: string;
   custom_equipment_input: string;
   equipment_rentals: { name: string; pickup_required: boolean }[];
@@ -97,6 +300,7 @@ interface FormData {
   badging_required: boolean;
   badging_type: string;
   special_instructions: string;
+  compliance_attachment_urls: string[];
   // Step 7
   difficulty_rating: number;
   additional_notes: string;
@@ -134,7 +338,15 @@ const initialFormData: FormData = {
   description: '',
   service_types: [],
   estimated_cost: '',
+  scope_details: {},
+  scope_input_modes: {},
+  removal_needed: false,
+  removal_method: '',
+  removal_equipment: [],
+  scope_photo_urls: [],
   equipment_needed: [],
+  equipment_details: {},
+  equipment_selections: {},
   special_equipment: '',
   custom_equipment_input: '',
   equipment_rentals: [],
@@ -152,6 +364,7 @@ const initialFormData: FormData = {
   badging_required: false,
   badging_type: '',
   special_instructions: '',
+  compliance_attachment_urls: [],
   difficulty_rating: 1,
   additional_notes: '',
   water_available: false,
@@ -299,7 +512,6 @@ export default function ScheduleFormPage() {
   const [submitted, setSubmitted] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState('');
   const [error, setError] = useState('');
-  const [salesDropdownOpen, setSalesDropdownOpen] = useState(false);
   // Customer/contact autocomplete state
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
   const [contactSuggestions, setContactSuggestions] = useState<{ contact_name: string; contact_phone: string }[]>([]);
@@ -308,9 +520,16 @@ export default function ScheduleFormPage() {
   const [allCustomers, setAllCustomers] = useState<string[]>([]);
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
-  const salesDropdownRef = useRef<HTMLDivElement>(null);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
   const contactDropdownRef = useRef<HTMLDivElement>(null);
+
+  // PO lookup state
+  const [poMatch, setPoMatch] = useState<{
+    customer_name: string; address: string; location: string;
+    customer_contact: string; site_contact_phone: string;
+  } | null>(null);
+  const [poLookupLoading, setPoLookupLoading] = useState(false);
+  const poLookupTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -319,6 +538,8 @@ export default function ScheduleFormPage() {
       return;
     }
     setUser(currentUser);
+    // Auto-fill submitted_by with logged-in user's name
+    setForm(f => ({ ...f, submitted_by: currentUser.name }));
 
     // Load all customer names for autocomplete
     const loadCustomers = async () => {
@@ -338,9 +559,6 @@ export default function ScheduleFormPage() {
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (salesDropdownRef.current && !salesDropdownRef.current.contains(e.target as Node)) {
-        setSalesDropdownOpen(false);
-      }
       if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
         setShowCustomerDropdown(false);
       }
@@ -434,6 +652,61 @@ export default function ScheduleFormPage() {
     }
   }, [voiceInput]);
 
+  // ── PO number auto-populate ──────────────────────────────────
+  const handlePoChange = useCallback((value: string) => {
+    updateForm({ po_number: value });
+    setPoMatch(null);
+
+    // Clear previous timer
+    if (poLookupTimer.current) clearTimeout(poLookupTimer.current);
+
+    if (!value.trim() || value.trim().length < 2) return;
+
+    // Debounce the API call by 600ms
+    poLookupTimer.current = setTimeout(async () => {
+      setPoLookupLoading(true);
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        if (!session.session) return;
+        const res = await fetch(`/api/admin/po-lookup?po=${encodeURIComponent(value.trim())}`, {
+          headers: { 'Authorization': `Bearer ${session.session.access_token}` },
+        });
+        const data = await res.json();
+        if (res.ok && data.match) {
+          setPoMatch(data.match);
+        }
+      } catch {} finally {
+        setPoLookupLoading(false);
+      }
+    }, 600);
+  }, [updateForm]);
+
+  const applyPoAutofill = useCallback(() => {
+    if (!poMatch) return;
+    updateForm({
+      contractor_name: poMatch.customer_name || '',
+      site_address: poMatch.address || '',
+      location_name: poMatch.location || '',
+      site_contact: poMatch.customer_contact || '',
+      contact_phone: poMatch.site_contact_phone || '',
+    });
+    setPoMatch(null);
+  }, [poMatch, updateForm]);
+
+  // ── Scope details helper ──────────────────────────────────────
+  const updateScopeDetail = useCallback((serviceCode: string, fieldKey: string, value: string) => {
+    setForm(f => ({
+      ...f,
+      scope_details: {
+        ...f.scope_details,
+        [serviceCode]: {
+          ...(f.scope_details[serviceCode] || {}),
+          [fieldKey]: value,
+        },
+      },
+    }));
+  }, []);
+
   // ── Validation per step ────────────────────────────────────
   const validateStep = (step: number): string | null => {
     switch (step) {
@@ -490,8 +763,15 @@ export default function ScheduleFormPage() {
         description: form.description || null,
         job_type: form.service_types.join(', '),
         estimated_cost: form.estimated_cost ? parseFloat(form.estimated_cost) : null,
+        scope_details: {
+          ...(form.scope_details || {}),
+          ...(form.removal_needed ? { _removal: { needed: 'true', method: form.removal_method, equipment: form.removal_equipment } } : {}),
+        },
+        scope_photo_urls: form.scope_photo_urls.length > 0 ? form.scope_photo_urls : [],
         // Step 4
         equipment_needed: form.equipment_needed,
+        equipment_details: Object.keys(form.equipment_details).length > 0 ? form.equipment_details : undefined,
+        equipment_selections: Object.keys(form.equipment_selections).length > 0 ? form.equipment_selections : undefined,
         special_equipment: form.special_equipment || null,
         equipment_rentals: form.equipment_rentals.map(r =>
           r.pickup_required ? `${r.name} (PICKUP REQUIRED)` : r.name
@@ -513,6 +793,7 @@ export default function ScheduleFormPage() {
           badging_required: form.badging_required,
           badging_type: form.badging_type || null,
           special_instructions: form.special_instructions || null,
+          attachment_urls: form.compliance_attachment_urls.length > 0 ? form.compliance_attachment_urls : undefined,
         },
         difficulty_rating: form.difficulty_rating,
         additional_notes: form.additional_notes || null,
@@ -657,53 +938,15 @@ export default function ScheduleFormPage() {
       case 1:
         return (
           <div className="space-y-6">
-            {/* Salesman Dropdown */}
+            {/* Auto-filled Submitted By */}
             <div>
               <Label>Submitted By</Label>
-              <div className="relative" ref={salesDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setSalesDropdownOpen(!salesDropdownOpen)}
-                  className={`w-full flex items-center justify-between px-4 py-3.5 sm:py-4 bg-white border rounded-xl text-base transition-all duration-200 ${
-                    salesDropdownOpen
-                      ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-sm'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <UserIcon size={18} className="text-slate-400" />
-                    <span className={form.submitted_by ? 'text-slate-800 font-medium' : 'text-slate-400'}>
-                      {form.submitted_by || 'Select salesman...'}
-                    </span>
-                  </div>
-                  <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${salesDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {salesDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150">
-                    {SALESMEN.map(name => (
-                      <button
-                        key={name}
-                        type="button"
-                        onClick={() => { updateForm({ submitted_by: name }); setSalesDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-5 py-4 text-base text-left transition-all ${
-                          form.submitted_by === name
-                            ? 'bg-blue-50 text-blue-700 font-semibold'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${
-                          form.submitted_by === name
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        {name}
-                        {form.submitted_by === name && <Check size={16} className="ml-auto text-blue-600" />}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="flex items-center gap-3 px-4 py-3.5 sm:py-4 bg-slate-50/80 border border-slate-200 rounded-xl">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-sm font-bold text-white shadow-sm">
+                  {(user?.name || '').split(' ').map(n => n[0]).join('')}
+                </div>
+                <span className="text-slate-800 font-medium text-base">{user?.name || '—'}</span>
+                <CheckCircle size={18} className="ml-auto text-green-500" />
               </div>
             </div>
 
@@ -724,8 +967,27 @@ export default function ScheduleFormPage() {
                   icon={FileText}
                   placeholder="Enter PO # (optional)"
                   value={form.po_number}
-                  onChange={e => updateForm({ po_number: e.target.value })}
+                  onChange={e => handlePoChange(e.target.value)}
                 />
+                {poLookupLoading && (
+                  <p className="mt-1.5 text-xs text-blue-500 font-medium flex items-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin" /> Looking up PO...
+                  </p>
+                )}
+                {poMatch && (
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                    <p className="text-xs font-bold text-blue-700 mb-1">📋 Found existing job with this PO</p>
+                    <p className="text-xs text-blue-600">Customer: <span className="font-semibold">{poMatch.customer_name}</span></p>
+                    {poMatch.address && <p className="text-xs text-blue-600">Address: {poMatch.address}</p>}
+                    <button
+                      type="button"
+                      onClick={applyPoAutofill}
+                      className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all"
+                    >
+                      Auto-fill Customer & Location →
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -837,39 +1099,6 @@ export default function ScheduleFormPage() {
         return (
           <div className="space-y-6">
             <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <Label>Description of Work</Label>
-                {voiceInput.isSupported && (
-                  <div className="flex items-center gap-2">
-                    {voiceInput.isListening && (
-                      <span className="text-xs font-semibold text-orange-500 animate-pulse">Listening...</span>
-                    )}
-                    <VoiceMicButton
-                      isListening={voiceInput.isListening}
-                      onClick={toggleVoice}
-                      size="sm"
-                      mode="free-speech"
-                    />
-                  </div>
-                )}
-              </div>
-              <TextArea
-                rows={4}
-                placeholder="Describe the work to be performed in detail... or tap the mic to dictate"
-                value={form.description}
-                onChange={e => updateForm({ description: e.target.value })}
-              />
-              {voiceInput.isListening && voiceInput.interimTranscript && (
-                <div className="mt-2 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl text-sm text-orange-700 italic">
-                  <span className="font-semibold text-orange-600">Hearing: </span>
-                  {voiceInput.interimTranscript}
-                </div>
-              )}
-              {voiceInput.error && (
-                <p className="mt-2 text-xs text-red-500 font-medium">{voiceInput.error}</p>
-              )}
-            </div>
-            <div>
               <Label required>Service Type</Label>
               <p className="text-xs sm:text-sm text-slate-400 mb-3 -mt-1">Select all that apply</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -902,6 +1131,576 @@ export default function ScheduleFormPage() {
                 })}
               </div>
             </div>
+
+            {/* ── Per-service scope detail fields ────────────── */}
+            {form.service_types.length > 0 && (
+              <div className="space-y-4">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Scope Quantities</p>
+                {form.service_types.map(code => {
+                  const config = SCOPE_FIELDS[code];
+                  if (!config) return null;
+                  const st = SERVICE_TYPES.find(s => s.code === code);
+                  const isFlexible = FLEXIBLE_SCOPE_TYPES.includes(code);
+                  const currentMode = form.scope_input_modes[code] || 'linear';
+                  const activeFields = (isFlexible && currentMode === 'areas' && config.altFields) ? config.altFields : config.fields;
+                  return (
+                    <div key={code} className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black bg-gradient-to-br ${st?.gradient || 'from-gray-500 to-gray-600'} text-white shadow-md`}>
+                            {code.substring(0, 2)}
+                          </div>
+                          <h4 className="text-base font-bold text-slate-800">{config.label}</h4>
+                        </div>
+                        {/* Scope type badge */}
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r ${st?.gradient || 'from-gray-500 to-gray-600'} text-white shadow-sm`}>
+                          {code}
+                        </span>
+                      </div>
+
+                      {/* Flexible input mode toggle */}
+                      {isFlexible && config.altFields && (
+                        <div className="flex gap-2 mb-4">
+                          <button
+                            type="button"
+                            onClick={() => updateForm({ scope_input_modes: { ...form.scope_input_modes, [code]: 'linear' } })}
+                            className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                              currentMode === 'linear'
+                                ? 'bg-blue-600 text-white shadow-md'
+                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-600'
+                            }`}
+                          >
+                            Linear Ft + Cut Depth
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateForm({ scope_input_modes: { ...form.scope_input_modes, [code]: 'areas' } })}
+                            className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                              currentMode === 'areas'
+                                ? 'bg-blue-600 text-white shadow-md'
+                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-600'
+                            }`}
+                          >
+                            {config.altLabel || 'Areas + Thickness'}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Field inputs */}
+                      {config.hasDynamicHoles ? (
+                        // ── Dynamic Holes Builder (core drilling) ──
+                        (() => {
+                          const holesRaw = form.scope_details[code]?.holes;
+                          const holes: { qty: string; bit_size: string; depth: string }[] = holesRaw
+                            ? (() => { try { return JSON.parse(holesRaw); } catch { return [{ qty: '', bit_size: '', depth: '' }]; } })()
+                            : [{ qty: '', bit_size: '', depth: '' }];
+
+                          const updateHoles = (newHoles: { qty: string; bit_size: string; depth: string }[]) => {
+                            updateScopeDetail(code, 'holes', JSON.stringify(newHoles));
+                          };
+
+                          // Compute totals
+                          const totalHoles = holes.reduce((sum, h) => sum + (parseInt(h.qty) || 0), 0);
+                          const uniqueSizes = [...new Set(holes.map(h => h.bit_size).filter(Boolean))];
+
+                          return (
+                            <div className="space-y-3">
+                              {holes.map((hole, idx) => (
+                                <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100' : ''}`}>
+                                  {idx === 0 && (
+                                    <div className="grid grid-cols-3 gap-3 mb-1.5">
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest"># of Holes</label>
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Bit Size</label>
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Depth</label>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-2">
+                                    <div className="grid grid-cols-3 gap-3 flex-1">
+                                      <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={hole.qty}
+                                        onChange={e => {
+                                          const updated = [...holes];
+                                          updated[idx] = { ...updated[idx], qty: e.target.value };
+                                          updateHoles(updated);
+                                        }}
+                                        className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                      />
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          placeholder='e.g. 4'
+                                          value={hole.bit_size}
+                                          onChange={e => {
+                                            const updated = [...holes];
+                                            updated[idx] = { ...updated[idx], bit_size: e.target.value };
+                                            updateHoles(updated);
+                                          }}
+                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">&quot;</span>
+                                      </div>
+                                      <div className="relative">
+                                        <input
+                                          type="number"
+                                          placeholder="0"
+                                          value={hole.depth}
+                                          onChange={e => {
+                                            const updated = [...holes];
+                                            updated[idx] = { ...updated[idx], depth: e.target.value };
+                                            updateHoles(updated);
+                                          }}
+                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">in.</span>
+                                      </div>
+                                    </div>
+                                    {holes.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => updateHoles(holes.filter((_, i) => i !== idx))}
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+
+                              {/* Add more holes button */}
+                              <button
+                                type="button"
+                                onClick={() => updateHoles([...holes, { qty: '', bit_size: '', depth: '' }])}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all"
+                              >
+                                <Plus size={16} />
+                                Add Different Holes
+                              </button>
+
+                              {/* Summary */}
+                              {totalHoles > 0 && (
+                                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total:</span>
+                                  <span className="text-sm font-bold text-slate-800">{totalHoles} hole{totalHoles !== 1 ? 's' : ''}</span>
+                                  {uniqueSizes.length > 0 && (
+                                    <span className="text-xs text-slate-400">Sizes: {uniqueSizes.map(s => `${s}"`).join(', ')}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : config.hasDynamicCuts && (!isFlexible || currentMode === 'linear') ? (
+                        // ── Dynamic Cuts Builder (sawing linear mode) ──
+                        (() => {
+                          const cutsRaw = form.scope_details[code]?.cuts;
+                          const cuts: { linear_feet: string; depth: string; num_cuts: string }[] = cutsRaw
+                            ? (() => { try { return JSON.parse(cutsRaw); } catch { return [{ linear_feet: '', depth: '', num_cuts: '' }]; } })()
+                            : [{ linear_feet: '', depth: '', num_cuts: '' }];
+
+                          const updateCuts = (newCuts: { linear_feet: string; depth: string; num_cuts: string }[]) => {
+                            updateScopeDetail(code, 'cuts', JSON.stringify(newCuts));
+                          };
+
+                          const totalLF = cuts.reduce((sum, c) => sum + (parseFloat(c.linear_feet) || 0), 0);
+                          const totalCuts = cuts.reduce((sum, c) => sum + (parseInt(c.num_cuts) || 0), 0);
+
+                          return (
+                            <div className="space-y-3">
+                              {cuts.map((cut, idx) => (
+                                <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100' : ''}`}>
+                                  {idx === 0 && (
+                                    <div className="grid grid-cols-3 gap-3 mb-1.5">
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Linear Feet</label>
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cut Depth</label>
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest"># of Cuts</label>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-2">
+                                    <div className="grid grid-cols-3 gap-3 flex-1">
+                                      <div className="relative">
+                                        <input
+                                          type="number"
+                                          placeholder="0"
+                                          value={cut.linear_feet}
+                                          onChange={e => {
+                                            const updated = [...cuts];
+                                            updated[idx] = { ...updated[idx], linear_feet: e.target.value };
+                                            updateCuts(updated);
+                                          }}
+                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">ft</span>
+                                      </div>
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          placeholder='0'
+                                          value={cut.depth}
+                                          onChange={e => {
+                                            const updated = [...cuts];
+                                            updated[idx] = { ...updated[idx], depth: e.target.value };
+                                            updateCuts(updated);
+                                          }}
+                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">in.</span>
+                                      </div>
+                                      <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={cut.num_cuts}
+                                        onChange={e => {
+                                          const updated = [...cuts];
+                                          updated[idx] = { ...updated[idx], num_cuts: e.target.value };
+                                          updateCuts(updated);
+                                        }}
+                                        className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                      />
+                                    </div>
+                                    {cuts.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => updateCuts(cuts.filter((_, i) => i !== idx))}
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+
+                              <button
+                                type="button"
+                                onClick={() => updateCuts([...cuts, { linear_feet: '', depth: '', num_cuts: '' }])}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all"
+                              >
+                                <Plus size={16} />
+                                Add Cut
+                              </button>
+
+                              {(totalLF > 0 || totalCuts > 0) && (
+                                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total:</span>
+                                  {totalLF > 0 && <span className="text-sm font-bold text-slate-800">{totalLF.toLocaleString()} linear ft</span>}
+                                  {totalCuts > 0 && <span className="text-xs text-slate-400">{totalCuts} cut{totalCuts !== 1 ? 's' : ''}</span>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : config.hasDynamicAreas && (isFlexible ? currentMode === 'areas' : true) ? (
+                        // ── Dynamic Areas Builder (L × W × Thickness × Qty) ──
+                        (() => {
+                          const areasRaw = form.scope_details[code]?.areas;
+                          const areas: { length: string; width: string; thickness: string; qty: string }[] = areasRaw
+                            ? (() => { try { return JSON.parse(areasRaw); } catch { return [{ length: '', width: '', thickness: '', qty: '' }]; } })()
+                            : [{ length: '', width: '', thickness: '', qty: '' }];
+
+                          const updateAreas = (newAreas: { length: string; width: string; thickness: string; qty: string }[]) => {
+                            updateScopeDetail(code, 'areas', JSON.stringify(newAreas));
+                          };
+
+                          const totalSqFt = areas.reduce((sum, a) => {
+                            const l = parseFloat(a.length) || 0;
+                            const w = parseFloat(a.width) || 0;
+                            const q = parseInt(a.qty) || 1;
+                            return sum + (l * w * q);
+                          }, 0);
+                          const totalAreaCount = areas.reduce((sum, a) => sum + (parseInt(a.qty) || 0), 0);
+
+                          return (
+                            <div className="space-y-3">
+                              {areas.map((area, idx) => (
+                                <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100' : ''}`}>
+                                  {idx === 0 && (
+                                    <div className="grid grid-cols-4 gap-3 mb-1.5">
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Length</label>
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Width</label>
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Thickness</label>
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Qty</label>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-2">
+                                    <div className="grid grid-cols-4 gap-3 flex-1">
+                                      <div className="relative">
+                                        <input
+                                          type="number"
+                                          placeholder="0"
+                                          value={area.length}
+                                          onChange={e => {
+                                            const updated = [...areas];
+                                            updated[idx] = { ...updated[idx], length: e.target.value };
+                                            updateAreas(updated);
+                                          }}
+                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">ft</span>
+                                      </div>
+                                      <div className="relative">
+                                        <input
+                                          type="number"
+                                          placeholder="0"
+                                          value={area.width}
+                                          onChange={e => {
+                                            const updated = [...areas];
+                                            updated[idx] = { ...updated[idx], width: e.target.value };
+                                            updateAreas(updated);
+                                          }}
+                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">ft</span>
+                                      </div>
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          placeholder="0"
+                                          value={area.thickness}
+                                          onChange={e => {
+                                            const updated = [...areas];
+                                            updated[idx] = { ...updated[idx], thickness: e.target.value };
+                                            updateAreas(updated);
+                                          }}
+                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">in.</span>
+                                      </div>
+                                      <input
+                                        type="number"
+                                        placeholder="1"
+                                        value={area.qty}
+                                        onChange={e => {
+                                          const updated = [...areas];
+                                          updated[idx] = { ...updated[idx], qty: e.target.value };
+                                          updateAreas(updated);
+                                        }}
+                                        className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                      />
+                                    </div>
+                                    {areas.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => updateAreas(areas.filter((_, i) => i !== idx))}
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {/* Per-row area calculation */}
+                                  {area.length && area.width && (
+                                    <div className="mt-1 ml-1">
+                                      <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">
+                                        {((parseFloat(area.length) || 0) * (parseFloat(area.width) || 0)).toFixed(0)} sq ft{parseInt(area.qty) > 1 ? ` x ${area.qty} = ${((parseFloat(area.length) || 0) * (parseFloat(area.width) || 0) * (parseInt(area.qty) || 1)).toFixed(0)} sq ft` : ''}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+
+                              <button
+                                type="button"
+                                onClick={() => updateAreas([...areas, { length: '', width: '', thickness: '', qty: '' }])}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all"
+                              >
+                                <Plus size={16} />
+                                Add Area
+                              </button>
+
+                              {totalSqFt > 0 && (
+                                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total:</span>
+                                  <span className="text-sm font-bold text-slate-800">{totalSqFt.toLocaleString()} sq ft</span>
+                                  {totalAreaCount > 0 && <span className="text-xs text-slate-400">({totalAreaCount} area{totalAreaCount !== 1 ? 's' : ''})</span>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : activeFields.length > 0 ? (
+                        // ── Standard field inputs (GPR, Demo, etc.) ──
+                        <div className={activeFields.some(f => f.fullWidth) ? 'space-y-3' : 'grid grid-cols-2 sm:grid-cols-3 gap-4'}>
+                          {activeFields.map(field => (
+                            <div key={field.key} className={field.fullWidth ? 'col-span-full' : ''}>
+                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">{field.label}</label>
+                              {field.type === 'textarea' ? (
+                                <textarea
+                                  rows={3}
+                                  placeholder={field.placeholder}
+                                  value={form.scope_details[code]?.[field.key] || ''}
+                                  onChange={e => updateScopeDetail(code, field.key, e.target.value)}
+                                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-base font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all resize-none"
+                                />
+                              ) : (
+                                <div className="relative">
+                                  <input
+                                    type={field.type}
+                                    placeholder={field.placeholder}
+                                    value={form.scope_details[code]?.[field.key] || ''}
+                                    onChange={e => updateScopeDetail(code, field.key, e.target.value)}
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                  />
+                                  {field.suffix && (
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">{field.suffix}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+
+                {/* ── Removal Section ────────────── */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br from-red-500 to-red-700 text-white shadow-md">
+                        <Truck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-slate-800">Material Removal</h4>
+                        <p className="text-xs text-slate-400">Are we removing material from the site?</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateForm({ removal_needed: !form.removal_needed, removal_method: '', removal_equipment: [] })}
+                      className={`relative w-14 h-7 rounded-full transition-all duration-200 ${
+                        form.removal_needed ? 'bg-red-500' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-200 ${
+                        form.removal_needed ? 'translate-x-7' : 'translate-x-0'
+                      }`} />
+                    </button>
+                  </div>
+                  {form.removal_needed && (
+                    <div className="mt-4 space-y-4">
+                      {/* Removal Method */}
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Removal Method</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { value: 'dumpster_on_site', label: 'Dumpster on Site' },
+                            { value: 'our_dump_truck', label: 'Our Dump Truck' },
+                          ].map(opt => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => updateForm({ removal_method: opt.value as typeof form.removal_method })}
+                              className={`px-4 py-3.5 rounded-xl text-sm font-bold transition-all ${
+                                form.removal_method === opt.value
+                                  ? 'bg-red-500 text-white border-2 border-red-400 shadow-lg'
+                                  : 'bg-slate-50 text-slate-600 border-2 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Removal Equipment Type */}
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Equipment for Removal</label>
+                        <p className="text-xs text-slate-400 mb-2">Select all that apply</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { value: 'forklift', label: 'Forklift' },
+                            { value: 'skidsteer', label: 'Skidsteer' },
+                            { value: 'lull', label: 'Lull' },
+                            { value: 'dingo', label: 'Dingo' },
+                            { value: 'sherpa', label: 'Sherpa' },
+                            { value: 'mini_excavator', label: 'Mini Excavator' },
+                          ].map(equip => {
+                            const isSelected = form.removal_equipment.includes(equip.value);
+                            return (
+                              <button
+                                key={equip.value}
+                                type="button"
+                                onClick={() => {
+                                  const updated = isSelected
+                                    ? form.removal_equipment.filter(e => e !== equip.value)
+                                    : [...form.removal_equipment, equip.value];
+                                  updateForm({ removal_equipment: updated });
+                                }}
+                                className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                                  isSelected
+                                    ? 'bg-orange-500 text-white border-2 border-orange-400 shadow-md'
+                                    : 'bg-white text-slate-600 border-2 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                }`}
+                              >
+                                {equip.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Description of Work ────────────── */}
+            <div>
+              <div className="flex items-center justify-between mb-2.5">
+                <Label>Description of Work</Label>
+                {voiceInput.isSupported && (
+                  <div className="flex items-center gap-2">
+                    {voiceInput.isListening && (
+                      <span className="text-xs font-semibold text-orange-500 animate-pulse">Listening...</span>
+                    )}
+                    <VoiceMicButton
+                      isListening={voiceInput.isListening}
+                      onClick={toggleVoice}
+                      size="sm"
+                      mode="free-speech"
+                    />
+                  </div>
+                )}
+              </div>
+              <TextArea
+                rows={4}
+                placeholder="Describe the work to be performed in detail... or tap the mic to dictate"
+                value={form.description}
+                onChange={e => updateForm({ description: e.target.value })}
+              />
+              {voiceInput.isListening && voiceInput.interimTranscript && (
+                <div className="mt-2 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl text-sm text-orange-700 italic">
+                  <span className="font-semibold text-orange-600">Hearing: </span>
+                  {voiceInput.interimTranscript}
+                </div>
+              )}
+              {voiceInput.error && (
+                <p className="mt-2 text-xs text-red-500 font-medium">{voiceInput.error}</p>
+              )}
+            </div>
+
+            {/* ── Scope Reference Photos ────────────── */}
+            <div>
+              <Label>Scope Photos</Label>
+              <p className="text-xs sm:text-sm text-slate-400 mb-3 -mt-1">Add reference photos for the operator</p>
+              <PhotoUploader
+                bucket="scope-photos"
+                pathPrefix="scope"
+                photos={form.scope_photo_urls}
+                onPhotosChange={(urls) => updateForm({ scope_photo_urls: urls })}
+                maxPhotos={10}
+                label="Add Scope Photos"
+                lightMode
+              />
+            </div>
+
             <div>
               <Label>Est. / Quoted Price</Label>
               <InputField
@@ -917,74 +1716,200 @@ export default function ScheduleFormPage() {
         );
 
       // ── STEP 4: Equipment Requirements ────────────────────
-      case 4:
+      case 4: {
+        // Helper to get/set equipment selection values
+        const getEquipVal = (serviceCode: string, itemId: string): string =>
+          form.equipment_selections[serviceCode]?.[itemId] || '';
+        const setEquipVal = (serviceCode: string, itemId: string, value: string) => {
+          const svc = { ...(form.equipment_selections[serviceCode] || {}) };
+          if (value) { svc[itemId] = value; } else { delete svc[itemId]; }
+          updateForm({ equipment_selections: { ...form.equipment_selections, [serviceCode]: svc } });
+        };
+        const toggleEquipItem = (serviceCode: string, itemId: string) => {
+          const current = getEquipVal(serviceCode, itemId);
+          setEquipVal(serviceCode, itemId, current ? '' : 'yes');
+        };
+
+        // Service types that have equipment configs
+        const serviceCodesWithEquip = form.service_types.filter(code => SERVICE_EQUIPMENT[code]);
+
         return (
           <div className="space-y-6">
-            <div>
-              <Label>Standard Equipment</Label>
-              <p className="text-xs sm:text-sm text-slate-400 mb-3 -mt-1">Select Patriot equipment presets</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {EQUIPMENT_PRESETS.map(eq => {
-                  const isSelected = form.equipment_needed.includes(eq.abbrev);
-                  return (
-                    <button
-                      key={eq.abbrev}
-                      type="button"
-                      onClick={() => {
-                        const updated = isSelected
-                          ? form.equipment_needed.filter(e => e !== eq.abbrev)
-                          : [...form.equipment_needed, eq.abbrev];
-                        updateForm({ equipment_needed: updated });
-                      }}
-                      className={`flex flex-col items-center gap-2 px-4 py-4 sm:py-5 rounded-xl text-sm font-bold border-2 transition-all duration-200 ${
-                        isSelected
-                          ? `bg-gradient-to-br ${eq.gradient} text-white border-transparent shadow-lg shadow-purple-200/50`
-                          : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 hover:shadow-md'
-                      }`}
-                    >
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-sm font-black ${
-                        isSelected ? 'bg-white/20 text-white' : `bg-gradient-to-br ${eq.gradient} text-white shadow-sm`
-                      }`}>
-                        {eq.abbrev}
+            {/* ── Smart Equipment per Service Type ─── */}
+            {serviceCodesWithEquip.length > 0 ? (
+              serviceCodesWithEquip.map(code => {
+                const config = SERVICE_EQUIPMENT[code];
+                const st = SERVICE_TYPES.find(s => s.code === code);
+                const subVal = getEquipVal(code, '_sub');
+
+                // Get dynamic items from scope data (e.g., core bit sizes)
+                const dynamicItems = config.getDynamicItems
+                  ? config.getDynamicItems(form.scope_details[code] || {})
+                  : [];
+
+                // Filter static items by sub-option
+                const visibleItems = [...config.items, ...dynamicItems].filter(item => {
+                  if (!item.showWhen) return true;
+                  if (!config.subOption) return true;
+                  return item.showWhen === subVal;
+                });
+
+                // Only show items if sub-option is selected (when sub-options exist)
+                const showItems = config.subOption ? (subVal ? visibleItems : []) : visibleItems;
+
+                return (
+                  <div key={code} className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black bg-gradient-to-br ${st?.gradient || 'from-gray-500 to-gray-600'} text-white shadow-md`}>
+                        {code.substring(0, 2)}
                       </div>
-                      <span className="text-xs mt-0.5">{eq.full}</span>
-                    </button>
-                  );
-                })}
-              </div>
+                      <h4 className="text-base font-bold text-slate-800">{st?.label || code} Equipment</h4>
+                    </div>
 
-              {/* Selected equipment tags */}
-              {form.equipment_needed.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {form.equipment_needed.map(eq => {
-                    const preset = EQUIPMENT_PRESETS.find(p => p.abbrev === eq);
-                    return (
-                      <span key={eq} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-full text-xs font-semibold">
-                        {eq}{preset ? ` — ${preset.full}` : ''}
-                        <button
-                          type="button"
-                          onClick={() => updateForm({ equipment_needed: form.equipment_needed.filter(e => e !== eq) })}
-                          className="ml-0.5 text-purple-400 hover:text-purple-700 transition-colors"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                    {/* Sub-option selector (e.g., Pentruder vs PBG) */}
+                    {config.subOption && (
+                      <div className="mb-4">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">{config.subOption.label}</label>
+                        <div className="flex gap-2">
+                          {config.subOption.choices.map(choice => (
+                            <button
+                              key={choice.value}
+                              type="button"
+                              onClick={() => setEquipVal(code, '_sub', subVal === choice.value ? '' : choice.value)}
+                              className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                                subVal === choice.value
+                                  ? 'bg-blue-600 text-white border-2 border-blue-500 shadow-lg'
+                                  : 'bg-slate-50 text-slate-600 border-2 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                              }`}
+                            >
+                              {choice.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-            {/* ── Side-by-side: Custom Equipment + Rental Equipment ─── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Left: Add Custom Equipment */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5">
-                <div className="flex items-center gap-2.5 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
-                    <Wrench size={16} className="text-white" />
+                    {/* Equipment items */}
+                    {showItems.length > 0 && (() => {
+                      const staticItems = showItems.filter(i => !i.id.startsWith('core_bit_'));
+                      const coreBitItems = showItems.filter(i => i.id.startsWith('core_bit_'));
+
+                      const renderItem = (item: EquipItem) => {
+                        const val = getEquipVal(code, item.id);
+                        const isActive = !!val;
+
+                        if (item.type === 'toggle') {
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => toggleEquipItem(code, item.id)}
+                              className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                                isActive
+                                  ? 'bg-blue-600 text-white border-2 border-blue-500 shadow-md'
+                                  : 'bg-white text-slate-600 border-2 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          );
+                        }
+
+                        if (item.type === 'qty') {
+                          return (
+                            <div key={item.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all ${
+                              isActive ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white'
+                            }`}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isActive) { setEquipVal(code, item.id, ''); }
+                                  else { setEquipVal(code, item.id, '1'); }
+                                }}
+                                className={`text-sm font-semibold transition-colors ${isActive ? 'text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                              >
+                                {item.label}
+                              </button>
+                              {isActive && (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={val === 'yes' ? '' : val}
+                                    placeholder="Qty"
+                                    onChange={e => setEquipVal(code, item.id, e.target.value || '1')}
+                                    className="w-16 px-2 py-1.5 bg-white border border-blue-300 rounded-lg text-sm font-bold text-slate-800 text-center focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+                                  />
+                                  {item.qtyUnit && <span className="text-xs font-bold text-slate-400">{item.qtyUnit}</span>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        if (item.type === 'option' && item.options) {
+                          return (
+                            <div key={item.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all ${
+                              isActive ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white'
+                            }`}>
+                              <span className={`text-sm font-semibold ${isActive ? 'text-blue-700' : 'text-slate-500'}`}>{item.label}</span>
+                              <div className="flex gap-1">
+                                {item.options.map(opt => (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => setEquipVal(code, item.id, val === opt ? '' : opt)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                      val === opt
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    {opt}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      };
+
+                      return (
+                        <div className="space-y-3">
+                          {/* Static equipment items */}
+                          {staticItems.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {staticItems.map(renderItem)}
+                            </div>
+                          )}
+
+                          {/* Core Bit recommendations from scope */}
+                          {coreBitItems.length > 0 && (
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Recommended Core Bits</label>
+                              <div className="flex flex-wrap gap-2">
+                                {coreBitItems.map(renderItem)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
-                  <h3 className="text-sm font-bold text-slate-800">Add Custom Equipment</h3>
-                </div>
+                );
+              })
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center">
+                <p className="text-sm text-slate-500">Select service types in Step 3 to see recommended equipment</p>
+              </div>
+            )}
+
+            {/* ── Custom & Rental Equipment ─── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5">
+                <h3 className="text-sm font-bold text-slate-800 mb-3">Add Custom Equipment</h3>
                 <div className="flex gap-2">
                   <InputField
                     icon={Wrench}
@@ -1002,17 +1927,20 @@ export default function ScheduleFormPage() {
                     Add
                   </button>
                 </div>
-                {/* Custom equipment added items (shown as part of equipment_needed above) */}
+                {form.equipment_needed.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {form.equipment_needed.map(eq => (
+                      <span key={eq} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-full text-xs font-semibold">
+                        {eq}
+                        <button type="button" onClick={() => updateForm({ equipment_needed: form.equipment_needed.filter(e => e !== eq) })} className="ml-0.5 text-slate-400 hover:text-slate-700">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Right: Add Rental Equipment */}
               <div className="bg-rose-50/50 border border-rose-200 rounded-2xl p-4 sm:p-5">
-                <div className="flex items-center gap-2.5 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center shadow-sm">
-                    <Truck size={16} className="text-white" />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-800">Add Rental Equipment</h3>
-                </div>
+                <h3 className="text-sm font-bold text-slate-800 mb-3">Add Rental Equipment</h3>
                 <div className="flex gap-2">
                   <InputField
                     icon={Truck}
@@ -1030,13 +1958,10 @@ export default function ScheduleFormPage() {
                     Add
                   </button>
                 </div>
-
-                {/* Rental equipment tags with pickup toggle */}
                 {form.equipment_rentals.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {form.equipment_rentals.map((rental, idx) => (
                       <div key={idx} className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-rose-200 rounded-xl text-sm font-semibold shadow-sm">
-                        <Truck size={14} className="text-rose-500 flex-shrink-0" />
                         <span className="text-rose-700">{rental.name}</span>
                         <button
                           type="button"
@@ -1049,30 +1974,23 @@ export default function ScheduleFormPage() {
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
                             rental.pickup_required
                               ? 'bg-amber-100 border-amber-300 text-amber-700'
-                              : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-amber-50 hover:border-amber-200'
+                              : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-amber-50'
                           }`}
                         >
                           Pickup: {rental.pickup_required ? 'Yes' : 'No'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => updateForm({ equipment_rentals: form.equipment_rentals.filter((_, i) => i !== idx) })}
-                          className="text-rose-400 hover:text-rose-700 transition-colors font-bold text-base leading-none"
-                        >
-                          ×
-                        </button>
+                        <button type="button" onClick={() => updateForm({ equipment_rentals: form.equipment_rentals.filter((_, i) => i !== idx) })} className="text-rose-400 hover:text-rose-700 font-bold">×</button>
                       </div>
                     ))}
                   </div>
                 )}
-
                 {form.equipment_rentals.length === 0 && (
                   <p className="mt-2 text-xs text-slate-400 italic">No rental equipment added yet</p>
                 )}
               </div>
             </div>
 
-            {/* Special Equipment Notes — below both cards */}
+            {/* Special Equipment Notes */}
             <div>
               <Label>Special Equipment Notes</Label>
               <TextArea
@@ -1084,6 +2002,7 @@ export default function ScheduleFormPage() {
             </div>
           </div>
         );
+      }
 
       // ── STEP 5: Scheduling Details ────────────────────────
       case 5:
@@ -1247,6 +2166,21 @@ export default function ScheduleFormPage() {
                 placeholder="Any special site access instructions, parking, PPE requirements, etc."
                 value={form.special_instructions}
                 onChange={e => updateForm({ special_instructions: e.target.value })}
+              />
+            </div>
+
+            {/* ── Compliance Attachments ────────────── */}
+            <div>
+              <Label>Site Compliance Documents</Label>
+              <p className="text-xs sm:text-sm text-slate-400 mb-3 -mt-1">Upload any site certs, permits, or compliance docs</p>
+              <PhotoUploader
+                bucket="site-compliance-docs"
+                pathPrefix="compliance"
+                photos={form.compliance_attachment_urls}
+                onPhotosChange={(urls) => updateForm({ compliance_attachment_urls: urls })}
+                maxPhotos={10}
+                label="Add Documents"
+                lightMode
               />
             </div>
           </div>
