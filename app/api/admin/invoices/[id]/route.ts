@@ -1,0 +1,143 @@
+/**
+ * API Route: /api/admin/invoices/[id]
+ * GET - Get invoice with line items
+ * PATCH - Update invoice (status, amounts, line items)
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
+    const { id } = await params;
+
+    const { data: invoice, error } = await supabaseAdmin
+      .from('invoices')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !invoice) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
+    }
+
+    // Get line items
+    const { data: lineItems } = await supabaseAdmin
+      .from('invoice_line_items')
+      .select('*')
+      .eq('invoice_id', id)
+      .order('line_number', { ascending: true });
+
+    // Get payments
+    const { data: payments } = await supabaseAdmin
+      .from('payments')
+      .select('*')
+      .eq('invoice_id', id)
+      .order('payment_date', { ascending: true });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...invoice,
+        line_items: lineItems || [],
+        payments: payments || [],
+      },
+    });
+  } catch (error: any) {
+    console.error('Error in invoice GET:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
+    const { id } = await params;
+    const body = await request.json();
+
+    // Allowed update fields
+    const allowedFields = [
+      'customer_name', 'customer_email', 'billing_address',
+      'due_date', 'subtotal', 'tax_rate', 'tax_amount',
+      'discount_amount', 'discount_description', 'total_amount',
+      'balance_due', 'status', 'payment_terms', 'po_number',
+      'contract_number', 'notes', 'internal_notes',
+    ];
+
+    const updates: any = {};
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        updates[field] = body[field];
+      }
+    }
+
+    // Handle status transitions
+    if (updates.status === 'sent' && !body.sent_at) {
+      updates.sent_at = new Date().toISOString();
+      updates.sent_by = auth.userId;
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    const { data: invoice, error } = await supabaseAdmin
+      .from('invoices')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating invoice:', error);
+      return NextResponse.json({ error: 'Failed to update invoice' }, { status: 500 });
+    }
+
+    // Update line items if provided
+    if (body.line_items && Array.isArray(body.line_items)) {
+      // Delete existing and re-insert
+      await supabaseAdmin
+        .from('invoice_line_items')
+        .delete()
+        .eq('invoice_id', id);
+
+      if (body.line_items.length > 0) {
+        const items = body.line_items.map((item: any, idx: number) => ({
+          invoice_id: id,
+          line_number: idx + 1,
+          description: item.description,
+          billing_type: item.billing_type || 'labor',
+          quantity: item.quantity || 1,
+          unit: item.unit || 'each',
+          unit_rate: item.unit_rate || 0,
+          amount: item.amount || 0,
+          job_order_id: item.job_order_id || null,
+          operator_id: item.operator_id || null,
+          taxable: item.taxable !== false,
+        }));
+
+        await supabaseAdmin
+          .from('invoice_line_items')
+          .insert(items);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: invoice,
+    });
+  } catch (error: any) {
+    console.error('Error in invoice PATCH:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

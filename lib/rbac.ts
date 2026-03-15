@@ -132,6 +132,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     features: ['View all equipment', 'Search by operator', 'Equipment status', 'Assignment tracking'],
   },
   {
+    key: 'billing',
+    title: 'Billing & Invoicing',
+    description: 'Generate invoices from completed jobs and track payments',
+    icon: '💰',
+    href: '/dashboard/admin/billing',
+    bgColor: 'from-emerald-600 to-green-700',
+    iconBg: 'bg-emerald-600',
+    features: ['Auto-generate invoices', 'Track payments', 'PDF export', 'QuickBooks ready'],
+  },
+  {
     key: 'operations_hub',
     title: 'Operations Hub',
     description: 'System diagnostics, security monitoring, and audit trail',
@@ -196,6 +206,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     completed_jobs: 'view',
     blade_inventory: 'none',
     tools_equipment: 'none',
+    billing: 'view',
     operations_hub: 'none',
   },
   supervisor: {
@@ -209,6 +220,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     completed_jobs: 'view',
     blade_inventory: 'none',
     tools_equipment: 'view',
+    billing: 'none',
     operations_hub: 'none',
   },
   salesman: {
@@ -222,6 +234,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     completed_jobs: 'none',
     blade_inventory: 'none',
     tools_equipment: 'none',
+    billing: 'none',
     operations_hub: 'none',
   },
   operator: allCards('none'),

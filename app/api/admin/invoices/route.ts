@@ -1,0 +1,268 @@
+/**
+ * API Route: /api/admin/invoices
+ * GET - List all invoices with filtering
+ * POST - Create invoice from completed job
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
+
+export async function GET(request: NextRequest) {
+  try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status'); // draft, sent, paid, overdue, void
+    const limit = parseInt(searchParams.get('limit') || '50');
+
+    let query = supabaseAdmin
+      .from('invoices')
+      .select('*, invoice_line_items(count)')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data: invoices, error } = await query;
+
+    if (error) {
+      console.error('Error fetching invoices:', error);
+      return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 });
+    }
+
+    // Calculate summary stats
+    const allInvoices = invoices || [];
+    const stats = {
+      total: allInvoices.length,
+      draft: allInvoices.filter(i => i.status === 'draft').length,
+      sent: allInvoices.filter(i => i.status === 'sent').length,
+      paid: allInvoices.filter(i => i.status === 'paid').length,
+      overdue: allInvoices.filter(i => i.status === 'overdue').length,
+      totalOutstanding: allInvoices
+        .filter(i => ['sent', 'overdue'].includes(i.status))
+        .reduce((sum, i) => sum + Number(i.balance_due || 0), 0),
+      totalPaid: allInvoices
+        .filter(i => i.status === 'paid')
+        .reduce((sum, i) => sum + Number(i.total_amount || 0), 0),
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: invoices,
+      stats,
+    });
+  } catch (error: any) {
+    console.error('Error in invoices GET:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
+    const body = await request.json();
+    const { jobOrderId } = body;
+
+    if (!jobOrderId) {
+      return NextResponse.json({ error: 'jobOrderId is required' }, { status: 400 });
+    }
+
+    // Fetch the completed job with all details
+    const { data: job, error: jobError } = await supabaseAdmin
+      .from('job_orders')
+      .select('*')
+      .eq('id', jobOrderId)
+      .single();
+
+    if (jobError || !job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    // Check if invoice already exists for this job
+    const { data: existingInvoice } = await supabaseAdmin
+      .from('invoice_line_items')
+      .select('invoice_id')
+      .eq('job_order_id', jobOrderId)
+      .limit(1)
+      .single();
+
+    if (existingInvoice) {
+      return NextResponse.json(
+        { error: 'Invoice already exists for this job', invoiceId: existingInvoice.invoice_id },
+        { status: 409 }
+      );
+    }
+
+    // Generate invoice number: INV-{year}-{6 digits}
+    const year = new Date().getFullYear();
+    const randomNum = Math.floor(100000 + Math.random() * 900000);
+    const invoiceNumber = `INV-${year}-${randomNum}`;
+
+    // Calculate due date (Net 30 by default)
+    const invoiceDate = new Date();
+    const dueDate = new Date(invoiceDate);
+    dueDate.setDate(dueDate.getDate() + 30);
+
+    // Fetch work items for line item generation
+    const { data: workItems } = await supabaseAdmin
+      .from('work_items')
+      .select('*')
+      .eq('job_order_id', jobOrderId)
+      .order('day_number', { ascending: true });
+
+    // Fetch daily logs for labor hours
+    const { data: dailyLogs } = await supabaseAdmin
+      .from('daily_job_logs')
+      .select('*')
+      .eq('job_order_id', jobOrderId)
+      .order('log_date', { ascending: true });
+
+    // Calculate total labor hours
+    const totalLabor = dailyLogs
+      ? dailyLogs.reduce((sum, log) => sum + Number(log.hours_worked || 0), 0)
+      : 0;
+
+    // Use job time tracking as fallback
+    let laborHours = totalLabor;
+    if (laborHours === 0 && job.work_started_at && job.work_completed_at) {
+      const start = new Date(job.work_started_at);
+      const end = new Date(job.work_completed_at);
+      laborHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    }
+
+    // Build line items from work items
+    const lineItems: any[] = [];
+    let lineNumber = 1;
+    let subtotal = 0;
+
+    // If there's an estimated cost, use that as a flat rate line item
+    if (job.estimated_cost && Number(job.estimated_cost) > 0) {
+      const amount = Number(job.estimated_cost);
+      lineItems.push({
+        line_number: lineNumber++,
+        description: `${job.title} — ${job.job_type || 'Concrete Cutting Services'}`,
+        billing_type: 'flat_rate',
+        quantity: 1,
+        unit: 'job',
+        unit_rate: amount,
+        amount: amount,
+        job_order_id: jobOrderId,
+        taxable: true,
+      });
+      subtotal += amount;
+    } else {
+      // Build from work items with default rates
+      if (workItems && workItems.length > 0) {
+        for (const item of workItems) {
+          let desc = item.work_type;
+          let qty = Number(item.quantity) || 1;
+          let unit = 'each';
+          let rate = 0;
+
+          // Set rates based on work type
+          if (item.core_quantity) {
+            desc += ` (${item.core_size || ''} x ${item.core_depth_inches || ''}in)`;
+            qty = item.core_quantity;
+            unit = 'cores';
+          } else if (item.linear_feet_cut) {
+            desc += ` (${item.cut_depth_inches || ''}in deep)`;
+            qty = Number(item.linear_feet_cut);
+            unit = 'LF';
+          }
+
+          const amount = qty * rate;
+          lineItems.push({
+            line_number: lineNumber++,
+            description: desc,
+            billing_type: 'labor',
+            quantity: qty,
+            unit: unit,
+            unit_rate: rate,
+            amount: amount,
+            job_order_id: jobOrderId,
+            operator_id: item.operator_id,
+            taxable: true,
+          });
+          subtotal += amount;
+        }
+      }
+
+      // Add labor hours line item
+      if (laborHours > 0) {
+        lineItems.push({
+          line_number: lineNumber++,
+          description: `Labor — ${laborHours.toFixed(1)} hours on-site`,
+          billing_type: 'labor',
+          quantity: Number(laborHours.toFixed(2)),
+          unit: 'hours',
+          unit_rate: 0, // Rate to be set by admin
+          amount: 0,
+          job_order_id: jobOrderId,
+          taxable: true,
+        });
+      }
+    }
+
+    // Create the invoice
+    const { data: invoice, error: invoiceError } = await supabaseAdmin
+      .from('invoices')
+      .insert({
+        invoice_number: invoiceNumber,
+        customer_name: job.customer_name || 'Unknown Customer',
+        customer_email: job.customer_contact || null,
+        billing_address: job.address || null,
+        invoice_date: invoiceDate.toISOString().split('T')[0],
+        due_date: dueDate.toISOString().split('T')[0],
+        subtotal: subtotal,
+        tax_rate: 0,
+        tax_amount: 0,
+        total_amount: subtotal,
+        balance_due: subtotal,
+        status: 'draft',
+        payment_terms: 30,
+        po_number: job.po_number || null,
+        notes: `Job: ${job.job_number}\nLocation: ${job.location || job.address || 'N/A'}`,
+        created_by: auth.userId,
+      })
+      .select()
+      .single();
+
+    if (invoiceError) {
+      console.error('Error creating invoice:', invoiceError);
+      return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 });
+    }
+
+    // Insert line items
+    if (lineItems.length > 0) {
+      const itemsWithInvoiceId = lineItems.map(item => ({
+        ...item,
+        invoice_id: invoice.id,
+      }));
+
+      const { error: lineError } = await supabaseAdmin
+        .from('invoice_line_items')
+        .insert(itemsWithInvoiceId);
+
+      if (lineError) {
+        console.error('Error creating line items:', lineError);
+        // Invoice was created but line items failed - don't fail the whole request
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: invoice,
+      lineItemsCount: lineItems.length,
+      message: `Invoice ${invoiceNumber} created as draft`,
+    });
+  } catch (error: any) {
+    console.error('Error in invoices POST:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
