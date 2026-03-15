@@ -129,6 +129,10 @@ async function updateJobStatus(
       'job_difficulty_rating', 'job_access_rating',
       'job_difficulty_notes', 'job_access_notes',
       'feedback_submitted_at',
+      // Equipment confirmation tracking (per-operator)
+      'equipment_confirmed_by',
+      // Job survey (smart post-work survey)
+      'job_survey',
     ];
 
     for (const field of allowedExtraFields) {
