@@ -1,0 +1,446 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
+import { getCurrentUser } from '@/lib/auth';
+import {
+  CheckCircle2,
+  CalendarPlus,
+  ArrowLeft,
+  FileSignature,
+  Clock,
+  Loader2,
+  AlertTriangle,
+  Sun,
+  Trophy,
+  PenTool,
+} from 'lucide-react';
+
+export default function DayCompletePage() {
+  const router = useRouter();
+  const params = useParams();
+  const jobId = params.id as string;
+
+  const [job, setJob] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [showSignature, setShowSignature] = useState(false);
+  const [signerName, setSignerName] = useState('');
+  const [signatureData, setSignatureData] = useState('');
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+
+  // Signature canvas
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  useEffect(() => {
+    fetchJob();
+  }, []);
+
+  const fetchJob = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push('/login'); return; }
+
+      const res = await fetch(`/api/job-orders/${jobId}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setJob(data.data || data);
+      } else {
+        // Fallback: fetch directly from supabase
+        const { data } = await supabase
+          .from('job_orders')
+          .select('*, profiles!job_orders_assigned_to_fkey(full_name)')
+          .eq('id', jobId)
+          .single();
+        setJob(data);
+      }
+    } catch (err) {
+      console.error('Error fetching job:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showNotif = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  // Calculate hours worked today
+  const getHoursWorked = () => {
+    if (!job) return 0;
+    const start = job.work_started_at ? new Date(job.work_started_at) :
+                  job.route_started_at ? new Date(job.route_started_at) : null;
+    if (!start) return 0;
+    return ((Date.now() - start.getTime()) / (1000 * 60 * 60)).toFixed(1);
+  };
+
+  // ─── DONE FOR TODAY (Continue Tomorrow) ───────────────────
+  const handleDoneForToday = async () => {
+    setSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Get work performed from localStorage
+      const stored = localStorage.getItem(`work-performed-${jobId}`);
+      const workPerformed = stored ? JSON.parse(stored).items : [];
+
+      const res = await fetch(`/api/job-orders/${jobId}/daily-log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          workPerformed,
+          notes: `Day complete. Continuing tomorrow.`,
+          continueNextDay: true,
+          latitude: null,
+          longitude: null,
+        })
+      });
+
+      if (res.ok) {
+        showNotif('Day logged! Job will continue tomorrow.', 'success');
+        // Clear localStorage work data for this job
+        localStorage.removeItem(`work-performed-${jobId}`);
+        setTimeout(() => router.push('/dashboard/my-jobs'), 1500);
+      } else {
+        const data = await res.json();
+        showNotif(data.error || 'Failed to save daily log', 'error');
+      }
+    } catch (err) {
+      console.error('Error saving daily log:', err);
+      showNotif('Failed to save. Please try again.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ─── JOB FULLY COMPLETE ──────────────────────────────────
+  const handleJobComplete = async () => {
+    setSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Get work performed from localStorage
+      const stored = localStorage.getItem(`work-performed-${jobId}`);
+      const workPerformed = stored ? JSON.parse(stored).items : [];
+
+      // Create final daily log entry
+      await fetch(`/api/job-orders/${jobId}/daily-log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          workPerformed,
+          notes: 'Final day. Job complete.',
+          signerName: signerName || undefined,
+          signatureData: signatureData || undefined,
+          continueNextDay: false,
+          latitude: null,
+          longitude: null,
+        })
+      }).catch(() => {}); // Don't block on daily log
+
+      // Mark job as completed via status API
+      const statusRes = await fetch(`/api/job-orders/${jobId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          status: 'completed',
+          work_completed_at: new Date().toISOString(),
+          completion_signer_name: signerName || undefined,
+          completion_signature: signatureData || undefined,
+        })
+      });
+
+      if (statusRes.ok) {
+        showNotif('Job completed! Great work!', 'success');
+        localStorage.removeItem(`work-performed-${jobId}`);
+        setTimeout(() => router.push('/dashboard/my-jobs'), 1500);
+      } else {
+        const data = await statusRes.json();
+        showNotif(data.error || 'Failed to complete job', 'error');
+      }
+    } catch (err) {
+      console.error('Error completing job:', err);
+      showNotif('Failed to complete. Please try again.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ─── SIGNATURE CANVAS HANDLERS ────────────────────────────
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    setIsDrawing(true);
+    const rect = canvas.getBoundingClientRect();
+    const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      setSignatureData(canvas.toDataURL());
+    }
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setSignatureData('');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-50 shadow-2xl">
+        <div className="container mx-auto px-4 py-4 max-w-lg">
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/dashboard/job-schedule/${jobId}/work-performed`}
+              className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-lg font-bold">Day Complete</h1>
+              <p className="text-xs text-blue-200">{job?.job_number} &bull; {job?.customer_name}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${
+          notification.type === 'success' ? 'bg-emerald-500' :
+          notification.type === 'error' ? 'bg-red-500' : 'bg-amber-500'
+        }`}>
+          {notification.message}
+        </div>
+      )}
+
+      <div className="container mx-auto px-4 py-6 max-w-lg space-y-6">
+        {/* Hours Worked Today */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-blue-100 rounded-xl">
+              <Clock className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Hours Worked Today</p>
+              <p className="text-2xl font-bold text-slate-900">{getHoursWorked()} hrs</p>
+            </div>
+          </div>
+          {job?.is_multi_day && (
+            <div className="mt-3 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="text-xs text-amber-700 font-medium">
+                Multi-day job &bull; Day {(job?.total_days_worked || 0) + 1}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Main Decision */}
+        {!showSignature ? (
+          <div className="space-y-4">
+            <h2 className="text-center text-lg font-semibold text-slate-800">
+              Are you done with this job?
+            </h2>
+
+            {/* Done for Today */}
+            <button
+              onClick={handleDoneForToday}
+              disabled={submitting}
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <Sun className="w-7 h-7" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-lg font-bold">Done for Today</p>
+                  <p className="text-sm text-amber-100">
+                    Job continues tomorrow. Progress saved.
+                  </p>
+                </div>
+                {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
+              </div>
+            </button>
+
+            {/* Job Fully Complete */}
+            <button
+              onClick={() => setShowSignature(true)}
+              disabled={submitting}
+              className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <Trophy className="w-7 h-7" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-lg font-bold">Job Fully Complete</p>
+                  <p className="text-sm text-emerald-100">
+                    All work finished. Get customer signature.
+                  </p>
+                </div>
+              </div>
+            </button>
+          </div>
+        ) : (
+          /* Customer Signature Section */
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => setShowSignature(false)}
+                className="p-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4 text-slate-600" />
+              </button>
+              <h2 className="text-lg font-semibold text-slate-800">
+                Customer Signature
+              </h2>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+              {/* Signer Name */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Customer Name (optional)
+                </label>
+                <input
+                  type="text"
+                  value={signerName}
+                  onChange={(e) => setSignerName(e.target.value)}
+                  placeholder="Name of person signing"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900"
+                />
+              </div>
+
+              {/* Signature Pad */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
+                    <PenTool className="w-3.5 h-3.5" />
+                    Signature (optional)
+                  </label>
+                  {signatureData && (
+                    <button
+                      onClick={clearSignature}
+                      className="text-xs text-red-500 hover:text-red-700"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50">
+                  <canvas
+                    ref={canvasRef}
+                    width={350}
+                    height={150}
+                    className="w-full touch-none cursor-crosshair"
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                  />
+                </div>
+                <p className="text-xs text-slate-400 mt-1 text-center">
+                  Draw signature above or skip
+                </p>
+              </div>
+
+              {/* Complete Button */}
+              <button
+                onClick={handleJobComplete}
+                disabled={submitting}
+                className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl py-4 font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5" />
+                )}
+                {submitting ? 'Completing...' : 'Complete Job'}
+              </button>
+
+              {/* Skip signature option */}
+              <button
+                onClick={handleJobComplete}
+                disabled={submitting}
+                className="w-full text-slate-500 text-sm hover:text-slate-700 py-2"
+              >
+                Skip signature and complete
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Warning */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="flex gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-700">
+              <strong>Done for Today</strong> saves your progress and resets the job for tomorrow.
+              <strong> Job Fully Complete</strong> marks the job as finished and sends it to billing.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

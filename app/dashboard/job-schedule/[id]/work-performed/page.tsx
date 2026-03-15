@@ -1134,19 +1134,27 @@ export default function WorkPerformed() {
     }
 
     try {
-      // Save work performed data to localStorage for the survey page to read
-      const workPerformedData = {
-        jobId: params.id,
-        items: selectedItems,
-        timestamp: new Date().toISOString()
-      };
-
-      console.log('Saving work performed:', workPerformedData);
-      localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
-
-      // Track blade usage for sawing work (fire and forget)
       const { data: { session } } = await supabase.auth.getSession();
+
       if (session) {
+        // Save work items to database (primary storage)
+        const res = await fetch(`/api/job-orders/${params.id}/work-items`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            items: selectedItems,
+            dayNumber: 1 // Will be overridden by daily-log system for multi-day jobs
+          })
+        });
+
+        if (!res.ok) {
+          console.error('Failed to save work items to DB, falling back to localStorage');
+        }
+
+        // Track blade usage for sawing work (fire and forget)
         fetch('/api/equipment/track-usage', {
           method: 'POST',
           headers: {
@@ -1169,21 +1177,35 @@ export default function WorkPerformed() {
           body: JSON.stringify({
             jobId: params.id,
             completedStep: 'work_performed',
-            currentStep: 'job_survey',
+            currentStep: 'day_complete',
           })
         }).catch(err => console.log('Workflow tracking unavailable:', err));
       }
 
-      showNotification('Work performed saved! Proceeding to job survey...', 'success');
+      // Also save to localStorage as backup
+      const workPerformedData = {
+        jobId: params.id,
+        items: selectedItems,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
 
-      // Navigate to job survey page
+      showNotification('Work performed saved!', 'success');
+
+      // Navigate to day completion page (done for today vs fully complete)
       setTimeout(() => {
-        router.push(`/dashboard/job-schedule/${params.id}/job-survey`);
+        router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
       }, 800);
     } catch (error) {
       console.error('Error submitting work performed:', error);
-      // Still navigate — work was saved to localStorage
-      router.push(`/dashboard/job-schedule/${params.id}/job-survey`);
+      // Fallback: save to localStorage and still navigate
+      const workPerformedData = {
+        jobId: params.id,
+        items: selectedItems,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
+      router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
     }
   };
 
