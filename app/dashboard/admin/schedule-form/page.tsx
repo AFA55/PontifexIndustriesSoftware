@@ -253,6 +253,19 @@ const SERVICE_EQUIPMENT: Record<string, ServiceEquipConfig> = {
       { id: 'hydraulic_hose', label: 'Hydraulic Hose', type: 'qty' },
     ],
   },
+  'HHS/PS': {
+    items: [
+      { id: 'hydraulic_hose', label: 'Hydraulic Hose', type: 'qty', qtyUnit: 'ft' },
+      { id: 'gas_power_pack', label: 'Gas Power Pack', type: 'toggle' },
+      { id: 'chalk_line', label: 'Chalk Line', type: 'toggle' },
+      { id: 'clear_spray', label: 'Clear Spray', type: 'toggle' },
+      { id: 'tape', label: 'Tape', type: 'toggle' },
+      { id: 'plastic', label: 'Plastic', type: 'toggle' },
+      { id: 'handsaw_20', label: '20" Handsaw', type: 'toggle' },
+      { id: 'handsaw_24', label: '24" Handsaw', type: 'toggle' },
+      { id: 'push_saw', label: 'Push Saw', type: 'toggle' },
+    ],
+  },
 };
 
 // ── Form state type ──────────────────────────────────────────
