@@ -11,7 +11,8 @@ import {
   MapPin, Wrench, HardHat, Calendar, ShieldCheck, BarChart3,
   Building2, ChevronRight, Loader2, CheckCircle, AlertTriangle,
   ChevronDown, Phone, FileText, DollarSign, Zap, Clock,
-  Clipboard, Star, Droplets, Plug, Wind, Scissors, Truck, Mic, Plus, Trash2
+  Clipboard, Star, Droplets, Plug, Wind, Scissors, Truck, Mic, Plus, Trash2,
+  Eye, X, Users,
 } from 'lucide-react';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
@@ -544,6 +545,13 @@ export default function ScheduleFormPage() {
   const [poLookupLoading, setPoLookupLoading] = useState(false);
   const poLookupTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // Schedule preview state
+  const [showSchedulePreview, setShowSchedulePreview] = useState(false);
+  const [schedulePreviewData, setSchedulePreviewData] = useState<any[]>([]);
+  const [schedulePreviewOperators, setSchedulePreviewOperators] = useState<any[]>([]);
+  const [schedulePreviewLoading, setSchedulePreviewLoading] = useState(false);
+  const [schedulePreviewDate, setSchedulePreviewDate] = useState('');
+
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser || !isAdmin()) {
@@ -748,6 +756,51 @@ export default function ScheduleFormPage() {
     setError('');
     setCurrentStep(s => Math.max(s - 1, 1));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // ── Schedule Preview ───────────────────────────────────────
+  const fetchSchedulePreview = async (date?: string) => {
+    setSchedulePreviewLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const previewDate = date || form.start_date || new Date().toISOString().split('T')[0];
+      setSchedulePreviewDate(previewDate);
+
+      // Fetch a week of schedule data starting from the target date
+      const startDate = previewDate;
+      const endObj = new Date(previewDate);
+      endObj.setDate(endObj.getDate() + 6);
+      const endDate = endObj.toISOString().split('T')[0];
+
+      const res = await fetch(`/api/admin/schedule-board?startDate=${startDate}&endDate=${endDate}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSchedulePreviewData(data.data || []);
+      }
+
+      // Fetch all operators
+      const { data: operators } = await supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .in('role', ['operator', 'apprentice'])
+        .order('full_name');
+
+      setSchedulePreviewOperators(operators || []);
+    } catch (err) {
+      console.error('Error fetching schedule preview:', err);
+    } finally {
+      setSchedulePreviewLoading(false);
+    }
+  };
+
+  const openSchedulePreview = () => {
+    setShowSchedulePreview(true);
+    fetchSchedulePreview();
   };
 
   // ── Submit ─────────────────────────────────────────────────
@@ -2021,6 +2074,22 @@ export default function ScheduleFormPage() {
       case 5:
         return (
           <div className="space-y-6">
+            {/* View Schedule Button */}
+            <button
+              type="button"
+              onClick={openSchedulePreview}
+              className="w-full flex items-center justify-center gap-3 px-5 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl text-blue-700 font-bold hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 hover:shadow-md transition-all active:scale-[0.99]"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-sm">
+                <Eye size={18} className="text-white" />
+              </div>
+              <div className="text-left">
+                <span className="text-base">View Current Schedule</span>
+                <p className="text-xs font-medium text-blue-500">Check operator availability before picking a date</p>
+              </div>
+              <ChevronRight size={20} className="text-blue-400 ml-auto" />
+            </button>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <Label required>Start Date</Label>
@@ -2634,6 +2703,257 @@ export default function ScheduleFormPage() {
         </div>
         <p className="text-center text-xs text-slate-400 mt-2 font-medium">{Math.round((currentStep / 8) * 100)}% complete</p>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* SCHEDULE PREVIEW MODAL                                     */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      {showSchedulePreview && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowSchedulePreview(false)}
+          />
+
+          {/* Modal */}
+          <div className="relative mt-8 sm:mt-16 mx-4 w-full max-w-4xl max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Calendar size={20} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Schedule Preview</h3>
+                  <p className="text-xs text-blue-200">Check operator availability & talent pool</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSchedulePreview(false)}
+                className="w-9 h-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors"
+              >
+                <X size={18} className="text-white" />
+              </button>
+            </div>
+
+            {/* Date Navigation */}
+            <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <button
+                onClick={() => {
+                  const d = new Date(schedulePreviewDate);
+                  d.setDate(d.getDate() - 7);
+                  const newDate = d.toISOString().split('T')[0];
+                  setSchedulePreviewDate(newDate);
+                  fetchSchedulePreview(newDate);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg border border-slate-200 transition-all"
+              >
+                <ArrowLeft size={14} />
+                Prev Week
+              </button>
+              <div className="text-sm font-bold text-slate-700">
+                {schedulePreviewDate && (() => {
+                  const start = new Date(schedulePreviewDate + 'T00:00:00');
+                  const end = new Date(start);
+                  end.setDate(end.getDate() + 6);
+                  return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+                })()}
+              </div>
+              <button
+                onClick={() => {
+                  const d = new Date(schedulePreviewDate);
+                  d.setDate(d.getDate() + 7);
+                  const newDate = d.toISOString().split('T')[0];
+                  setSchedulePreviewDate(newDate);
+                  fetchSchedulePreview(newDate);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg border border-slate-200 transition-all"
+              >
+                Next Week
+                <ArrowRight size={14} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {schedulePreviewLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 size={32} className="animate-spin text-blue-500" />
+                  <p className="text-sm text-slate-500 font-medium">Loading schedule...</p>
+                </div>
+              ) : (
+                <>
+                  {/* ── Week Grid ─────────────────────────────── */}
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <Calendar size={15} className="text-blue-600" />
+                      Week View — Jobs Scheduled
+                    </h4>
+                    <div className="grid grid-cols-7 gap-2">
+                      {Array.from({ length: 7 }).map((_, i) => {
+                        const day = new Date(schedulePreviewDate + 'T00:00:00');
+                        day.setDate(day.getDate() + i);
+                        const dayStr = day.toISOString().split('T')[0];
+                        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                        const dayJobs = schedulePreviewData.filter(j => {
+                          const jStart = j.scheduled_date?.split('T')[0];
+                          const jEnd = j.end_date?.split('T')[0] || jStart;
+                          return dayStr >= jStart && dayStr <= jEnd;
+                        });
+                        const isToday = dayStr === new Date().toISOString().split('T')[0];
+
+                        return (
+                          <div
+                            key={dayStr}
+                            className={`rounded-xl border p-2 min-h-[100px] transition-all ${
+                              isToday
+                                ? 'border-blue-400 bg-blue-50/50 shadow-sm'
+                                : isWeekend
+                                  ? 'border-slate-200 bg-slate-50/50'
+                                  : 'border-slate-200 bg-white'
+                            }`}
+                          >
+                            <div className="text-center mb-1.5">
+                              <p className={`text-[10px] font-bold uppercase ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>
+                                {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                              </p>
+                              <p className={`text-lg font-bold ${isToday ? 'text-blue-700' : 'text-slate-800'}`}>
+                                {day.getDate()}
+                              </p>
+                            </div>
+                            {dayJobs.length === 0 ? (
+                              <div className="text-center py-1">
+                                <p className="text-[10px] text-emerald-500 font-semibold">Available</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {dayJobs.slice(0, 3).map((job: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="px-1.5 py-1 rounded-md bg-gradient-to-r from-slate-700 to-slate-800 text-[9px] text-white font-medium truncate"
+                                    title={`${job.customer_name || 'Job'} — ${job.job_type || ''}`}
+                                  >
+                                    {job.customer_name?.split(' ')[0] || 'Job'}
+                                  </div>
+                                ))}
+                                {dayJobs.length > 3 && (
+                                  <p className="text-[9px] text-slate-500 text-center font-semibold">+{dayJobs.length - 3} more</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* ── Talent Pool ────────────────────────────── */}
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <Users size={15} className="text-indigo-600" />
+                      Talent Pool — Operator Availability
+                    </h4>
+                    {schedulePreviewOperators.length === 0 ? (
+                      <p className="text-sm text-slate-400 italic">No operators found.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {schedulePreviewOperators.map((op: any) => {
+                          // Count how many jobs this operator is assigned to in the preview week
+                          const assignedJobs = schedulePreviewData.filter(j =>
+                            j.assigned_operators?.some((a: any) =>
+                              a.operator_id === op.id || a.id === op.id
+                            )
+                          );
+                          const assignedCount = assignedJobs.length;
+                          const isFree = assignedCount === 0;
+
+                          return (
+                            <div
+                              key={op.id}
+                              className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
+                                isFree
+                                  ? 'bg-emerald-50/60 border-emerald-200'
+                                  : assignedCount >= 5
+                                    ? 'bg-red-50/60 border-red-200'
+                                    : 'bg-amber-50/60 border-amber-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white ${
+                                  isFree
+                                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                                    : assignedCount >= 5
+                                      ? 'bg-gradient-to-br from-red-500 to-rose-600'
+                                      : 'bg-gradient-to-br from-amber-500 to-orange-600'
+                                }`}>
+                                  {op.full_name?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-slate-800">{op.full_name || 'Unknown'}</p>
+                                  <p className="text-[10px] text-slate-500 uppercase font-semibold">{op.role}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                {isFree ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                    <CheckCircle size={12} />
+                                    Available
+                                  </span>
+                                ) : (
+                                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                                    assignedCount >= 5
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                  }`}>
+                                    {assignedCount} job{assignedCount !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Summary Stats ──────────────────────────── */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
+                      <p className="text-2xl font-bold text-blue-700">{schedulePreviewData.length}</p>
+                      <p className="text-[10px] font-semibold text-blue-500 uppercase">Jobs This Week</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-200">
+                      <p className="text-2xl font-bold text-emerald-700">
+                        {schedulePreviewOperators.filter(op =>
+                          !schedulePreviewData.some(j =>
+                            j.assigned_operators?.some((a: any) => a.operator_id === op.id || a.id === op.id)
+                          )
+                        ).length}
+                      </p>
+                      <p className="text-[10px] font-semibold text-emerald-500 uppercase">Available Operators</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                      <p className="text-2xl font-bold text-slate-700">{schedulePreviewOperators.length}</p>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase">Total Crew</p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+              <p className="text-xs text-slate-400">Use this preview to pick the best date for your job</p>
+              <button
+                onClick={() => setShowSchedulePreview(false)}
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-bold text-sm rounded-xl hover:shadow-lg transition-all active:scale-[0.98]"
+              >
+                Close & Pick Date
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

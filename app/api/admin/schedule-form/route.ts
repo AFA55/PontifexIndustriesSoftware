@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       // ── Auto-generated ──────────────────────────────────────
       job_number: jobNumber,
       title: `${body.customer_name} - ${body.job_type?.split(',')[0]?.trim() || 'Job'}`,
-      status: profile.role === 'super_admin' ? 'scheduled' : 'pending_approval',
+      status: 'pending_approval', // All submissions require super_admin review before going on the board
       priority: 'medium',
       created_by: user.id,
       created_via: 'schedule_form',
