@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Wrench,
   CalendarDays,
+  Activity,
 } from 'lucide-react';
 
 interface ActiveJob {
@@ -74,7 +75,6 @@ export default function ActiveJobsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Fetch active jobs (not completed, not cancelled, not pending)
       const { data, error } = await supabase
         .from('job_orders')
         .select(`
@@ -91,7 +91,6 @@ export default function ActiveJobsPage() {
 
       if (error) throw error;
 
-      // Fetch operator names
       const operatorIds = [...new Set((data || []).map(j => j.assigned_to).filter(Boolean))];
       const helperIds = [...new Set((data || []).map(j => j.helper_assigned_to).filter(Boolean))];
       const allIds = [...new Set([...operatorIds, ...helperIds])];
@@ -107,7 +106,6 @@ export default function ActiveJobsPage() {
         }
       }
 
-      // Fetch work item counts per job
       const jobIds = (data || []).map(j => j.id);
       let workItemCounts: Record<string, number> = {};
       if (jobIds.length > 0) {
@@ -122,7 +120,6 @@ export default function ActiveJobsPage() {
         }
       }
 
-      // Fetch daily log counts
       let dailyLogCounts: Record<string, number> = {};
       if (jobIds.length > 0) {
         const { data: logData } = await supabase
@@ -157,7 +154,6 @@ export default function ActiveJobsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Fetch work items
       const { data: items } = await supabase
         .from('work_items')
         .select('*')
@@ -166,7 +162,6 @@ export default function ActiveJobsPage() {
 
       if (items) setWorkItems(prev => ({ ...prev, [jobId]: items }));
 
-      // Fetch daily logs
       const { data: logs } = await supabase
         .from('daily_job_logs')
         .select('*')
@@ -196,11 +191,11 @@ export default function ActiveJobsPage() {
     return job.status === filter;
   });
 
-  const statusConfig: Record<string, { color: string; bg: string; icon: any; label: string }> = {
-    scheduled: { color: 'text-blue-700', bg: 'bg-blue-100', icon: Calendar, label: 'Scheduled' },
-    assigned: { color: 'text-purple-700', bg: 'bg-purple-100', icon: User, label: 'Assigned' },
-    in_route: { color: 'text-amber-700', bg: 'bg-amber-100', icon: Truck, label: 'In Route' },
-    in_progress: { color: 'text-emerald-700', bg: 'bg-emerald-100', icon: Hammer, label: 'In Progress' },
+  const statusConfig: Record<string, { color: string; bg: string; border: string; icon: any; label: string }> = {
+    scheduled: { color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', icon: Calendar, label: 'Scheduled' },
+    assigned: { color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200', icon: User, label: 'Assigned' },
+    in_route: { color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', icon: Truck, label: 'In Route' },
+    in_progress: { color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', icon: Hammer, label: 'In Progress' },
   };
 
   const stats = {
@@ -210,30 +205,43 @@ export default function ActiveJobsPage() {
     multiDay: jobs.filter(j => j.is_multi_day).length,
   };
 
+  const filterConfig: Record<string, { active: string }> = {
+    all: { active: 'bg-slate-800 text-white shadow-sm' },
+    in_progress: { active: 'bg-emerald-600 text-white shadow-sm' },
+    in_route: { active: 'bg-amber-500 text-white shadow-sm' },
+    assigned: { active: 'bg-purple-600 text-white shadow-sm' },
+    multi_day: { active: 'bg-blue-600 text-white shadow-sm' },
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Header */}
-      <div className="bg-black/20 backdrop-blur-sm border-b border-white/10 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+      <div className="backdrop-blur-xl bg-white/90 border-b border-gray-200 sticky top-0 z-50 shadow-lg">
+        <div className="container mx-auto px-4 py-4 max-w-4xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link
                 href="/dashboard/admin"
-                className="p-2 bg-white/10 rounded-xl border border-white/20 hover:bg-white/20 transition-all"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-5 h-5 text-white" />
+                <ArrowLeft className="w-6 h-6 text-gray-800" />
               </Link>
               <div>
-                <h1 className="text-xl font-bold text-white">Active Jobs</h1>
-                <p className="text-xs text-white/60">{stats.total} jobs in progress</p>
+                <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-sm">
+                    <Activity size={16} className="text-white" />
+                  </div>
+                  Active Jobs
+                </h1>
+                <p className="text-sm text-gray-500">{stats.total} jobs in progress</p>
               </div>
             </div>
             <button
               onClick={fetchActiveJobs}
               disabled={loading}
-              className="p-2 bg-white/10 rounded-xl border border-white/20 hover:bg-white/20 transition-all"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <RefreshCw className={`w-5 h-5 text-white ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
@@ -241,27 +249,31 @@ export default function ActiveJobsPage() {
 
       <div className="container mx-auto px-4 py-6 max-w-4xl">
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 p-3 text-center">
-            <p className="text-2xl font-bold text-white">{stats.total}</p>
-            <p className="text-xs text-white/60">Total Active</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm hover:shadow transition-shadow">
+            <Activity className="w-5 h-5 text-blue-600 mb-2" />
+            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Active</p>
           </div>
-          <div className="bg-emerald-500/20 backdrop-blur-sm rounded-xl border border-emerald-400/20 p-3 text-center">
-            <p className="text-2xl font-bold text-emerald-300">{stats.inProgress}</p>
-            <p className="text-xs text-emerald-200/60">In Progress</p>
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm hover:shadow transition-shadow">
+            <Hammer className="w-5 h-5 text-emerald-600 mb-2" />
+            <p className="text-2xl font-bold text-gray-900">{stats.inProgress}</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">In Progress</p>
           </div>
-          <div className="bg-amber-500/20 backdrop-blur-sm rounded-xl border border-amber-400/20 p-3 text-center">
-            <p className="text-2xl font-bold text-amber-300">{stats.inRoute}</p>
-            <p className="text-xs text-amber-200/60">In Route</p>
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm hover:shadow transition-shadow">
+            <Truck className="w-5 h-5 text-amber-600 mb-2" />
+            <p className="text-2xl font-bold text-gray-900">{stats.inRoute}</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">In Route</p>
           </div>
-          <div className="bg-purple-500/20 backdrop-blur-sm rounded-xl border border-purple-400/20 p-3 text-center">
-            <p className="text-2xl font-bold text-purple-300">{stats.multiDay}</p>
-            <p className="text-xs text-purple-200/60">Multi-Day</p>
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm hover:shadow transition-shadow">
+            <CalendarDays className="w-5 h-5 text-purple-600 mb-2" />
+            <p className="text-2xl font-bold text-gray-900">{stats.multiDay}</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Multi-Day</p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-5">
           {[
             { key: 'all', label: 'All' },
             { key: 'in_progress', label: 'In Progress' },
@@ -272,10 +284,10 @@ export default function ActiveJobsPage() {
             <button
               key={f.key}
               onClick={() => setFilter(f.key as any)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+              className={`px-3.5 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all ${
                 filter === f.key
-                  ? 'bg-white text-slate-900'
-                  : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  ? filterConfig[f.key]?.active || 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
               }`}
             >
               {f.label}
@@ -285,13 +297,18 @@ export default function ActiveJobsPage() {
 
         {/* Job List */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-14 h-14 mx-auto mb-4 relative">
+              <div className="absolute inset-0 rounded-full border-4 border-blue-100" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin" />
+            </div>
+            <p className="text-gray-600 font-medium">Loading active jobs...</p>
           </div>
         ) : filteredJobs.length === 0 ? (
-          <div className="bg-white/5 rounded-2xl border border-white/10 p-12 text-center">
-            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-            <p className="text-white/70">No active jobs matching this filter</p>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-12 text-center">
+            <CheckCircle2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No Active Jobs</h3>
+            <p className="text-gray-600">No jobs matching this filter</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -301,35 +318,35 @@ export default function ActiveJobsPage() {
               const isExpanded = expandedJob === job.id;
 
               return (
-                <div key={job.id} className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
+                <div key={job.id} className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow">
                   {/* Job Header */}
                   <button
                     onClick={() => toggleExpand(job.id)}
-                    className="w-full p-4 text-left hover:bg-white/5 transition-all"
+                    className="w-full p-5 text-left hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.color}`}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${status.bg} ${status.color}`}>
                             <StatusIcon className="w-3 h-3" />
                             {status.label}
                           </span>
                           {job.is_multi_day && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
                               <CalendarDays className="w-3 h-3" />
                               Day {job.total_days_worked || 1}
                             </span>
                           )}
                           {job.priority === 'urgent' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
                               <AlertCircle className="w-3 h-3" />
                               Urgent
                             </span>
                           )}
                         </div>
-                        <p className="text-sm font-bold text-white truncate">{job.job_number} — {job.title}</p>
-                        <p className="text-xs text-white/50 truncate">{job.customer_name}</p>
-                        <div className="flex items-center gap-3 mt-2 text-xs text-white/40">
+                        <p className="text-sm font-bold text-gray-900 truncate">{job.job_number} — {job.title}</p>
+                        <p className="text-xs text-gray-500 truncate">{job.customer_name}</p>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
                           {job.operator_name && (
                             <span className="flex items-center gap-1">
                               <User className="w-3 h-3" /> {job.operator_name}
@@ -344,9 +361,9 @@ export default function ActiveJobsPage() {
                       </div>
                       <div className="ml-2 flex-shrink-0">
                         {isExpanded ? (
-                          <ChevronUp className="w-5 h-5 text-white/40" />
+                          <ChevronUp className="w-5 h-5 text-gray-400" />
                         ) : (
-                          <ChevronDown className="w-5 h-5 text-white/40" />
+                          <ChevronDown className="w-5 h-5 text-gray-400" />
                         )}
                       </div>
                     </div>
@@ -354,41 +371,41 @@ export default function ActiveJobsPage() {
 
                   {/* Expanded Details */}
                   {isExpanded && (
-                    <div className="px-4 pb-4 border-t border-white/10 pt-4 space-y-4">
-                      {/* Job Info */}
-                      <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="px-5 pb-5 border-t border-gray-100 pt-4 space-y-4">
+                      {/* Job Info Grid */}
+                      <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <p className="text-white/40 text-xs">Scheduled</p>
-                          <p className="text-white">{job.scheduled_date}</p>
+                          <p className="text-gray-500 text-xs font-semibold mb-0.5">Scheduled</p>
+                          <p className="text-gray-900 font-medium">{job.scheduled_date}</p>
                         </div>
                         {job.end_date && (
                           <div>
-                            <p className="text-white/40 text-xs">End Date</p>
-                            <p className="text-white">{job.end_date}</p>
+                            <p className="text-gray-500 text-xs font-semibold mb-0.5">End Date</p>
+                            <p className="text-gray-900 font-medium">{job.end_date}</p>
                           </div>
                         )}
                         {job.estimated_cost && (
                           <div>
-                            <p className="text-white/40 text-xs">Estimated Cost</p>
-                            <p className="text-emerald-400 font-semibold">${Number(job.estimated_cost).toLocaleString()}</p>
+                            <p className="text-gray-500 text-xs font-semibold mb-0.5">Estimated Cost</p>
+                            <p className="text-emerald-600 font-bold">${Number(job.estimated_cost).toLocaleString()}</p>
                           </div>
                         )}
                         {job.estimated_hours && (
                           <div>
-                            <p className="text-white/40 text-xs">Est. Hours</p>
-                            <p className="text-white">{job.estimated_hours}h</p>
+                            <p className="text-gray-500 text-xs font-semibold mb-0.5">Est. Hours</p>
+                            <p className="text-gray-900 font-medium">{job.estimated_hours}h</p>
                           </div>
                         )}
                         {job.helper_name && (
                           <div>
-                            <p className="text-white/40 text-xs">Helper</p>
-                            <p className="text-white">{job.helper_name}</p>
+                            <p className="text-gray-500 text-xs font-semibold mb-0.5">Helper</p>
+                            <p className="text-gray-900 font-medium">{job.helper_name}</p>
                           </div>
                         )}
                         {job.job_type && (
                           <div>
-                            <p className="text-white/40 text-xs">Job Type</p>
-                            <p className="text-white">{job.job_type}</p>
+                            <p className="text-gray-500 text-xs font-semibold mb-0.5">Job Type</p>
+                            <p className="text-gray-900 font-medium">{job.job_type}</p>
                           </div>
                         )}
                       </div>
@@ -396,17 +413,17 @@ export default function ActiveJobsPage() {
                       {/* Work Items */}
                       {workItems[job.id] && workItems[job.id].length > 0 && (
                         <div>
-                          <p className="text-xs text-white/40 font-medium mb-2 flex items-center gap-1">
+                          <p className="text-xs text-gray-500 font-semibold mb-2 flex items-center gap-1 uppercase tracking-wider">
                             <Wrench className="w-3 h-3" /> Work Items ({workItems[job.id].length})
                           </p>
                           <div className="space-y-1">
                             {workItems[job.id].map((item, i) => (
-                              <div key={i} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
-                                <span className="text-sm text-white">{item.work_type}</span>
-                                <div className="flex items-center gap-2 text-xs text-white/50">
+                              <div key={i} className="flex items-center justify-between bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg px-3 py-2">
+                                <span className="text-sm text-gray-800 font-medium">{item.work_type}</span>
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
                                   {item.core_quantity && <span>{item.core_quantity} cores</span>}
                                   {item.linear_feet_cut && <span>{item.linear_feet_cut} LF</span>}
-                                  <span>Day {item.day_number}</span>
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">Day {item.day_number}</span>
                                 </div>
                               </div>
                             ))}
@@ -417,14 +434,14 @@ export default function ActiveJobsPage() {
                       {/* Daily Logs */}
                       {dailyLogs[job.id] && dailyLogs[job.id].length > 0 && (
                         <div>
-                          <p className="text-xs text-white/40 font-medium mb-2 flex items-center gap-1">
+                          <p className="text-xs text-gray-500 font-semibold mb-2 flex items-center gap-1 uppercase tracking-wider">
                             <CalendarDays className="w-3 h-3" /> Daily Progress ({dailyLogs[job.id].length} days)
                           </p>
                           <div className="space-y-1">
                             {dailyLogs[job.id].map((log, i) => (
-                              <div key={i} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
-                                <span className="text-sm text-white">Day {log.day_number} — {log.log_date}</span>
-                                <span className="text-xs text-white/50">{log.hours_worked}h worked</span>
+                              <div key={i} className="flex items-center justify-between bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg px-3 py-2">
+                                <span className="text-sm text-gray-800 font-medium">Day {log.day_number} — {log.log_date}</span>
+                                <span className="text-xs text-gray-500 font-medium">{log.hours_worked}h worked</span>
                               </div>
                             ))}
                           </div>
@@ -434,10 +451,10 @@ export default function ActiveJobsPage() {
                       {/* Equipment */}
                       {job.equipment_needed && job.equipment_needed.length > 0 && (
                         <div>
-                          <p className="text-xs text-white/40 font-medium mb-1">Equipment</p>
-                          <div className="flex flex-wrap gap-1">
+                          <p className="text-xs text-gray-500 font-semibold mb-1.5 uppercase tracking-wider">Equipment</p>
+                          <div className="flex flex-wrap gap-1.5">
                             {job.equipment_needed.map((eq, i) => (
-                              <span key={i} className="px-2 py-1 bg-white/5 rounded text-xs text-white/70">
+                              <span key={i} className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 rounded-full text-xs text-indigo-700 font-medium">
                                 {eq}
                               </span>
                             ))}
