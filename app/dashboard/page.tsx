@@ -7,6 +7,7 @@ import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
 import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
 import OnboardingTour from '@/components/OnboardingTour';
+import NfcClockInModal from '@/components/NfcClockInModal';
 
 // Pontifex Industries Logo Component
 function PontifexLogo({ className = "h-8" }: { className?: string }) {
@@ -78,6 +79,7 @@ export default function Dashboard() {
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isShopHours, setIsShopHours] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showNfcClockInModal, setShowNfcClockInModal] = useState(false);
   const [clockOutBlock, setClockOutBlock] = useState<{
     show: boolean;
     blockType: string;
@@ -401,49 +403,41 @@ export default function Dashboard() {
     return accessibleCards.includes(cardName);
   };
 
-  const handleClockIn = async () => {
+  // Open the NFC clock-in modal instead of directly clocking in
+  const handleClockIn = () => {
+    setShowNfcClockInModal(true);
+  };
+
+  // Called by NfcClockInModal when a method is chosen and verified
+  const performClockIn = async (data: {
+    method: string;
+    nfc_tag_id?: string;
+    nfc_tag_uid?: string;
+    remote_photo_url?: string;
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+  }) => {
     setClockLoading(true);
     setClockMessage(null);
 
     try {
-      console.log('📍 Getting location for clock in...');
-      setDebugInfo(prev => ({ ...prev, gpsStatus: 'requesting...', timestamp: new Date().toISOString() }));
-
-      // Get Supabase session token
       const { data: { session } } = await supabase.auth.getSession();
-
       if (!session) {
         setClockMessage({ type: 'error', text: 'Session expired. Please log in again.' });
-        setDebugInfo(prev => ({ ...prev, lastError: 'No session found', gpsStatus: 'error' }));
         setClockLoading(false);
-        return;
+        throw new Error('Session expired');
       }
-
-      // Verify location
-      const verification = await verifyShopLocation();
 
       setDebugInfo(prev => ({
         ...prev,
-        gpsStatus: verification.verified ? 'verified ✅' : 'rejected ❌',
-        latitude: verification.location?.latitude || null,
-        longitude: verification.location?.longitude || null,
-        accuracy: verification.location?.accuracy || null,
-        distanceFromShop: verification.distanceFormatted || '-',
-        lastError: verification.error || '',
+        gpsStatus: `${data.method} verified ✅`,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        accuracy: data.accuracy || null,
+        timestamp: new Date().toISOString(),
       }));
 
-      if (!verification.verified) {
-        setClockMessage({
-          type: 'error',
-          text: verification.error || 'Location verification failed',
-        });
-        setClockLoading(false);
-        return;
-      }
-
-      console.log('✅ Location verified:', verification.distanceFormatted, 'from shop');
-
-      // Call clock-in API with auth token + shop hours flag
       const response = await fetch('/api/timecard/clock-in', {
         method: 'POST',
         headers: {
@@ -451,10 +445,14 @@ export default function Dashboard() {
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          latitude: verification.location.latitude,
-          longitude: verification.location.longitude,
-          accuracy: verification.location.accuracy,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          accuracy: data.accuracy,
           is_shop_hours: isShopHours,
+          clock_in_method: data.method,
+          nfc_tag_id: data.nfc_tag_id,
+          nfc_tag_uid: data.nfc_tag_uid,
+          remote_photo_url: data.remote_photo_url,
         }),
       });
 
@@ -467,15 +465,12 @@ export default function Dashboard() {
 
       if (!response.ok) {
         const errorDetail = result.details ? `\n${result.details}` : '';
-        setClockMessage({
-          type: 'error',
-          text: (result.error || 'Failed to clock in') + errorDetail,
-        });
+        const errorText = (result.error || 'Failed to clock in') + errorDetail;
+        setClockMessage({ type: 'error', text: errorText });
         setClockLoading(false);
-        return;
+        throw new Error(errorText);
       }
 
-      console.log('✅ Clocked in successfully');
       setIsClockedIn(true);
       setCurrentTimecard({
         id: result.data.id,
@@ -483,21 +478,23 @@ export default function Dashboard() {
         currentHours: 0,
       });
       setCurrentStatus('clocked_in');
+      setShowNfcClockInModal(false);
 
       const flags = [];
       if (isShopHours) flags.push('🏭 Shop Hours');
       if (result.data.isNightShift) flags.push('🌙 Night Shift');
       if (result.data.hourType === 'mandatory_overtime') flags.push('⚠️ Weekend OT');
+      if (data.method === 'nfc') flags.push('📱 NFC Verified');
+      if (data.method === 'remote') flags.push('📷 Remote (Pending Approval)');
 
       setClockMessage({
         type: 'success',
         text: result.message + (flags.length > 0 ? ` (${flags.join(', ')})` : ''),
       });
 
-      // Reset shop hours checkbox after successful clock-in
       setIsShopHours(false);
 
-      // Create initial status entry (best-effort, don't block)
+      // Create initial status entry (fire-and-forget)
       fetch('/api/operator/status', {
         method: 'POST',
         headers: {
@@ -506,21 +503,21 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           status: 'clocked_in',
-          latitude: verification.location.latitude,
-          longitude: verification.location.longitude,
-          accuracy: verification.location.accuracy,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          accuracy: data.accuracy,
         }),
       }).catch(() => {});
 
-      // Hide success message after 5 seconds
       setTimeout(() => setClockMessage(null), 5000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error clocking in:', error);
-      setDebugInfo(prev => ({ ...prev, lastError: error.message, gpsStatus: 'error' }));
-      setClockMessage({
-        type: 'error',
-        text: error.message || 'An error occurred while clocking in',
-      });
+      const msg = error instanceof Error ? error.message : 'An error occurred';
+      setDebugInfo(prev => ({ ...prev, lastError: msg, gpsStatus: 'error' }));
+      if (!clockMessage) {
+        setClockMessage({ type: 'error', text: msg });
+      }
+      throw error; // Re-throw so modal knows it failed
     } finally {
       setClockLoading(false);
     }
@@ -1313,6 +1310,15 @@ export default function Dashboard() {
           animation: gradient 3s ease infinite;
         }
       `}</style>
+
+      {/* NFC Clock-In Modal */}
+      {showNfcClockInModal && (
+        <NfcClockInModal
+          isShopHours={isShopHours}
+          onClockIn={performClockIn}
+          onClose={() => setShowNfcClockInModal(false)}
+        />
+      )}
     </div>
   );
 }
