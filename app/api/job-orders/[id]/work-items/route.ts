@@ -104,19 +104,45 @@ export async function POST(
       );
     }
 
-    // Also update the job_orders.work_performed text field for quick reference
-    const workSummary = items.map((item: any) => {
-      let desc = `${item.name} x${item.quantity}`;
-      if (item.details?.holes) {
-        const totalCores = item.details.holes.reduce((sum: number, h: any) => sum + (h.quantity || 1), 0);
-        desc += ` (${totalCores} cores)`;
+    // Build a comprehensive work_performed summary from ALL days (not just today)
+    // This prevents multi-day jobs from losing previous days' summaries
+    const { data: allWorkItems } = await supabaseAdmin
+      .from('work_items')
+      .select('work_type, quantity, core_quantity, linear_feet_cut, day_number')
+      .eq('job_order_id', jobId)
+      .order('day_number', { ascending: true });
+
+    let workSummary = '';
+    if (allWorkItems && allWorkItems.length > 0) {
+      // Group by day
+      const byDay: Record<number, typeof allWorkItems> = {};
+      allWorkItems.forEach(wi => {
+        const d = wi.day_number || 1;
+        if (!byDay[d]) byDay[d] = [];
+        byDay[d].push(wi);
+      });
+
+      const dayKeys = Object.keys(byDay).map(Number).sort((a, b) => a - b);
+      if (dayKeys.length === 1) {
+        // Single day — no prefix
+        workSummary = byDay[dayKeys[0]].map(wi => {
+          let desc = `${wi.work_type} x${wi.quantity || 1}`;
+          if (wi.core_quantity) desc += ` (${wi.core_quantity} cores)`;
+          if (wi.linear_feet_cut) desc += ` (${wi.linear_feet_cut} LF)`;
+          return desc;
+        }).join('; ');
+      } else {
+        // Multi-day — prefix each day
+        workSummary = dayKeys.map(d =>
+          `Day ${d}: ${byDay[d].map(wi => {
+            let desc = `${wi.work_type} x${wi.quantity || 1}`;
+            if (wi.core_quantity) desc += ` (${wi.core_quantity} cores)`;
+            if (wi.linear_feet_cut) desc += ` (${wi.linear_feet_cut} LF)`;
+            return desc;
+          }).join(', ')}`
+        ).join(' | ');
       }
-      if (item.details?.cuts) {
-        const totalLF = item.details.cuts.reduce((sum: number, c: any) => sum + (c.linearFeet || 0), 0);
-        if (totalLF > 0) desc += ` (${totalLF} LF)`;
-      }
-      return desc;
-    }).join('; ');
+    }
 
     await supabaseAdmin
       .from('job_orders')

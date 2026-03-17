@@ -206,26 +206,31 @@ export default function WorkPerformed() {
   const [accessNotes, setAccessNotes] = useState('');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [jobType, setJobType] = useState<string>('');
+  const [currentDayNumber, setCurrentDayNumber] = useState<number>(1);
 
-  // Fetch job type for smart recommendations
+  // Fetch job type and day number for smart recommendations + correct work item tracking
   useEffect(() => {
-    const fetchJobType = async () => {
+    const fetchJobInfo = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const res = await fetch(`/api/job-orders?include_helper_jobs=true&includeCompleted=true`, {
+        // Fetch only this specific job (not all jobs) for efficiency on long-term projects
+        const res = await fetch(`/api/job-orders?id=${params.id}&include_helper_jobs=true&includeCompleted=true`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (res.ok) {
           const json = await res.json();
-          const found = (json.data || []).find((j: any) => j.id === params.id);
+          const found = (json.data || [])[0];
           if (found?.job_type) setJobType(found.job_type);
+          // Calculate the current day number: total_days_worked + 1 (today is a new day)
+          const daysWorked = found?.total_days_worked || 0;
+          setCurrentDayNumber(daysWorked + 1);
         }
       } catch (err) {
-        console.error('Error fetching job type:', err);
+        console.error('Error fetching job info:', err);
       }
     };
-    fetchJobType();
+    fetchJobInfo();
   }, [params.id]);
   const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
   const [totalStandbyMinutes, setTotalStandbyMinutes] = useState(0);
@@ -1146,7 +1151,7 @@ export default function WorkPerformed() {
           },
           body: JSON.stringify({
             items: selectedItems,
-            dayNumber: 1 // Will be overridden by daily-log system for multi-day jobs
+            dayNumber: currentDayNumber
           })
         });
 

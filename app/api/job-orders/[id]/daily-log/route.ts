@@ -77,29 +77,41 @@ export async function POST(
     const startTime = workStarted || routeStarted;
     const hoursWorked = startTime ? (new Date().getTime() - startTime.getTime()) / (1000 * 60 * 60) : 0;
 
-    // Create daily log entry — gracefully handle missing table
+    // Calculate the day number for this log
+    const { data: existingLogs } = await supabaseAdmin
+      .from('daily_job_logs')
+      .select('id')
+      .eq('job_order_id', jobId)
+      .neq('log_date', today);
+    const dayNumber = (existingLogs?.length || 0) + 1;
+
+    // Upsert daily log entry — handles duplicate submissions on same day gracefully
+    // Uses the UNIQUE constraint on (job_order_id, log_date)
     let dailyLog = null;
+    const logPayload = {
+      job_order_id: jobId,
+      operator_id: user.id,
+      log_date: today,
+      day_number: dayNumber,
+      route_started_at: job.route_started_at,
+      work_started_at: job.work_started_at,
+      day_completed_at: now,
+      work_performed: workPerformed || [],
+      notes: notes || null,
+      hours_worked: Number(hoursWorked.toFixed(2)),
+      daily_signer_name: signerName || null,
+      daily_signature_data: signatureData || null,
+      route_start_latitude: job.route_start_latitude,
+      route_start_longitude: job.route_start_longitude,
+      work_start_latitude: job.work_start_latitude,
+      work_start_longitude: job.work_start_longitude,
+      day_end_latitude: latitude,
+      day_end_longitude: longitude
+    };
+
     const { data: logData, error: logError } = await supabaseAdmin
       .from('daily_job_logs')
-      .insert({
-        job_order_id: jobId,
-        operator_id: user.id,
-        log_date: today,
-        route_started_at: job.route_started_at,
-        work_started_at: job.work_started_at,
-        day_completed_at: now,
-        work_performed: workPerformed || [],
-        notes: notes || null,
-        hours_worked: Number(hoursWorked.toFixed(2)),
-        daily_signer_name: signerName || null,
-        daily_signature_data: signatureData || null,
-        route_start_latitude: job.route_start_latitude,
-        route_start_longitude: job.route_start_longitude,
-        work_start_latitude: job.work_start_latitude,
-        work_start_longitude: job.work_start_longitude,
-        day_end_latitude: latitude,
-        day_end_longitude: longitude
-      })
+      .upsert(logPayload, { onConflict: 'job_order_id,log_date' })
       .select()
       .single();
 

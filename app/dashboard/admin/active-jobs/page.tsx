@@ -438,12 +438,19 @@ export default function ActiveJobsPage() {
                             <CalendarDays className="w-3 h-3" /> Daily Progress ({dailyLogs[job.id].length} days)
                           </p>
                           <div className="space-y-1">
-                            {dailyLogs[job.id].map((log, i) => (
+                            {dailyLogs[job.id].map((log: any, i: number) => (
                               <div key={i} className="flex items-center justify-between bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg px-3 py-2">
                                 <span className="text-sm text-gray-800 font-medium">Day {log.day_number} — {log.log_date}</span>
                                 <span className="text-xs text-gray-500 font-medium">{log.hours_worked}h worked</span>
                               </div>
                             ))}
+                          </div>
+                          {/* Cumulative totals */}
+                          <div className="mt-2 flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+                            <span className="text-sm text-indigo-800 font-bold">Total Hours</span>
+                            <span className="text-sm text-indigo-700 font-bold">
+                              {dailyLogs[job.id].reduce((sum: number, log: any) => sum + Number(log.hours_worked || 0), 0).toFixed(1)}h across {dailyLogs[job.id].length} days
+                            </span>
                           </div>
                         </div>
                       )}

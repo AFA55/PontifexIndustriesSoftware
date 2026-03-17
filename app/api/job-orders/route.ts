@@ -128,9 +128,13 @@ export async function GET(request: NextRequest) {
       let helperQuery = supabaseAdmin.from('active_job_orders').select('*').eq('helper_assigned_to', user.id);
 
       // Apply shared filters
+      // For date filtering, include multi-day jobs where the date falls within scheduled_date..end_date
       if (scheduledDate) {
-        operatorQuery = operatorQuery.eq('scheduled_date', scheduledDate);
-        helperQuery = helperQuery.eq('scheduled_date', scheduledDate);
+        // Jobs that either:
+        // 1. Start on this date (exact match) OR
+        // 2. Are multi-day and this date falls within their range (scheduled_date <= date AND end_date >= date)
+        operatorQuery = operatorQuery.or(`scheduled_date.eq.${scheduledDate},and(scheduled_date.lte.${scheduledDate},end_date.gte.${scheduledDate})`);
+        helperQuery = helperQuery.or(`scheduled_date.eq.${scheduledDate},and(scheduled_date.lte.${scheduledDate},end_date.gte.${scheduledDate})`);
       }
       if (dateFrom) {
         operatorQuery = operatorQuery.gte('scheduled_date', dateFrom);
@@ -191,9 +195,9 @@ export async function GET(request: NextRequest) {
       query = query.eq('assigned_to', user.id);
     }
 
-    // Filter by scheduled_date if provided
+    // Filter by scheduled_date — also include multi-day jobs spanning this date
     if (scheduledDate) {
-      query = query.eq('scheduled_date', scheduledDate);
+      query = query.or(`scheduled_date.eq.${scheduledDate},and(scheduled_date.lte.${scheduledDate},end_date.gte.${scheduledDate})`);
     }
     if (dateFrom) {
       query = query.gte('scheduled_date', dateFrom);

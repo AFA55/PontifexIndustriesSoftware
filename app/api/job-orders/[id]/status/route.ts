@@ -70,8 +70,9 @@ async function updateJobStatus(
       .eq('id', user.id)
       .single();
 
-    // Check permissions: operator can only update their own jobs, admin can update any
-    if (profile?.role !== 'admin' && existingJob.assigned_to !== user.id) {
+    // Check permissions: operator can only update their own jobs, admin roles can update any
+    const adminRoles = ['admin', 'super_admin', 'operations_manager'];
+    if (!adminRoles.includes(profile?.role || '') && existingJob.assigned_to !== user.id) {
       return NextResponse.json(
         { error: 'You can only update jobs assigned to you' },
         { status: 403 }
@@ -226,7 +227,7 @@ async function updateJobStatus(
   }
 }
 
-// Export both POST and PUT handlers
+// Export POST, PUT, and PATCH handlers (day-complete page uses PATCH)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -235,6 +236,13 @@ export async function POST(
 }
 
 export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return updateJobStatus(request, params);
+}
+
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
