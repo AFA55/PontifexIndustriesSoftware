@@ -49,8 +49,9 @@ export async function POST(
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin, super_admin, or operations_manager
+    const adminRoles = ['admin', 'super_admin', 'operations_manager'];
+    if (!adminRoles.includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can approve timecards' },
         { status: 403 }

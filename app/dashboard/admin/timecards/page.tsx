@@ -37,8 +37,11 @@ interface TimecardWithUser {
 // ── Week helpers ──────────────────────────────────────────────
 function getWeekBounds(offset: number) {
   const now = new Date();
+  const day = now.getDay(); // 0=Sun, 1=Mon...6=Sat
+  // On Sunday (day 0), go back 6 days to get Monday; otherwise go back (day-1) days
+  const diff = day === 0 ? 6 : day - 1;
   const monday = new Date(now);
-  monday.setDate(monday.getDate() - monday.getDay() + 1 + offset * 7);
+  monday.setDate(monday.getDate() - diff + offset * 7);
   monday.setHours(0, 0, 0, 0);
   const sunday = new Date(monday);
   sunday.setDate(sunday.getDate() + 6);
