@@ -166,6 +166,9 @@ export default function ScheduleBoardPage() {
   // ═══ CAPACITY SETTINGS ═══
   const [capacityMaxSlots, setCapacityMaxSlots] = useState(10);
   const [capacityWarningThreshold, setCapacityWarningThreshold] = useState(8);
+  const [shopNotesEnabled, setShopNotesEnabled] = useState(true);
+  const [shopNotesLabel, setShopNotesLabel] = useState('Shop / Notes');
+  const [shopNotesText, setShopNotesText] = useState('');
   const [findingNextAvailable, setFindingNextAvailable] = useState(false);
   const [nextAvailableDate, setNextAvailableDate] = useState<{ date: string; jobCount: number; availableSlots: number } | null>(null);
 
@@ -303,6 +306,12 @@ export default function ScheduleBoardPage() {
         scheduled_date: j.scheduled_date,
         end_date: j.end_date || null,
         estimated_cost: j.estimated_cost ? Number(j.estimated_cost) : null,
+        jobsite_conditions: j.jobsite_conditions || null,
+        site_compliance: j.site_compliance || null,
+        equipment_selections: j.equipment_selections || null,
+        scope_details: j.scope_details || null,
+        additional_info: j.additional_info || null,
+        special_equipment: j.special_equipment || null,
       }));
       const willCall = (json.data?.willCall || []).map(toJobCard);
 
@@ -373,6 +382,8 @@ export default function ScheduleBoardPage() {
           if (json.data) {
             setCapacityMaxSlots(json.data.max_slots ?? 10);
             setCapacityWarningThreshold(json.data.warning_threshold ?? 8);
+            setShopNotesEnabled(json.data.shop_notes_enabled ?? true);
+            setShopNotesLabel(json.data.shop_notes_label ?? 'Shop / Notes');
           }
         }
       } catch { /* use defaults */ }
@@ -1339,6 +1350,26 @@ export default function ScheduleBoardPage() {
             onChangeHelper={(name) => handleChangeRowHelper(idx, name)}
           />
         ))}
+
+        {/* ═══ SHOP / NOTES ROW ══════════════════════════════════════ */}
+        {shopNotesEnabled && (
+          <div className="bg-white rounded-2xl shadow-lg border-2 border-dashed border-blue-300 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-500 to-cyan-600 px-5 py-2.5">
+              <div className="flex items-center gap-2 text-white">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                <h3 className="font-bold text-sm">{shopNotesLabel}</h3>
+              </div>
+            </div>
+            <div className="p-4">
+              <textarea
+                value={shopNotesText}
+                onChange={(e) => setShopNotesText(e.target.value)}
+                placeholder="Who's working in the shop today, notes for the crew, special instructions..."
+                className="w-full h-20 px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-gray-400"
+              />
+            </div>
+          </div>
+        )}
 
         {/* ═══ UNASSIGNED SECTION ═══════════════════════════════════════ */}
         {unassignedJobs.length > 0 && (

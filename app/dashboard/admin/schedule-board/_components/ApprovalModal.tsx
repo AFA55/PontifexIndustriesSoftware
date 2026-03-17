@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   X, Calendar, MapPin, Wrench, CheckCircle, DollarSign,
-  AlertTriangle, XCircle, Loader2, ArrowRight, CalendarDays
+  AlertTriangle, XCircle, Loader2, ArrowRight, CalendarDays,
+  Gauge, Droplets, Zap, Shield, HardHat, Wind, Scissors,
+  ChevronDown, ChevronUp, Package, ClipboardList, Info, FileText
 } from 'lucide-react';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { getDisplayName } from '@/lib/equipment-map';
@@ -33,6 +35,15 @@ interface ApprovalModalProps {
   onClose: () => void;
 }
 
+// Difficulty color helper
+function getDifficultyInfo(rating: number): { color: string; bg: string; label: string } {
+  if (rating <= 2) return { color: 'text-green-700', bg: 'bg-green-100', label: 'Easy' };
+  if (rating <= 4) return { color: 'text-blue-700', bg: 'bg-blue-100', label: 'Moderate' };
+  if (rating <= 6) return { color: 'text-yellow-700', bg: 'bg-yellow-100', label: 'Challenging' };
+  if (rating <= 8) return { color: 'text-orange-700', bg: 'bg-orange-100', label: 'Hard' };
+  return { color: 'text-red-700', bg: 'bg-red-100', label: 'Extreme' };
+}
+
 export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModalProps) {
   const [scheduledDate, setScheduledDate] = useState(job.scheduled_date || '');
   const [capacityLoading, setCapacityLoading] = useState(false);
@@ -41,11 +52,15 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
   const [nextAvailable, setNextAvailable] = useState<{ date: string; jobCount: number; availableSlots: number } | null>(null);
   const [findingNext, setFindingNext] = useState(false);
   const [warningAcknowledged, setWarningAcknowledged] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    conditions: false,
+    compliance: false,
+    equipment: true,
+  });
 
   const isMultiDay = !!(job.end_date && job.scheduled_date && job.end_date !== job.scheduled_date);
   const endDate = job.end_date || scheduledDate;
 
-  // Calculate number of days
   const dayCount = (() => {
     if (!scheduledDate || !endDate) return 1;
     const start = new Date(scheduledDate + 'T12:00:00');
@@ -53,12 +68,15 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
     return Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   })();
 
-  // Check if selected date is a weekend
   const isWeekend = (() => {
     if (!scheduledDate) return false;
     const d = new Date(scheduledDate + 'T12:00:00');
     return d.getDay() === 0 || d.getDay() === 6;
   })();
+
+  const toggleSection = (key: string) => {
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // ── Fetch capacity when date changes ──
   const checkCapacity = useCallback(async (startDate: string, eDate: string) => {
@@ -86,7 +104,6 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
         setCapacityData(json.data);
         if (json.summary) setCapacitySummary(json.summary);
         else {
-          // Single date — build summary
           const info = json.data[startDate];
           if (info) {
             setCapacitySummary({
@@ -141,16 +158,55 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
   const hasWarningDates = (capacitySummary?.warningDates?.length ?? 0) > 0;
   const canApprove = scheduledDate && !hasFullDates && (!hasWarningDates || warningAcknowledged);
 
-  // Format date for display
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
-  // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
+
+  // ── Build jobsite conditions summary ──
+  const conditions = job.jobsite_conditions;
+  const compliance = job.site_compliance;
+
+  // Count active conditions for badge
+  const conditionFlags: { label: string; active: boolean; icon: React.ReactNode; detail?: string; warning?: boolean }[] = conditions ? [
+    { label: 'Water Available', active: !!conditions.water_available, icon: <Droplets className="w-3.5 h-3.5" />, detail: conditions.water_available_ft ? `${conditions.water_available_ft}ft away` : undefined },
+    { label: 'Water Control', active: !!conditions.water_control, icon: <Droplets className="w-3.5 h-3.5" /> },
+    { label: 'Electricity', active: !!conditions.electricity_available, icon: <Zap className="w-3.5 h-3.5" />, detail: conditions.electricity_available_ft ? `${conditions.electricity_available_ft}ft away` : undefined },
+    { label: 'Manpower Provided', active: !!conditions.manpower_provided, icon: <HardHat className="w-3.5 h-3.5" /> },
+    { label: 'Scaffolding Provided', active: !!conditions.scaffolding_provided, icon: <Package className="w-3.5 h-3.5" /> },
+    { label: 'Proper Ventilation', active: !!conditions.proper_ventilation, icon: <Wind className="w-3.5 h-3.5" /> },
+    { label: 'Overcutting Allowed', active: !!conditions.overcutting_allowed, icon: <Scissors className="w-3.5 h-3.5" /> },
+    { label: '480 Cord Needed', active: !!conditions.cord_480, icon: <Zap className="w-3.5 h-3.5" />, detail: conditions.cord_480_ft ? `${conditions.cord_480_ft}ft` : undefined, warning: true },
+    { label: 'High Work', active: !!conditions.high_work, icon: <AlertTriangle className="w-3.5 h-3.5" />, detail: conditions.high_work_ft ? `${conditions.high_work_ft}ft` : undefined, warning: true },
+    { label: 'Hydraulic Hose', active: !!conditions.hyd_hose, icon: <Package className="w-3.5 h-3.5" />, detail: conditions.hyd_hose_ft ? `${conditions.hyd_hose_ft}ft` : undefined },
+    { label: 'Plastic Needed', active: !!conditions.plastic_needed, icon: <Package className="w-3.5 h-3.5" /> },
+    { label: 'Clean Up Required', active: !!conditions.clean_up_required, icon: <ClipboardList className="w-3.5 h-3.5" /> },
+  ] : [];
+
+  const activeConditions = conditionFlags.filter(c => c.active);
+  const warningConditions = conditionFlags.filter(c => c.active && c.warning);
+
+  // Build recommended equipment from equipment_selections
+  const recommendedEquipment: { scope: string; items: { label: string; value: string }[] }[] = [];
+  if (job.equipment_selections) {
+    for (const [scope, selections] of Object.entries(job.equipment_selections)) {
+      const items: { label: string; value: string }[] = [];
+      for (const [key, val] of Object.entries(selections)) {
+        if (val && val !== 'no' && val !== 'false' && val !== '0') {
+          const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          const displayVal = val === 'yes' || val === 'true' ? '✓' : val;
+          items.push({ label, value: displayVal });
+        }
+      }
+      if (items.length > 0) {
+        recommendedEquipment.push({ scope, items });
+      }
+    }
+  }
 
   return (
     <>
@@ -180,38 +236,252 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-gray-900 text-lg">{job.customer_name}</h3>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mt-1">
-                    {job.job_type?.split(',')[0]?.trim()}
-                  </span>
-                </div>
-                {job.estimated_cost && (
-                  <div className="text-right">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase">Quoted</div>
-                    <div className="text-lg font-bold text-green-600 flex items-center gap-1">
-                      <DollarSign className="w-4 h-4" />
-                      {formatCurrency(job.estimated_cost).replace('$', '')}
-                    </div>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {job.job_type?.split(',').map((t, i) => (
+                      <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+                        {t.trim()}
+                      </span>
+                    ))}
                   </div>
-                )}
+                </div>
+                <div className="text-right flex flex-col items-end gap-1.5">
+                  {job.estimated_cost && (
+                    <div>
+                      <div className="text-[10px] font-bold text-gray-400 uppercase">Quoted</div>
+                      <div className="text-lg font-bold text-green-600 flex items-center gap-1">
+                        <DollarSign className="w-4 h-4" />
+                        {formatCurrency(job.estimated_cost).replace('$', '')}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
+
               {job.location && (
                 <p className="text-xs text-gray-500 flex items-center gap-1 mt-2">
                   <MapPin className="w-3.5 h-3.5" /> {job.location}
                 </p>
               )}
-              {job.equipment_needed.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {job.equipment_needed.map(eq => (
-                    <span key={eq} className="px-2 py-0.5 bg-indigo-50 rounded text-xs text-indigo-600 font-medium">
-                      <Wrench className="w-3 h-3 inline mr-0.5" />{getDisplayName(eq)}
-                    </span>
-                  ))}
-                </div>
-              )}
+
               {job.description && (
-                <p className="text-xs text-gray-500 mt-2 italic line-clamp-2">&ldquo;{job.description}&rdquo;</p>
+                <p className="text-xs text-gray-500 mt-2 italic line-clamp-3">&ldquo;{job.description}&rdquo;</p>
               )}
             </div>
+
+            {/* ── Difficulty Rating ── */}
+            {job.difficulty_rating && (
+              <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
+                <Gauge className="w-5 h-5 text-gray-500" />
+                <div className="flex-1">
+                  <div className="text-[10px] font-bold text-gray-400 uppercase">Job Difficulty</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex gap-0.5">
+                      {Array.from({ length: 10 }, (_, i) => (
+                        <div
+                          key={i}
+                          className={`w-5 h-2.5 rounded-sm ${
+                            i < job.difficulty_rating!
+                              ? i < 3 ? 'bg-green-400' : i < 5 ? 'bg-blue-400' : i < 7 ? 'bg-yellow-400' : i < 9 ? 'bg-orange-400' : 'bg-red-500'
+                              : 'bg-gray-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getDifficultyInfo(job.difficulty_rating).bg} ${getDifficultyInfo(job.difficulty_rating).color}`}>
+                      {job.difficulty_rating}/10 — {getDifficultyInfo(job.difficulty_rating).label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Equipment Section ── */}
+            <div className="bg-indigo-50 rounded-xl border border-indigo-200 overflow-hidden">
+              <button
+                onClick={() => toggleSection('equipment')}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-indigo-100/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-indigo-600" />
+                  <span className="text-sm font-bold text-indigo-900">Equipment</span>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-indigo-200 text-indigo-700 rounded-full font-bold">
+                    {job.equipment_needed.length + recommendedEquipment.reduce((sum, s) => sum + s.items.length, 0)} items
+                  </span>
+                </div>
+                {expandedSections.equipment ? <ChevronUp className="w-4 h-4 text-indigo-500" /> : <ChevronDown className="w-4 h-4 text-indigo-500" />}
+              </button>
+
+              {expandedSections.equipment && (
+                <div className="px-4 pb-3 space-y-3">
+                  {/* Typed/Selected Equipment */}
+                  {job.equipment_needed.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">Selected Equipment</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {job.equipment_needed.map(eq => (
+                          <span key={eq} className="px-2.5 py-1 bg-white rounded-lg text-xs text-indigo-700 font-semibold border border-indigo-200 flex items-center gap-1">
+                            <Wrench className="w-3 h-3" />{getDisplayName(eq)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recommended Equipment from Selections */}
+                  {recommendedEquipment.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">Recommended Equipment</div>
+                      {recommendedEquipment.map(({ scope, items }) => (
+                        <div key={scope} className="mb-2">
+                          <div className="text-[10px] font-semibold text-indigo-400 mb-1">{scope}</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {items.map(item => (
+                              <span key={item.label} className="px-2.5 py-1 bg-emerald-50 rounded-lg text-xs text-emerald-700 font-semibold border border-emerald-200 flex items-center gap-1">
+                                <Package className="w-3 h-3" />
+                                {item.label}
+                                {item.value !== '✓' && <span className="text-emerald-500 font-bold ml-0.5">({item.value})</span>}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Special equipment */}
+                  {job.special_equipment && job.special_equipment.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-amber-500 uppercase mb-1.5">Special Equipment</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {job.special_equipment.map(eq => (
+                          <span key={eq} className="px-2.5 py-1 bg-amber-50 rounded-lg text-xs text-amber-700 font-semibold border border-amber-200">
+                            {eq}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Jobsite Conditions ── */}
+            {conditions && activeConditions.length > 0 && (
+              <div className={`rounded-xl border overflow-hidden ${warningConditions.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                <button
+                  onClick={() => toggleSection('conditions')}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/5 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className={`w-4 h-4 ${warningConditions.length > 0 ? 'text-amber-600' : 'text-slate-600'}`} />
+                    <span className={`text-sm font-bold ${warningConditions.length > 0 ? 'text-amber-900' : 'text-slate-900'}`}>
+                      Jobsite Conditions
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${warningConditions.length > 0 ? 'bg-amber-200 text-amber-700' : 'bg-slate-200 text-slate-700'}`}>
+                      {activeConditions.length} active
+                    </span>
+                    {warningConditions.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full font-bold flex items-center gap-0.5">
+                        <AlertTriangle className="w-3 h-3" /> {warningConditions.length} alert{warningConditions.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  {expandedSections.conditions ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                </button>
+
+                {expandedSections.conditions && (
+                  <div className="px-4 pb-3">
+                    {/* Inside/Outside indicator */}
+                    {conditions.inside_outside && (
+                      <div className="mb-2 text-xs font-bold text-slate-600 uppercase">
+                        Work Area: <span className="text-slate-900">{conditions.inside_outside}</span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {activeConditions.map(cond => (
+                        <div
+                          key={cond.label}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
+                            cond.warning
+                              ? 'bg-red-50 text-red-700 border border-red-200'
+                              : 'bg-white text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {cond.icon}
+                          <span className="truncate">{cond.label}</span>
+                          {cond.detail && <span className="text-[10px] opacity-75 ml-auto flex-shrink-0">{cond.detail}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Site Compliance / Orientation Info ── */}
+            {compliance && (compliance.orientation_required || compliance.badging_required || compliance.special_instructions) && (
+              <div className="bg-blue-50 rounded-xl border border-blue-200 overflow-hidden">
+                <button
+                  onClick={() => toggleSection('compliance')}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-blue-100/50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-bold text-blue-900">Site Compliance & Orientation</span>
+                    {(compliance.orientation_required || compliance.badging_required) && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-200 text-blue-700 rounded-full font-bold">
+                        Required
+                      </span>
+                    )}
+                  </div>
+                  {expandedSections.compliance ? <ChevronUp className="w-4 h-4 text-blue-500" /> : <ChevronDown className="w-4 h-4 text-blue-500" />}
+                </button>
+
+                {expandedSections.compliance && (
+                  <div className="px-4 pb-3 space-y-2">
+                    {compliance.orientation_required && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+                        <HardHat className="w-4 h-4 text-blue-600" />
+                        <div>
+                          <div className="text-xs font-bold text-blue-900">Orientation Required</div>
+                          {compliance.orientation_datetime && (
+                            <div className="text-[10px] text-blue-600">{new Date(compliance.orientation_datetime).toLocaleString()}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {compliance.badging_required && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+                        <Shield className="w-4 h-4 text-blue-600" />
+                        <div>
+                          <div className="text-xs font-bold text-blue-900">Badging Required</div>
+                          {compliance.badging_type && (
+                            <div className="text-[10px] text-blue-600">{compliance.badging_type}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {compliance.special_instructions && (
+                      <div className="px-3 py-2 bg-white rounded-lg border border-blue-200">
+                        <div className="text-[10px] font-bold text-blue-500 uppercase mb-1">Special Instructions</div>
+                        <p className="text-xs text-blue-900">{compliance.special_instructions}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Additional Notes ── */}
+            {job.additional_info && (
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 flex items-start gap-2">
+                <FileText className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-[10px] font-bold text-gray-400 uppercase mb-0.5">Additional Notes</div>
+                  <p className="text-xs text-gray-700">{job.additional_info}</p>
+                </div>
+              </div>
+            )}
 
             {/* ── Dates Display ── */}
             <div className="grid grid-cols-2 gap-3">
@@ -270,7 +540,6 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
             {!capacityLoading && capacitySummary && (
               <div className="space-y-2">
-                {/* Full dates — BLOCKED */}
                 {hasFullDates && (
                   <div className="bg-red-50 rounded-xl p-4 border-2 border-red-200">
                     <div className="flex items-start gap-2">
@@ -301,7 +570,6 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                   </div>
                 )}
 
-                {/* Warning dates — CAUTION */}
                 {hasWarningDates && !hasFullDates && (
                   <div className="bg-amber-50 rounded-xl p-4 border-2 border-amber-200">
                     <div className="flex items-start gap-2">
@@ -340,7 +608,6 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                   </div>
                 )}
 
-                {/* All clear */}
                 {!hasFullDates && !hasWarningDates && (
                   <div className="bg-green-50 rounded-xl p-3 border border-green-200">
                     <p className="text-xs text-green-700 font-semibold flex items-center gap-1.5">
@@ -356,7 +623,6 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                   </div>
                 )}
 
-                {/* Next available suggestion */}
                 {nextAvailable && (
                   <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
                     <p className="text-xs text-purple-700 font-semibold">
@@ -399,7 +665,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                     <Loader2 className="w-4 h-4 animate-spin" /> Checking...
                   </span>
                 ) : (
-                  <>&#10003; {job.is_will_call ? 'Approve \u2192 Will Call' : 'Approve & Schedule'}</>
+                  <>&#10003; {job.is_will_call ? 'Approve → Will Call' : 'Approve & Schedule'}</>
                 )}
               </button>
             </div>

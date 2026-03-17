@@ -50,7 +50,7 @@ export async function PATCH(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
-    const { max_slots, warning_threshold } = body;
+    const { max_slots, warning_threshold, shop_notes_enabled, shop_notes_label } = body;
 
     if (!max_slots || !warning_threshold) {
       return NextResponse.json(
@@ -74,7 +74,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Upsert the capacity setting
-    const settingValue = { max_slots, warning_threshold };
+    const settingValue: Record<string, unknown> = { max_slots, warning_threshold };
+    if (typeof shop_notes_enabled === 'boolean') settingValue.shop_notes_enabled = shop_notes_enabled;
+    if (typeof shop_notes_label === 'string') settingValue.shop_notes_label = shop_notes_label;
 
     const { data: existing } = await supabaseAdmin
       .from('schedule_settings')

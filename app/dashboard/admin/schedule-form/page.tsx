@@ -780,7 +780,15 @@ export default function ScheduleFormPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setSchedulePreviewData(data.data || []);
+        // API returns { assigned, unassigned, pending, willCall } — flatten into one array
+        const d = data.data || {};
+        const allJobs = [
+          ...(d.assigned || []),
+          ...(d.unassigned || []),
+          ...(d.pending || []),
+          ...(d.willCall || []),
+        ];
+        setSchedulePreviewData(allJobs);
       }
 
       // Fetch all operators

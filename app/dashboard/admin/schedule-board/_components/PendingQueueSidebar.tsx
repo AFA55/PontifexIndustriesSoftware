@@ -3,6 +3,36 @@
 import { X, Clock, MapPin, Wrench, CheckCircle, Phone, AlertCircle, User, DollarSign, CalendarDays } from 'lucide-react';
 import { getDisplayName } from '@/lib/equipment-map';
 
+export interface JobsiteConditions {
+  water_available?: boolean;
+  water_available_ft?: number | null;
+  water_control?: boolean;
+  manpower_provided?: boolean;
+  scaffolding_provided?: boolean;
+  electricity_available?: boolean;
+  electricity_available_ft?: number | null;
+  inside_outside?: string | null;
+  proper_ventilation?: boolean;
+  overcutting_allowed?: boolean;
+  cord_480?: boolean;
+  cord_480_ft?: number | null;
+  clean_up_required?: boolean;
+  high_work?: boolean;
+  high_work_ft?: number | null;
+  high_work_access?: string | null;
+  hyd_hose?: boolean;
+  hyd_hose_ft?: number | null;
+  plastic_needed?: boolean;
+}
+
+export interface SiteCompliance {
+  orientation_required?: boolean;
+  orientation_datetime?: string | null;
+  badging_required?: boolean;
+  badging_type?: string | null;
+  special_instructions?: string | null;
+}
+
 export interface PendingJob {
   id: string;
   job_number: string;
@@ -19,6 +49,12 @@ export interface PendingJob {
   end_date: string | null;
   estimated_cost: number | null;
   address: string;
+  jobsite_conditions: JobsiteConditions | null;
+  site_compliance: SiteCompliance | null;
+  equipment_selections: Record<string, Record<string, string>> | null;
+  scope_details: Record<string, Record<string, string>> | null;
+  additional_info: string | null;
+  special_equipment: string[] | null;
 }
 
 interface PendingQueueSidebarProps {
