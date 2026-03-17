@@ -151,6 +151,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     iconBg: 'bg-slate-600',
     features: ['API Health Checks', 'Login Audit Trail', 'Error Monitoring', 'Database Stats'],
   },
+  {
+    key: 'settings',
+    title: 'Settings',
+    description: 'Configure schedule board, capacity, and system preferences',
+    icon: '⚙️',
+    href: '/dashboard/admin/settings',
+    bgColor: 'from-gray-600 to-gray-800',
+    iconBg: 'bg-gray-600',
+    features: ['Schedule slots', 'Shop notes row', 'Capacity warnings', 'System config'],
+  },
 ];
 
 // All card keys for iteration
@@ -208,6 +218,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     tools_equipment: 'none',
     billing: 'view',
     operations_hub: 'none',
+    settings: 'none',
   },
   supervisor: {
     timecards: 'view',
@@ -222,6 +233,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     tools_equipment: 'view',
     billing: 'none',
     operations_hub: 'none',
+    settings: 'none',
   },
   salesman: {
     timecards: 'none',
@@ -236,6 +248,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     tools_equipment: 'none',
     billing: 'none',
     operations_hub: 'none',
+    settings: 'none',
   },
   operator: allCards('none'),
   apprentice: allCards('none'),
