@@ -415,11 +415,24 @@ export default function JobDetailPage() {
 
         {/* Team Member Work Log (for helpers/team members only) */}
         {jobIsHelper && !isCompleted && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-4">
+          <HelperWorkLog
+            jobId={job.id}
+            jobNumber={job.job_number}
+            customerName={job.customer_name}
+            jobTitle={job.title}
+            job={job}
+          />
+        )}
+
+        {/* Completed job: show helper description as collapsible */}
+        {jobIsHelper && isCompleted && (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200 p-4">
             <HelperWorkLog
               jobId={job.id}
               jobNumber={job.job_number}
               customerName={job.customer_name}
+              jobTitle={job.title}
+              job={job}
             />
           </div>
         )}

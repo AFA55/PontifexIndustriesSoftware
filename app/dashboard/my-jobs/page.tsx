@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase } from 'lucide-react';
+import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DayNavigator from './_components/DayNavigator';
 import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
@@ -26,6 +26,9 @@ export default function MyJobsPage() {
   const [userRole, setUserRole] = useState<string>('operator');
   const [userId, setUserId] = useState<string>('');
   const [hasLongDurationJob, setHasLongDurationJob] = useState(false);
+  const [activeShopTicket, setActiveShopTicket] = useState<any>(null);
+  const [completingShop, setCompletingShop] = useState(false);
+  const [shopDescription, setShopDescription] = useState('');
 
   const isHelper = userRole === 'apprentice';
 
@@ -97,6 +100,54 @@ export default function MyJobsPage() {
     }
   }, []);
 
+  // Fetch active shop ticket for today (helpers only)
+  const fetchShopTicket = useCallback(async () => {
+    if (!isHelper) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/helper-work-log?all_today=true`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const shopTicket = (json.data || []).find((l: any) => l.is_shop_ticket && !l.completed_at);
+        setActiveShopTicket(shopTicket || null);
+        if (shopTicket?.work_description) setShopDescription(shopTicket.work_description);
+      }
+    } catch { /* silent */ }
+  }, [isHelper]);
+
+  const handleCompleteShopTicket = async () => {
+    if (!activeShopTicket) return;
+    setCompletingShop(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      await fetch('/api/helper-work-log', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          is_shop_ticket: true,
+          work_description: shopDescription.trim() || 'Shop work',
+          complete: true,
+        }),
+      });
+
+      setActiveShopTicket(null);
+      setShopDescription('');
+    } catch (err) {
+      console.error('Error completing shop ticket:', err);
+    } finally {
+      setCompletingShop(false);
+    }
+  };
+
   useEffect(() => {
     fetchJobs(selectedDate);
   }, [selectedDate, fetchJobs]);
@@ -104,6 +155,10 @@ export default function MyJobsPage() {
   useEffect(() => {
     checkLongDurationJobs();
   }, [checkLongDurationJobs]);
+
+  useEffect(() => {
+    fetchShopTicket();
+  }, [fetchShopTicket]);
 
 
   if (loading && jobs.length === 0) {
@@ -184,6 +239,43 @@ export default function MyJobsPage() {
             {jobs.map((job) => (
               <JobTicketCard key={job.id} job={job} />
             ))}
+          </div>
+        )}
+
+        {/* Active Shop Ticket (helpers only) */}
+        {isHelper && activeShopTicket && selectedDate === toDateString(new Date()) && (
+          <div className="mt-4 bg-amber-50 border-2 border-amber-200 rounded-2xl p-5 shadow-lg">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900">Working in Shop</h3>
+                <p className="text-xs text-amber-700 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Started {new Date(activeShopTicket.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+            <textarea
+              value={shopDescription}
+              onChange={(e) => setShopDescription(e.target.value)}
+              placeholder="Describe shop work..."
+              rows={2}
+              className="w-full px-3 py-2 border border-amber-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-200 outline-none text-sm resize-none mb-3"
+            />
+            <button
+              onClick={handleCompleteShopTicket}
+              disabled={completingShop}
+              className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {completingShop ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Complete Shop Work
+            </button>
           </div>
         )}
 

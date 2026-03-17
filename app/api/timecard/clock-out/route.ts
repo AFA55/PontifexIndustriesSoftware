@@ -179,6 +179,34 @@ export async function POST(request: NextRequest) {
     const milliseconds = now.getTime() - clockInTime.getTime();
     const totalHours = milliseconds / (1000 * 60 * 60); // Convert to hours
 
+    // Auto-close any open helper work logs (started but not completed)
+    // This handles the case where a helper clocks out without pressing "Complete Day"
+    if (['apprentice', 'operator'].includes(userRole)) {
+      const { data: openLogs } = await supabaseAdmin
+        .from('helper_work_logs')
+        .select('id, started_at')
+        .eq('helper_id', user.id)
+        .eq('log_date', today)
+        .is('completed_at', null)
+        .not('started_at', 'is', null);
+
+      if (openLogs && openLogs.length > 0) {
+        for (const log of openLogs) {
+          const startMs = new Date(log.started_at).getTime();
+          const endMs = now.getTime();
+          const hoursWorked = Number(((endMs - startMs) / (1000 * 60 * 60)).toFixed(2));
+
+          await supabaseAdmin
+            .from('helper_work_logs')
+            .update({
+              completed_at: now.toISOString(),
+              hours_worked: hoursWorked,
+            })
+            .eq('id', log.id);
+        }
+      }
+    }
+
     // Update timecard with clock out data
     const { data: updatedTimecard, error: updateError } = await supabaseAdmin
       .from('timecards')
