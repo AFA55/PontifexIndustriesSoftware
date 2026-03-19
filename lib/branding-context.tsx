@@ -170,6 +170,13 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     fetchBranding();
   }, [fetchBranding]);
 
+  // Update document title when branding loads
+  useEffect(() => {
+    if (!loading && branding.company_name) {
+      document.title = `${branding.company_name} - ${branding.tagline}`;
+    }
+  }, [branding.company_name, branding.tagline, loading]);
+
   return (
     <BrandingContext.Provider value={{ branding, loading, refreshBranding }}>
       {children}

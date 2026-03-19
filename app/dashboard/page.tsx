@@ -8,9 +8,13 @@ import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
 import OnboardingTour from '@/components/OnboardingTour';
 import NfcClockInModal from '@/components/NfcClockInModal';
+import { useBranding } from '@/lib/branding-context';
 
-// Pontifex Industries Logo Component
-function PontifexLogo({ className = "h-8" }: { className?: string }) {
+// Dynamic Logo Component — uses branding if available
+function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: string; logoUrl?: string | null; companyName?: string }) {
+  if (logoUrl) {
+    return <img src={logoUrl} alt={companyName || 'Company Logo'} className={`${className} w-auto object-contain`} />;
+  }
   return (
     <svg
       className={className}
@@ -18,33 +22,27 @@ function PontifexLogo({ className = "h-8" }: { className?: string }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* P Letter with Geometric Design */}
       <g>
-        {/* Outer P Shape */}
         <path
           d="M20 15L35 5L50 15L50 35L35 45L20 35L20 25L35 25L35 35L42 30L42 20L35 15L28 20L28 30L20 25V15Z"
-          fill="url(#pontifex-gradient)"
+          fill="url(#op-pontifex-gradient)"
         />
-        {/* Inner geometric elements */}
         <path
           d="M25 20L30 17L35 20L35 25L30 28L25 25V20Z"
           fill="currentColor"
           opacity="0.3"
         />
       </g>
-
-      {/* PONTIFEX Text */}
       <g fill="currentColor">
         <text x="65" y="25" className="text-lg font-bold" style={{fontSize: '18px', fontFamily: 'Inter, sans-serif'}}>
-          PONTIFEX
+          {(companyName || 'PONTIFEX').toUpperCase().split(' ')[0]}
         </text>
         <text x="65" y="45" className="text-sm" style={{fontSize: '12px', fontFamily: 'Inter, sans-serif', opacity: '0.8'}}>
-          INDUSTRIES
+          {(companyName || 'PONTIFEX INDUSTRIES').toUpperCase().split(' ').slice(1).join(' ') || 'INDUSTRIES'}
         </text>
       </g>
-
       <defs>
-        <linearGradient id="pontifex-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
+        <linearGradient id="op-pontifex-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
           <stop stopColor="#dc2626" />
           <stop offset="0.5" stopColor="#2563eb" />
           <stop offset="1" stopColor="#1e40af" />
@@ -63,6 +61,7 @@ interface Timecard {
 type OperatorStatus = 'clocked_in' | 'en_route' | 'in_progress' | 'job_completed' | 'clocked_out';
 
 export default function Dashboard() {
+  const { branding } = useBranding();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isClockedIn, setIsClockedIn] = useState(false);
@@ -721,7 +720,7 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold">Welcome to Pontifex!</h2>
+                  <h2 className="text-3xl font-bold">Welcome to {branding.company_short_name || 'Pontifex'}!</h2>
                   <p className="text-blue-100 mt-1">Demo Operator Dashboard Tour</p>
                 </div>
               </div>
@@ -739,7 +738,7 @@ export default function Dashboard() {
                   <div className="flex-1">
                     <h3 className="font-bold text-blue-900 text-lg mb-2">This is a Demo Account</h3>
                     <p className="text-blue-800 text-sm leading-relaxed">
-                      You're exploring a limited demonstration of the Pontifex operator platform.
+                      You&apos;re exploring a limited demonstration of the {branding.company_short_name || 'Pontifex'} operator platform.
                       Some features are restricted to showcase the full platform capabilities.
                     </p>
                   </div>
@@ -843,9 +842,9 @@ export default function Dashboard() {
       <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            {/* Pontifex Logo with Animation */}
+            {/* Company Logo with Animation */}
             <div className="transform hover:scale-105 transition-transform duration-200">
-              <PontifexLogo className="h-10 text-white" />
+              <BrandedLogo className="h-10 text-white" logoUrl={branding.logo_dark_url || branding.logo_url} companyName={branding.company_name} />
             </div>
 
             {/* Modern Profile Section */}

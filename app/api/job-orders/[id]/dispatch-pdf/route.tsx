@@ -74,6 +74,31 @@ export async function GET(
       helperName = helpProfile?.full_name || '';
     }
 
+    // Fetch branding for PDF
+    let pdfBranding: Record<string, unknown> = {};
+    try {
+      const { data: brandingRow } = await supabaseAdmin
+        .from('tenant_branding')
+        .select('company_name, support_phone, support_email, company_address, company_city, company_state, company_zip, pdf_header_text, pdf_footer_text, pdf_show_logo, primary_color, logo_url')
+        .limit(1)
+        .single();
+      if (brandingRow) {
+        const addr = [brandingRow.company_address, brandingRow.company_city, brandingRow.company_state, brandingRow.company_zip].filter(Boolean).join(', ');
+        pdfBranding = {
+          company_name: brandingRow.company_name,
+          company_address: addr || undefined,
+          company_phone: brandingRow.support_phone ? `Phone: ${brandingRow.support_phone}` : undefined,
+          logo_url: brandingRow.logo_url,
+          pdf_header_text: brandingRow.pdf_header_text,
+          pdf_footer_text: brandingRow.pdf_footer_text,
+          pdf_show_logo: brandingRow.pdf_show_logo,
+          primary_color: brandingRow.primary_color,
+        };
+      }
+    } catch {
+      // Use defaults if branding fetch fails
+    }
+
     // Build the PDF data
     const pdfData = {
       job_number: job.job_number,
@@ -112,7 +137,7 @@ export async function GET(
     // Render PDF to buffer
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buffer = await renderToBuffer(
-      React.createElement(DispatchTicketPDF, { job: pdfData }) as any
+      React.createElement(DispatchTicketPDF, { job: pdfData, branding: pdfBranding }) as any
     );
 
     // Return PDF response

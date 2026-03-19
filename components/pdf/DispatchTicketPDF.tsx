@@ -81,6 +81,18 @@ const s = StyleSheet.create({
   permitText: { fontSize: 7.5, color: '#78350F' },
 });
 
+// ── Branding prop for PDF (cannot use hooks) ───────────────
+export interface PDFBranding {
+  company_name?: string;
+  company_address?: string;
+  company_phone?: string;
+  logo_url?: string | null;
+  pdf_header_text?: string | null;
+  pdf_footer_text?: string | null;
+  pdf_show_logo?: boolean;
+  primary_color?: string;
+}
+
 // ── Interfaces ──────────────────────────────────────────────
 interface DispatchTicketData {
   job_number: string;
@@ -126,7 +138,7 @@ function formatDate(d?: string) {
 }
 
 // ── Component ───────────────────────────────────────────────
-export default function DispatchTicketPDF({ job }: { job: DispatchTicketData }) {
+export default function DispatchTicketPDF({ job, branding }: { job: DispatchTicketData; branding?: PDFBranding }) {
   const today = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
   const conditions = job.jobsite_conditions || {};
   const compliance = job.site_compliance || {};
@@ -207,9 +219,9 @@ export default function DispatchTicketPDF({ job }: { job: DispatchTicketData }) 
         {/* ═══ HEADER ═══ */}
         <View style={s.headerRow}>
           <View>
-            <Text style={s.companyName}>PATRIOT CONCRETE CUTTING</Text>
-            <Text style={s.companyAddress}>P.O Box 504, Piedmont, SC 29673</Text>
-            <Text style={s.companyPhone}>Phone: 864-299-0330  |  Fax: 864-299-1532</Text>
+            <Text style={s.companyName}>{(branding?.company_name || 'PATRIOT CONCRETE CUTTING').toUpperCase()}</Text>
+            <Text style={s.companyAddress}>{branding?.company_address || 'P.O Box 504, Piedmont, SC 29673'}</Text>
+            <Text style={s.companyPhone}>{branding?.company_phone || 'Phone: 864-299-0330  |  Fax: 864-299-1532'}</Text>
           </View>
           <View style={s.headerCenter}>
             <Text style={s.jobTicketTitle}>JOB TICKET</Text>

@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useBranding } from '@/lib/branding-context';
 
 const schema = z.object({
   email: z.string().email(),
@@ -23,6 +24,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { branding } = useBranding();
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
@@ -98,7 +100,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
+    <div
+      className="min-h-screen flex items-center justify-center relative overflow-hidden"
+      style={{
+        background: `linear-gradient(to bottom right, ${branding.login_bg_gradient_from || '#0f172a'}, ${branding.login_bg_gradient_to || '#1e1b4b'})`,
+      }}
+    >
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
@@ -118,7 +125,11 @@ export default function LoginPage() {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
           >
-            <Logo />
+            {branding.logo_url ? (
+              <img src={branding.logo_url} alt={branding.company_name} className="h-12 w-auto object-contain" />
+            ) : (
+              <Logo />
+            )}
           </motion.div>
           <motion.h1
             initial={{ opacity: 0 }}
@@ -126,9 +137,9 @@ export default function LoginPage() {
             transition={{ delay: 0.3 }}
             className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-red-700 bg-clip-text text-transparent mt-6 mb-2 tracking-tight"
           >
-            Pontifex Industries
+            {branding.login_welcome_text || 'Welcome Back'}
           </motion.h1>
-          <p className="text-gray-600 text-sm font-medium">Concrete Cutting Management System</p>
+          <p className="text-gray-600 text-sm font-medium">{branding.tagline || 'Concrete Cutting Management System'}</p>
         </div>
 
         {/* Login Form */}
@@ -205,7 +216,10 @@ export default function LoginPage() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.7 }}
             type="submit"
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white font-bold shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500/30 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="w-full py-4 rounded-xl text-white font-bold shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500/30 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            style={{
+              background: `linear-gradient(to right, ${branding.primary_color || '#2563eb'}, ${branding.secondary_color || '#dc2626'})`,
+            }}
             disabled={loading}
           >
             {loading ? (
@@ -231,51 +245,53 @@ export default function LoginPage() {
           </motion.div>
         </form>
 
-        {/* Demo Credentials - Modern Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
-          className="mt-8 space-y-3"
-        >
-          <h3 className="text-gray-700 font-bold text-sm mb-4 text-center">Quick Access Demo Accounts</h3>
+        {/* Demo Credentials - Modern Cards (conditionally shown) */}
+        {branding.show_demo_accounts && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9 }}
+            className="mt-8 space-y-3"
+          >
+            <h3 className="text-gray-700 font-bold text-sm mb-4 text-center">Quick Access Demo Accounts</h3>
 
-          {/* Operator Account */}
-          <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 hover:border-blue-300 transition-all hover:shadow-md cursor-default">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <h4 className="text-blue-800 font-bold text-xs tracking-wider">OPERATOR DASHBOARD</h4>
+            {/* Operator Account */}
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 hover:border-blue-300 transition-all hover:shadow-md cursor-default">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <h4 className="text-blue-800 font-bold text-xs tracking-wider">OPERATOR DASHBOARD</h4>
+              </div>
+              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+                <div><span className="text-blue-700 font-bold">Email:</span> demo@pontifex.com</div>
+                <div><span className="text-blue-700 font-bold">Password:</span> Demo1234!</div>
+              </div>
             </div>
-            <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-              <div><span className="text-blue-700 font-bold">Email:</span> demo@pontifex.com</div>
-              <div><span className="text-blue-700 font-bold">Password:</span> Demo1234!</div>
-            </div>
-          </div>
 
-          {/* Team Member Account */}
-          <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 hover:border-green-300 transition-all hover:shadow-md cursor-default">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <h4 className="text-green-800 font-bold text-xs tracking-wider">TEAM MEMBER DASHBOARD</h4>
+            {/* Team Member Account */}
+            <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 hover:border-green-300 transition-all hover:shadow-md cursor-default">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <h4 className="text-green-800 font-bold text-xs tracking-wider">TEAM MEMBER DASHBOARD</h4>
+              </div>
+              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+                <div><span className="text-green-700 font-bold">Email:</span> team@pontifex.com</div>
+                <div><span className="text-green-700 font-bold">Password:</span> Team1234!</div>
+              </div>
             </div>
-            <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-              <div><span className="text-green-700 font-bold">Email:</span> team@pontifex.com</div>
-              <div><span className="text-green-700 font-bold">Password:</span> Team1234!</div>
-            </div>
-          </div>
 
-          {/* Admin Account */}
-          <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200 hover:border-orange-300 transition-all hover:shadow-md cursor-default">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <h4 className="text-red-800 font-bold text-xs tracking-wider">ADMIN DASHBOARD</h4>
+            {/* Admin Account */}
+            <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200 hover:border-orange-300 transition-all hover:shadow-md cursor-default">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <h4 className="text-red-800 font-bold text-xs tracking-wider">ADMIN DASHBOARD</h4>
+              </div>
+              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+                <div><span className="text-red-700 font-bold">Email:</span> admin@pontifex.com</div>
+                <div><span className="text-red-700 font-bold">Password:</span> Admin1234!</div>
+              </div>
             </div>
-            <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-              <div><span className="text-red-700 font-bold">Email:</span> admin@pontifex.com</div>
-              <div><span className="text-red-700 font-bold">Password:</span> Admin1234!</div>
-            </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
       </motion.div>
     </div>
   );

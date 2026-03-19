@@ -126,6 +126,17 @@ const styles = StyleSheet.create({
   },
 });
 
+export interface PDFBranding {
+  company_name?: string;
+  logo_url?: string | null;
+  pdf_header_text?: string | null;
+  pdf_footer_text?: string | null;
+  pdf_show_logo?: boolean;
+  primary_color?: string;
+  support_email?: string | null;
+  support_phone?: string | null;
+}
+
 interface WorkOrderAgreementPDFProps {
   jobNumber: string;
   jobDate: string;
@@ -139,6 +150,7 @@ interface WorkOrderAgreementPDFProps {
   signedAt: string;
   cutThroughAuthorized: boolean;
   cutThroughSignature?: string;
+  branding?: PDFBranding;
 }
 
 export const WorkOrderAgreementPDF: React.FC<WorkOrderAgreementPDFProps> = ({
@@ -154,7 +166,11 @@ export const WorkOrderAgreementPDF: React.FC<WorkOrderAgreementPDFProps> = ({
   signedAt,
   cutThroughAuthorized,
   cutThroughSignature,
+  branding,
 }) => {
+  const companyName = branding?.company_name || 'Pontifex Industries';
+  const supportPhone = branding?.support_phone || '(833) 695-4288';
+  const supportEmail = branding?.support_email || 'support@pontifexindustries.com';
   const formattedDate = new Date(signedAt).toLocaleString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -168,7 +184,7 @@ export const WorkOrderAgreementPDF: React.FC<WorkOrderAgreementPDFProps> = ({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.companyName}>PONTIFEX INDUSTRIES</Text>
+          <Text style={styles.companyName}>{companyName.toUpperCase()}</Text>
           <Text style={styles.title}>Work Order & Service Agreement</Text>
           <Text style={styles.subtitle}>Signed before commencement of work</Text>
         </View>
@@ -236,7 +252,7 @@ export const WorkOrderAgreementPDF: React.FC<WorkOrderAgreementPDFProps> = ({
         <View style={styles.warningBox}>
           <Text style={styles.warningTitle}>⚠ WATER DAMAGE DISCLAIMER</Text>
           <Text style={styles.warningText}>
-            Pontifex Industries assumes NO responsibility for water damage, moisture intrusion, or water-related issues resulting from wet cutting operations, including damage to flooring, walls, ceilings, electrical systems, or stored materials.
+            {companyName} assumes NO responsibility for water damage, moisture intrusion, or water-related issues resulting from wet cutting operations, including damage to flooring, walls, ceilings, electrical systems, or stored materials.
           </Text>
         </View>
 
@@ -244,7 +260,7 @@ export const WorkOrderAgreementPDF: React.FC<WorkOrderAgreementPDFProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ground Penetrating Radar (GPR) Limitations</Text>
           <Text style={styles.paragraph}>
-            When GPR services are performed, Pontifex DOES NOT GUARANTEE detection of:
+            When GPR services are performed, {companyName} DOES NOT GUARANTEE detection of:
           </Text>
           <Text style={styles.listItem}>• Post-tension cables or small diameter rebar (less than #4)</Text>
           <Text style={styles.listItem}>• Non-metallic utilities (PVC, fiber optic, etc.)</Text>
@@ -259,7 +275,7 @@ export const WorkOrderAgreementPDF: React.FC<WorkOrderAgreementPDFProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Layout Assistance</Text>
           <Text style={styles.paragraph}>
-            Pontifex Industries may provide layout assistance as a courtesy. However, Customer acknowledges that Pontifex shall not be liable for any errors in layouts provided. Customer is solely responsible for verifying accuracy of all layouts prior to commencement of work.
+            {companyName} may provide layout assistance as a courtesy. However, Customer acknowledges that {companyName} shall not be liable for any errors in layouts provided. Customer is solely responsible for verifying accuracy of all layouts prior to commencement of work.
           </Text>
         </View>
 
@@ -267,7 +283,7 @@ export const WorkOrderAgreementPDF: React.FC<WorkOrderAgreementPDFProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Indemnification</Text>
           <Text style={styles.paragraph}>
-            Customer agrees to indemnify, defend, and hold harmless Pontifex Industries from any claims, damages, or expenses arising from Customer's negligence, inaccurate information, or failure to fulfill obligations under this Agreement.
+            Customer agrees to indemnify, defend, and hold harmless {companyName} from any claims, damages, or expenses arising from Customer&apos;s negligence, inaccurate information, or failure to fulfill obligations under this Agreement.
           </Text>
         </View>
 
@@ -276,7 +292,7 @@ export const WorkOrderAgreementPDF: React.FC<WorkOrderAgreementPDFProps> = ({
           <View style={styles.warningBox}>
             <Text style={styles.warningTitle}>⚠ CUT-THROUGH AUTHORIZATION</Text>
             <Text style={styles.warningText}>
-              Customer has authorized Pontifex Industries to cut through, near, or around marked obstructions. Customer assumes 100% of risk and liability for all resulting damages and agrees to indemnify Pontifex Industries from all claims.
+              Customer has authorized {companyName} to cut through, near, or around marked obstructions. Customer assumes 100% of risk and liability for all resulting damages and agrees to indemnify {companyName} from all claims.
             </Text>
             <View style={{ marginTop: 8 }}>
               <Text style={styles.signatureText}>{cutThroughSignature}</Text>
@@ -304,7 +320,7 @@ export const WorkOrderAgreementPDF: React.FC<WorkOrderAgreementPDFProps> = ({
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text>Pontifex Industries | Phone: (833) 695-4288 | Email: support@pontifexindustries.com</Text>
+          <Text>{branding?.pdf_footer_text || `${companyName} | Phone: ${supportPhone} | Email: ${supportEmail}`}</Text>
           <Text style={{ marginTop: 3 }}>This agreement was electronically signed and is legally binding.</Text>
         </View>
       </Page>

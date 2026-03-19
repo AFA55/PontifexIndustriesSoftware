@@ -67,6 +67,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch branding for PDF
+    let pdfBranding: Record<string, unknown> = {};
+    try {
+      const { data: brandingRow } = await supabaseAdmin
+        .from('tenant_branding')
+        .select('company_name, support_phone, support_email, pdf_footer_text, pdf_show_logo, primary_color, logo_url')
+        .limit(1)
+        .single();
+      if (brandingRow) {
+        pdfBranding = {
+          company_name: brandingRow.company_name,
+          support_phone: brandingRow.support_phone,
+          support_email: brandingRow.support_email,
+          pdf_footer_text: brandingRow.pdf_footer_text,
+          pdf_show_logo: brandingRow.pdf_show_logo,
+          primary_color: brandingRow.primary_color,
+          logo_url: brandingRow.logo_url,
+        };
+      }
+    } catch {
+      // Use defaults if branding fetch fails
+    }
+
     // Generate PDF
     console.log('[AGREEMENT PDF] Generating PDF document...');
     const pdfElement = WorkOrderAgreementPDF({
@@ -81,7 +104,8 @@ export async function POST(request: NextRequest) {
       signerTitle: signerTitle || '',
       signedAt,
       cutThroughAuthorized: cutThroughAuthorized || false,
-      cutThroughSignature
+      cutThroughSignature,
+      branding: pdfBranding as any,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfBuffer = await renderToBuffer(pdfElement as any);

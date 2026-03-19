@@ -14,9 +14,13 @@ import {
   getCardPermission,
   type PermissionLevel,
 } from '@/lib/rbac';
+import { useBranding } from '@/lib/branding-context';
 
-// Pontifex Industries Logo Component
-function PontifexLogo({ className = "h-8" }: { className?: string }) {
+// Dynamic Logo Component — uses branding if available
+function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: string; logoUrl?: string | null; companyName?: string }) {
+  if (logoUrl) {
+    return <img src={logoUrl} alt={companyName || 'Company Logo'} className={`${className} w-auto object-contain`} />;
+  }
   return (
     <svg
       className={className}
@@ -24,31 +28,25 @@ function PontifexLogo({ className = "h-8" }: { className?: string }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* P Letter with Geometric Design */}
       <g>
-        {/* Outer P Shape */}
         <path
           d="M20 15L35 5L50 15L50 35L35 45L20 35L20 25L35 25L35 35L42 30L42 20L35 15L28 20L28 30L20 25V15Z"
           fill="url(#pontifex-gradient)"
         />
-        {/* Inner geometric elements */}
         <path
           d="M25 20L30 17L35 20L35 25L30 28L25 25V20Z"
           fill="currentColor"
           opacity="0.3"
         />
       </g>
-
-      {/* PONTIFEX Text */}
       <g fill="currentColor">
         <text x="65" y="25" className="text-lg font-bold" style={{fontSize: '18px', fontFamily: 'Inter, sans-serif'}}>
-          PONTIFEX
+          {(companyName || 'PONTIFEX').toUpperCase().split(' ')[0]}
         </text>
         <text x="65" y="45" className="text-sm" style={{fontSize: '12px', fontFamily: 'Inter, sans-serif', opacity: '0.8'}}>
-          INDUSTRIES
+          {(companyName || 'PONTIFEX INDUSTRIES').toUpperCase().split(' ').slice(1).join(' ') || 'INDUSTRIES'}
         </text>
       </g>
-
       <defs>
         <linearGradient id="pontifex-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
           <stop stopColor="#dc2626" />
@@ -65,8 +63,17 @@ interface QuickStats {
   crewsWorking: number;
 }
 
+// Feature flag to card key mapping
+const FEATURE_FLAG_CARD_MAP: Record<string, string[]> = {
+  show_billing_module: ['billing'],
+  show_analytics_module: ['analytics'],
+  show_inventory_module: ['blade_inventory', 'tools_equipment', 'equipment_performance'],
+  show_customer_crm: ['customer_profiles'],
+};
+
 export default function AdminDashboard() {
   const router = useRouter();
+  const { branding } = useBranding();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<QuickStats>({
@@ -236,11 +243,21 @@ export default function AdminDashboard() {
     return getCardPermission(userPermissions, cardKey, user?.role || 'operator');
   };
 
-  // Build card list from centralized ADMIN_CARDS, sorted: full → view → none
-  const sortedCards = [...ADMIN_CARDS].sort((a, b) => {
-    const order: Record<PermissionLevel, number> = { full: 0, view: 1, none: 2 };
-    return order[getPermission(a.key)] - order[getPermission(b.key)];
-  });
+  // Determine which card keys are hidden by feature flags
+  const hiddenByFeatureFlags = new Set<string>();
+  for (const [flag, cardKeys] of Object.entries(FEATURE_FLAG_CARD_MAP)) {
+    if (!(branding as unknown as Record<string, unknown>)[flag]) {
+      cardKeys.forEach(k => hiddenByFeatureFlags.add(k));
+    }
+  }
+
+  // Build card list from centralized ADMIN_CARDS, filtered by feature flags, sorted: full → view → none
+  const sortedCards = [...ADMIN_CARDS]
+    .filter(card => !hiddenByFeatureFlags.has(card.key))
+    .sort((a, b) => {
+      const order: Record<PermissionLevel, number> = { full: 0, view: 1, none: 2 };
+      return order[getPermission(a.key)] - order[getPermission(b.key)];
+    });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -255,9 +272,9 @@ export default function AdminDashboard() {
       <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            {/* Pontifex Logo with Animation */}
+            {/* Company Logo with Animation */}
             <div className="transform hover:scale-105 transition-transform duration-200">
-              <PontifexLogo className="h-10 text-white" />
+              <BrandedLogo className="h-10 text-white" logoUrl={branding.logo_dark_url || branding.logo_url} companyName={branding.company_name} />
             </div>
 
             {/* Modern Profile Section */}

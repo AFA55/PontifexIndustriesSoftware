@@ -103,6 +103,17 @@ const styles = StyleSheet.create({
   },
 });
 
+export interface PDFBranding {
+  company_name?: string;
+  logo_url?: string | null;
+  pdf_header_text?: string | null;
+  pdf_footer_text?: string | null;
+  pdf_show_logo?: boolean;
+  primary_color?: string;
+  support_email?: string | null;
+  support_phone?: string | null;
+}
+
 interface LiabilityReleasePDFProps {
   customerName: string;
   customerEmail: string;
@@ -111,6 +122,7 @@ interface LiabilityReleasePDFProps {
   jobNumber: string;
   jobAddress: string;
   signedAt: string;
+  branding?: PDFBranding;
 }
 
 export const LiabilityReleasePDF: React.FC<LiabilityReleasePDFProps> = ({
@@ -121,7 +133,11 @@ export const LiabilityReleasePDF: React.FC<LiabilityReleasePDFProps> = ({
   jobNumber,
   jobAddress,
   signedAt,
+  branding,
 }) => {
+  const companyName = branding?.company_name || 'Pontifex Industries';
+  const supportPhone = branding?.support_phone || '(833) 695-4288';
+  const supportEmail = branding?.support_email || 'support@pontifexindustries.com';
   const formattedDate = new Date(signedAt).toLocaleString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -135,7 +151,7 @@ export const LiabilityReleasePDF: React.FC<LiabilityReleasePDFProps> = ({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.companyName}>PONTIFEX INDUSTRIES</Text>
+          <Text style={styles.companyName}>{companyName.toUpperCase()}</Text>
           <Text style={styles.title}>Liability Release & Indemnification</Text>
           <Text style={styles.subtitle}>Required before starting work</Text>
         </View>
@@ -172,28 +188,28 @@ export const LiabilityReleasePDF: React.FC<LiabilityReleasePDFProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Layout Assistance</Text>
           <Text style={styles.paragraph}>
-            Pontifex Industries may provide layout assistance and marking services as a courtesy to the Customer. However, Customer acknowledges and agrees that Pontifex Industries shall not be liable for any errors, omissions, or inaccuracies in layouts or markings provided, regardless of whether such layouts were performed at Customer's request or as a courtesy. Customer is solely responsible for verifying the accuracy and suitability of any layouts prior to the commencement of cutting, coring, or demolition work. Customer agrees to indemnify and hold harmless Pontifex Industries from any claims arising from work performed based on layouts, whether provided by Pontifex Industries or third parties, including but not limited to claims for incorrect placement, dimensional errors, or damage resulting from reliance on such layouts.
+            {companyName} may provide layout assistance and marking services as a courtesy to the Customer. However, Customer acknowledges and agrees that {companyName} shall not be liable for any errors, omissions, or inaccuracies in layouts or markings provided, regardless of whether such layouts were performed at Customer's request or as a courtesy. Customer is solely responsible for verifying the accuracy and suitability of any layouts prior to the commencement of cutting, coring, or demolition work. Customer agrees to indemnify and hold harmless {companyName} from any claims arising from work performed based on layouts, whether provided by {companyName} or third parties, including but not limited to claims for incorrect placement, dimensional errors, or damage resulting from reliance on such layouts.
           </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Limitation of Liability</Text>
           <Text style={styles.paragraph}>
-            Pontifex Industries' liability for any claim arising out of this agreement shall not exceed the total amount paid for the services rendered. We shall not be liable for any indirect, incidental, special, or consequential damages.
+            {companyName + "'s"} liability for any claim arising out of this agreement shall not exceed the total amount paid for the services rendered. We shall not be liable for any indirect, incidental, special, or consequential damages.
           </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Indemnification</Text>
           <Text style={styles.paragraph}>
-            Customer agrees to indemnify, defend, and hold harmless Pontifex Industries, its officers, employees, and agents from any claims, damages, losses, or expenses (including reasonable attorney fees) arising from: (a) Customer's breach of this agreement; (b) Customer's use of the services or work product; (c) Any third-party claims related to the work performed at Customer's premises.
+            Customer agrees to indemnify, defend, and hold harmless {companyName}, its officers, employees, and agents from any claims, damages, losses, or expenses (including reasonable attorney fees) arising from: (a) Customer's breach of this agreement; (b) Customer's use of the services or work product; (c) Any third-party claims related to the work performed at Customer's premises.
           </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Underground Utilities</Text>
           <Text style={styles.paragraph}>
-            Customer warrants that all underground utilities have been properly marked and disclosed. Pontifex Industries is not liable for damage to unmarked or incorrectly marked utilities.
+            Customer warrants that all underground utilities have been properly marked and disclosed. {companyName} is not liable for damage to unmarked or incorrectly marked utilities.
           </Text>
         </View>
 
@@ -207,7 +223,7 @@ export const LiabilityReleasePDF: React.FC<LiabilityReleasePDFProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Operator Acknowledgment</Text>
           <Text style={styles.paragraph}>
-            By signing below, the operator acknowledges that they have read and understand these terms and are authorized to execute this agreement on behalf of Pontifex Industries prior to commencing work.
+            By signing below, the operator acknowledges that they have read and understand these terms and are authorized to execute this agreement on behalf of {companyName} prior to commencing work.
           </Text>
         </View>
 
@@ -222,13 +238,13 @@ export const LiabilityReleasePDF: React.FC<LiabilityReleasePDFProps> = ({
           </View>
 
           <Text style={styles.paragraph}>
-            I have read and accept all terms and conditions stated above, including the liability release and indemnification provisions. I understand that I am signing this agreement on behalf of Pontifex Industries before commencing work.
+            I have read and accept all terms and conditions stated above, including the liability release and indemnification provisions. I understand that I am signing this agreement on behalf of {companyName} before commencing work.
           </Text>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text>Pontifex Industries | Phone: (833) 695-4288 | Email: support@pontifexindustries.com</Text>
+          <Text>{branding?.pdf_footer_text || `${companyName} | Phone: ${supportPhone} | Email: ${supportEmail}`}</Text>
           <Text>This document should be reviewed by legal counsel before use. This template is provided for informational purposes and does not constitute legal advice.</Text>
         </View>
       </Page>

@@ -86,6 +86,29 @@ export async function POST(request: NextRequest) {
       }, { status: 200 });
     }
 
+    // Fetch branding for PDF
+    let pdfBranding: Record<string, unknown> = {};
+    try {
+      const { data: brandingRow } = await supabaseAdmin
+        .from('tenant_branding')
+        .select('company_name, support_phone, support_email, pdf_footer_text, pdf_show_logo, primary_color, logo_url')
+        .limit(1)
+        .single();
+      if (brandingRow) {
+        pdfBranding = {
+          company_name: brandingRow.company_name,
+          support_phone: brandingRow.support_phone,
+          support_email: brandingRow.support_email,
+          pdf_footer_text: brandingRow.pdf_footer_text,
+          pdf_show_logo: brandingRow.pdf_show_logo,
+          primary_color: brandingRow.primary_color,
+          logo_url: brandingRow.logo_url,
+        };
+      }
+    } catch {
+      // Use defaults if branding fetch fails
+    }
+
     // Generate PDF
     console.log('[LIABILITY PDF] Generating PDF document...');
     const pdfElement = LiabilityReleasePDF({
@@ -95,7 +118,8 @@ export async function POST(request: NextRequest) {
       signatureDataURL,
       jobNumber: jobNumber || jobId,
       jobAddress: jobAddress || 'N/A',
-      signedAt: new Date().toISOString()
+      signedAt: new Date().toISOString(),
+      branding: pdfBranding as any,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfBuffer = await renderToBuffer(pdfElement as any);
@@ -127,18 +151,21 @@ export async function POST(request: NextRequest) {
     console.log('[LIABILITY PDF] Sending email to:', customerEmail);
 
     try {
+      const emailCompanyName = (pdfBranding.company_name as string) || 'Pontifex Industries';
+      const emailPhone = (pdfBranding.support_phone as string) || '(833) 695-4288';
+      const emailSupportAddr = (pdfBranding.support_email as string) || 'support@pontifexindustries.com';
       const emailResult = await resend.emails.send({
-        from: 'Pontifex Industries <noreply@pontifexindustries.com>',
+        from: `${emailCompanyName} <noreply@pontifexindustries.com>`,
         to: customerEmail,
         subject: `Liability Release - Job #${jobNumber || jobId}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #EA580C;">Pontifex Industries</h1>
+            <h1 style="color: #EA580C;">${emailCompanyName}</h1>
             <h2 style="color: #334155;">Liability Release & Indemnification</h2>
 
             <p>Dear ${customerName},</p>
 
-            <p>Thank you for working with Pontifex Industries. This email confirms that the Liability Release & Indemnification agreement has been signed for:</p>
+            <p>Thank you for working with ${emailCompanyName}. This email confirms that the Liability Release & Indemnification agreement has been signed for:</p>
 
             <div style="background: #F1F5F9; padding: 16px; border-radius: 8px; margin: 20px 0;">
               <p style="margin: 4px 0;"><strong>Job Number:</strong> ${jobNumber || jobId}</p>
@@ -152,11 +179,11 @@ export async function POST(request: NextRequest) {
             <p>If you have any questions or concerns, please don't hesitate to contact us:</p>
 
             <div style="margin: 20px 0;">
-              <p style="margin: 4px 0;"><strong>Phone:</strong> (833) 695-4288</p>
-              <p style="margin: 4px 0;"><strong>Email:</strong> support@pontifexindustries.com</p>
+              <p style="margin: 4px 0;"><strong>Phone:</strong> ${emailPhone}</p>
+              <p style="margin: 4px 0;"><strong>Email:</strong> ${emailSupportAddr}</p>
             </div>
 
-            <p>Thank you for choosing Pontifex Industries.</p>
+            <p>Thank you for choosing ${emailCompanyName}.</p>
 
             <p style="margin-top: 30px; color: #64748B; font-size: 14px;">
               This is an automated message. Please do not reply to this email.
