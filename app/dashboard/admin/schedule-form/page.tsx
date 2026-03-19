@@ -15,6 +15,7 @@ import {
   Eye, X, Users,
 } from 'lucide-react';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
+import { CustomerAutocomplete } from '@/components/ui/CustomerAutocomplete';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { VoiceMicButton } from '@/components/ui/VoiceMicButton';
 // Equipment presets no longer displayed as grid; now using SERVICE_EQUIPMENT config
@@ -281,6 +282,8 @@ interface FormData {
   site_address: string;
   contact_phone: string;
   location_name: string;
+  customer_id: string;
+  save_as_customer: boolean;
   // Step 3
   description: string;
   service_types: string[];
@@ -315,6 +318,9 @@ interface FormData {
   badging_type: string;
   special_instructions: string;
   compliance_attachment_urls: string[];
+  permit_required: boolean;
+  permits: { type: string; details: string }[];
+  permit_other_text: string;
   // Step 7
   difficulty_rating: number;
   additional_notes: string;
@@ -349,6 +355,8 @@ const initialFormData: FormData = {
   site_address: '',
   contact_phone: '',
   location_name: '',
+  customer_id: '',
+  save_as_customer: false,
   description: '',
   service_types: [],
   estimated_cost: '',
@@ -379,6 +387,9 @@ const initialFormData: FormData = {
   badging_type: '',
   special_instructions: '',
   compliance_attachment_urls: [],
+  permit_required: false,
+  permits: [],
+  permit_other_text: '',
   difficulty_rating: 1,
   additional_notes: '',
   water_available: false,
@@ -611,7 +622,34 @@ export default function ScheduleFormPage() {
     }
   }, [allCustomers, updateForm]);
 
-  // When a customer is selected, load their contacts
+  // When a customer is selected from CRM autocomplete
+  const selectCrmCustomer = useCallback(async (customer: { id: string; company_name: string; primary_contact_name: string | null; primary_contact_phone: string | null; address: string | null }) => {
+    updateForm({
+      contractor_name: customer.company_name,
+      customer_id: customer.id,
+      site_contact: customer.primary_contact_name || '',
+      contact_phone: customer.primary_contact_phone || '',
+      site_address: customer.address || '',
+    });
+    setShowCustomerDropdown(false);
+    // Fetch CRM contacts for this customer
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session) return;
+    try {
+      const res = await fetch(`/api/admin/customers/${customer.id}/contacts`, {
+        headers: { 'Authorization': `Bearer ${session.session.access_token}` },
+      });
+      const data = await res.json();
+      if (data.data) {
+        setContactSuggestions(data.data.map((c: any) => ({
+          contact_name: c.name,
+          contact_phone: c.phone || '',
+        })));
+      }
+    } catch {}
+  }, [updateForm]);
+
+  // When a customer is selected from legacy suggestions, load their contacts
   const selectCustomer = useCallback(async (name: string) => {
     updateForm({ contractor_name: name });
     setShowCustomerDropdown(false);
@@ -829,6 +867,8 @@ export default function ScheduleFormPage() {
         po_number: form.po_number || null,
         // Step 2
         customer_name: form.contractor_name.trim(),
+        customer_id: form.customer_id || null,
+        save_as_customer: form.save_as_customer || false,
         site_contact: form.site_contact || null,
         contact_phone: form.contact_phone || null,
         address: form.site_address || null,
@@ -869,6 +909,8 @@ export default function ScheduleFormPage() {
           special_instructions: form.special_instructions || null,
           attachment_urls: form.compliance_attachment_urls.length > 0 ? form.compliance_attachment_urls : undefined,
         },
+        permit_required: form.permit_required,
+        permits: form.permits.length > 0 ? form.permits : undefined,
         difficulty_rating: form.difficulty_rating,
         additional_notes: form.additional_notes || null,
         jobsite_conditions: {
@@ -1071,36 +1113,35 @@ export default function ScheduleFormPage() {
       case 2:
         return (
           <div className="space-y-6">
-            {/* Customer Name with Autocomplete */}
-            <div ref={customerDropdownRef} className="relative">
+            {/* Customer Name with CRM Autocomplete */}
+            <div>
               <Label required>Contractor / Customer Name</Label>
-              <InputField
-                icon={Building2}
-                placeholder="Enter contractor or customer name"
+              <CustomerAutocomplete
                 value={form.contractor_name}
-                onChange={e => handleCustomerChange(e.target.value)}
-                onFocus={() => {
-                  if (form.contractor_name.trim() && customerSuggestions.length > 0) {
-                    setShowCustomerDropdown(true);
-                  }
+                onChange={(value) => {
+                  handleCustomerChange(value);
+                  // Clear customer_id if user types freely
+                  if (form.customer_id) updateForm({ customer_id: '' });
                 }}
+                onSelect={(customer) => selectCrmCustomer(customer)}
+                onCreateNew={() => updateForm({ save_as_customer: true })}
                 autoFocus
-                autoComplete="off"
               />
-              {showCustomerDropdown && customerSuggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150">
-                  {customerSuggestions.map(name => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => selectCustomer(name)}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-all"
-                    >
-                      <Building2 size={16} className="text-slate-400 flex-shrink-0" />
-                      <span className="font-medium">{name}</span>
-                    </button>
-                  ))}
-                </div>
+              {form.customer_id && (
+                <p className="mt-1.5 text-xs text-emerald-500 font-medium flex items-center gap-1">
+                  <CheckCircle size={12} /> Linked to customer record
+                </p>
+              )}
+              {!form.customer_id && form.contractor_name.trim() && (
+                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.save_as_customer}
+                    onChange={e => updateForm({ save_as_customer: e.target.checked })}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <span className="text-xs text-slate-500">Save as new customer on submit</span>
+                </label>
               )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -2245,6 +2286,101 @@ export default function ScheduleFormPage() {
                     value={form.badging_type}
                     onChange={e => updateForm({ badging_type: e.target.value })}
                   />
+                </div>
+              )}
+            </SectionCard>
+
+            {/* ── Permits Required ────────────── */}
+            <SectionCard>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Permits</p>
+              <Toggle
+                checked={form.permit_required}
+                onChange={v => {
+                  const updates: Partial<FormData> = { permit_required: v };
+                  if (!v) updates.permits = [];
+                  updateForm(updates);
+                }}
+                label="Permits Required?"
+                icon={ShieldCheck}
+              />
+              {form.permit_required && (
+                <div className="pl-4 border-l-2 border-amber-200 ml-2 space-y-3">
+                  <p className="text-xs text-slate-500">Select all permits required for this job:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {[
+                      { type: 'work_permit', label: 'Work Permit', color: 'border-blue-300 bg-blue-50 text-blue-800' },
+                      { type: 'hot_work', label: 'Hot Work Permit', color: 'border-red-300 bg-red-50 text-red-800' },
+                      { type: 'excavation', label: 'Excavation Permit', color: 'border-amber-300 bg-amber-50 text-amber-800' },
+                      { type: 'confined_space', label: 'Confined Space Permit', color: 'border-purple-300 bg-purple-50 text-purple-800' },
+                    ].map(p => {
+                      const isSelected = form.permits.some(fp => fp.type === p.type);
+                      return (
+                        <button
+                          key={p.type}
+                          type="button"
+                          onClick={() => {
+                            const current = [...form.permits];
+                            if (isSelected) {
+                              updateForm({ permits: current.filter(fp => fp.type !== p.type) });
+                            } else {
+                              updateForm({ permits: [...current, { type: p.type, details: '' }] });
+                            }
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                            isSelected
+                              ? `${p.color} ring-2 ring-offset-1 ring-current`
+                              : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                            isSelected ? 'border-current bg-current' : 'border-slate-300'
+                          }`}>
+                            {isSelected && <CheckCircle size={10} className="text-white" />}
+                          </div>
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Other permit - free text */}
+                  <div className="mt-2">
+                    <Label>Other Permit (specify)</Label>
+                    <InputField
+                      placeholder="e.g. Noise permit, Environmental permit..."
+                      value={form.permit_other_text}
+                      onChange={e => {
+                        updateForm({ permit_other_text: e.target.value });
+                        // Add/update "other" permit in array
+                        if (e.target.value.trim()) {
+                          const current = form.permits.filter(p => p.type !== 'other');
+                          updateForm({ permits: [...current, { type: 'other', details: e.target.value.trim() }] });
+                        } else {
+                          updateForm({ permits: form.permits.filter(p => p.type !== 'other') });
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Permit details per selected type */}
+                  {form.permits.filter(p => p.type !== 'other').length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      <p className="text-xs text-slate-400 font-semibold">Permit Details (optional)</p>
+                      {form.permits.filter(p => p.type !== 'other').map(p => (
+                        <InputField
+                          key={p.type}
+                          placeholder={`${p.type.replace(/_/g, ' ')} details (permit #, expiry, etc.)`}
+                          value={p.details}
+                          onChange={e => {
+                            const updated = form.permits.map(fp =>
+                              fp.type === p.type ? { ...fp, details: e.target.value } : fp
+                            );
+                            updateForm({ permits: updated });
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </SectionCard>

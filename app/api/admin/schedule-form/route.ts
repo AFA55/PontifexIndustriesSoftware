@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
 
       // ── Step 2: Customer & Job Location ─────────────────────
       customer_name: body.customer_name.trim(),
+      customer_id: body.customer_id || null,
       customer_contact: body.site_contact || null,
       site_contact_phone: body.contact_phone || null,
       foreman_phone: body.contact_phone || null,  // backward compat
@@ -101,6 +102,8 @@ export async function POST(request: NextRequest) {
 
       // ── Step 6: Site Access & Compliance ─────────────────────
       site_compliance: body.site_compliance || {},
+      permit_required: body.permit_required || false,
+      permits: body.permits || [],
 
       // ── Step 7: Job Difficulty & Notes ──────────────────────
       job_difficulty_rating: body.difficulty_rating || null,
@@ -126,6 +129,56 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Schedule Form job created: ${jobNumber} by ${profile.full_name}`);
+
+    // ── Customer CRM: auto-link or create customer ────────────
+    try {
+      let resolvedCustomerId = body.customer_id || null;
+
+      // If no customer_id provided, try to auto-link by name
+      if (!resolvedCustomerId && body.customer_name?.trim()) {
+        const { data: existingCustomer } = await supabaseAdmin
+          .from('customers')
+          .select('id')
+          .ilike('name', body.customer_name.trim())
+          .limit(1)
+          .single();
+
+        if (existingCustomer) {
+          resolvedCustomerId = existingCustomer.id;
+        }
+      }
+
+      // If save_as_customer flag set and no existing customer, create one
+      if (!resolvedCustomerId && body.save_as_customer && body.customer_name?.trim()) {
+        const { data: newCustomer } = await supabaseAdmin
+          .from('customers')
+          .insert({
+            name: body.customer_name.trim(),
+            display_name: body.customer_name.trim(),
+            primary_contact_name: body.site_contact || null,
+            primary_contact_phone: body.contact_phone || null,
+            address: body.address || null,
+            created_by: user.id,
+          })
+          .select('id')
+          .single();
+
+        if (newCustomer) {
+          resolvedCustomerId = newCustomer.id;
+        }
+      }
+
+      // Link the job to the customer
+      if (resolvedCustomerId && resolvedCustomerId !== jobOrderData.customer_id) {
+        await supabaseAdmin
+          .from('job_orders')
+          .update({ customer_id: resolvedCustomerId })
+          .eq('id', jobOrder.id);
+      }
+    } catch (crmError) {
+      // Non-critical: log but don't fail
+      console.warn('CRM customer linking failed (non-critical):', crmError);
+    }
 
     // ── Smart Learning: Record scope→equipment pairings ────────
     try {
