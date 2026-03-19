@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import {
   X, Calendar, Clock, MapPin, Wrench, Phone, FileText, Edit3, Save, Trash2,
-  AlertTriangle, MessageSquare, ChevronRight, Plus, Users
+  AlertTriangle, MessageSquare, ChevronRight, Plus, Users, Printer, Loader2
 } from 'lucide-react';
 import type { JobCardData } from './JobCard';
 import { EQUIPMENT_ABBREVIATIONS, getDisplayName } from '@/lib/equipment-map';
+import SkillMatchIndicator from './SkillMatchIndicator';
 
 interface EditJobPanelProps {
   job: JobCardData;
@@ -17,6 +18,7 @@ interface EditJobPanelProps {
   currentHelperName: string | null;
   busyOperators: Record<string, string>;
   busyHelpers: Record<string, string>;
+  operatorSkillMap?: Record<string, number | null>;
   onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null }) => void;
   onClose: () => void;
   onViewNotes: () => void;
@@ -27,7 +29,7 @@ interface EditJobPanelProps {
 export default function EditJobPanel({
   job, canEdit, allOperators, allHelpers,
   currentOperatorName, currentHelperName,
-  busyOperators, busyHelpers,
+  busyOperators, busyHelpers, operatorSkillMap,
   onSave, onClose, onViewNotes, onMakeWillCall, onRemoveFromSchedule,
 }: EditJobPanelProps) {
   const [scheduledDate, setScheduledDate] = useState(job.scheduled_date || '');
@@ -38,8 +40,30 @@ export default function EditJobPanel({
   const [selectedOperator, setSelectedOperator] = useState<string>(currentOperatorName || '');
   const [selectedHelper, setSelectedHelper] = useState<string>(currentHelperName || '');
   const [hasChanges, setHasChanges] = useState(false);
+  const [printingPdf, setPrintingPdf] = useState(false);
 
   const markChanged = () => setHasChanges(true);
+
+  const handlePrintDispatch = async () => {
+    setPrintingPdf(true);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/job-orders/${job.id}/dispatch-pdf`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const pdfUrl = URL.createObjectURL(blob);
+        window.open(pdfUrl, '_blank');
+      }
+    } catch (err) {
+      console.error('Error generating dispatch PDF:', err);
+    } finally {
+      setPrintingPdf(false);
+    }
+  };
 
   const addEquipment = (item: string) => {
     const trimmed = item.trim().toUpperCase();
@@ -82,9 +106,19 @@ export default function EditJobPanel({
               </h2>
               <p className="text-sm opacity-80">{job.job_number}</p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
-              <X className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handlePrintDispatch}
+                disabled={printingPdf}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                title="Print Dispatch Ticket"
+              >
+                {printingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <Printer className="w-5 h-5" />}
+              </button>
+              <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -259,12 +293,31 @@ export default function EditJobPanel({
                   className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 bg-white"
                 >
                   <option value="">Unassigned</option>
-                  {allOperators.map(name => (
-                    <option key={name} value={name}>
-                      {name}{busyOperators[name] && name !== currentOperatorName ? ` — On: ${busyOperators[name]}` : ''}
-                    </option>
-                  ))}
+                  {allOperators.map(name => {
+                    const skill = operatorSkillMap?.[name];
+                    const skillLabel = skill !== null && skill !== undefined ? ` [Skill: ${skill}]` : '';
+                    return (
+                      <option key={name} value={name}>
+                        {name}{skillLabel}{busyOperators[name] && name !== currentOperatorName ? ` — On: ${busyOperators[name]}` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
+                {/* Skill match indicator for selected operator */}
+                {selectedOperator && operatorSkillMap && operatorSkillMap[selectedOperator] !== undefined && (
+                  <div className="flex items-center gap-2 mt-1.5 px-2 py-1.5 bg-gray-50 rounded-lg border border-gray-200">
+                    <span className="text-xs text-gray-600">Skill Match:</span>
+                    <SkillMatchIndicator
+                      operatorSkill={operatorSkillMap[selectedOperator] ?? null}
+                      jobDifficulty={job.difficulty_rating}
+                    />
+                    {job.difficulty_rating && (
+                      <span className="text-[10px] text-gray-400 ml-auto">
+                        Operator {operatorSkillMap[selectedOperator] ?? '?'} vs Job {job.difficulty_rating}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {operatorBusy && (
                   <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1.5 bg-amber-50 rounded-lg border border-amber-200">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />

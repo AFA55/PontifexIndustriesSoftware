@@ -30,6 +30,10 @@ import type { PendingJob } from './_components/PendingQueueSidebar';
 import type { ToastData } from './_components/Toast';
 import type { NoteData } from './_components/NotesDrawer';
 import JobPreviewPanel from './_components/JobPreviewPanel';
+import JobDetailView from './_components/JobDetailView';
+import DndBoardWrapper from './_components/DndBoardWrapper';
+import OperatorRowView from './_components/OperatorRowView';
+import ViewToggle from './_components/ViewToggle';
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
@@ -142,9 +146,17 @@ interface RowChangeConflict {
 export default function ScheduleBoardPage() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(toDateString(new Date()));
-  const viewMode = 'day'; // week view removed
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [boardViewMode, setBoardViewMode] = useState<'slots' | 'operators'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('schedule-board-view-mode') as 'slots' | 'operators') || 'slots';
+    }
+    return 'slots';
+  });
+  const [weekData, setWeekData] = useState<Record<string, JobCardData[]>>({});
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('admin');
+  const [operatorSkillMap, setOperatorSkillMap] = useState<Record<string, number | null>>({});
 
   // canEdit is determined by role — only super_admin can edit
   const canEdit = userRole === 'super_admin';
@@ -164,8 +176,8 @@ export default function ScheduleBoardPage() {
   const [helperIdMap, setHelperIdMap] = useState<Record<string, string>>({}); // name → id
 
   // ═══ CAPACITY SETTINGS ═══
-  const [capacityMaxSlots, setCapacityMaxSlots] = useState(10);
-  const [capacityWarningThreshold, setCapacityWarningThreshold] = useState(8);
+  const [capacityMaxSlots, setCapacityMaxSlots] = useState(8);
+  const [capacityWarningThreshold, setCapacityWarningThreshold] = useState(7);
   const [shopNotesEnabled, setShopNotesEnabled] = useState(true);
   const [shopNotesLabel, setShopNotesLabel] = useState('Shop / Notes');
   const [shopNotesText, setShopNotesText] = useState('');
@@ -174,7 +186,7 @@ export default function ScheduleBoardPage() {
 
   // ═══ ROW ASSIGNMENTS — who's in which crew row (driven by capacityMaxSlots) ═══
   const [rowAssignments, setRowAssignments] = useState<{ operator: string | null; helper: string | null }[]>(
-    Array.from({ length: 10 }, () => ({ operator: null, helper: null }))
+    Array.from({ length: 8 }, () => ({ operator: null, helper: null }))
   );
   const NUM_ROWS = capacityMaxSlots;
 
@@ -200,6 +212,7 @@ export default function ScheduleBoardPage() {
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
   const [previewJob, setPreviewJob] = useState<{ job: JobCardData; operatorName?: string | null; helperName?: string | null } | null>(null);
+  const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null } | null>(null);
 
   // ═══ TOAST HELPER ═══
   const addToast = useCallback((type: ToastData['type'], title: string, message?: string) => {
@@ -281,6 +294,169 @@ export default function ScheduleBoardPage() {
     fetchCrew();
   }, []);
 
+  // ═══ FETCH OPERATOR SKILL LEVELS ═══
+  useEffect(() => {
+    async function fetchSkills() {
+      try {
+        const res = await apiFetch('/api/admin/schedule-board/operator-skills');
+        if (res.ok) {
+          const json = await res.json();
+          const map: Record<string, number | null> = {};
+          for (const op of json.data || []) {
+            if (op.full_name) map[op.full_name] = op.skill_level_numeric ?? null;
+          }
+          setOperatorSkillMap(map);
+        }
+      } catch { /* ignore */ }
+    }
+    fetchSkills();
+  }, []);
+
+  // ═══ BOARD VIEW MODE HANDLER ═══
+  const handleBoardViewModeChange = useCallback((mode: 'slots' | 'operators') => {
+    setBoardViewMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('schedule-board-view-mode', mode);
+    }
+  }, []);
+
+  // ═══ DND REORDER HANDLER ═══
+  const handleDndReorder = useCallback(async (
+    jobId: string,
+    targetOperatorId: string | null,
+    _sourceOperatorId: string | null
+  ): Promise<boolean> => {
+    // Find the job in current state
+    let draggedJob: JobCardData | null = null;
+    let sourceRowIndex: number | null = null;
+
+    for (let i = 0; i < NUM_ROWS; i++) {
+      const jobs = operatorJobs[i] || [];
+      const found = jobs.find(j => j.id === jobId);
+      if (found) {
+        draggedJob = found;
+        sourceRowIndex = i;
+        break;
+      }
+    }
+
+    if (!draggedJob) {
+      draggedJob = unassignedJobs.find(j => j.id === jobId) || null;
+      sourceRowIndex = null;
+    }
+
+    if (!draggedJob) {
+      addToast('error', 'Move Failed', 'Could not find job to move');
+      return false;
+    }
+
+    // Find target row by operator ID
+    let targetRowIndex: number | null = null;
+    if (targetOperatorId === 'unassigned' || targetOperatorId === null) {
+      targetRowIndex = null; // Move to unassigned
+    } else {
+      for (let i = 0; i < NUM_ROWS; i++) {
+        const opName = rowAssignments[i]?.operator;
+        if (opName && operatorIdMap[opName] === targetOperatorId) {
+          targetRowIndex = i;
+          break;
+        }
+      }
+      // Also check by row-index format
+      if (targetRowIndex === null && targetOperatorId.startsWith('row-')) {
+        const idx = parseInt(targetOperatorId.replace('row-', ''));
+        if (!isNaN(idx) && idx < NUM_ROWS) targetRowIndex = idx;
+      }
+    }
+
+    // Same location — no change needed
+    if (sourceRowIndex === targetRowIndex) return false;
+
+    // Optimistic update: move in UI immediately
+    // Remove from source
+    if (sourceRowIndex !== null) {
+      setOperatorJobs(prev => ({
+        ...prev,
+        [sourceRowIndex!]: (prev[sourceRowIndex!] || []).filter(j => j.id !== jobId),
+      }));
+    } else {
+      setUnassignedJobs(prev => prev.filter(j => j.id !== jobId));
+    }
+
+    // Add to target
+    if (targetRowIndex !== null) {
+      setOperatorJobs(prev => ({
+        ...prev,
+        [targetRowIndex!]: [...(prev[targetRowIndex!] || []), draggedJob!],
+      }));
+    } else {
+      setUnassignedJobs(prev => [...prev, draggedJob!]);
+    }
+
+    // Call API
+    const targetOp = targetRowIndex !== null ? rowAssignments[targetRowIndex]?.operator : null;
+    const targetOpId = targetOp ? operatorIdMap[targetOp] : null;
+    const targetHelpName = targetRowIndex !== null ? rowAssignments[targetRowIndex]?.helper : null;
+    const targetHelpId = targetHelpName ? operatorIdMap[targetHelpName] : null;
+
+    try {
+      const res = await apiFetch('/api/admin/schedule-board/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          jobId: jobId,
+          newOperatorId: targetOpId || null,
+          newHelperId: targetHelpId || null,
+        }),
+      });
+
+      if (!res.ok) {
+        // Revert optimistic update
+        if (targetRowIndex !== null) {
+          setOperatorJobs(prev => ({
+            ...prev,
+            [targetRowIndex!]: (prev[targetRowIndex!] || []).filter(j => j.id !== jobId),
+          }));
+        } else {
+          setUnassignedJobs(prev => prev.filter(j => j.id !== jobId));
+        }
+        if (sourceRowIndex !== null) {
+          setOperatorJobs(prev => ({
+            ...prev,
+            [sourceRowIndex!]: [...(prev[sourceRowIndex!] || []), draggedJob!],
+          }));
+        } else {
+          setUnassignedJobs(prev => [...prev, draggedJob!]);
+        }
+        addToast('error', 'Move Failed', 'Could not reassign job');
+        return false;
+      }
+
+      const targetName = targetOp || 'Unassigned';
+      addToast('success', 'Job Moved', `${draggedJob.customer_name} → ${targetName}`);
+      return true;
+    } catch {
+      // Revert optimistic: put it back
+      if (targetRowIndex !== null) {
+        setOperatorJobs(prev => ({
+          ...prev,
+          [targetRowIndex!]: (prev[targetRowIndex!] || []).filter(j => j.id !== jobId),
+        }));
+      } else {
+        setUnassignedJobs(prev => prev.filter(j => j.id !== jobId));
+      }
+      if (sourceRowIndex !== null) {
+        setOperatorJobs(prev => ({
+          ...prev,
+          [sourceRowIndex!]: [...(prev[sourceRowIndex!] || []), draggedJob!],
+        }));
+      } else {
+        setUnassignedJobs(prev => [...prev, draggedJob!]);
+      }
+      addToast('error', 'Move Failed', 'An error occurred');
+      return false;
+    }
+  }, [operatorJobs, unassignedJobs, rowAssignments, operatorIdMap, addToast, selectedDate, NUM_ROWS]);
+
   // ═══ FETCH SCHEDULE DATA ═══
   const fetchScheduleData = useCallback(async (date: string) => {
     setLoading(true);
@@ -353,10 +529,57 @@ export default function ScheduleBoardPage() {
     }
   }, [addToast, capacityMaxSlots]);
 
+  // ═══ FETCH WEEK DATA (for weekly view) ═══
+  const fetchWeekData = useCallback(async (startDate: string) => {
+    try {
+      // Calculate Mon-Fri of the week containing startDate
+      const d = parseLocalDate(startDate);
+      const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ...
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      const friday = new Date(monday);
+      friday.setDate(monday.getDate() + 4);
+
+      const monStr = toDateString(monday);
+      const friStr = toDateString(friday);
+
+      const res = await apiFetch(`/api/admin/schedule-board?startDate=${monStr}&endDate=${friStr}`);
+      if (!res.ok) return;
+      const json = await res.json();
+
+      // Group all jobs by date
+      const byDate: Record<string, JobCardData[]> = {};
+      for (let i = 0; i < 5; i++) {
+        const dt = new Date(monday);
+        dt.setDate(monday.getDate() + i);
+        byDate[toDateString(dt)] = [];
+      }
+
+      const allJobs = [...(json.data?.assigned || []), ...(json.data?.unassigned || [])];
+      for (const rawJob of allJobs) {
+        const jobDate = rawJob.scheduled_date;
+        if (byDate[jobDate]) {
+          byDate[jobDate].push(toJobCard(rawJob));
+        } else {
+          // Multi-day job might span the week
+          byDate[jobDate] = [toJobCard(rawJob)];
+        }
+      }
+
+      setWeekData(byDate);
+    } catch (err) {
+      console.error('Failed to fetch week data:', err);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchScheduleData(selectedDate);
-    fetchDispatchStatus(selectedDate);
-  }, [selectedDate, fetchScheduleData, fetchDispatchStatus]);
+    if (viewMode === 'day') {
+      fetchScheduleData(selectedDate);
+      fetchDispatchStatus(selectedDate);
+    } else {
+      fetchWeekData(selectedDate);
+    }
+  }, [selectedDate, viewMode, fetchScheduleData, fetchDispatchStatus, fetchWeekData]);
 
   // ═══ FETCH DAILY NOTES ═══
   useEffect(() => {
@@ -435,6 +658,77 @@ export default function ScheduleBoardPage() {
       }
     } catch {
       addToast('error', 'Save Failed', 'Could not connect to server');
+    }
+  };
+
+  // ═══ DRAG & DROP — Move job between rows ═══
+  const handleDropJob = async (jobDataStr: string, targetRowIndex: number) => {
+    try {
+      const { jobId, sourceRowIndex } = JSON.parse(jobDataStr);
+      if (sourceRowIndex === targetRowIndex) return; // dropped on same row
+
+      // Find the job in current state
+      let draggedJob: JobCardData | null = null;
+
+      // Check if source is an operator row
+      if (sourceRowIndex !== undefined && sourceRowIndex !== null && sourceRowIndex >= 0) {
+        const sourceJobs = operatorJobs[sourceRowIndex] || [];
+        draggedJob = sourceJobs.find(j => j.id === jobId) || null;
+      }
+
+      // Check unassigned jobs if not found
+      if (!draggedJob) {
+        draggedJob = unassignedJobs.find(j => j.id === jobId) || null;
+      }
+
+      if (!draggedJob) {
+        addToast('error', 'Move Failed', 'Could not find job to move');
+        return;
+      }
+
+      // Get target operator ID
+      const targetOperator = rowAssignments[targetRowIndex]?.operator;
+      const targetHelper = rowAssignments[targetRowIndex]?.helper;
+      const targetOperatorId = targetOperator ? operatorIdMap[targetOperator] : null;
+      const targetHelperId = targetHelper ? operatorIdMap[targetHelper] : null;
+
+      // Update backend
+      const res = await apiFetch('/api/admin/schedule-board/assign', {
+        method: 'POST',
+        body: JSON.stringify({
+          jobOrderId: jobId,
+          operatorId: targetOperatorId || null,
+          helperId: targetHelperId || null,
+        }),
+      });
+
+      if (!res.ok) {
+        addToast('error', 'Move Failed', 'Could not reassign job');
+        return;
+      }
+
+      // Update local state — remove from source
+      if (sourceRowIndex !== undefined && sourceRowIndex !== null && sourceRowIndex >= 0) {
+        setOperatorJobs(prev => ({
+          ...prev,
+          [sourceRowIndex]: (prev[sourceRowIndex] || []).filter(j => j.id !== jobId),
+        }));
+      } else {
+        // Remove from unassigned
+        setUnassignedJobs(prev => prev.filter(j => j.id !== jobId));
+      }
+
+      // Add to target row
+      setOperatorJobs(prev => ({
+        ...prev,
+        [targetRowIndex]: [...(prev[targetRowIndex] || []), draggedJob!],
+      }));
+
+      const targetName = targetOperator || `Row ${targetRowIndex + 1}`;
+      addToast('success', 'Job Moved', `${draggedJob.customer_name} → ${targetName}`);
+    } catch (err) {
+      console.error('Drop error:', err);
+      addToast('error', 'Move Failed', 'An error occurred while moving the job');
     }
   };
 
@@ -1196,10 +1490,32 @@ export default function ScheduleBoardPage() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <ScheduleDatePicker value={selectedDate} onChange={setSelectedDate} />
 
-            <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl">
-              <div className="px-4 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg flex items-center gap-2">
-                <LayoutGrid className="w-4 h-4" /> Day View
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setViewMode('day')}
+                  className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
+                    viewMode === 'day'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" /> Day
+                </button>
+                <button
+                  onClick={() => setViewMode('week')}
+                  className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
+                    viewMode === 'week'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <CalendarDays className="w-4 h-4" /> Week
+                </button>
               </div>
+              {viewMode === 'day' && (
+                <ViewToggle viewMode={boardViewMode} onChange={handleBoardViewModeChange} />
+              )}
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -1325,31 +1641,125 @@ export default function ScheduleBoardPage() {
         </div>
       )}
 
+      {/* ═══ WEEKLY VIEW ═══════════════════════════════════════════════════ */}
+      {viewMode === 'week' && (
+        <div className="container mx-auto px-4 md:px-6 pb-6">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="grid grid-cols-5 divide-x divide-gray-200">
+              {Object.entries(weekData).sort(([a], [b]) => a.localeCompare(b)).map(([date, jobs]) => {
+                const d = parseLocalDate(date);
+                const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+                const dayNum = d.getDate();
+                const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+                const isToday = toDateString(new Date()) === date;
+                const isSelected = selectedDate === date;
+                return (
+                  <div key={date} className="min-w-0">
+                    {/* Day header */}
+                    <button
+                      onClick={() => { setSelectedDate(date); setViewMode('day'); }}
+                      className={`w-full px-3 py-2.5 text-center border-b-2 transition-all ${
+                        isToday ? 'bg-purple-50 border-purple-500' :
+                        isSelected ? 'bg-blue-50 border-blue-400' :
+                        'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <p className={`text-xs font-bold uppercase ${isToday ? 'text-purple-600' : 'text-gray-500'}`}>{dayName}</p>
+                      <p className={`text-lg font-bold ${isToday ? 'text-purple-700' : 'text-gray-900'}`}>{monthName} {dayNum}</p>
+                      <p className={`text-[10px] font-semibold ${
+                        jobs.length === 0 ? 'text-green-500' :
+                        jobs.length >= capacityMaxSlots ? 'text-red-500' :
+                        'text-gray-400'
+                      }`}>
+                        {jobs.length} job{jobs.length !== 1 ? 's' : ''}
+                      </p>
+                    </button>
+                    {/* Jobs list */}
+                    <div className="p-2 space-y-1.5 max-h-[60vh] overflow-y-auto">
+                      {jobs.length === 0 ? (
+                        <p className="text-xs text-gray-400 text-center py-6 italic">No jobs</p>
+                      ) : (
+                        jobs.map(job => (
+                          <div
+                            key={job.id}
+                            draggable={canEdit}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/job-card', JSON.stringify({ jobId: job.id, sourceRowIndex: -1 }));
+                              e.dataTransfer.effectAllowed = 'move';
+                            }}
+                            onClick={() => { setSelectedDate(date); setViewMode('day'); }}
+                            className="p-2 rounded-lg border border-gray-200 bg-white hover:shadow-md transition-all cursor-pointer group"
+                          >
+                            <p className="text-xs font-bold text-gray-900 truncate">{job.customer_name}</p>
+                            <p className="text-[10px] text-purple-600 font-semibold truncate">{job.job_type?.split(',')[0]?.trim()}</p>
+                            {job.arrival_time && (
+                              <p className="text-[10px] text-gray-400 mt-0.5">⏰ {job.arrival_time}</p>
+                            )}
+                            <div className="flex flex-wrap gap-0.5 mt-1">
+                              {job.equipment_needed.slice(0, 3).map(eq => (
+                                <span key={eq} className="px-1 py-0.5 bg-indigo-50 rounded text-[8px] text-indigo-600 font-medium">{eq}</span>
+                              ))}
+                              {job.equipment_needed.length > 3 && (
+                                <span className="text-[8px] text-gray-400">+{job.equipment_needed.length - 3}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══ DAY VIEW — OPERATOR ROWS ════════════════════════════════════ */}
+      {viewMode === 'day' && <DndBoardWrapper canDrag={canEdit} onReorder={handleDndReorder}>
       <div className="container mx-auto px-4 md:px-6 pb-6 space-y-4">
-        {Array.from({ length: NUM_ROWS }).map((_, idx) => (
-          <OperatorRow
-            key={idx}
-            rowIndex={idx}
-            operatorName={rowAssignments[idx]?.operator ?? null}
-            helperName={rowAssignments[idx]?.helper ?? null}
-            jobs={operatorJobs[idx] || []}
-            colorScheme={OPERATOR_COLORS[idx % OPERATOR_COLORS.length]}
+        {boardViewMode === 'slots' ? (
+          <>
+            {Array.from({ length: NUM_ROWS }).map((_, idx) => (
+              <OperatorRow
+                key={idx}
+                rowIndex={idx}
+                operatorName={rowAssignments[idx]?.operator ?? null}
+                helperName={rowAssignments[idx]?.helper ?? null}
+                jobs={operatorJobs[idx] || []}
+                colorScheme={OPERATOR_COLORS[idx % OPERATOR_COLORS.length]}
+                canEdit={canEdit}
+                isAvailable={(operatorJobs[idx] || []).length === 0}
+                allOperators={allOperatorsList}
+                allHelpers={allHelpersList}
+                busyOperators={busyOperators}
+                busyHelpers={busyHelpers}
+                onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setChangeRequestTarget(job)}
+                onRequestChange={(job) => setChangeRequestTarget(job)}
+                onViewNotes={(job) => handleViewNotes(job)}
+                onPreviewJob={(job) => setPreviewJob({ job, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
+                onAssignJob={() => handleAssignToAvailableOperator(idx)}
+                onChangeOperator={(name) => handleChangeRowOperator(idx, name)}
+                onChangeHelper={(name) => handleChangeRowHelper(idx, name)}
+                onDropJob={handleDropJob}
+              />
+            ))}
+          </>
+        ) : (
+          <OperatorRowView
+            operatorJobs={operatorJobs}
+            unassignedJobs={unassignedJobs}
+            rowAssignments={rowAssignments}
+            operatorIdMap={operatorIdMap}
+            operatorSkillMap={operatorSkillMap}
+            canDrag={canEdit}
             canEdit={canEdit}
-            isAvailable={(operatorJobs[idx] || []).length === 0}
-            allOperators={allOperatorsList}
-            allHelpers={allHelpersList}
-            busyOperators={busyOperators}
-            busyHelpers={busyHelpers}
-            onEditJob={(job) => canEdit ? setEditTarget({ job, rowIndex: idx }) : setChangeRequestTarget(job)}
+            onEditJob={(job, rowIndex) => canEdit ? setEditTarget({ job, rowIndex }) : setChangeRequestTarget(job)}
             onRequestChange={(job) => setChangeRequestTarget(job)}
             onViewNotes={(job) => handleViewNotes(job)}
-            onPreviewJob={(job) => setPreviewJob({ job, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
-            onAssignJob={() => handleAssignToAvailableOperator(idx)}
-            onChangeOperator={(name) => handleChangeRowOperator(idx, name)}
-            onChangeHelper={(name) => handleChangeRowHelper(idx, name)}
+            onPreviewJob={(job) => setPreviewJob({ job })}
           />
-        ))}
+        )}
 
         {/* ═══ SHOP / NOTES ROW ══════════════════════════════════════ */}
         {shopNotesEnabled && (
@@ -1372,7 +1782,7 @@ export default function ScheduleBoardPage() {
         )}
 
         {/* ═══ UNASSIGNED SECTION ═══════════════════════════════════════ */}
-        {unassignedJobs.length > 0 && (
+        {boardViewMode === 'slots' && unassignedJobs.length > 0 && (
           <div className="bg-white rounded-2xl shadow-lg border-2 border-dashed border-orange-300 overflow-hidden">
             <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-5 py-3">
               <div className="flex items-center justify-between">
@@ -1387,7 +1797,18 @@ export default function ScheduleBoardPage() {
             <div className="p-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {unassignedJobs.map((job) => (
-                  <div key={job.id} className="rounded-xl border-2 border-orange-200 bg-orange-50/50 p-4 hover:shadow-md transition-all">
+                  <div
+                    key={job.id}
+                    draggable={canEdit}
+                    onDragStart={(e) => {
+                      if (!canEdit) return;
+                      e.dataTransfer.setData('application/job-card', JSON.stringify({ jobId: job.id, sourceRowIndex: -1 }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      (e.currentTarget as HTMLElement).style.opacity = '0.5';
+                    }}
+                    onDragEnd={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                    className={`rounded-xl border-2 border-orange-200 bg-orange-50/50 p-4 hover:shadow-md transition-all ${canEdit ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                  >
                     <h4 className="font-bold text-gray-900 text-sm mb-1">{job.customer_name}</h4>
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mb-2">{job.job_type?.split(',')[0]?.trim()}</span>
                     <p className="text-xs text-gray-500 flex items-center gap-1 mb-2"><MapPin className="w-3 h-3 text-gray-400" /> {job.location}</p>
@@ -1422,6 +1843,7 @@ export default function ScheduleBoardPage() {
           onDeleteNote={handleDeleteDailyNote}
         />
       </div>
+      </DndBoardWrapper>}
 
       {/* ═══ PENDING QUEUE SIDEBAR ══════════════════════════════════════ */}
       <PendingQueueSidebar
@@ -1456,6 +1878,7 @@ export default function ScheduleBoardPage() {
           currentHelperName={editTarget.rowIndex !== null ? rowAssignments[editTarget.rowIndex]?.helper ?? null : null}
           busyOperators={busyOperators}
           busyHelpers={busyHelpers}
+          operatorSkillMap={operatorSkillMap}
           onSave={handleEditSave}
           onClose={() => setEditTarget(null)}
           onViewNotes={() => { setEditTarget(null); handleViewNotes(editTarget.job); }}
@@ -1496,6 +1919,22 @@ export default function ScheduleBoardPage() {
           operatorName={previewJob.operatorName}
           helperName={previewJob.helperName}
           onClose={() => setPreviewJob(null)}
+        />
+      )}
+
+      {/* ═══ JOB DETAIL VIEW (full-page overlay) ═══════════════════════ */}
+      {jobDetailTarget && (
+        <JobDetailView
+          job={jobDetailTarget.job}
+          operatorName={jobDetailTarget.operatorName}
+          helperName={jobDetailTarget.helperName}
+          rowIndex={jobDetailTarget.rowIndex}
+          onClose={() => setJobDetailTarget(null)}
+          onEdit={() => {
+            const target = jobDetailTarget;
+            setJobDetailTarget(null);
+            setEditTarget({ job: target.job, rowIndex: target.rowIndex });
+          }}
         />
       )}
 

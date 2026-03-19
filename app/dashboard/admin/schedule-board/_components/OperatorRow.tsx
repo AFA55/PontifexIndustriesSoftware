@@ -30,6 +30,7 @@ interface OperatorRowProps {
   onAssignJob?: () => void;
   onChangeOperator?: (name: string | null) => void;
   onChangeHelper?: (name: string | null) => void;
+  onDropJob?: (jobData: string, targetRowIndex: number) => void;
 }
 
 // ── Inline dropdown for picking operator or helper ──────────────────────
@@ -130,11 +131,39 @@ export default function OperatorRow({
   onAssignJob,
   onChangeOperator,
   onChangeHelper,
+  onDropJob,
 }: OperatorRowProps) {
   const hasJobs = jobs.length > 0;
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!canEdit) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => setDragOver(false);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (!canEdit) return;
+    const jobData = e.dataTransfer.getData('application/job-card');
+    if (jobData && onDropJob) {
+      onDropJob(jobData, rowIndex);
+    }
+  };
 
   return (
-    <div className={`border-l-4 ${colorScheme.border} bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow`}>
+    <div
+      className={`border-l-4 ${colorScheme.border} bg-white rounded-xl shadow-sm hover:shadow-md transition-all ${
+        dragOver ? 'ring-2 ring-purple-400 ring-offset-2 shadow-lg scale-[1.01] bg-purple-50/30' : ''
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="p-4">
         {/* Row header */}
         <div className="flex items-center justify-between mb-3">
@@ -201,8 +230,18 @@ export default function OperatorRow({
             {jobs.map((job) => (
               <div
                 key={job.id}
+                draggable={canEdit}
+                onDragStart={(e) => {
+                  if (!canEdit) return;
+                  e.dataTransfer.setData('application/job-card', JSON.stringify({ jobId: job.id, sourceRowIndex: rowIndex }));
+                  e.dataTransfer.effectAllowed = 'move';
+                  (e.currentTarget as HTMLElement).style.opacity = '0.5';
+                }}
+                onDragEnd={(e) => {
+                  (e.currentTarget as HTMLElement).style.opacity = '1';
+                }}
                 onClick={() => onPreviewJob?.(job)}
-                className={onPreviewJob ? 'cursor-pointer' : ''}
+                className={`${onPreviewJob ? 'cursor-pointer' : ''} ${canEdit ? 'cursor-grab active:cursor-grabbing' : ''}`}
               >
                 <JobCard
                   job={job}
@@ -218,17 +257,28 @@ export default function OperatorRow({
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center py-3 bg-green-50/50 rounded-lg border-2 border-dashed border-green-200">
-            <p className="text-sm text-green-500 font-medium flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-400 rounded-full" />
-              Available
-              {canEdit && (
-                <button
-                  onClick={onAssignJob}
-                  className="ml-1 text-purple-600 hover:text-purple-800 font-semibold hover:underline"
-                >
-                  + Assign
-                </button>
+          <div className={`flex items-center justify-center py-3 rounded-lg border-2 border-dashed transition-all ${
+            dragOver ? 'bg-purple-50 border-purple-400' : 'bg-green-50/50 border-green-200'
+          }`}>
+            <p className={`text-sm font-medium flex items-center gap-2 ${dragOver ? 'text-purple-600' : 'text-green-500'}`}>
+              {dragOver ? (
+                <>
+                  <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+                  Drop here to assign
+                </>
+              ) : (
+                <>
+                  <span className="w-2 h-2 bg-green-400 rounded-full" />
+                  Available
+                  {canEdit && (
+                    <button
+                      onClick={onAssignJob}
+                      className="ml-1 text-purple-600 hover:text-purple-800 font-semibold hover:underline"
+                    >
+                      + Assign
+                    </button>
+                  )}
+                </>
               )}
             </p>
           </div>

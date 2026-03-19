@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ChevronLeft, Settings, Calendar, Save, Loader2,
   LayoutGrid, StickyNote, AlertTriangle, CheckCircle,
-  Hash, Bell, Minus, Plus
+  Hash, Bell, Minus, Plus, Users
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 
@@ -29,6 +29,11 @@ export default function SettingsPage() {
     shop_notes_enabled: true,
     shop_notes_label: 'Shop / Notes',
   });
+  const [operators, setOperators] = useState<{ id: string; full_name: string; skill_level_numeric: number | null }[]>([]);
+  const [skillChanges, setSkillChanges] = useState<Record<string, number | null>>({});
+  const [savingSkills, setSavingSkills] = useState(false);
+  const [skillsSaved, setSkillsSaved] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Auth guard — super_admin only
   useEffect(() => {
@@ -38,6 +43,7 @@ export default function SettingsPage() {
       router.push('/dashboard');
       return;
     }
+    setIsSuperAdmin(user.role === 'super_admin');
   }, [router]);
 
   // Fetch current settings
@@ -69,6 +75,66 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  // Fetch operator skill levels
+  useEffect(() => {
+    async function fetchOperatorSkills() {
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data: session } = await supabase.auth.getSession();
+        const token = session.session?.access_token || '';
+
+        const res = await fetch('/api/admin/schedule-board/operator-skills', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setOperators(json.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch operator skills:', err);
+      }
+    }
+    fetchOperatorSkills();
+  }, []);
+
+  // Save operator skill levels
+  const handleSaveSkills = async () => {
+    setSavingSkills(true);
+    setSkillsSaved(false);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token || '';
+
+      const changedEntries = Object.entries(skillChanges);
+      for (const [operatorId, skillLevel] of changedEntries) {
+        await fetch('/api/admin/schedule-board/operator-skills', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ operator_id: operatorId, skill_level: skillLevel }),
+        });
+      }
+
+      // Update local state
+      setOperators(prev => prev.map(op => {
+        if (skillChanges[op.id] !== undefined) {
+          return { ...op, skill_level_numeric: skillChanges[op.id] };
+        }
+        return op;
+      }));
+      setSkillChanges({});
+      setSkillsSaved(true);
+      setTimeout(() => setSkillsSaved(false), 3000);
+    } catch {
+      setError('Failed to save operator skill levels');
+    } finally {
+      setSavingSkills(false);
+    }
+  };
 
   // Save settings
   const handleSave = async () => {
@@ -398,6 +464,94 @@ export default function SettingsPage() {
               </Link>
             </div>
           </div>
+
+          {/* ══════════════════════════════════════════════
+              OPERATOR SKILL LEVELS (super_admin only)
+             ══════════════════════════════════════════════ */}
+          {isSuperAdmin && (
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-4 text-white">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Operator Skill Levels
+                </h2>
+                <p className="text-emerald-100 text-sm mt-0.5">Set skill levels (1-10) to match operators with job difficulty ratings</p>
+              </div>
+              <div className="p-6">
+                {operators.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">No operators found</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-[1fr_auto] gap-3 items-center px-3 pb-2 border-b border-gray-200">
+                      <span className="text-xs font-bold text-gray-500 uppercase">Operator</span>
+                      <span className="text-xs font-bold text-gray-500 uppercase w-24 text-center">Skill Level</span>
+                    </div>
+                    {operators.map((op) => {
+                      const currentSkill = skillChanges[op.id] !== undefined ? skillChanges[op.id] : op.skill_level_numeric;
+                      return (
+                        <div key={op.id} className="grid grid-cols-[1fr_auto] gap-3 items-center px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                          <div>
+                            <span className="text-sm font-semibold text-gray-900">{op.full_name}</span>
+                            {currentSkill !== null && currentSkill !== undefined && (
+                              <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                currentSkill >= 7
+                                  ? 'bg-green-100 text-green-700'
+                                  : currentSkill >= 4
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-red-100 text-red-700'
+                              }`}>
+                                {currentSkill >= 7 ? 'Expert' : currentSkill >= 4 ? 'Intermediate' : 'Beginner'}
+                              </span>
+                            )}
+                          </div>
+                          <select
+                            value={currentSkill ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseInt(e.target.value);
+                              setSkillChanges(prev => ({ ...prev, [op.id]: val }));
+                            }}
+                            className="w-24 px-3 py-2 border border-gray-300 rounded-xl text-sm text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                          >
+                            <option value="">--</option>
+                            {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {Object.keys(skillChanges).length > 0 && (
+                  <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500">{Object.keys(skillChanges).length} change(s) pending</p>
+                    <button
+                      onClick={handleSaveSkills}
+                      disabled={savingSkills}
+                      className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {savingSkills ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      {savingSkills ? 'Saving...' : 'Save Skill Levels'}
+                    </button>
+                  </div>
+                )}
+
+                {skillsSaved && (
+                  <div className="mt-3 flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-semibold">
+                    <CheckCircle className="w-4 h-4" />
+                    Operator skill levels saved successfully!
+                  </div>
+                )}
+
+                <div className="mt-4 bg-emerald-50 rounded-xl p-3 border border-emerald-200">
+                  <p className="text-xs text-emerald-700">
+                    <strong>How it works:</strong> Each job has a difficulty rating (1-10). When assigning operators, the schedule board will show match quality indicators — green for good matches, yellow for stretch assignments, and red when an operator is under-skilled for the job.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ══════════════════════════════════════════════
               QUICK REFERENCE
