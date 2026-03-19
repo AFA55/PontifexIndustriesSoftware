@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
-  ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2
+  ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
@@ -243,6 +243,30 @@ export default function JobDetailPage() {
                 Team Member
               </span>
             )}
+            {/* Print Dispatch Ticket */}
+            <button
+              onClick={async () => {
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) return;
+                  const url = `/api/job-orders/${jobId}/dispatch-pdf`;
+                  const res = await fetch(url, {
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                  });
+                  if (res.ok) {
+                    const blob = await res.blob();
+                    const pdfUrl = URL.createObjectURL(blob);
+                    window.open(pdfUrl, '_blank');
+                  }
+                } catch (err) {
+                  console.error('Error generating PDF:', err);
+                }
+              }}
+              className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all flex-shrink-0"
+              title="Print Dispatch Ticket"
+            >
+              <Printer className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>

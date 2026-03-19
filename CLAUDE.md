@@ -10,6 +10,20 @@ Next.js 15 (App Router) + React 19 + TypeScript + Supabase (PostgreSQL) + Tailwi
 - Run `npm run build` after significant changes to verify no errors
 - Commit work in logical chunks with descriptive messages
 - Push to feature branch when commits are ready
+- When starting a new session, read CLAUDE_HANDOFF.md first to resume context
+- At the END of every session, update CLAUDE_HANDOFF.md with what was done and what's next
+
+## Session Workflow
+1. **Start of session:** Read CLAUDE_HANDOFF.md → pick up where last session left off
+2. **During session:** Work through sprint backlog top-to-bottom unless user reprioritizes
+3. **After each feature:** Run `npm run build` to verify, commit with descriptive message
+4. **End of session:** Update CLAUDE_HANDOFF.md + push to branch
+5. **If user says "pick up next task":** Read the sprint backlog and start the next unchecked item
+
+## Parallel Work
+- User can request multiple features built simultaneously using parallel agents
+- Each agent works in an isolated worktree to avoid conflicts
+- Batch by layer when possible: all backend API routes → all UI pages → all migrations
 
 ## Key Conventions
 - API routes use `requireAuth()`, `requireAdmin()`, `requireSuperAdmin()`, or `requireScheduleBoardAccess()` from `lib/api-auth.ts`
@@ -44,4 +58,29 @@ npm run build      # Production build check (must pass with 0 errors)
 ## Context Files
 - `CLAUDE_CONTEXT.md` — Full project architecture reference
 - `CLAUDE_SESSION_CONTEXT.md` — Detailed schema, patterns, business rules
-- `CLAUDE_HANDOFF.md` — Latest session handoff with pending work
+- `CLAUDE_HANDOFF.md` — Latest session handoff with pending work (ALWAYS update at end of session)
+
+---
+
+## Sprint Backlog (Target: April 2, 2026)
+
+### Week 1 — Core Feature Completion (March 19–25)
+- [ ] Finish dispatch ticket PDF generation (in progress — component + API route exist)
+- [ ] Apply permit fields migration to Supabase
+- [ ] Customer signature capture in job completion flow
+- [ ] Photo upload during job execution (Supabase Storage buckets exist)
+- [ ] PDF invoice generation (using @react-pdf/renderer — already in deps)
+- [ ] QuickBooks CSV export from billing page
+
+### Week 2 — Polish, Rebrand & Launch Prep (March 26 – April 2)
+- [ ] White-label rebrand: Pontifex → Patriot Concrete Cutting (logos, names, colors)
+- [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
+- [ ] Mobile responsive audit on all operator pages
+- [ ] Loading states & error handling audit across all pages
+- [ ] Production deployment prep (env vars, custom domain, SSL)
+- [ ] Final build verification & merge to main
+
+### Ongoing / As-Needed
+- [ ] Add audit logging to remaining admin API routes
+- [ ] Schedule board performance optimization
+- [ ] Notification system polish (SMS/email for job assignments)
