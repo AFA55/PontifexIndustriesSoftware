@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 19, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING
+**Date:** March 19, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING (161 pages, 0 errors)
 
 ---
 
@@ -7,87 +7,69 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2` (up to date with `origin/feature/schedule-board-v2`)
-- **Last pushed commit:** `58204eb0` — "feat: Team member dashboard with smart job transitions + shop tickets"
-- **Uncommitted work:** 7 modified files + 3 new files/dirs (see below)
+- **Last pushed commit:** `2a72b9fd` — "fix: 3 critical bugs found during testing"
+- **Clean working tree** (all changes committed and pushed)
 
-### Uncommitted Changes (Work in Progress)
-**Modified:**
-- `app/api/admin/schedule-form/route.ts` — permit fields added to schedule form API
-- `app/dashboard/admin/schedule-board/_components/EditJobPanel.tsx` — permit fields in edit panel
-- `app/dashboard/admin/schedule-board/_components/OperatorRow.tsx` — UI updates
-- `app/dashboard/admin/schedule-board/page.tsx` — dispatch PDF integration + board enhancements
-- `app/dashboard/admin/schedule-form/page.tsx` — permit fields in form wizard
-- `app/dashboard/my-jobs/[id]/page.tsx` — operator job detail updates
-- `tsconfig.tsbuildinfo` — build artifact
-
-**New (untracked):**
-- `app/api/job-orders/[id]/dispatch-pdf/` — API route for generating dispatch ticket PDFs
-- `components/pdf/DispatchTicketPDF.tsx` — React PDF component for dispatch tickets
-- `supabase/migrations/20260318_add_permit_fields_to_job_orders.sql` — adds permit_number, permit_required, permit_status columns
-
-### Unapplied Migration
-- `20260318_add_permit_fields_to_job_orders.sql` — needs to be applied to Supabase
+### Recent Commits (this session)
+```
+2a72b9fd fix: 3 critical bugs found during testing
+c20ea7df chore: Update context files, apply permit migration, misc updates
+f83b4c15 feat: Customer CRM system with profiles, contacts, and schedule form integration
+ab330d34 feat: Drag-and-drop schedule board with operator view + smart skill matching
+c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
+```
 
 ---
 
-## WHAT WAS BUILT RECENTLY (Last 5 Sessions)
+## WHAT WAS BUILT THIS SESSION
 
-1. **Team member dashboard** with smart job transitions + shop tickets
-2. **Multi-day job workflow** — 7 critical bug fixes
-3. **Timecard admin/operator** type safety improvements
-4. **NFC clock-in system** with remote selfie fallback
-5. **Admin settings page** + NFC tag management
-6. **Billing & Invoicing system** — full pipeline from completed jobs to invoices
-7. **Active Jobs admin view** — multi-day progress tracking
-8. **Dispatch ticket PDF** (in progress) — component + API route exist, needs finishing
-9. **Permit fields** — migration written, form/board UI started
+### Feature 1: Dispatch Ticket PDF + Job Detail View
+- **JobDetailView** — Full-page overlay with gradient header, collapsible sections
+- **DispatchTicketPDF** — Landscape 3-column layout, scope table, notes, signature
+- **API** — `GET /api/job-orders/[id]/full-detail`
+- Clicking jobs on schedule board opens detail view
 
----
+### Feature 2: Drag & Drop Schedule Board + Smart Scheduling
+- **Two layouts**: Slot View + Operator Row View (ViewToggle)
+- **@dnd-kit** drag-and-drop (super_admin only)
+- **6 components**: DndBoardWrapper, DraggableJobCard, DroppableOperatorRow, OperatorRowView, ViewToggle, SkillMatchIndicator
+- **Skill matching**: operator levels 1-10, green/yellow/red indicators
+- **Settings**: Operator Skills management section
+- **APIs**: operator-skills, skill-match, reorder
 
-## WHAT TO DO NEXT (Sprint Backlog — see CLAUDE.md for full list)
+### Feature 3: Customer CRM System
+- **Tables**: customers, customer_contacts (with backfill of 8 existing)
+- **Pages**: Customer Profiles list, Customer Detail with contacts/jobs/revenue
+- **Schedule form integration**: CustomerAutocomplete, auto-fill
+- **RBAC**: Customer Profiles card added
 
-### Immediate (finish in-progress work)
-1. **Apply permit fields migration** to Supabase
-2. **Finish dispatch ticket PDF** — verify component renders, API returns PDF, test download from board
-3. **Commit + push** all uncommitted work
-
-### Then continue sprint backlog:
-4. Customer signature capture in completion flow
-5. Photo upload during job execution
-6. PDF invoice generation
-7. QuickBooks CSV export
-8. White-label rebrand (Pontifex → Patriot)
-9. E2E testing
-10. Production deployment prep
+### Bug Fixes
+1. Unassigned job cards: added click-to-detail handler
+2. CRM auth: fixed 401s using supabase.auth.getSession()
+3. Scope of Work: formatted holes array properly
 
 ---
 
-## KEY ARCHITECTURE REFERENCE
+## WHAT TO DO NEXT
 
-### Tech Stack
-- Next.js 15 (App Router) + React 19 + TypeScript
-- Supabase (PostgreSQL) — project `klatddoyncxidgqtcjnu`
-- Tailwind CSS (purple/dark theme)
-- @react-pdf/renderer for PDF generation
+### Week 1 Remaining
+- [ ] Customer signature capture in completion flow
+- [ ] Photo upload during job execution
+- [ ] PDF invoice generation
+- [ ] QuickBooks CSV export
 
-### Auth Pattern
-- Server: `requireAuth()`, `requireAdmin()`, `requireSuperAdmin()`, `requireScheduleBoardAccess()` from `lib/api-auth.ts`
-- Client: `getCurrentUser()` from `lib/auth.ts` + role array check in useEffect
-- Admin client (`lib/supabase-admin.ts`) bypasses RLS for server-side ops
+### Week 2 — Polish & Launch
+- [ ] White-label rebrand (Pontifex → Patriot)
+- [ ] E2E workflow testing
+- [ ] Mobile responsive audit
+- [ ] Loading states & error handling
+- [ ] Production deployment prep
+- [ ] Merge to main
 
-### Roles
-super_admin > operations_manager > admin > salesman > shop_manager > inventory_manager > operator > apprentice
+---
 
-### Key Workflows
-- **Scheduling:** Admin creates job via schedule form → appears on schedule board → assign operator/helper
-- **Operator flow:** my-jobs → jobsite → work-performed → day-complete → (done for today | complete)
-- **Billing:** Completed job → create invoice (draft) → sent → paid
-- **Multi-day:** Jobs span start_date → end_date, daily_job_logs track day_number via DB trigger
-
-### File Organization
-- `app/api/` — API routes (Next.js Route Handlers)
-- `app/dashboard/admin/` — Admin pages (schedule board, billing, analytics, etc.)
-- `app/dashboard/my-jobs/` — Operator pages
-- `components/` — Shared components (PDF templates, UI elements)
-- `lib/` — Utilities (auth, supabase clients, audit logging, RBAC)
-- `supabase/migrations/` — 60+ SQL migrations
+## KEY PATTERNS
+- **Token retrieval**: Always `supabase.auth.getSession()` — NOT localStorage
+- **API auth**: requireAdmin/requireSuperAdmin from lib/api-auth.ts
+- **Client guard**: getCurrentUser() + role array in useEffect
+- **Theme**: Purple/dark, lucide-react icons, Tailwind
