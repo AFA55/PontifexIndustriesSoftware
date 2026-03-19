@@ -1807,7 +1807,8 @@ export default function ScheduleBoardPage() {
                       (e.currentTarget as HTMLElement).style.opacity = '0.5';
                     }}
                     onDragEnd={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-                    className={`rounded-xl border-2 border-orange-200 bg-orange-50/50 p-4 hover:shadow-md transition-all ${canEdit ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                    onClick={() => setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null })}
+                    className={`rounded-xl border-2 border-orange-200 bg-orange-50/50 p-4 hover:shadow-md transition-all cursor-pointer ${canEdit ? 'active:cursor-grabbing' : ''}`}
                   >
                     <h4 className="font-bold text-gray-900 text-sm mb-1">{job.customer_name}</h4>
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mb-2">{job.job_type?.split(',')[0]?.trim()}</span>
@@ -1821,7 +1822,7 @@ export default function ScheduleBoardPage() {
                     )}
                     {canEdit && (
                       <button
-                        onClick={() => setAssignTarget({ job, source: 'unassigned' })}
+                        onClick={(e) => { e.stopPropagation(); setAssignTarget({ job, source: 'unassigned' }); }}
                         className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md"
                       >
                         <Users className="w-3.5 h-3.5 inline mr-1.5" /> Assign Operator

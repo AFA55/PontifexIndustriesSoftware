@@ -7,6 +7,7 @@ import {
   ChevronLeft, Building2, Plus, Search, Loader2
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import CustomerCard from './_components/CustomerCard';
 import CustomerForm from './_components/CustomerForm';
 
@@ -20,9 +21,13 @@ interface Customer {
   total_revenue: number;
 }
 
+async function getToken() {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || '';
+}
+
 async function apiFetch(url: string, opts?: RequestInit) {
-  const stored = typeof window !== 'undefined' ? localStorage.getItem('supabase-user') : null;
-  const token = stored ? JSON.parse(stored).session?.access_token : null;
+  const token = await getToken();
   return fetch(url, {
     ...opts,
     headers: {

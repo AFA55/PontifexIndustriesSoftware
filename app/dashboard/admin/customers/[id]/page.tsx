@@ -8,6 +8,7 @@ import {
   DollarSign, Briefcase, Loader2, User, FileText, Save, Star, Shield
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import CustomerForm from '../_components/CustomerForm';
 import ContactForm from '../_components/ContactForm';
 
@@ -85,9 +86,13 @@ const ROLE_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
+async function getToken() {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || '';
+}
+
 async function apiFetch(url: string, opts?: RequestInit) {
-  const stored = typeof window !== 'undefined' ? localStorage.getItem('supabase-user') : null;
-  const token = stored ? JSON.parse(stored).session?.access_token : null;
+  const token = await getToken();
   return fetch(url, {
     ...opts,
     headers: {

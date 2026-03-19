@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Building2, Search, Plus, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface CustomerResult {
   id: string;
@@ -35,9 +36,9 @@ export function CustomerAutocomplete({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  const getToken = () => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('supabase-user') : null;
-    return stored ? JSON.parse(stored).session?.access_token : null;
+  const getToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || null;
   };
 
   const searchCustomers = useCallback(async (query: string) => {
@@ -49,7 +50,7 @@ export function CustomerAutocomplete({
 
     setLoading(true);
     try {
-      const token = getToken();
+      const token = await getToken();
       const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(query.trim())}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

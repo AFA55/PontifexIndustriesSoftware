@@ -356,16 +356,33 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                           </tr>
                         </thead>
                         <tbody>
-                          {Object.entries(d.scope_details).map(([key, val], i) => (
-                            <tr key={key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                              <td className="px-3 py-2 text-gray-700 font-medium">{key.replace(/_/g, ' ')}</td>
-                              <td className="px-3 py-2 text-gray-900">
-                                {typeof val === 'object' && val !== null
-                                  ? Object.entries(val as Record<string, unknown>).map(([k, v]) => `${k}: ${v}`).join(', ')
-                                  : String(val)}
-                              </td>
-                            </tr>
-                          ))}
+                          {Object.entries(d.scope_details).map(([key, val], i) => {
+                            // Format scope detail values
+                            const formatScopeValue = (v: unknown): string => {
+                              if (Array.isArray(v)) {
+                                // holes array: [{qty, bit_size, depth}]
+                                return v.map((item: Record<string, unknown>) => {
+                                  if (item.qty && item.bit_size && item.depth) {
+                                    return `${item.qty}x ${item.bit_size}" @ ${item.depth}" deep`;
+                                  }
+                                  return Object.entries(item).map(([k2, v2]) => `${k2.replace(/_/g, ' ')}: ${v2}`).join(', ');
+                                }).join(' | ');
+                              }
+                              if (typeof v === 'object' && v !== null) {
+                                return Object.entries(v as Record<string, unknown>)
+                                  .filter(([, v2]) => v2 !== null && v2 !== undefined && v2 !== '' && v2 !== false)
+                                  .map(([k2, v2]) => `${k2.replace(/_/g, ' ')}: ${v2}`)
+                                  .join(', ');
+                              }
+                              return String(v ?? '--');
+                            };
+                            return (
+                              <tr key={key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                                <td className="px-3 py-2 text-gray-700 font-medium capitalize">{key.replace(/_/g, ' ')}</td>
+                                <td className="px-3 py-2 text-gray-900">{formatScopeValue(val)}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
