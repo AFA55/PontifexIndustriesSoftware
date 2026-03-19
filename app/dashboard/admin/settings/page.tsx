@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ChevronLeft, Settings, Calendar, Save, Loader2,
   LayoutGrid, StickyNote, AlertTriangle, CheckCircle,
-  Hash, Bell, Minus, Plus, Users
+  Hash, Bell, Minus, Plus, Users, Palette, ChevronRight
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 
@@ -250,6 +250,27 @@ export default function SettingsPage() {
         )}
 
         <div className="space-y-6">
+          {/* ══════════════════════════════════════════════
+              COMPANY BRANDING (super_admin only)
+             ══════════════════════════════════════════════ */}
+          {isSuperAdmin && (
+            <Link
+              href="/dashboard/admin/settings/branding"
+              className="block bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden hover:shadow-2xl transition-all hover:scale-[1.01]"
+            >
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    <Palette className="w-5 h-5" />
+                    Company Branding
+                  </h2>
+                  <p className="text-purple-200 text-sm mt-0.5">Customize your company name, logo, colors, and feature modules</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-white/70" />
+              </div>
+            </Link>
+          )}
+
           {/* ══════════════════════════════════════════════
               SCHEDULE BOARD CONFIGURATION
              ══════════════════════════════════════════════ */}
