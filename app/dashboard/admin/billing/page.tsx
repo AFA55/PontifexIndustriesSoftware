@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import CreateInvoiceForm from './_components/CreateInvoiceForm';
 import {
   ArrowLeft,
   RefreshCw,
@@ -23,6 +24,7 @@ import {
   Eye,
   Receipt,
   X,
+  Printer,
 } from 'lucide-react';
 
 interface Invoice {
@@ -64,6 +66,8 @@ export default function BillingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [creating, setCreating] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -190,6 +194,60 @@ export default function BillingPage() {
     }
   };
 
+  const downloadPdf = async (invoiceId: string, invoiceNumber: string) => {
+    setDownloadingPdf(invoiceId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/admin/invoices/${invoiceId}/pdf`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${invoiceNumber}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        alert('Failed to generate PDF');
+      }
+    } catch (err) {
+      console.error('Error downloading PDF:', err);
+    } finally {
+      setDownloadingPdf(null);
+    }
+  };
+
+  const printPdf = async (invoiceId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/admin/invoices/${invoiceId}/pdf`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const printWindow = window.open(url, '_blank');
+        if (printWindow) {
+          printWindow.addEventListener('load', () => {
+            printWindow.print();
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error printing PDF:', err);
+    }
+  };
+
   const filteredInvoices = invoices.filter(inv => {
     if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
     if (searchQuery) {
@@ -234,13 +292,22 @@ export default function BillingPage() {
                 <p className="text-sm text-gray-500">Create and manage job invoices</p>
               </div>
             </div>
-            <button
-              onClick={fetchData}
-              disabled={loading}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-purple-500/25"
+              >
+                <Plus className="w-4 h-4" />
+                Create Invoice
+              </button>
+              <button
+                onClick={fetchData}
+                disabled={loading}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -344,7 +411,14 @@ export default function BillingPage() {
                   <FileText className="text-slate-300" size={28} />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">No invoices yet</h3>
-                <p className="text-gray-600">Create invoices from completed jobs</p>
+                <p className="text-gray-600 mb-4">Create invoices from completed jobs or start a new one</p>
+                <button
+                  onClick={() => setShowCreateForm(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-purple-500/25"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create Invoice
+                </button>
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -353,14 +427,16 @@ export default function BillingPage() {
                   const StatusIcon = cfg.icon;
 
                   return (
-                    <button
+                    <div
                       key={inv.id}
-                      onClick={() => viewInvoice(inv.id)}
-                      className={`w-full p-4 hover:bg-slate-50 transition-colors text-left flex items-center justify-between ${
+                      className={`p-4 hover:bg-slate-50 transition-colors flex items-center justify-between ${
                         idx < filteredInvoices.length - 1 ? 'border-b border-slate-100' : ''
                       }`}
                     >
-                      <div className="flex-1 min-w-0">
+                      <button
+                        onClick={() => viewInvoice(inv.id)}
+                        className="flex-1 min-w-0 text-left"
+                      >
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-bold text-gray-900">{inv.invoice_number}</span>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.bg} ${cfg.color}`}>
@@ -372,9 +448,9 @@ export default function BillingPage() {
                         <p className="text-xs text-gray-400">
                           {inv.invoice_date} {inv.po_number ? `| PO: ${inv.po_number}` : ''}
                         </p>
-                      </div>
-                      <div className="text-right ml-4 flex items-center gap-3">
-                        <div>
+                      </button>
+                      <div className="flex items-center gap-3 ml-4">
+                        <div className="text-right">
                           <p className="text-lg font-bold text-gray-900">
                             ${Number(inv.total_amount).toLocaleString()}
                           </p>
@@ -384,9 +460,41 @@ export default function BillingPage() {
                             </p>
                           )}
                         </div>
-                        <ChevronRight className="w-4 h-4 text-gray-300" />
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadPdf(inv.id, inv.invoice_number);
+                            }}
+                            disabled={downloadingPdf === inv.id}
+                            className="p-1.5 hover:bg-purple-50 text-gray-400 hover:text-purple-600 rounded-lg transition-colors"
+                            title="Download PDF"
+                          >
+                            {downloadingPdf === inv.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              printPdf(inv.id);
+                            }}
+                            className="p-1.5 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-lg transition-colors"
+                            title="Print Invoice"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => viewInvoice(inv.id)}
+                            className="p-1.5 hover:bg-slate-100 text-gray-300 rounded-lg transition-colors"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -458,12 +566,33 @@ export default function BillingPage() {
                     <h2 className="text-xl font-bold text-gray-900">{selectedInvoice.invoice_number}</h2>
                     <p className="text-sm text-gray-500">{selectedInvoice.customer_name}</p>
                   </div>
-                  <button
-                    onClick={() => setSelectedInvoice(null)}
-                    className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-                  >
-                    <X className="w-5 h-5 text-gray-500" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => downloadPdf(selectedInvoice.id, selectedInvoice.invoice_number)}
+                      disabled={downloadingPdf === selectedInvoice.id}
+                      className="p-2 hover:bg-purple-50 text-gray-500 hover:text-purple-600 rounded-xl transition-colors border border-gray-200"
+                      title="Download PDF"
+                    >
+                      {downloadingPdf === selectedInvoice.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => printPdf(selectedInvoice.id)}
+                      className="p-2 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-xl transition-colors border border-gray-200"
+                      title="Print Invoice"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setSelectedInvoice(null)}
+                      className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                    >
+                      <X className="w-5 h-5 text-gray-500" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Status + Actions */}
@@ -598,6 +727,17 @@ export default function BillingPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Create Invoice Form Modal */}
+        {showCreateForm && (
+          <CreateInvoiceForm
+            onClose={() => setShowCreateForm(false)}
+            onCreated={() => {
+              setShowCreateForm(false);
+              fetchData();
+            }}
+          />
         )}
       </div>
     </div>
