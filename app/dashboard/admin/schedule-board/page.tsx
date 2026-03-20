@@ -1721,8 +1721,8 @@ export default function ScheduleBoardPage() {
       {/* ═══ WEEKLY VIEW ═══════════════════════════════════════════════════ */}
       {viewMode === 'week' && (
         <div className="container mx-auto px-4 md:px-6 pb-6">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-            <div className="grid grid-cols-5 divide-x divide-gray-200">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-x-auto">
+            <div className="grid grid-cols-1 md:grid-cols-5 divide-x divide-gray-200 min-w-0 md:min-w-[800px]">
               {Object.entries(weekData).sort(([a], [b]) => a.localeCompare(b)).map(([date, jobs]) => {
                 const d = parseLocalDate(date);
                 const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });

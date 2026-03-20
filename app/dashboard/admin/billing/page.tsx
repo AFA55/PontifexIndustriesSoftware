@@ -467,7 +467,7 @@ export default function BillingPage() {
                               downloadPdf(inv.id, inv.invoice_number);
                             }}
                             disabled={downloadingPdf === inv.id}
-                            className="p-1.5 hover:bg-purple-50 text-gray-400 hover:text-purple-600 rounded-lg transition-colors"
+                            className="p-2.5 hover:bg-purple-50 text-gray-400 hover:text-purple-600 rounded-lg transition-colors"
                             title="Download PDF"
                           >
                             {downloadingPdf === inv.id ? (
@@ -481,14 +481,14 @@ export default function BillingPage() {
                               e.stopPropagation();
                               printPdf(inv.id);
                             }}
-                            className="p-1.5 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-lg transition-colors"
+                            className="p-2.5 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-lg transition-colors"
                             title="Print Invoice"
                           >
                             <Printer className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => viewInvoice(inv.id)}
-                            className="p-1.5 hover:bg-slate-100 text-gray-300 rounded-lg transition-colors"
+                            className="p-2.5 hover:bg-slate-100 text-gray-300 rounded-lg transition-colors"
                           >
                             <ChevronRight className="w-4 h-4" />
                           </button>
@@ -558,7 +558,7 @@ export default function BillingPage() {
         {/* Invoice Detail Modal */}
         {selectedInvoice && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-gray-200 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-white border border-gray-200 rounded-2xl max-w-full sm:max-w-2xl mx-4 sm:mx-0 w-full max-h-[90vh] overflow-y-auto shadow-2xl">
               <div className="p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -650,7 +650,7 @@ export default function BillingPage() {
                 {/* Line Items Table */}
                 <div className="mb-6">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Line Items</p>
-                  <div className="bg-white rounded-xl border border-slate-200/60 overflow-hidden">
+                  <div className="bg-white rounded-xl border border-slate-200/60 overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-slate-50/80 border-b border-slate-100">

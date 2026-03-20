@@ -3136,7 +3136,7 @@ export default function ScheduleFormPage() {
       {!submitted && currentStep <= 8 && (
         <button
           onClick={() => setShowAISmartFill(true)}
-          className="fixed bottom-6 right-6 z-40 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transition-all flex items-center gap-2 font-bold text-sm group"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transition-all flex items-center gap-2 font-bold text-sm group"
         >
           <Brain className="w-5 h-5 group-hover:scale-110 transition-transform" />
           <span className="hidden sm:inline">AI Smart Fill</span>

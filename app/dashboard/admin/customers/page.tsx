@@ -121,7 +121,7 @@ export default function CustomersPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
             <p className="text-2xl font-bold text-white">{totalCount}</p>
             <p className="text-xs text-gray-400">Customers</p>
