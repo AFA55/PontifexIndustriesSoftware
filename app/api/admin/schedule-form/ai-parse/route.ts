@@ -128,30 +128,37 @@ function parseSawCuts(text: string): { cuts: { linear_feet: string; depth: strin
 function parseCustomer(text: string): { name: string; confidence: number } {
   // "for ABC Construction", "customer is XYZ Corp", "contractor ABC"
   const patterns = [
-    /(?:for|customer|contractor|company|client)\s+(?:is\s+)?([A-Z][A-Za-z\s&'.,-]+?)(?:\s+(?:at|on|in|needs?|wants?|job|project|located|address)|\.|,|$)/i,
+    /(?:for|customer|contractor|company|client)\s+(?:is\s+)?([A-Z][A-Za-z\s&'.,-]+?)(?:\s+(?:at|on|in|needs?|wants?|job|project|located|address|next|this|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|starting|scheduled|estimated|difficulty|water|power|electric|inside|outside|contact|phone|PO)|\.|,|$)/i,
     /([A-Z][A-Za-z\s&'.,-]+?)\s+(?:needs?|wants?|is\s+requesting|requested|called|phoned)/i,
   ];
 
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match && match[1].trim().length > 2 && match[1].trim().length < 60) {
-      return { name: match[1].trim(), confidence: 0.7 };
+      // Clean trailing common words that aren't part of company names
+      let name = match[1].trim();
+      name = name.replace(/\s+(next|this|tomorrow|today|on|at|in|the)$/i, '').trim();
+      if (name.length > 2) {
+        return { name, confidence: 0.7 };
+      }
     }
   }
   return { name: '', confidence: 0 };
 }
 
 function parseAddress(text: string): { address: string; confidence: number } {
-  // Look for address-like patterns
+  // Look for address-like patterns — require a street suffix to avoid false positives
+  const streetSuffix = '(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Way|Place|Pl|Circle|Cir|Court|Ct|Highway|Hwy|Parkway|Pkwy)';
   const patterns = [
-    /(?:at|address|location|located\s+at|site\s+at|job\s+(?:at|site))\s+(\d+\s+[A-Za-z\s]+(?:(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Way|Place|Pl|Circle|Cir|Court|Ct|Highway|Hwy|Parkway|Pkwy)[.,]?\s*(?:[A-Za-z\s]+,?\s*[A-Z]{2}\s*\d{5})?)?)/i,
-    // Simple numbered address
-    /(\d{1,5}\s+[A-Z][A-Za-z]+(?:\s+[A-Za-z]+){0,3}\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Way|Place|Pl|Circle|Cir|Court|Ct|Highway|Hwy|Parkway|Pkwy)[.,]?\s*(?:[A-Za-z\s]+,?\s*[A-Z]{2}\s*\d{5})?)/i,
+    // "at 450 Main Street" — requires number + street name + street suffix
+    new RegExp(`(?:at|address|location|located\\s+at|site\\s+at|job\\s+(?:at|site))\\s+(\\d+\\s+[A-Za-z]+(?:\\s+[A-Za-z]+){0,3}\\s+${streetSuffix}[.,]?\\s*(?:[A-Za-z\\s]+,?\\s*[A-Z]{2}\\s*\\d{5})?)`, 'i'),
+    // Standalone numbered address with street suffix
+    new RegExp(`(\\d{1,5}\\s+[A-Z][A-Za-z]+(?:\\s+[A-Za-z]+){0,3}\\s+${streetSuffix}[.,]?\\s*(?:[A-Za-z\\s]+,?\\s*[A-Z]{2}\\s*\\d{5})?)`, 'i'),
   ];
 
   for (const pattern of patterns) {
     const match = text.match(pattern);
-    if (match && match[1].trim().length > 5) {
+    if (match && match[1].trim().length > 8) {
       return { address: match[1].trim(), confidence: 0.75 };
     }
   }
