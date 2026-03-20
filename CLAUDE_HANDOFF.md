@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 19, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING
+**Date:** March 20, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING
 
 ---
 
@@ -7,19 +7,26 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2` (up to date with `origin/feature/schedule-board-v2`)
-- **Last commit:** `d99d4027` — "feat: AI Smart Fill — voice/text job parsing for schedule form"
+- **Last commit:** `3b1ab8cb` — "fix: Add error handling with retry banners across key pages"
 - **Clean working tree** (all changes committed and pushed)
 
-### Recent Commits (this session)
+### Recent Commits (this session — March 20)
 ```
+3b1ab8cb fix: Add error handling with retry banners across key pages
+58007779 fix: Mobile responsive audit — critical issues across admin pages
+97975d0f feat: Photo upload during job execution + enhanced signature capture
+6494f198 fix: Improve AI parser accuracy for customer names and addresses
+```
+
+### Previous Session Commits (March 19)
+```
+87b3389d docs: Update handoff — AI auto-schedule + AI smart fill complete
 d99d4027 feat: AI Smart Fill — voice/text job parsing for schedule form
 528a35b9 feat: AI Auto-Scheduling Engine with one-click operator assignment
 d9ecc37a docs: Deep competitive analysis — Pontifex vs CenPoint vs DSM
 feddc0a7 feat: Professional invoice PDF generation + create invoice form
 2e9b0d13 feat: Apply white-label branding across entire application
 bb3d9eb5 feat: White-label branding system with full settings UI
-be164cdd docs: Update handoff for March 19 session
-2a72b9fd fix: 3 critical bugs found during testing
 f83b4c15 feat: Customer CRM system with profiles, contacts, and schedule form integration
 ab330d34 feat: Drag-and-drop schedule board with operator view + smart skill matching
 c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
@@ -27,82 +34,79 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 
 ---
 
-## WHAT WAS BUILT THIS SESSION
+## WHAT WAS BUILT (March 20 Session)
 
-### Feature 1: Dispatch Ticket PDF + Job Detail View
-- **JobDetailView** — Full-page overlay with gradient header, collapsible sections
-- **DispatchTicketPDF** — Landscape 3-column layout, scope table, notes, signature
-- **API** — `GET /api/job-orders/[id]/full-detail`
+### Photo Upload During Job Execution
+- **PhotoUploader integrated into work-performed page** — operators can take job site photos during work
+- **Completion photos on day-complete page** — before/after photos section
+- **Signature upload to Supabase Storage** — signatures stored as PNG files instead of raw base64
+- **New API: `POST/GET /api/job-orders/[id]/photos`** — appends photos to job_orders.photo_urls
 
-### Feature 2: Drag & Drop Schedule Board + Smart Scheduling
-- **Two layouts**: Slot View + Operator Row View (ViewToggle)
-- **@dnd-kit** drag-and-drop (super_admin only)
-- **Skill matching**: operator levels 1-10, green/yellow/red indicators
+### AI Parser Bug Fixes
+- Customer name parser stops at date words ("next Tuesday", "tomorrow", etc.)
+- Address parser requires street suffix to prevent false positives ("6 inches" no longer matches)
 
-### Feature 3: Customer CRM System
-- **Tables**: customers, customer_contacts (with backfill)
-- **Pages**: Customer Profiles list, Customer Detail with contacts/jobs/revenue
-- **Schedule form**: CustomerAutocomplete, auto-fill
+### Mobile Responsive Audit (Critical Fixes)
+- **Billing modal**: `max-w-full sm:max-w-2xl` for proper mobile width
+- **Billing buttons**: touch targets increased from 24px to 40px+ (`p-1.5` → `p-2.5`)
+- **Billing table**: horizontal scroll wrapper added
+- **Customers stats**: `grid-cols-1 sm:grid-cols-3` (stack on mobile)
+- **Schedule board weekly view**: `grid-cols-1 md:grid-cols-5` + `overflow-x-auto`
+- **Schedule form AI button**: responsive positioning for mobile
 
-### Feature 4: White-Label Branding System
-- **tenant_branding** table with all branding fields
-- **BrandingProvider** React Context with localStorage caching (5-min TTL)
-- **Settings page** at /admin/settings/branding — 7 collapsible sections
-- **Applied throughout**: login page, admin dashboard, operator dashboard, all PDFs
+### Loading States & Error Handling Audit
+- **Billing page**: added `setError()` in catch block + error banner with Retry button
+- **Customers page**: error state + retry banner (dark theme styled)
+- **My Jobs page**: error banner between day navigator and job list
+- All pages already had loading spinners and empty states (verified ✅)
 
-### Feature 5: Invoice PDF Generation
-- **InvoicePDF** component with branded header, line items, totals
-- **CreateInvoiceForm** modal with customer autocomplete + line item editor
+---
 
-### Feature 6: Competitive Analysis
-- **COMPETITIVE_ANALYSIS.md** — Deep feature comparison across 12 categories
-- Identified top 10 features for 10x advantage over CenPoint and DSM
+## SPRINT STATUS (Target: April 2, 2026)
 
-### Feature 7: AI Auto-Scheduling Engine ⭐ NEW
-- **POST /api/admin/schedule-board/auto-schedule** — one-click AI job assignment
-- **Scoring algorithm**: skill match (40pts) + workload balance (30pts) + travel distance (30pts)
-- Haversine distance calculation for travel optimization (no API cost)
-- Assigns hardest jobs first to best-qualified operators
-- Prevents overloading: respects max jobs per operator
-- Results modal showing assignments with match quality badges (good/stretch/over)
-- "AI Schedule" button in schedule board header (super_admin only)
+### Week 1 — Core Features ✅ COMPLETE
+- [x] Dispatch ticket PDF generation
+- [x] Customer signature capture in job completion flow
+- [x] Photo upload during job execution
+- [x] PDF invoice generation
+- [x] ~~QuickBooks CSV export~~ (deprioritized)
 
-### Feature 8: AI Smart Fill for Schedule Form ⭐ NEW
-- **POST /api/admin/schedule-form/ai-parse** — NLP parser for concrete cutting jobs
-- Parses: service types, core holes (qty/diameter/depth), saw cuts (LF/depth),
-  customer names, addresses, dates ("next Tuesday"), costs, difficulty, PO numbers,
-  contact info, site conditions (water, power, inside/outside, etc.)
-- **AISmartFillModal** — voice input via Web Speech API + text input
-- Confidence scores per field with selectable checkboxes
-- Quick example phrases for common job types
-- Floating "AI Smart Fill" button on schedule form page
+### Week 2 — Polish & Launch (In Progress)
+- [x] Mobile responsive audit (critical fixes done)
+- [x] Loading states & error handling audit
+- [ ] E2E workflow testing (schedule → dispatch → execute → complete → invoice)
+- [ ] White-label rebrand finalization (system built, needs Patriot-specific assets)
+- [ ] Production deployment prep (env vars, custom domain, SSL)
+- [ ] Final build verification & merge to main
 
-### Bug Fixes
-1. Unassigned job cards: added click-to-detail handler
-2. CRM auth: fixed 401s using supabase.auth.getSession()
-3. Scope of Work: formatted holes array properly
+### Bonus Features Built (Ahead of Schedule)
+- [x] AI Auto-Scheduling Engine (one-click operator assignment)
+- [x] AI Smart Fill (voice/text NLP for schedule form)
+- [x] Customer CRM system with autocomplete
+- [x] Drag-and-drop schedule board with operator view
+- [x] Competitive analysis (vs CenPoint, DSM)
+- [x] White-label branding system
 
 ---
 
 ## WHAT TO DO NEXT
 
-### Next Priority (based on user direction)
+### Immediate Priority
+- [ ] E2E workflow testing — test the full pipeline end-to-end
+- [ ] Apply Patriot branding assets (logos, colors) via the branding settings page
+- [ ] Production deployment prep
+
+### Nice-to-Have (If Time Allows)
 - [ ] AR aging warnings on dispatch screen
-- [ ] Stripe payment links on invoices (customer payment portal)
-- [ ] Mobile responsive audit
-- [ ] E2E workflow testing
-- [ ] Loading states & error handling audit
+- [ ] Stripe payment links on invoices
+- [ ] Schedule board performance optimization for large datasets
 
 ### Deprioritized by User
-- ~~Diamond blade intelligence~~ (not needed right now)
-- ~~Equipment management enhancements~~ (not needed right now)
-- ~~Certified payroll~~ (current timecard system is fine for now)
-- ~~Estimate-to-job pipeline~~ (not using right now)
-- ~~QuickBooks CSV export~~ (worry about later)
-
-### Polish & Launch
-- [ ] Production deployment prep
-- [ ] Merge to main
+- ~~Diamond blade intelligence~~
+- ~~Equipment management enhancements~~
+- ~~Certified payroll~~
+- ~~Estimate-to-job pipeline~~
+- ~~QuickBooks CSV export~~
 
 ---
 
@@ -114,3 +118,5 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 - **Branding**: Use `useBranding()` hook for dynamic company name/colors
 - **PDFs**: Server-side only with @react-pdf/renderer, no React hooks
 - **Input fields**: Always `text-gray-900 bg-white` (black text on white)
+- **Photos**: PhotoUploader component → Supabase Storage `job-photos` bucket
+- **Signatures**: Upload to Storage as PNG, fallback to base64 in DB
