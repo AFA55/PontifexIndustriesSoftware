@@ -7,7 +7,7 @@ import {
   Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
   UserCheck, UserX, Eye, FolderOpen, Timer, Loader2, Settings, Search, X,
-  Megaphone, CheckCircle2
+  Megaphone, CheckCircle2, Sparkles, Zap, Brain
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -213,6 +213,17 @@ export default function ScheduleBoardPage() {
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
   const [previewJob, setPreviewJob] = useState<{ job: JobCardData; operatorName?: string | null; helperName?: string | null } | null>(null);
   const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null } | null>(null);
+
+  // ═══ AI AUTO-SCHEDULE STATE ═══
+  const [autoScheduleLoading, setAutoScheduleLoading] = useState(false);
+  const [autoScheduleResults, setAutoScheduleResults] = useState<{
+    assignments: { jobNumber: string; customerName: string; operatorName: string; matchQuality: string; reason: string; travelDistance?: number | null }[];
+    skipped: { jobNumber: string; customerName: string; reason: string }[];
+    totalAssigned: number;
+    totalUnassigned: number;
+    totalSkipped: number;
+    message: string;
+  } | null>(null);
 
   // ═══ TOAST HELPER ═══
   const addToast = useCallback((type: ToastData['type'], title: string, message?: string) => {
@@ -658,6 +669,53 @@ export default function ScheduleBoardPage() {
       }
     } catch {
       addToast('error', 'Save Failed', 'Could not connect to server');
+    }
+  };
+
+  // ═══ AI AUTO-SCHEDULE HANDLER ═══
+  const handleAutoSchedule = async () => {
+    if (unassignedJobs.length === 0) {
+      addToast('info', 'No Unassigned Jobs', 'All jobs for this date are already assigned');
+      return;
+    }
+
+    setAutoScheduleLoading(true);
+    try {
+      const res = await apiFetch('/api/admin/schedule-board/auto-schedule', {
+        method: 'POST',
+        body: JSON.stringify({
+          date: selectedDate,
+          options: { maxJobsPerOperator: Math.max(3, Math.ceil(unassignedJobs.length / allOperatorsList.length) + 2) },
+        }),
+      });
+
+      const json = await res.json();
+
+      if (res.ok && json.success) {
+        setAutoScheduleResults({
+          assignments: json.data.assignments || [],
+          skipped: json.data.skipped || [],
+          totalAssigned: json.data.totalAssigned || 0,
+          totalUnassigned: json.data.totalUnassigned || 0,
+          totalSkipped: json.data.totalSkipped || 0,
+          message: json.message || '',
+        });
+
+        // Refresh the board to show new assignments
+        fetchScheduleData(selectedDate);
+
+        if (json.data.totalAssigned > 0) {
+          addToast('success', 'AI Schedule Complete', json.message);
+        } else {
+          addToast('info', 'No Assignments Made', json.message);
+        }
+      } else {
+        addToast('error', 'Auto-Schedule Failed', json.error || 'Unknown error');
+      }
+    } catch {
+      addToast('error', 'Auto-Schedule Failed', 'Network error occurred');
+    } finally {
+      setAutoScheduleLoading(false);
     }
   };
 
@@ -1460,6 +1518,25 @@ export default function ScheduleBoardPage() {
               {canEdit && (
                 <>
                   <button
+                    onClick={handleAutoSchedule}
+                    disabled={autoScheduleLoading || unassignedJobs.length === 0}
+                    className={`relative px-3 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md ${
+                      unassignedJobs.length > 0
+                        ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {autoScheduleLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    {autoScheduleLoading ? 'Scheduling...' : 'AI Schedule'}
+                    {unassignedJobs.length > 0 && !autoScheduleLoading && (
+                      <span className="px-1.5 py-0.5 bg-white/20 rounded-full text-xs">{unassignedJobs.length}</span>
+                    )}
+                  </button>
+                  <button
                     onClick={() => setShowQuickAdd(true)}
                     className="px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
                   >
@@ -1890,6 +1967,109 @@ export default function ScheduleBoardPage() {
       {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSubmit={handleChangeRequest} onClose={() => setChangeRequestTarget(null)} />}
       {notesTarget && <NotesDrawer job={notesTarget} notes={jobNotes[notesTarget.id] || []} onAddNote={handleAddNote} onClose={() => setNotesTarget(null)} />}
       {showQuickAdd && <QuickAddModal salesmen={SALESMEN} onSubmit={handleQuickAdd} onClose={() => setShowQuickAdd(false)} />}
+
+      {/* ═══ AI AUTO-SCHEDULE RESULTS MODAL ═══ */}
+      {autoScheduleResults && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setAutoScheduleResults(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Brain className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">AI Auto-Schedule Results</h2>
+                  <p className="text-violet-200 text-sm">{autoScheduleResults.message}</p>
+                </div>
+              </div>
+              <button onClick={() => setAutoScheduleResults(null)} className="p-2 hover:bg-white/20 rounded-lg transition-all">
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Stats */}
+            <div className="px-6 py-4 grid grid-cols-3 gap-3 border-b border-gray-100">
+              <div className="text-center p-3 bg-green-50 rounded-xl">
+                <div className="text-2xl font-bold text-green-600">{autoScheduleResults.totalAssigned}</div>
+                <div className="text-xs font-semibold text-green-500 uppercase">Assigned</div>
+              </div>
+              <div className="text-center p-3 bg-amber-50 rounded-xl">
+                <div className="text-2xl font-bold text-amber-600">{autoScheduleResults.totalSkipped}</div>
+                <div className="text-xs font-semibold text-amber-500 uppercase">Skipped</div>
+              </div>
+              <div className="text-center p-3 bg-purple-50 rounded-xl">
+                <div className="text-2xl font-bold text-purple-600">{autoScheduleResults.totalUnassigned}</div>
+                <div className="text-xs font-semibold text-purple-500 uppercase">Total Jobs</div>
+              </div>
+            </div>
+
+            {/* Assignments list */}
+            <div className="px-6 py-4 overflow-y-auto max-h-[45vh] space-y-2">
+              {autoScheduleResults.assignments.length > 0 && (
+                <>
+                  <h3 className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2 mb-2">
+                    <Zap className="w-4 h-4 text-green-500" /> Assignments
+                  </h3>
+                  {autoScheduleResults.assignments.map((a, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm truncate">{a.customerName}</div>
+                        <div className="text-xs text-gray-500">{a.jobNumber}</div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-3">
+                        <span className="text-sm font-medium text-gray-700">→ {a.operatorName}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          a.matchQuality === 'good' ? 'bg-green-100 text-green-700' :
+                          a.matchQuality === 'stretch' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {a.matchQuality === 'good' ? '✓ Good' : a.matchQuality === 'stretch' ? '~ Stretch' : '✗ Over'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {autoScheduleResults.skipped.length > 0 && (
+                <>
+                  <h3 className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2 mt-4 mb-2">
+                    <AlertCircle className="w-4 h-4 text-amber-500" /> Skipped
+                  </h3>
+                  {autoScheduleResults.skipped.map((s, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm truncate">{s.customerName}</div>
+                        <div className="text-xs text-gray-500">{s.jobNumber}</div>
+                      </div>
+                      <span className="text-xs text-amber-600 font-medium ml-3">{s.reason}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {autoScheduleResults.assignments.length === 0 && autoScheduleResults.skipped.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <Sparkles className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <p>No unassigned jobs to schedule</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setAutoScheduleResults(null)}
+                className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {conflictData && (
         <ConflictModal
           personName={conflictData.personName}
