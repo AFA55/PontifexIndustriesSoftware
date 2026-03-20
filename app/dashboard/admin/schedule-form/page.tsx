@@ -12,12 +12,13 @@ import {
   Building2, ChevronRight, Loader2, CheckCircle, AlertTriangle,
   ChevronDown, Phone, FileText, DollarSign, Zap, Clock,
   Clipboard, Star, Droplets, Plug, Wind, Scissors, Truck, Mic, Plus, Trash2,
-  Eye, X, Users,
+  Eye, X, Users, Brain,
 } from 'lucide-react';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { CustomerAutocomplete } from '@/components/ui/CustomerAutocomplete';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { VoiceMicButton } from '@/components/ui/VoiceMicButton';
+import AISmartFillModal from './_components/AISmartFillModal';
 // Equipment presets no longer displayed as grid; now using SERVICE_EQUIPMENT config
 import PhotoUploader from '@/components/PhotoUploader';
 import {
@@ -548,6 +549,9 @@ export default function ScheduleFormPage() {
   const customerDropdownRef = useRef<HTMLDivElement>(null);
   const contactDropdownRef = useRef<HTMLDivElement>(null);
 
+  // AI Smart Fill state
+  const [showAISmartFill, setShowAISmartFill] = useState(false);
+
   // PO lookup state
   const [poMatch, setPoMatch] = useState<{
     customer_name: string; address: string; location: string;
@@ -710,6 +714,35 @@ export default function ScheduleFormPage() {
       voiceInput.start();
     }
   }, [voiceInput]);
+
+  // ── AI Smart Fill handler ──────────────────────────────────
+  const handleAISmartFill = useCallback((fields: Record<string, unknown>) => {
+    setForm(prev => {
+      const updated = { ...prev };
+
+      // Apply each parsed field
+      for (const [key, value] of Object.entries(fields)) {
+        if (key === 'service_types' && Array.isArray(value)) {
+          updated.service_types = [...new Set([...prev.service_types, ...value as string[]])];
+        } else if (key === 'scope_details' && typeof value === 'object' && value !== null) {
+          updated.scope_details = { ...prev.scope_details, ...value as Record<string, Record<string, string>> };
+        } else if (key in updated) {
+          (updated as any)[key] = value;
+        }
+      }
+
+      return updated;
+    });
+
+    // Jump to appropriate step based on what was filled
+    if (fields.service_types || fields.scope_details || fields.description) {
+      setCurrentStep(3); // Scope of work
+    } else if (fields.contractor_name || fields.site_address) {
+      setCurrentStep(2); // Customer & location
+    } else if (fields.start_date) {
+      setCurrentStep(5); // Scheduling
+    }
+  }, []);
 
   // ── PO number auto-populate ──────────────────────────────────
   const handlePoChange = useCallback((value: string) => {
@@ -3097,6 +3130,25 @@ export default function ScheduleFormPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ═══ AI SMART FILL FLOATING BUTTON ═══ */}
+      {!submitted && currentStep <= 8 && (
+        <button
+          onClick={() => setShowAISmartFill(true)}
+          className="fixed bottom-6 right-6 z-40 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transition-all flex items-center gap-2 font-bold text-sm group"
+        >
+          <Brain className="w-5 h-5 group-hover:scale-110 transition-transform" />
+          <span className="hidden sm:inline">AI Smart Fill</span>
+        </button>
+      )}
+
+      {/* ═══ AI SMART FILL MODAL ═══ */}
+      {showAISmartFill && (
+        <AISmartFillModal
+          onApply={handleAISmartFill}
+          onClose={() => setShowAISmartFill(false)}
+        />
       )}
     </div>
   );
