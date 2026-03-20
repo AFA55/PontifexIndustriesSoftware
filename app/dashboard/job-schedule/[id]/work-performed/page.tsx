@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 import QuickAccessButtons from '@/components/QuickAccessButtons';
 import EquipmentUsageForm from '@/components/EquipmentUsageForm';
 import RecommendedItems from './_components/RecommendedItems';
+import PhotoUploader from '@/components/PhotoUploader';
+import { Camera } from 'lucide-react';
 
 // Organized work item categories based on DSM screenshots
 const WORK_CATEGORIES = {
@@ -207,6 +209,7 @@ export default function WorkPerformed() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [jobType, setJobType] = useState<string>('');
   const [currentDayNumber, setCurrentDayNumber] = useState<number>(1);
+  const [jobPhotos, setJobPhotos] = useState<string[]>([]);
 
   // Fetch job type and day number for smart recommendations + correct work item tracking
   useEffect(() => {
@@ -1172,6 +1175,18 @@ export default function WorkPerformed() {
           })
         }).catch(err => console.error('Blade tracking error:', err));
 
+        // Save photos if any were taken
+        if (jobPhotos.length > 0) {
+          fetch(`/api/job-orders/${params.id}/photos`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ photo_urls: jobPhotos })
+          }).catch(err => console.error('Photo save error:', err));
+        }
+
         // Update workflow tracking (fire and forget)
         fetch('/api/workflow', {
           method: 'POST',
@@ -1191,6 +1206,7 @@ export default function WorkPerformed() {
       const workPerformedData = {
         jobId: params.id,
         items: selectedItems,
+        photos: jobPhotos,
         timestamp: new Date().toISOString()
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
@@ -1207,6 +1223,7 @@ export default function WorkPerformed() {
       const workPerformedData = {
         jobId: params.id,
         items: selectedItems,
+        photos: jobPhotos,
         timestamp: new Date().toISOString()
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
@@ -1765,6 +1782,27 @@ export default function WorkPerformed() {
             )}
           </div>
         )}
+
+        {/* Job Photos Section */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mx-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Camera className="w-5 h-5 text-blue-600" />
+            <h3 className="text-sm font-bold text-slate-700">Job Photos</h3>
+            <span className="text-xs text-slate-400">(optional)</span>
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            Take photos of work performed, site conditions, or anything noteworthy
+          </p>
+          <PhotoUploader
+            bucket="job-photos"
+            pathPrefix={params.id as string}
+            photos={jobPhotos}
+            onPhotosChange={setJobPhotos}
+            maxPhotos={10}
+            label="Add Job Photos"
+            lightMode={true}
+          />
+        </div>
 
         {/* Submit Button */}
         {selectedItems.length > 0 && (

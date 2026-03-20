@@ -16,7 +16,9 @@ import {
   Sun,
   Trophy,
   PenTool,
+  Camera,
 } from 'lucide-react';
+import PhotoUploader from '@/components/PhotoUploader';
 
 export default function DayCompletePage() {
   const router = useRouter();
@@ -30,6 +32,7 @@ export default function DayCompletePage() {
   const [signerName, setSignerName] = useState('');
   const [signatureData, setSignatureData] = useState('');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [completionPhotos, setCompletionPhotos] = useState<string[]>([]);
 
   // Signature canvas
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -88,6 +91,18 @@ export default function DayCompletePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // Save completion photos if any
+      if (completionPhotos.length > 0) {
+        fetch(`/api/job-orders/${jobId}/photos`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ photo_urls: completionPhotos })
+        }).catch(err => console.error('Photo save error:', err));
+      }
+
       // Get work performed from localStorage
       const stored = localStorage.getItem(`work-performed-${jobId}`);
       const workPerformed = stored ? JSON.parse(stored).items : [];
@@ -131,6 +146,21 @@ export default function DayCompletePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // Upload signature to storage
+      const signatureUrl = await uploadSignature();
+
+      // Save completion photos
+      if (completionPhotos.length > 0) {
+        fetch(`/api/job-orders/${jobId}/photos`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ photo_urls: completionPhotos })
+        }).catch(err => console.error('Photo save error:', err));
+      }
+
       // Get work performed from localStorage
       const stored = localStorage.getItem(`work-performed-${jobId}`);
       const workPerformed = stored ? JSON.parse(stored).items : [];
@@ -146,12 +176,12 @@ export default function DayCompletePage() {
           workPerformed,
           notes: 'Final day. Job complete.',
           signerName: signerName || undefined,
-          signatureData: signatureData || undefined,
+          signatureData: signatureUrl || undefined,
           continueNextDay: false,
           latitude: null,
           longitude: null,
         })
-      }).catch(() => {}); // Don't block on daily log
+      }).catch(() => {});
 
       // Mark job as completed via status API
       const statusRes = await fetch(`/api/job-orders/${jobId}/status`, {
@@ -164,7 +194,7 @@ export default function DayCompletePage() {
           status: 'completed',
           work_completed_at: new Date().toISOString(),
           completion_signer_name: signerName || undefined,
-          completion_signature: signatureData || undefined,
+          completion_signature: signatureUrl || undefined,
         })
       });
 
@@ -181,6 +211,34 @@ export default function DayCompletePage() {
       showNotif('Failed to complete. Please try again.', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // ─── UPLOAD SIGNATURE TO STORAGE ─────────────────────────
+  const uploadSignature = async (): Promise<string | null> => {
+    if (!signatureData) return null;
+    try {
+      // Convert base64 to blob
+      const res = await fetch(signatureData);
+      const blob = await res.blob();
+      const fileName = `${jobId}/signatures/completion-${Date.now()}.png`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('job-photos')
+        .upload(fileName, blob, { contentType: 'image/png' });
+
+      if (uploadError) {
+        console.error('Signature upload error:', uploadError);
+        return signatureData; // Fallback to base64
+      }
+
+      const { data } = supabase.storage
+        .from('job-photos')
+        .getPublicUrl(fileName);
+
+      return data?.publicUrl || signatureData;
+    } catch {
+      return signatureData; // Fallback to base64
     }
   };
 
@@ -290,6 +348,28 @@ export default function DayCompletePage() {
               </p>
             </div>
           )}
+        </div>
+
+        {/* Completion Photos */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-indigo-100 rounded-xl">
+              <Camera className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-700">Completion Photos</h3>
+              <p className="text-xs text-slate-500">Before/after photos, site conditions</p>
+            </div>
+          </div>
+          <PhotoUploader
+            bucket="job-photos"
+            pathPrefix={`${jobId}/completion`}
+            photos={completionPhotos}
+            onPhotosChange={setCompletionPhotos}
+            maxPhotos={10}
+            label="Add Completion Photos"
+            lightMode={true}
+          />
         </div>
 
         {/* Main Decision */}
