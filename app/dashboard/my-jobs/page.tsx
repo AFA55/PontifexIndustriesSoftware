@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock } from 'lucide-react';
+import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DayNavigator from './_components/DayNavigator';
 import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
@@ -23,6 +23,7 @@ export default function MyJobsPage() {
   const [selectedDate, setSelectedDate] = useState(toDateString(new Date()));
   const [jobs, setJobs] = useState<JobTicketData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string>('operator');
   const [userId, setUserId] = useState<string>('');
   const [hasLongDurationJob, setHasLongDurationJob] = useState(false);
@@ -63,6 +64,7 @@ export default function MyJobsPage() {
       }
     } catch (err) {
       console.error('Error fetching schedule:', err);
+      setError('Failed to load your schedule. Pull down to retry.');
     } finally {
       setLoading(false);
     }
@@ -216,6 +218,17 @@ export default function MyJobsPage() {
             hasLongDurationJob={hasLongDurationJob}
           />
         </div>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-700 flex-1">{error}</p>
+            <button onClick={() => { setError(null); fetchJobs(selectedDate); }} className="text-sm font-semibold text-red-600 hover:text-red-800 transition-colors">
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Job Tickets */}
         {loading ? (

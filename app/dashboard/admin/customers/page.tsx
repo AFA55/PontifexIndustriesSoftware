@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ChevronLeft, Building2, Plus, Search, Loader2
+  ChevronLeft, Building2, Plus, Search, Loader2, AlertCircle
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -42,6 +42,7 @@ export default function CustomersPage() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -68,6 +69,7 @@ export default function CustomersPage() {
       }
     } catch (err) {
       console.error('Failed to fetch customers:', err);
+      setError('Failed to load customers. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -149,6 +151,17 @@ export default function CustomersPage() {
             />
           </div>
         </div>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <p className="text-sm text-red-300 flex-1">{error}</p>
+            <button onClick={() => { setError(null); fetchCustomers(); }} className="text-sm font-semibold text-red-400 hover:text-red-300 transition-colors">
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Customer Grid */}
         {loading ? (

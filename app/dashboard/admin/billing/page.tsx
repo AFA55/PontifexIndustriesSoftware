@@ -68,6 +68,7 @@ export default function BillingPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -116,6 +117,7 @@ export default function BillingPage() {
       }
     } catch (err) {
       console.error('Error fetching billing data:', err);
+      setError('Failed to load billing data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -368,6 +370,16 @@ export default function BillingPage() {
             )}
           </button>
         </div>
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-700 flex-1">{error}</p>
+            <button onClick={() => { setError(null); fetchData(); }} className="text-sm font-semibold text-red-600 hover:text-red-800 transition-colors">
+              Retry
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
