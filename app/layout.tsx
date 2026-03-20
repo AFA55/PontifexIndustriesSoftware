@@ -3,6 +3,9 @@ import type { Metadata } from 'next';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 import { BrandingProvider } from '@/lib/branding-context';
+import { NotificationProvider } from '@/contexts/NotificationContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import NetworkMonitor from '@/components/NetworkMonitor';
 
 export const metadata: Metadata = {
   title: 'Pontifex Industries - Concrete Cutting Management Software',
@@ -71,7 +74,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="transition-colors duration-200">
         <ThemeProvider>
           <BrandingProvider>
-            <GoogleMapsProvider>{children}</GoogleMapsProvider>
+            <NotificationProvider>
+              <ErrorBoundary>
+                <NetworkMonitor />
+                <GoogleMapsProvider>{children}</GoogleMapsProvider>
+              </ErrorBoundary>
+            </NotificationProvider>
           </BrandingProvider>
         </ThemeProvider>
       </body>
