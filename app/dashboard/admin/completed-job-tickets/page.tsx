@@ -46,7 +46,7 @@ export default function CompletedJobTicketsPage() {
       }
 
       // Check admin role from localStorage to avoid RLS recursion
-      const userStr = localStorage.getItem('pontifex-user');
+      const userStr = localStorage.getItem('patriot-user');
       if (userStr) {
         const user = JSON.parse(userStr);
         if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(user.role)) {

@@ -357,12 +357,12 @@ async function generateWeeklyPDF(
     doc.setFontSize(6.5);
     doc.setTextColor(...gray500);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Pontifex Industries  |  Timecard Report  |  ${weekRange}  |  For QuickBooks Payroll`, margin, pageH - 6);
+    doc.text(`Patriot Concrete Cutting  |  Timecard Report  |  ${weekRange}  |  For QuickBooks Payroll`, margin, pageH - 6);
     doc.text(`Page ${p} of ${totalPages}`, pageW - margin, pageH - 6, { align: 'right' });
   }
 
   // Save
-  const filename = `Pontifex_Timecards_${monday.toISOString().split('T')[0]}_to_${sunday.toISOString().split('T')[0]}.pdf`;
+  const filename = `Patriot_Timecards_${monday.toISOString().split('T')[0]}_to_${sunday.toISOString().split('T')[0]}.pdf`;
   doc.save(filename);
 }
 

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function SetupPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@pontifex.com');
+  const [email, setEmail] = useState('admin@patriotcc.com');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('Super Admin');
   const [loading, setLoading] = useState(false);

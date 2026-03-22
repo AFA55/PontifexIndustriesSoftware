@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const emailSent = await sendEmail({
       to: email,
-      subject: 'Password Reset Request - Pontifex Industries',
+      subject: 'Password Reset Request - Patriot Concrete Cutting',
       html: resetEmailHtml,
     });
 

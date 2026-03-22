@@ -31,7 +31,7 @@ function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: 
       <g>
         <path
           d="M20 15L35 5L50 15L50 35L35 45L20 35L20 25L35 25L35 35L42 30L42 20L35 15L28 20L28 30L20 25V15Z"
-          fill="url(#pontifex-gradient)"
+          fill="url(#patriot-gradient)"
         />
         <path
           d="M25 20L30 17L35 20L35 25L30 28L25 25V20Z"
@@ -48,7 +48,7 @@ function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: 
         </text>
       </g>
       <defs>
-        <linearGradient id="pontifex-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
+        <linearGradient id="patriot-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
           <stop stopColor="#dc2626" />
           <stop offset="0.5" stopColor="#2563eb" />
           <stop offset="1" stopColor="#1e40af" />
@@ -109,7 +109,7 @@ export default function AdminDashboard() {
     // Check if this is demo admin account
     const isDemo = currentUser.email?.toLowerCase().includes('demo') ||
                    currentUser.email === 'admin@demo.com' ||
-                   currentUser.email === 'admin@pontifex.com';
+                   currentUser.email === 'admin@patriotcc.com';
     setIsDemoAdmin(isDemo);
 
     // Show walkthrough for demo admin on first visit
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
       if (!session) {
         console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
         localStorage.removeItem('supabase-user');
-        localStorage.removeItem('pontifex-user');
+        localStorage.removeItem('patriot-user');
         window.location.href = '/login';
         return;
       }

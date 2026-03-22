@@ -43,8 +43,8 @@ export interface TenantBranding {
 
 const DEFAULT_BRANDING: TenantBranding = {
   id: '',
-  company_name: 'Pontifex Industries',
-  company_short_name: 'Pontifex',
+  company_name: 'Patriot Concrete Cutting',
+  company_short_name: 'Patriot',
   tagline: 'Concrete Cutting Management Software',
   logo_url: null,
   logo_dark_url: null,
@@ -80,7 +80,7 @@ const DEFAULT_BRANDING: TenantBranding = {
   show_customer_crm: true,
 };
 
-const CACHE_KEY = 'pontifex-branding';
+const CACHE_KEY = 'patriot-branding';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface CachedBranding {

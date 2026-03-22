@@ -229,7 +229,7 @@ export async function POST(
 
     const emailSent = await sendEmail({
       to: accessRequest.email,
-      subject: 'Access Approved - Pontifex Industries',
+      subject: 'Access Approved - Patriot Concrete Cutting',
       html: approvalEmailHtml,
     });
 

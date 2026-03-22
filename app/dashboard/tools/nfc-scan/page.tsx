@@ -482,7 +482,7 @@ function NfcScanPageContent() {
                     type="text"
                     value={manualId}
                     onChange={(e) => setManualId(e.target.value)}
-                    placeholder="Enter Pontifex ID (e.g., PX-BLD-0001)"
+                    placeholder="Enter Patriot ID (e.g., PX-BLD-0001)"
                     className="w-full pl-10 pr-4 py-3 bg-white/80 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 backdrop-blur-sm shadow-sm"
                   />
                 </div>

@@ -25,7 +25,7 @@ function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: 
       <g>
         <path
           d="M20 15L35 5L50 15L50 35L35 45L20 35L20 25L35 25L35 35L42 30L42 20L35 15L28 20L28 30L20 25V15Z"
-          fill="url(#op-pontifex-gradient)"
+          fill="url(#op-patriot-gradient)"
         />
         <path
           d="M25 20L30 17L35 20L35 25L30 28L25 25V20Z"
@@ -42,7 +42,7 @@ function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: 
         </text>
       </g>
       <defs>
-        <linearGradient id="op-pontifex-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
+        <linearGradient id="op-patriot-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
           <stop stopColor="#dc2626" />
           <stop offset="0.5" stopColor="#2563eb" />
           <stop offset="1" stopColor="#1e40af" />
@@ -160,7 +160,7 @@ export default function Dashboard() {
   // Check if user should see onboarding tour
   const checkOnboardingStatus = (currentUser: User) => {
     const isDemoAccount = currentUser.email.toLowerCase().includes('demo');
-    const onboardingKey = `pontifex-onboarding-${currentUser.id}`;
+    const onboardingKey = `patriot-onboarding-${currentUser.id}`;
     const hasSeenOnboarding = localStorage.getItem(onboardingKey);
 
     // Demo accounts: always show tour
@@ -223,7 +223,7 @@ export default function Dashboard() {
       if (!session) {
         console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
         localStorage.removeItem('supabase-user');
-        localStorage.removeItem('pontifex-user');
+        localStorage.removeItem('patriot-user');
         window.location.href = '/login';
         return;
       }
@@ -720,7 +720,7 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold">Welcome to {branding.company_short_name || 'Pontifex'}!</h2>
+                  <h2 className="text-3xl font-bold">Welcome to {branding.company_short_name || 'Patriot'}!</h2>
                   <p className="text-blue-100 mt-1">Demo Operator Dashboard Tour</p>
                 </div>
               </div>
@@ -738,7 +738,7 @@ export default function Dashboard() {
                   <div className="flex-1">
                     <h3 className="font-bold text-blue-900 text-lg mb-2">This is a Demo Account</h3>
                     <p className="text-blue-800 text-sm leading-relaxed">
-                      You&apos;re exploring a limited demonstration of the {branding.company_short_name || 'Pontifex'} operator platform.
+                      You&apos;re exploring a limited demonstration of the {branding.company_short_name || 'Patriot'} operator platform.
                       Some features are restricted to showcase the full platform capabilities.
                     </p>
                   </div>

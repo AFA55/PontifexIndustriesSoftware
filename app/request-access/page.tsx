@@ -129,7 +129,7 @@ export default function RequestAccessPage() {
             <span className="text-4xl">📝</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Request Access</h1>
-          <p className="text-gray-600">Submit your information to request access to Pontifex Industries platform</p>
+          <p className="text-gray-600">Submit your information to request access to Patriot Concrete Cutting platform</p>
         </div>
 
         {/* Error Message */}

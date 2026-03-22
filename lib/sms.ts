@@ -129,7 +129,7 @@ export async function sendInRouteNotification(options: {
   jobNumber?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const message = `
-🚗 Pontifex Industries Update
+🚗 Patriot Concrete Cutting Update
 
 ${options.operatorName} is on the way!
 
@@ -154,7 +154,7 @@ export async function send15MinuteNotification(options: {
   jobNumber?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const message = `
-📍 Pontifex Industries Update
+📍 Patriot Concrete Cutting Update
 
 ${options.operatorName} is 15 minutes away!
 
@@ -180,7 +180,7 @@ export async function sendStandbyNotification(options: {
   jobNumber?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const message = `
-⏱️ Pontifex Industries - Standby Notice
+⏱️ Patriot Concrete Cutting - Standby Notice
 
 ${options.operatorName} is on-site but unable to proceed.
 
@@ -208,7 +208,7 @@ export async function sendArrivedNotification(options: {
   jobNumber?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const message = `
-✅ Pontifex Industries Update
+✅ Patriot Concrete Cutting Update
 
 ${options.operatorName} has arrived on-site and is beginning work.
 

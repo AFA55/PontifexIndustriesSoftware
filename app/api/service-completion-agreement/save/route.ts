@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Pontifex Industries (formerly B&D Concrete Cutting)', pageWidth / 2, yPos, { align: 'center' });
+    pdf.text('Patriot Concrete Cutting (formerly B&D Concrete Cutting)', pageWidth / 2, yPos, { align: 'center' });
     yPos += 15;
 
     // Job Information
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     yPos += 10;
 
     pdf.setFont('helvetica', 'normal');
-    const ackText = `I acknowledge that Pontifex Industries (formerly B&D Concrete Cutting) has ${signatureData.workSatisfactory ? 'satisfactorily completed' : 'completed'} the contracted services at the above location as described.`;
+    const ackText = `I acknowledge that Patriot Concrete Cutting (formerly B&D Concrete Cutting) has ${signatureData.workSatisfactory ? 'satisfactorily completed' : 'completed'} the contracted services at the above location as described.`;
     const ackLines = pdf.splitTextToSize(ackText, contentWidth);
     pdf.text(ackLines, margin, yPos);
     yPos += (ackLines.length * 7) + 10;
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     const footerY = pdf.internal.pageSize.getHeight() - 20;
     pdf.setFontSize(8);
     pdf.setTextColor(128, 128, 128);
-    pdf.text('Generated with Claude Code - Pontifex Platform', pageWidth / 2, footerY, { align: 'center' });
+    pdf.text('Generated with Claude Code - Patriot Platform', pageWidth / 2, footerY, { align: 'center' });
 
     // Convert PDF to buffer
     const pdfBuffer = Buffer.from(pdf.output('arraybuffer'));
@@ -284,14 +284,14 @@ export async function POST(request: NextRequest) {
               html: `
                 <h2>Service Completion Agreement</h2>
                 <p>Dear ${job.customer},</p>
-                <p>Thank you for choosing Pontifex Industries (formerly B&D Concrete Cutting)!</p>
+                <p>Thank you for choosing Patriot Concrete Cutting (formerly B&D Concrete Cutting)!</p>
                 <p>Your signed Service Completion Agreement is attached to this email for your records.</p>
                 <p><strong>Job ID:</strong> ${jobId}</p>
                 <p><strong>Signed by:</strong> ${signatureData.customerName}</p>
                 <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
                 <p>You can also view the document here: <a href="${publicUrl}">View PDF</a></p>
                 <p>If you have any questions, please don't hesitate to contact us.</p>
-                <p>Best regards,<br>Pontifex Industries Team</p>
+                <p>Best regards,<br>Patriot Concrete Cutting Team</p>
               `,
               pdfUrl: publicUrl,
               pdfName: fileName

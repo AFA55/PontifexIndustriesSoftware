@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     yPos += 10;
 
     pdf.setFontSize(12);
-    pdf.text('Pontifex Industries', 105, yPos, { align: 'center' });
+    pdf.text('Patriot Concrete Cutting', 105, yPos, { align: 'center' });
     yPos += 15;
 
     // Job Information

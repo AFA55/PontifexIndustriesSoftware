@@ -316,7 +316,7 @@ export default function InvoicePDF({
 }) {
   const primaryColor = branding?.primary_color || '#7C3AED';
   const s = createStyles(primaryColor);
-  const companyName = branding?.company_name || 'Pontifex Industries';
+  const companyName = branding?.company_name || 'Patriot Concrete Cutting';
   const companyAddress = branding?.company_address || '';
   const companyPhone = branding?.company_phone || '';
 

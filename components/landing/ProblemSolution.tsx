@@ -101,7 +101,7 @@ export default function ProblemSolution() {
             </motion.ul>
           </motion.div>
 
-          {/* Right Card -- The Pontifex Way */}
+          {/* Right Card -- The Patriot Way */}
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}

@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
         unit_id: unit.id,
         event_type: 'nfc_scanned',
         performed_by: auth.userId,
-        description: `Scanned via ${scanMethod === 'nfc' ? 'NFC tag' : scanMethod === 'id' ? 'Pontifex ID' : 'lookup'} "${scanIdentifier}"`,
+        description: `Scanned via ${scanMethod === 'nfc' ? 'NFC tag' : scanMethod === 'id' ? 'Patriot ID' : 'lookup'} "${scanIdentifier}"`,
         metadata: {
           scan_method: scanMethod,
           identifier: scanIdentifier,

@@ -85,7 +85,7 @@ export default function OperatorsMonitoringPage() {
       if (!session) {
         console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
         localStorage.removeItem('supabase-user');
-        localStorage.removeItem('pontifex-user');
+        localStorage.removeItem('patriot-user');
         window.location.href = '/login';
         return;
       }

@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const isDemoOperator = profile?.email === 'demo@pontifex.com' ||
+    const isDemoOperator = profile?.email === 'demo@patriotcc.com' ||
                           profile?.full_name === 'Demo Operator';
 
     console.log('[LIABILITY PDF] Is demo operator:', isDemoOperator);
@@ -151,11 +151,11 @@ export async function POST(request: NextRequest) {
     console.log('[LIABILITY PDF] Sending email to:', customerEmail);
 
     try {
-      const emailCompanyName = (pdfBranding.company_name as string) || 'Pontifex Industries';
+      const emailCompanyName = (pdfBranding.company_name as string) || 'Patriot Concrete Cutting';
       const emailPhone = (pdfBranding.support_phone as string) || '(833) 695-4288';
-      const emailSupportAddr = (pdfBranding.support_email as string) || 'support@pontifexindustries.com';
+      const emailSupportAddr = (pdfBranding.support_email as string) || 'support@patriotconcretecutting.com';
       const emailResult = await getResend().emails.send({
-        from: `${emailCompanyName} <noreply@pontifexindustries.com>`,
+        from: `${emailCompanyName} <noreply@patriotconcretecutting.com>`,
         to: customerEmail,
         subject: `Liability Release - Job #${jobNumber || jobId}`,
         html: `

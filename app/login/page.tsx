@@ -262,7 +262,7 @@ export default function LoginPage() {
                 <h4 className="text-blue-800 font-bold text-xs tracking-wider">OPERATOR DASHBOARD</h4>
               </div>
               <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-blue-700 font-bold">Email:</span> demo@pontifex.com</div>
+                <div><span className="text-blue-700 font-bold">Email:</span> demo@patriotcc.com</div>
                 <div><span className="text-blue-700 font-bold">Password:</span> Demo1234!</div>
               </div>
             </div>
@@ -274,7 +274,7 @@ export default function LoginPage() {
                 <h4 className="text-green-800 font-bold text-xs tracking-wider">TEAM MEMBER DASHBOARD</h4>
               </div>
               <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-green-700 font-bold">Email:</span> team@pontifex.com</div>
+                <div><span className="text-green-700 font-bold">Email:</span> team@patriotcc.com</div>
                 <div><span className="text-green-700 font-bold">Password:</span> Team1234!</div>
               </div>
             </div>
@@ -286,7 +286,7 @@ export default function LoginPage() {
                 <h4 className="text-red-800 font-bold text-xs tracking-wider">ADMIN DASHBOARD</h4>
               </div>
               <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-red-700 font-bold">Email:</span> admin@pontifex.com</div>
+                <div><span className="text-red-700 font-bold">Email:</span> admin@patriotcc.com</div>
                 <div><span className="text-red-700 font-bold">Password:</span> Admin1234!</div>
               </div>
             </div>

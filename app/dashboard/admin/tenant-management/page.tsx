@@ -528,7 +528,7 @@ function CreateTenantModal({ onClose, onCreate }: {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">URL Slug *</label>
             <div className="flex items-center">
-              <span className="px-3 py-2.5 bg-gray-50 border border-r-0 border-gray-200 rounded-l-xl text-sm text-gray-400">app.pontifex.com/</span>
+              <span className="px-3 py-2.5 bg-gray-50 border border-r-0 border-gray-200 rounded-l-xl text-sm text-gray-400">app.patriotconcretecutting.com/</span>
               <input
                 type="text"
                 value={slug}

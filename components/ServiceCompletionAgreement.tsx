@@ -371,7 +371,7 @@ export default function ServiceCompletionAgreement({
 
               <div className="space-y-3">
                 <p className="text-gray-700 leading-relaxed">
-                  I acknowledge that <strong>Pontifex Industries</strong> (formerly B&D Concrete Cutting) has completed the contracted services at the above location as described. The work has been performed in accordance with the scope of services requested.
+                  I acknowledge that <strong>Patriot Concrete Cutting</strong> (formerly B&D Concrete Cutting) has completed the contracted services at the above location as described. The work has been performed in accordance with the scope of services requested.
                 </p>
 
                 <div className="bg-white rounded-lg p-4 space-y-3">
@@ -659,13 +659,13 @@ export default function ServiceCompletionAgreement({
                 <h4 className="font-bold text-gray-900 mb-4">Liability Release & Indemnification</h4>
                 <div className="space-y-3 text-gray-700 text-sm leading-relaxed">
                   <p>
-                    <strong>Limitation of Liability:</strong> Pontifex Industries' liability for any claim arising out of this agreement shall not exceed the total amount paid for the services rendered. We shall not be liable for any indirect, incidental, special, or consequential damages.
+                    <strong>Limitation of Liability:</strong> Patriot Concrete Cutting' liability for any claim arising out of this agreement shall not exceed the total amount paid for the services rendered. We shall not be liable for any indirect, incidental, special, or consequential damages.
                   </p>
                   <p>
-                    <strong>Indemnification:</strong> Customer agrees to indemnify, defend, and hold harmless Pontifex Industries, its officers, employees, and agents from any claims, damages, losses, or expenses (including reasonable attorney fees) arising from: (a) Customer's breach of this agreement; (b) Customer's use of the services or work product; (c) Any third-party claims related to the work performed at Customer's premises.
+                    <strong>Indemnification:</strong> Customer agrees to indemnify, defend, and hold harmless Patriot Concrete Cutting, its officers, employees, and agents from any claims, damages, losses, or expenses (including reasonable attorney fees) arising from: (a) Customer's breach of this agreement; (b) Customer's use of the services or work product; (c) Any third-party claims related to the work performed at Customer's premises.
                   </p>
                   <p>
-                    <strong>Underground Utilities:</strong> Customer warrants that all underground utilities have been properly marked and disclosed. Pontifex Industries is not liable for damage to unmarked or incorrectly marked utilities.
+                    <strong>Underground Utilities:</strong> Customer warrants that all underground utilities have been properly marked and disclosed. Patriot Concrete Cutting is not liable for damage to unmarked or incorrectly marked utilities.
                   </p>
                   <p>
                     <strong>Site Conditions:</strong> Customer is responsible for site safety and access. Any unforeseen site conditions that affect the scope of work may result in additional charges.

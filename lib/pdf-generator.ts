@@ -266,7 +266,7 @@ export class PDFGenerator {
       yPosition = pageHeight - 15;
       pdf.setFontSize(8);
       pdf.setTextColor(100, 100, 100);
-      pdf.text('Generated with Pontifex Industries Platform', margin, yPosition);
+      pdf.text('Generated with Patriot Concrete Cutting Platform', margin, yPosition);
       pdf.text(`Page ${pdf.internal.pages.length - 1}`, pageWidth - margin - 15, yPosition);
 
       // Upload to Supabase Storage

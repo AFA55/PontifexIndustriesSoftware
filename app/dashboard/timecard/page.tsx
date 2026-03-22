@@ -64,7 +64,7 @@ export default function TimecardPage() {
     isRedirecting.current = true;
     console.warn('Session expired, redirecting to login...');
     localStorage.removeItem('supabase-user');
-    localStorage.removeItem('pontifex-user');
+    localStorage.removeItem('patriot-user');
     window.location.href = '/login';
   }, []);
 

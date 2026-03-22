@@ -13,7 +13,7 @@ interface OnboardingStep {
 const OPERATOR_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: 'Welcome to Pontifex Industries! 👋',
+    title: 'Welcome to Patriot Concrete Cutting! 👋',
     description: 'Your complete job management platform. Let us show you how to navigate your workday with ease.',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,7 +143,7 @@ export default function OnboardingTour({ userId, onComplete }: OnboardingTourPro
   const handleNext = () => {
     if (isLastStep) {
       // Mark as completed in localStorage
-      localStorage.setItem(`pontifex-onboarding-${userId}`, 'completed');
+      localStorage.setItem(`patriot-onboarding-${userId}`, 'completed');
       setIsVisible(false);
       onComplete();
     } else {
@@ -158,7 +158,7 @@ export default function OnboardingTour({ userId, onComplete }: OnboardingTourPro
   };
 
   const handleSkip = () => {
-    localStorage.setItem(`pontifex-onboarding-${userId}`, 'skipped');
+    localStorage.setItem(`patriot-onboarding-${userId}`, 'skipped');
     setIsVisible(false);
     onComplete();
   };

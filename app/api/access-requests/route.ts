@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     const emailSent = await sendEmail({
       to: email,
-      subject: 'Access Request Received - Pontifex Industries',
+      subject: 'Access Request Received - Patriot Concrete Cutting',
       html: confirmationEmailHtml,
     });
 

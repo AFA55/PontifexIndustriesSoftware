@@ -12,8 +12,8 @@ const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build'
 
 // Allowed domains for PDF URL fetching (SSRF protection)
 const ALLOWED_PDF_DOMAINS = [
-  'pontifexindustries.com',
-  'www.pontifexindustries.com',
+  'patriotconcretecutting.com',
+  'www.patriotconcretecutting.com',
   'pontifex-industries-software-z8py.vercel.app',
   'localhost',
 ];
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare email options
     const emailOptions: any = {
-      from: process.env.RESEND_FROM_EMAIL || 'Pontifex Industries <onboarding@resend.dev>',
+      from: process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <onboarding@resend.dev>',
       to: [to],
       subject: subject,
       html: html,

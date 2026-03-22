@@ -188,7 +188,7 @@ function EquipmentUnitsContent() {
         try {
           setNfcPairingStatus('writing');
 
-          // Write the Pontifex ID to the NFC tag
+          // Write the Patriot ID to the NFC tag
           await ndef.write({
             records: [{ recordType: 'text', data: pontifexId }],
           });
@@ -530,7 +530,7 @@ function EquipmentUnitsContent() {
             <table className="w-full">
               <thead className="bg-gray-50/80 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Pontifex ID</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Patriot ID</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 hidden md:table-cell">Category</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
@@ -701,7 +701,7 @@ function EquipmentUnitsContent() {
                                       <Smartphone className="w-5 h-5 text-indigo-600" />
                                       <div>
                                         <p className="text-gray-800 text-sm font-semibold">Pair NFC Tag</p>
-                                        <p className="text-gray-500 text-xs">Write Pontifex ID to NFC tag</p>
+                                        <p className="text-gray-500 text-xs">Write Patriot ID to NFC tag</p>
                                       </div>
                                     </button>
                                   )}

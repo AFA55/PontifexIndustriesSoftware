@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Create auth user
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: 'Pontifex2026!', // Default password — user should change on first login
+      password: 'Patriot2026!', // Default password — user should change on first login
       email_confirm: true,
       user_metadata: { full_name: fullName },
     });

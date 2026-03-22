@@ -83,9 +83,9 @@ interface CompletionForm {
 }
 
 // ============================================================
-// Pontifex Logo (consistent with admin)
+// Patriot Logo (consistent with admin)
 // ============================================================
-function PontifexLogo({ className = "h-8" }: { className?: string }) {
+function PatriotLogo({ className = "h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 250 60" fill="none" xmlns="http://www.w3.org/2000/svg">
       <g>
@@ -504,7 +504,7 @@ export default function ShopDashboard() {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="transform hover:scale-105 transition-transform duration-200">
-              <PontifexLogo className="h-10 text-white" />
+              <PatriotLogo className="h-10 text-white" />
             </div>
 
             <div className="flex items-center gap-3">
@@ -876,7 +876,7 @@ export default function ShopDashboard() {
                         type="text"
                         value={equipmentSearch}
                         onChange={(e) => setEquipmentSearch(e.target.value)}
-                        placeholder="Search by name or Pontifex ID..."
+                        placeholder="Search by name or Patriot ID..."
                         className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                       />
                       {equipmentSearchLoading && (
