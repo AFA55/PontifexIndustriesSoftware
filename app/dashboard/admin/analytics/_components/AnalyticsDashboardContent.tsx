@@ -13,7 +13,8 @@ import { supabase } from '@/lib/supabase';
 import DashboardHeader from './DashboardHeader';
 import KPIRow from './KPIRow';
 import WidgetWrapper from './WidgetWrapper';
-import AddWidgetModal from './AddWidgetModal';
+import DashboardSettingsPanel from './DashboardSettingsPanel';
+import { LAYOUT_PRESETS, LayoutPreset } from './LayoutPresets';
 import { WIDGET_REGISTRY, getDefaultLayout } from './WidgetRegistry';
 import { TimeRange, WidgetProps } from './types';
 
@@ -35,6 +36,12 @@ const CommissionWidget = dynamic(() => import('./widgets/CommissionWidget'), { s
 const MyJobsWidget = dynamic(() => import('./widgets/MyJobsWidget'), { ssr: false });
 const PipelineWidget = dynamic(() => import('./widgets/PipelineWidget'), { ssr: false });
 const InvoiceSummaryWidget = dynamic(() => import('./widgets/InvoiceSummaryWidget'), { ssr: false });
+const QuickNotesWidget = dynamic(() => import('./widgets/QuickNotesWidget'), { ssr: false });
+const MyTasksWidget = dynamic(() => import('./widgets/MyTasksWidget'), { ssr: false });
+const TeamMessagesWidget = dynamic(() => import('./widgets/TeamMessagesWidget'), { ssr: false });
+const MiniCalendarWidget = dynamic(() => import('./widgets/MiniCalendarWidget'), { ssr: false });
+const NotificationsFeedWidget = dynamic(() => import('./widgets/NotificationsFeedWidget'), { ssr: false });
+const CrewUtilizationWidget = dynamic(() => import('./widgets/CrewUtilizationWidget'), { ssr: false });
 
 const WIDGET_COMPONENT_MAP: Record<string, React.ComponentType<WidgetProps>> = {
   revenue_overview: RevenueOverviewWidget as unknown as React.ComponentType<WidgetProps>,
@@ -51,6 +58,12 @@ const WIDGET_COMPONENT_MAP: Record<string, React.ComponentType<WidgetProps>> = {
   my_jobs: MyJobsWidget as unknown as React.ComponentType<WidgetProps>,
   pipeline: PipelineWidget as unknown as React.ComponentType<WidgetProps>,
   invoice_summary: InvoiceSummaryWidget as unknown as React.ComponentType<WidgetProps>,
+  quick_notes: QuickNotesWidget as unknown as React.ComponentType<WidgetProps>,
+  my_tasks: MyTasksWidget as unknown as React.ComponentType<WidgetProps>,
+  team_messages: TeamMessagesWidget as unknown as React.ComponentType<WidgetProps>,
+  mini_calendar: MiniCalendarWidget as unknown as React.ComponentType<WidgetProps>,
+  notifications_feed: NotificationsFeedWidget as unknown as React.ComponentType<WidgetProps>,
+  crew_utilization: CrewUtilizationWidget as unknown as React.ComponentType<WidgetProps>,
 };
 
 const ALLOWED_ROLES = ['admin', 'super_admin', 'operations_manager', 'salesman', 'supervisor'];
@@ -61,8 +74,15 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('monthly');
   const [editMode, setEditMode] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [layoutItems, setLayoutItems] = useState<Layout>([]);
+  const [density, setDensity] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboard-density');
+      return saved ? Number(saved) : 72;
+    }
+    return 72;
+  });
   const [dashboardData, setDashboardData] = useState<Record<string, any>>({});
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [token, setToken] = useState<string>('');
@@ -180,11 +200,6 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
     return layoutItems.map((item) => item.i);
   }, [layoutItems]);
 
-  const availableWidgets = useMemo(() => {
-    return Object.values(WIDGET_REGISTRY)
-      .filter((w) => w.roles.includes(userRole) && !activeWidgetIds.includes(w.id))
-      .map((w) => ({ id: w.id, title: w.title, description: w.description, icon: w.icon }));
-  }, [userRole, activeWidgetIds]);
 
   const handleAddWidget = useCallback(
     (widgetId: string) => {
@@ -211,6 +226,43 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
     setLayoutItems((prev) => prev.filter((item) => item.i !== widgetId));
   }, []);
 
+  const handleToggleWidget = useCallback(
+    (widgetId: string, active: boolean) => {
+      if (active) {
+        handleAddWidget(widgetId);
+      } else {
+        handleRemoveWidget(widgetId);
+      }
+    },
+    [handleAddWidget, handleRemoveWidget]
+  );
+
+  const handleApplyPreset = useCallback(
+    (preset: LayoutPreset) => {
+      const newLayout = preset.getLayout();
+      setLayoutItems(newLayout);
+      setShowSettings(false);
+
+      // Save layout
+      if (token) {
+        fetch('/api/admin/dashboard-layout', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ layout: { lg: newLayout } }),
+        }).catch(() => {});
+      }
+    },
+    [token]
+  );
+
+  const handleDensityChange = useCallback((rowHeight: number) => {
+    setDensity(rowHeight);
+    localStorage.setItem('dashboard-density', String(rowHeight));
+  }, []);
+
   if (loading) {
     return (
       <div className={`${embedded ? '' : 'min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50'} flex items-center justify-center py-20`}>
@@ -223,13 +275,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
   }
 
   return (
-    <div className={embedded ? '' : 'min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50'}>
-      {!embedded && (
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full opacity-10 blur-3xl animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full opacity-10 blur-3xl animate-pulse"></div>
-        </div>
-      )}
+    <div className={embedded ? '' : 'min-h-screen bg-gray-50'}>
 
       {embedded ? (
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -271,14 +317,16 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
             >
               {editMode ? 'Done' : 'Customize'}
             </button>
-            {editMode && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-100 transition-all"
-              >
-                + Add Widget
-              </button>
-            )}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
+              title="Dashboard settings"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
           </div>
         </div>
       ) : (
@@ -288,11 +336,11 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
           editMode={editMode}
           onToggleEdit={() => setEditMode((prev) => !prev)}
           onRefresh={fetchStats}
-          onAddWidget={editMode ? () => setShowAddModal(true) : undefined}
+          onOpenSettings={() => setShowSettings(true)}
         />
       )}
 
-      <div className={`${embedded ? '' : 'container mx-auto px-4 py-8'} max-w-7xl space-y-6 relative`}>
+      <div className={`${embedded ? '' : 'container mx-auto px-4 py-4'} max-w-7xl space-y-3 relative`}>
         <KPIRow
           data={dashboardData.kpi ?? null}
           isLoading={isDataLoading}
@@ -305,8 +353,8 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
               layouts={{ lg: layoutItems }}
               breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
               cols={{ lg: 12, md: 8, sm: 4, xs: 2 }}
-              rowHeight={100}
-              margin={[16, 16]}
+              rowHeight={density}
+              margin={[12, 12]}
               dragConfig={{
                 enabled: editMode,
                 handle: '.drag-handle',
@@ -351,11 +399,15 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
         )}
       </div>
 
-      <AddWidgetModal
-        open={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        availableWidgets={availableWidgets}
-        onAdd={handleAddWidget}
+      <DashboardSettingsPanel
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        activeWidgetIds={activeWidgetIds}
+        userRole={userRole}
+        onToggleWidget={handleToggleWidget}
+        onApplyPreset={handleApplyPreset}
+        density={density}
+        onDensityChange={handleDensityChange}
       />
     </div>
   );

@@ -486,6 +486,88 @@ export async function GET(request: NextRequest) {
       })());
     }
 
+    // ─── NOTIFICATIONS widget (dataKey: 'notifications') ──────
+    queries.push((async () => {
+      const { data, error } = await supabaseAdmin
+        .from('schedule_notifications')
+        .select('*')
+        .eq('recipient_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error && isTableNotFoundError(error)) {
+        widgetData.notifications = { items: [], unread: 0 };
+        return;
+      }
+
+      widgetData.notifications = {
+        items: data || [],
+        unread: (data || []).filter((n: any) => !n.read).length,
+      };
+    })());
+
+    // ─── CALENDAR widget (dataKey: 'calendar') ──────────────────
+    queries.push((async () => {
+      const fourteenDays = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+      const { data } = await supabaseAdmin
+        .from('job_orders')
+        .select('id, job_number, customer_name, status, scheduled_date, scheduled_time')
+        .gte('scheduled_date', thirtyDaysAgo)
+        .lte('scheduled_date', fourteenDays)
+        .order('scheduled_date');
+
+      const byDate: Record<string, any> = {};
+      for (const j of data || []) {
+        if (!j.scheduled_date) continue;
+        if (!byDate[j.scheduled_date]) byDate[j.scheduled_date] = { count: 0, jobs: [] };
+        byDate[j.scheduled_date].count++;
+        byDate[j.scheduled_date].jobs.push({
+          id: j.id,
+          job_number: j.job_number,
+          customer: j.customer_name,
+          status: j.status,
+          time: j.scheduled_time,
+        });
+      }
+
+      widgetData.calendar = { dates: byDate };
+    })());
+
+    // ─── CREW UTILIZATION widget (dataKey: 'crew_utilization') ──
+    if (isOpsRole) {
+      queries.push((async () => {
+        // Count active operators
+        const { data: ops } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('active', true)
+          .in('role', ['operator', 'apprentice']);
+        const totalOperators = ops?.length || 0;
+        const availableHours = totalOperators * 8;
+
+        // Count scheduled hours today
+        const { data: todayJobs } = await supabaseAdmin
+          .from('job_orders')
+          .select('id, estimated_hours')
+          .eq('scheduled_date', today)
+          .not('status', 'in', '("completed","cancelled")');
+        const scheduledHours = (todayJobs || []).reduce(
+          (sum: number, j: any) => sum + Number(j.estimated_hours || 4), 0
+        );
+        const utilization = availableHours > 0
+          ? Math.round((scheduledHours / availableHours) * 100)
+          : 0;
+
+        widgetData.crew_utilization = {
+          total_operators: totalOperators,
+          available_hours: availableHours,
+          scheduled_hours: scheduledHours,
+          utilization_pct: utilization,
+        };
+      })());
+    }
+
     // Execute all queries in parallel
     await Promise.all(queries);
 

@@ -1,8 +1,5 @@
 'use client';
 
-import { DollarSign, Briefcase, CheckCircle, Users, TrendingUp, TrendingDown } from 'lucide-react';
-import { KPISkeleton } from './widgets/LoadingSkeleton';
-
 interface KPIData {
   total_revenue: number;
   active_jobs: number;
@@ -25,72 +22,80 @@ function formatCurrency(value: number): string {
   return `$${value}`;
 }
 
-const CARDS = [
+const CELLS = [
   {
     key: 'total_revenue' as const,
-    label: 'Total Revenue',
-    icon: DollarSign,
-    gradient: 'from-blue-500 via-indigo-500 to-purple-600',
+    label: 'Revenue',
+    dotColor: 'bg-purple-500',
     format: (v: number) => formatCurrency(v),
     trendKey: 'revenue_trend' as const,
   },
   {
     key: 'active_jobs' as const,
     label: 'Active Jobs',
-    icon: Briefcase,
-    gradient: 'from-cyan-500 via-blue-500 to-indigo-600',
+    dotColor: 'bg-blue-500',
     format: (v: number) => String(v),
     trendKey: 'jobs_trend' as const,
   },
   {
     key: 'completion_rate' as const,
-    label: 'Completion Rate',
-    icon: CheckCircle,
-    gradient: 'from-emerald-500 via-green-500 to-teal-600',
+    label: 'Completion',
+    dotColor: 'bg-green-500',
     format: (v: number) => `${v}%`,
     trendKey: 'completion_trend' as const,
   },
   {
     key: 'active_crews' as const,
-    label: 'Active Crews',
-    icon: Users,
-    gradient: 'from-orange-500 via-amber-500 to-yellow-600',
+    label: 'Crews',
+    dotColor: 'bg-orange-500',
     format: (v: number) => String(v),
     trendKey: 'crews_trend' as const,
   },
 ];
 
 export default function KPIRow({ data, isLoading }: KPIRowProps) {
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {CARDS.map((card) => {
-        if (isLoading) {
-          return (
-            <div key={card.key} className={`bg-gradient-to-br ${card.gradient} rounded-2xl p-5 text-white shadow-lg`}>
-              <KPISkeleton />
-            </div>
-          );
-        }
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex divide-x divide-gray-100">
+        {CELLS.map((cell) => (
+          <div key={cell.key} className="flex-1 px-4 py-3">
+            <div className="h-2.5 w-16 bg-gray-200 rounded animate-pulse mb-2" />
+            <div className="h-6 w-12 bg-gray-200 rounded animate-pulse" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
-        const value = data?.[card.key] ?? 0;
-        const trend = data?.[card.trendKey] ?? 0;
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex divide-x divide-gray-100">
+      {CELLS.map((cell) => {
+        const value = data?.[cell.key] ?? 0;
+        const trend = data?.[cell.trendKey] ?? 0;
         const isUp = trend >= 0;
 
         return (
-          <div key={card.key} className={`bg-gradient-to-br ${card.gradient} rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transform hover:scale-[1.03] transition-all duration-300`}>
-            <div className="flex items-start justify-between">
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-lg">
-                <card.icon className="w-6 h-6" />
-              </div>
+          <div key={cell.key} className="flex-1 px-4 py-3">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className={`w-2 h-2 rounded-full ${cell.dotColor}`} />
+              <span className="text-[11px] text-gray-500 font-medium uppercase tracking-wider">
+                {cell.label}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-gray-900">
+                {cell.format(value)}
+              </span>
               {trend !== 0 && (
-                <div className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${isUp ? 'bg-white/20' : 'bg-red-400/30'}`}>
-                  {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {Math.abs(trend)}%
-                </div>
+                <span
+                  className={`text-[10px] font-semibold ${
+                    isUp ? 'text-green-600' : 'text-red-500'
+                  }`}
+                >
+                  {isUp ? '▲' : '▼'} {Math.abs(trend)}%
+                </span>
               )}
             </div>
-            <p className="text-3xl font-bold mt-3 drop-shadow-lg">{card.format(value)}</p>
-            <p className="text-sm text-white/90 font-semibold mt-1">{card.label}</p>
           </div>
         );
       })}

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Pencil, RefreshCw, Plus, Check } from 'lucide-react';
+import { ArrowLeft, Pencil, RefreshCw, Settings, Check } from 'lucide-react';
 import TimeRangeSelector from './TimeRangeSelector';
 import { TimeRange } from './types';
 
@@ -11,7 +11,7 @@ interface DashboardHeaderProps {
   editMode: boolean;
   onToggleEdit: () => void;
   onRefresh: () => void;
-  onAddWidget?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export default function DashboardHeader({
@@ -20,7 +20,7 @@ export default function DashboardHeader({
   editMode,
   onToggleEdit,
   onRefresh,
-  onAddWidget,
+  onOpenSettings,
 }: DashboardHeaderProps) {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -31,7 +31,7 @@ export default function DashboardHeader({
 
   return (
     <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
-      <div className="container mx-auto px-4 py-4 max-w-7xl">
+      <div className="container mx-auto px-4 py-3 max-w-7xl">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Link
@@ -69,13 +69,13 @@ export default function DashboardHeader({
               <RefreshCw className="w-4 h-4" />
             </button>
 
-            {editMode && onAddWidget && (
+            {onOpenSettings && (
               <button
-                onClick={onAddWidget}
-                className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-xl transition-all shadow-lg"
-                title="Add widget"
+                onClick={onOpenSettings}
+                className="p-2 bg-white/10 border border-white/20 rounded-xl text-blue-200 hover:bg-white/20 hover:text-white transition-all"
+                title="Dashboard settings"
               >
-                <Plus className="w-4 h-4" />
+                <Settings className="w-4 h-4" />
               </button>
             )}
           </div>

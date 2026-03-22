@@ -11,10 +11,10 @@ interface WidgetWrapperProps {
 
 export default function WidgetWrapper({ title, editMode, onRemove, children }: WidgetWrapperProps) {
   return (
-    <div className={`bg-gradient-to-br from-white to-gray-50 rounded-3xl border border-gray-200/80 shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col h-full overflow-hidden ${editMode ? 'ring-2 ring-blue-200 ring-offset-2' : ''}`}>
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-200 transition-all duration-300 flex flex-col h-full overflow-hidden ${editMode ? 'ring-1 ring-blue-300' : ''}`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <h3 className="text-sm font-bold text-gray-800">{title}</h3>
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h3>
         <div className="flex items-center gap-1">
           {editMode && (
             <>
@@ -34,7 +34,7 @@ export default function WidgetWrapper({ title, editMode, onRemove, children }: W
         </div>
       </div>
       {/* Body */}
-      <div className="flex-1 px-5 pb-4 min-h-0 overflow-hidden">
+      <div className="flex-1 px-3 pb-2.5 min-h-0 overflow-hidden">
         {children}
       </div>
     </div>
