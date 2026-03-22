@@ -1,13 +1,13 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 21, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING
+**Date:** March 22, 2026 | **Branch:** `claude/mystifying-diffie` (worktree) | **Build Status:** PASSING
 
 ---
 
 ## CURRENT STATE
 
 ### Git Status
-- **Branch:** `feature/schedule-board-v2` (up to date with `origin/feature/schedule-board-v2`)
-- **Last commit:** `d8740252` — "feat: Global error handling, system health dashboard, SaaS multi-tenant foundation"
+- **Branch:** `claude/mystifying-diffie` (worktree off `feature/schedule-board-v2`)
+- **Last commit:** `c9251b90` — "fix: E2E workflow critical fixes — invoice rates, work item persistence, photo uploads"
 - **Clean working tree** (all changes committed and pushed)
 
 ### Recent Commits (March 21)
@@ -37,6 +37,26 @@ f83b4c15 feat: Customer CRM system with profiles, contacts, and schedule form in
 ab330d34 feat: Drag-and-drop schedule board with operator view + smart skill matching
 c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 ```
+
+---
+
+## WHAT WAS DONE (March 22 Session)
+
+### 1. Applied Pending Migration
+- Tables created in Supabase: `tenants`, `tenant_users`, `backup_logs`
+- Extended existing `error_logs` table with new columns (type, stack_trace, component_stack, url, user_agent, metadata)
+- All RLS policies applied
+
+### 2. E2E Workflow Audit (Schedule → Dispatch → Execute → Complete → Invoice)
+- **Schedule → Dispatch:** Fully functional. Form creates `pending_approval` job, dispatch updates `dispatched_at` + creates operator notifications, PDF endpoint works.
+- **Execute → Complete:** Functional but had data persistence gaps (fixed below).
+- **Complete → Invoice:** Had critical $0 rate bug (fixed below).
+
+### 3. Critical Fixes Applied
+- **Invoice line items had $0 rates** — Added default rate card: Core Drilling $150/core, Wall Sawing $12/LF, Flat Sawing $8/LF, etc. Labor at $125/hr. Admin can still adjust on draft invoice.
+- **Work items only in localStorage** — Daily-log API now also persists work items to `work_items` table (fire-and-forget) so billing can pull line items from DB.
+- **Photos were fire-and-forget** — Both "Done for Today" and "Job Complete" flows now await photo upload before proceeding.
+- **Build failure** — Fixed Resend SDK instantiation at module level in liability-release PDF route (lazy init with fallback).
 
 ---
 
@@ -140,8 +160,8 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 - [x] System health monitoring dashboard
 - [x] SaaS multi-tenant foundation
 - [x] Backup system (auto daily + manual snapshots)
-- [ ] Apply pending migration (error_logs, tenants, tenant_users, backup_logs)
-- [ ] E2E workflow testing (schedule → dispatch → execute → complete → invoice)
+- [x] Apply pending migration (error_logs, tenants, tenant_users, backup_logs)
+- [x] E2E workflow audit + critical fixes (invoice rates, work item persistence, photo uploads)
 - [ ] White-label rebrand finalization (Patriot-specific assets: logos, colors)
 - [ ] Production deployment prep (env vars, custom domain, SSL)
 - [ ] Final build verification & merge to main
@@ -163,10 +183,10 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 ## WHAT TO DO NEXT
 
 ### Immediate Priority
-1. Apply migration `20260320_add_error_logs_tenants_backups.sql` to Supabase
-2. E2E workflow testing — test the full pipeline end-to-end
-3. Apply Patriot branding assets via `/dashboard/admin/settings/branding`
-4. Production deployment prep
+1. ~~Apply migration~~ — DONE
+2. ~~E2E workflow audit + fixes~~ — DONE
+3. White-label rebrand: apply Patriot branding assets via `/dashboard/admin/settings/branding`
+4. Production deployment prep (env vars, custom domain, SSL)
 
 ### Nice-to-Have (If Time Allows)
 - AR aging warnings on dispatch screen
@@ -184,7 +204,7 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 ---
 
 ## UNAPPLIED MIGRATIONS
-1. `20260320_add_error_logs_tenants_backups.sql` — error_logs, tenants, tenant_users, backup_logs tables
+None — all migrations applied.
 
 ---
 
