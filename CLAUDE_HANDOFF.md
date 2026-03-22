@@ -7,8 +7,16 @@
 
 ### Git Status
 - **Branch:** `claude/mystifying-diffie` (worktree off `feature/schedule-board-v2`)
-- **Last commit:** `c9251b90` — "fix: E2E workflow critical fixes — invoice rates, work item persistence, photo uploads"
-- **Clean working tree** (all changes committed and pushed)
+- **Last commit:** `990e9339` — "feat: Production deployment prep — env template, security headers, image optimization"
+- **Clean working tree** (all changes committed)
+
+### Recent Commits (March 22)
+```
+990e9339 feat: Production deployment prep — env template, security headers, image optimization
+d31f016f feat: White-label rebrand — Pontifex Industries → Patriot Concrete Cutting
+c9251b90 fix: E2E workflow critical fixes — invoice rates, work item persistence, photo uploads
+0413cef4 docs: Update handoff — March 22 session (migration, E2E audit, critical fixes)
+```
 
 ### Recent Commits (March 21)
 ```
@@ -52,7 +60,19 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 - **Execute → Complete:** Functional but had data persistence gaps (fixed below).
 - **Complete → Invoice:** Had critical $0 rate bug (fixed below).
 
-### 3. Critical Fixes Applied
+### 3. White-Label Rebrand (52 files)
+- Replaced all "Pontifex Industries" → "Patriot Concrete Cutting" across codebase
+- Updated branding defaults, metadata, email templates, SMS messages, legal documents, PDFs
+- Demo account emails changed to @patriotcc.com domain
+- localStorage keys and SVG IDs renamed
+- Verified all public pages (landing, login, shop-login, request-access)
+
+### 4. Production Deployment Prep
+- Created `.env.example` documenting all 17 env vars (required vs optional)
+- Added security headers to `next.config.js` (X-Frame-Options, CSP, etc.)
+- Configured Next.js image optimization for Supabase Storage
+
+### 5. Critical Fixes Applied
 - **Invoice line items had $0 rates** — Added default rate card: Core Drilling $150/core, Wall Sawing $12/LF, Flat Sawing $8/LF, etc. Labor at $125/hr. Admin can still adjust on draft invoice.
 - **Work items only in localStorage** — Daily-log API now also persists work items to `work_items` table (fire-and-forget) so billing can pull line items from DB.
 - **Photos were fire-and-forget** — Both "Done for Today" and "Job Complete" flows now await photo upload before proceeding.
@@ -162,8 +182,8 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 - [x] Backup system (auto daily + manual snapshots)
 - [x] Apply pending migration (error_logs, tenants, tenant_users, backup_logs)
 - [x] E2E workflow audit + critical fixes (invoice rates, work item persistence, photo uploads)
-- [ ] White-label rebrand finalization (Patriot-specific assets: logos, colors)
-- [ ] Production deployment prep (env vars, custom domain, SSL)
+- [x] White-label rebrand (Pontifex → Patriot Concrete Cutting, 52 files)
+- [x] Production deployment prep (.env.example, security headers, image optimization)
 - [ ] Final build verification & merge to main
 
 ### Bonus Features Built (Ahead of Schedule)
@@ -185,8 +205,10 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 ### Immediate Priority
 1. ~~Apply migration~~ — DONE
 2. ~~E2E workflow audit + fixes~~ — DONE
-3. White-label rebrand: apply Patriot branding assets via `/dashboard/admin/settings/branding`
-4. Production deployment prep (env vars, custom domain, SSL)
+3. ~~White-label rebrand~~ — DONE (52 files rebranded)
+4. ~~Production deployment prep~~ — DONE (.env.example, security headers)
+5. **Final build verification & merge to main** — NEXT
+6. **Deploy to Vercel** — set env vars, connect custom domain
 
 ### Nice-to-Have (If Time Allows)
 - AR aging warnings on dispatch screen
