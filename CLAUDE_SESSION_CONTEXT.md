@@ -1,88 +1,59 @@
 # Pontifex Industries Platform — Session Context
-> Last updated: 2026-03-09
+> Last updated: 2026-03-21
 > Use this file to resume work after a session restart.
 
 ---
 
 ## PART 1: CURRENT WORK IN PROGRESS
 
-### What We Built (All Code Complete ✅)
-
-**1. Custom Calendar Date Picker** ✅
-- Replaced native browser date picker with modern custom calendar
-- Purple/pink gradient theme matching app aesthetic
-- Prev/next day arrows, "Today" button, month navigation dropdown
-- **File**: `app/dashboard/admin/schedule-board/_components/ScheduleDatePicker.tsx` (NEW)
-
-**2. Smart Capacity API** ✅
-- **Endpoint**: `GET /api/admin/schedule-board/capacity`
-- Three modes: single date check, date range check, find-next-available
-- Counts active jobs per date (excludes `pending_approval`, `cancelled`, will-call)
-- Skips weekends, scans up to 90 days ahead for next available
-- **File**: `app/api/admin/schedule-board/capacity/route.ts` (NEW)
-
-**3. Configurable Capacity Settings** ✅
-- **Endpoint**: `GET/PATCH /api/admin/schedule-board/settings`
-- Super admin can adjust max_slots (default 10) and warning_threshold (default 8)
-- Settings gear icon on schedule board (super_admin only)
-- Inline modal to change capacity as team grows
-- **File**: `app/api/admin/schedule-board/settings/route.ts` (NEW)
-
-**4. Enhanced Approval Modal** ✅
-- Shows **quoted amount** (`estimated_cost`) with dollar icon
-- Shows **start date & end date** with day count for multi-day jobs
-- **Real-time capacity checking** — three visual states:
-  - 🟢 Green = clear to approve
-  - 🟡 Amber = warning threshold hit (requires checkbox acknowledgment)
-  - 🔴 Red = full capacity, blocks approval entirely
-- **"Find Next Available Date"** button when blocked/warning
-- "Use This Date" quick-apply from suggestion
-- **File**: `app/dashboard/admin/schedule-board/_components/ApprovalModal.tsx` (REWRITTEN)
-
-**5. Multi-Day Continuous Validation** ✅
-- If a job spans start_date → end_date, checks ALL dates have availability
-- Reports which specific dates are full or at warning level
-- Ensures no gaps in continuous availability before approval
-
-**6. Schedule Board Page Updates** ✅
-- `NUM_ROWS` now **dynamic** — driven by `capacityMaxSlots` from settings (not hardcoded 10)
-- Capacity indicator in stats bar with color-coded status (green/amber/red)
-- "Next Available" button for admin/salesman users
-- Settings gear button for super_admin
-- Floating "Next Available Date" result banner
-- Server-side capacity double-check in `handleApprove` before approving
-- **File**: `app/dashboard/admin/schedule-board/page.tsx` (MODIFIED)
-
-**7. Pending Queue Sidebar Updates** ✅
-- Shows estimated cost as green badge with DollarSign icon
-- Shows date range (start → end) for multi-day jobs
-- **File**: `app/dashboard/admin/schedule-board/_components/PendingQueueSidebar.tsx` (MODIFIED)
-
-**8. Job Orders API Update** ✅
-- Added `helper_assigned_to`, `estimated_cost`, `is_will_call`, `difficulty_rating` to allowed update fields
-- **File**: `app/api/admin/job-orders/[id]/route.ts` (MODIFIED)
-
-### What's Left (1 Item) 🔲
-
-**Database Migration** — `supabase/migrations/20260309_capacity_settings.sql`
-- Uses `DROP VIEW + CREATE VIEW` (NOT `CREATE OR REPLACE` — PostgreSQL can't add columns via replace)
-- Updates `schedule_board_view` to include `estimated_cost` + `scheduling_flexibility`
-- Creates `schedule_settings` table with default capacity (10 max, 8 warning)
-- RLS policies: read for admin/super_admin/salesman, write for super_admin only
-- Performance index on `job_orders.status`
-- **Status**: SQL file ready, NOT YET APPLIED to Supabase database
-- **Note**: The Supabase MCP tool was failing with `net::ERR_FAILED` — restart Claude Desktop to reset MCP connections
-
 ### Build Status
-- ✅ `npm run build` passes with zero errors
-- ✅ Dev server runs on port 3000
-- ✅ All code saved and ready
-- 🔲 Migration needs to be applied, then end-to-end verification
+- Build PASSING (zero errors)
+- All changes committed and pushed to `feature/schedule-board-v2`
+- Last commit: `d8740252` — Global error handling, system health, SaaS foundation
 
-### Next Steps After Migration
-1. Apply migration to Supabase
-2. Verify: login → schedule board → approve job with capacity warnings → test "Next Available" → test settings modal
-3. **Then**: Build job tickets for operators based on the new job cards
+### Unapplied Migration
+- **File:** `supabase/migrations/20260320_add_error_logs_tenants_backups.sql`
+- **Tables:** error_logs, tenants, tenant_users, backup_logs
+- **Reason:** Supabase MCP had `net::ERR_FAILED` network errors
+- **To apply:** Restart Claude Desktop to reset MCP, then run `apply_migration`
+
+### What Was Built This Sprint (March 19-21)
+
+**AI Features:**
+- AI Auto-Scheduling Engine — one-click intelligent operator assignment (`/api/admin/schedule-board/auto-schedule`)
+- AI Smart Fill — voice/text NLP job parsing for schedule form (`/api/admin/schedule-form/ai-parse`)
+- Smart Fill uses regex-based NLP (no external API costs), parses: service types, core holes, saw cuts, customers, addresses, dates, costs, difficulty, PO numbers, contacts, site conditions
+
+**Core Features:**
+- Photo upload during job execution (PhotoUploader → Supabase Storage `job-photos` bucket)
+- Enhanced signature capture (uploads PNG to Storage instead of raw base64)
+- Professional invoice PDF generation (@react-pdf/renderer server-side)
+- Customer CRM system with profiles, contacts, schedule form autocomplete
+- Dispatch ticket PDF redesign
+- White-label branding system (full settings UI, dynamic company name/colors)
+
+**Infrastructure:**
+- Global toast notification system (`useNotifications()` hook)
+- Network/connection monitor (offline detection, server health monitoring)
+- Global error boundary (prevents white screen crashes)
+- `useApi()` hook — authenticated fetch with auto error notifications
+- System health dashboard (real-time DB/Auth/Storage monitoring)
+- Health check endpoint (`/api/health`)
+- Client error logging endpoint (`/api/log-error`)
+- SaaS multi-tenant foundation (tenants, tenant_users, plans, feature flags)
+- Manual backup system (JSON snapshots to Supabase Storage)
+
+**Polish:**
+- Mobile responsive audit (billing, customers, schedule board, schedule form)
+- Loading states & error handling audit (retry banners across key pages)
+- Competitive analysis document (vs CenPoint, DSM)
+
+### Next Steps
+1. Apply pending migration to Supabase
+2. E2E workflow testing (schedule → dispatch → execute → complete → invoice)
+3. Apply Patriot branding assets (logos, colors)
+4. Production deployment prep (env vars, custom domain, SSL)
+5. Final build verification & merge to main
 
 ---
 
@@ -94,15 +65,20 @@
 - **Styling**: Tailwind CSS 3.3.0
 - **Database**: Supabase (PostgreSQL) — project ref: `klatddoyncxidgqtcjnu`
 - **Auth**: Supabase Auth with JWT Bearer tokens
-- **Forms**: react-hook-form + zod validation
 - **Email**: Resend (from `noreply@admin.pontifexindustries.com`)
-- **SMS**: Twilio (phone: `+18336954288`)
+- **SMS**: Telnyx
 - **Maps**: Google Maps (Places API, geocoding, GPS geofencing)
 - **PDF**: @react-pdf/renderer + jspdf + html2canvas
 - **Charts**: recharts
 - **Icons**: lucide-react
 - **Animations**: framer-motion
+- **Voice**: Web Speech API (SpeechRecognition)
 - **Hosting**: Vercel
+
+### Root Layout Provider Stack
+```
+ThemeProvider > BrandingProvider > NotificationProvider > ErrorBoundary > NetworkMonitor > GoogleMapsProvider > App
+```
 
 ### Auth System
 
@@ -120,110 +96,122 @@
 
 **API Route Guards** (`lib/api-auth.ts`):
 - `requireAuth(request)` — any authenticated user
-- `requireAdmin(request)` — `admin` or `super_admin`
-- `requireSuperAdmin(request)` — `super_admin` only
-- `requireScheduleBoardAccess(request)` — `admin`, `super_admin`, or `salesman`
-- Returns discriminated union: `{ authorized: true, userId, role }` or `{ authorized: false, response }`
+- `requireAdmin(request)` — admin, super_admin, operations_manager, supervisor, salesman
+- `requireSuperAdmin(request)` — super_admin only
+- `requireScheduleBoardAccess(request)` — admin, super_admin, salesman, ops_manager, supervisor
+- `requireOpsManager(request)` — super_admin, operations_manager
+- Returns: `{ authorized: true, userId, userEmail, role }` or `{ authorized: false, response }`
 
 **Client-Side Auth** (`lib/auth.ts`):
-- `getCurrentUser()` — reads from localStorage
-- `isAdmin()` — true for `admin` AND `super_admin`
-- `isSuperAdmin()` — true for `super_admin` only
-- `isSalesman()`, `isOperator()`, `isShopUser()`, `isShopManager()`, `hasRole()`
+- `getCurrentUser()` — synchronous, reads from localStorage, returns User | null
+- `isAdmin()`, `isSuperAdmin()`, `isSalesman()`, `isOperator()`
 
-### Role System
-
-| Role | Dashboard Access | Schedule Board | Job Creation | Special Permissions |
-|------|-----------------|----------------|--------------|-------------------|
-| `super_admin` | All 11 cards | Full edit (`canEdit: true`) | Auto-approved (`scheduled`) | Approve/reject change requests, modify capacity settings |
-| `admin` | 3 cards (Timecard, Schedule Form, Schedule Board) | View only | Goes to `pending_approval` | Can create change requests and notes |
-| `salesman` | 3 cards (same as admin) | View only | Goes to `pending_approval` | Can create change requests and notes |
-| `operator` | Redirected to `/dashboard` | No access | N/A | View assigned jobs, clock in/out, complete workflow |
-| `apprentice` | Same as operator | No access | N/A | Same as operator, differentiated in profile |
-| `shop_manager` | Treated as admin | N/A | N/A | Shop-related functionality |
-| `shop_hand` | Defined but limited | N/A | N/A | — |
-| `inventory_manager` | Defined but limited | N/A | N/A | — |
+### Role System (8 tiers)
+```
+super_admin > operations_manager > admin > salesman > shop_manager > inventory_manager > operator > apprentice
+```
 
 ### Database Schema (Key Tables)
 
-**`profiles`**: `id` (FK auth.users), `email`, `full_name`, `role`, `phone`, `active`, timestamps
+**`job_orders`** (core table):
+- Identity: job_number, title, customer_name, job_type
+- Location: location, address, latitude, longitude
+- Assignment: assigned_to UUID, helper_assigned_to UUID
+- Status: pending_approval | scheduled | assigned | in_route | in_progress | completed | cancelled
+- Priority: low | medium | high | urgent
+- Scheduling: scheduled_date, end_date, arrival_time, shop_arrival_time, estimated_hours
+- Financial: estimated_cost, quoted_amount
+- JSONB: jobsite_conditions, site_compliance, scheduling_flexibility
+- Arrays: equipment_needed[], special_equipment[], photo_urls[]
+- Flags: is_will_call, difficulty_rating (1-10)
+- Tracking: created_via ('quick_add' | 'schedule_form')
+- Soft delete: deleted_at, deleted_by
 
-**`job_orders`** (core dispatch table):
-- Identity: `job_number` (unique), `title`, `customer_name`, `customer_contact`, `job_type`
-- Location: `location`, `address`
-- Assignment: `assigned_to` UUID (FK), `helper_assigned_to` UUID (FK), `foreman_name`, `salesman_name`
-- Status: `scheduled | assigned | in_route | in_progress | completed | cancelled | pending_approval`
-- Priority: `low | medium | high | urgent`
-- Scheduling: `scheduled_date`, `end_date`, `arrival_time`, `shop_arrival_time`, `estimated_hours`
-- Time tracking: `assigned_at`, `route_started_at`, `work_started_at`, `work_completed_at` → triggers compute `drive_time`, `production_time`, `total_time`
-- Equipment: `equipment_needed` TEXT[], `special_equipment` TEXT[]
-- Financial: `estimated_cost`, `quoted_amount`
-- JSONB fields: `jobsite_conditions`, `site_compliance`, `scheduling_flexibility`
-- Will-call: `is_will_call` BOOLEAN, `difficulty_rating` (1-10)
-- Soft delete: `deleted_at`, `deleted_by`
-- Created via: `created_via` ('quick_add' or 'schedule_form')
+**`profiles`**: id, email, full_name, role, phone, active, avatar_url
 
-**`schedule_change_requests`**: request_type (`reschedule | reassign | cancel | other`), status (`pending | approved | rejected`). Admin/salesman create; super_admin approves.
+**`customers`**: name, email, phone, company, address, city, state, zip, contact_persons (JSONB)
 
-**`schedule_settings`**: Key-value JSONB config. Currently used for `capacity: { max_slots, warning_threshold }`. Super_admin only for writes.
+**`invoices`**: invoice_number, job_order_id, line_items (JSONB), subtotal, tax, total, status (draft/sent/paid/overdue)
 
-**`job_notes`**: Notes on jobs. `note_type` ('manual' or 'change_log'). Admin/super_admin access.
+**`tenants`** (PENDING MIGRATION): name, slug, domain, status, plan, max_users, features (JSONB)
 
-**`time_clock`**: `clock_in_time`, `clock_out_time`, GPS locations as JSONB, auto-calculated `total_hours`
+**`error_logs`** (PENDING MIGRATION): type, error_message, stack_trace, url, metadata (JSONB)
 
-**`access_requests`**: Self-registration. Anyone can INSERT. Admin approves → creates auth user + profile.
-
-**Views**:
-- `schedule_board_view` — joins job_orders with profiles for names, includes notes_count + pending_change_requests_count
-- `active_job_orders` — non-deleted jobs with operator name
-- `recent_completed_jobs` — last 90 days
-- `operator_performance_summary` — aggregated stats
+**Views**: schedule_board_view, active_job_orders, recent_completed_jobs, operator_performance_summary
 
 ### Key Business Rules
 
-**Job Order Lifecycle**:
-1. Created via Schedule Form (8-step wizard) or Quick Add
-2. If creator is `super_admin` → status = `scheduled` (auto-approved)
-3. If creator is `admin` or `salesman` → status = `pending_approval`
-4. Pending jobs appear in global queue on Schedule Board sidebar
-5. Super_admin approves → job gets `scheduled_date` and enters the board
-6. Assignment: `assigned_to` set → status = `assigned`
-7. Progression: `scheduled → assigned → in_route → in_progress → completed`
-8. Completion triggers archive to `completed_jobs_archive`
+**Job Lifecycle**:
+1. Created via Schedule Form (8-step) or Quick Add
+2. super_admin → `scheduled` (auto-approved); admin/salesman → `pending_approval`
+3. Pending jobs appear in sidebar queue on Schedule Board
+4. super_admin approves → scheduled with date on board
+5. `assigned_to` set → `assigned`
+6. Progression: scheduled → assigned → in_route → in_progress → completed
 
-**Schedule Board Rules**:
-- Access: `admin`, `super_admin`, `salesman` (via `requireScheduleBoardAccess`)
-- Edit: Only `super_admin` (returned in API meta: `canEdit: auth.role === 'super_admin'`)
-- Capacity: Configurable max_slots (default 10) and warning_threshold (default 8)
-- Will-call jobs: Fetched globally (not date-filtered), shown separately
-- Pending jobs: Fetched globally, shown in sidebar queue
+**Job Numbering**: `JOB-{year}-{6 digits}` (form) or `QA-{year}-{6 digits}` (quick add)
 
-**Job Numbering**:
-- Schedule Form: `JOB-{year}-{random 6 digits}`
-- Quick Add: `QA-{year}-{random 6 digits}`
+**Schedule Board**: Only `super_admin` can edit (canEdit flag). Capacity is configurable.
 
-**Soft Deletes**: `job_orders` uses `deleted_at`/`deleted_by`. All views filter `WHERE deleted_at IS NULL`.
+**Operator Workflow**: my-jobs → jobsite → work-performed → day-complete → (done for today | complete)
 
-**RLS**: All tables have RLS enabled. API routes use `supabaseAdmin` (service_role) which bypasses RLS. RLS is a second line of defense for direct database access.
+**Billing Pipeline**: completed job → create invoice (draft) → sent → paid
 
 ### API Response Format
 ```
-Success: { success: true, data: { ... }, [message: '...'], [meta: { userRole, canEdit }] }
+Success: { success: true, data: {...} }
 Error:   { error: 'Human-readable message' } with HTTP status 4xx/5xx
 ```
+
+### Key Coding Patterns
+- **Token**: Always `supabase.auth.getSession()` — NEVER localStorage for tokens
+- **Logging**: Fire-and-forget: `Promise.resolve(supabaseAdmin.from('audit_logs').insert(...)).catch(() => {})`
+- **Inputs**: Always `text-gray-900 bg-white` (black text on white background)
+- **Cards**: `bg-white rounded-2xl border border-gray-200 p-5`
+- **PDFs**: Server-side only with @react-pdf/renderer, NO React hooks
+- **Notifications**: `useNotifications()` for toast messages
+- **API calls**: `useApi()` hook or manual fetch with session token
+- **Branding**: `useBranding()` for dynamic company name/colors
+- **Table not found**: Use `isTableNotFoundError(error)` from api-auth.ts for graceful handling
 
 ### Project Structure (Key Paths)
 ```
 app/
-  api/admin/schedule-board/     — main board, assign, capacity, settings, operators, quick-add, reorder
-  api/admin/job-orders/         — CRUD with audit trail
-  api/admin/change-requests/    — schedule change requests
-  api/admin/job-notes/          — notes on jobs
-  api/auth/login/               — login endpoint
-  dashboard/admin/              — admin pages (11 modules)
-  dashboard/admin/schedule-board/ — schedule board + _components/
-  dashboard/job-schedule/[id]/  — operator job workflow (15+ sub-pages)
-components/                     — ~58 shared components
-lib/                           — auth.ts, api-auth.ts, supabase.ts, supabase-admin.ts
-supabase/migrations/           — 53 migration files
+  api/admin/schedule-board/     — main board, assign, auto-schedule, capacity, etc.
+  api/admin/schedule-form/      — ai-parse endpoint
+  api/admin/tenants/            — multi-tenant CRUD
+  api/admin/backups/            — backup system
+  api/admin/system-health/      — system monitoring
+  api/health/                   — public health check
+  api/log-error/                — client error logging
+  dashboard/admin/              — 27 admin pages
+  dashboard/admin/schedule-board/ — schedule board + 23 sub-components
+  dashboard/admin/system-health/  — system health dashboard
+  dashboard/admin/tenant-management/ — tenant + backup management
+  dashboard/job-schedule/[id]/  — operator job workflow (6+ sub-pages)
+components/                     — ~60 shared components
+  ErrorBoundary.tsx             — global crash prevention
+  NetworkMonitor.tsx            — offline/server health detection
+contexts/
+  NotificationContext.tsx       — global toast notification system
+  ThemeContext.tsx               — dark/light mode
+hooks/
+  useApi.ts                     — authenticated fetch wrapper
+  useVoiceInput.ts              — Web Speech API
+lib/
+  api-auth.ts                   — API route guards
+  auth.ts                       — client auth helpers
+  rbac.ts                       — ADMIN_CARDS, roles, permissions
+  branding-context.tsx          — white-label branding
+  supabase.ts / supabase-admin.ts — DB clients
+supabase/migrations/            — 73 migration files
+```
+
+### Environment Variables
+```
+NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+RESEND_API_KEY, RESEND_FROM_EMAIL
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+TELNYX_API_KEY, TELNYX_FROM_NUMBER
+NEXT_PUBLIC_APP_URL
 ```
