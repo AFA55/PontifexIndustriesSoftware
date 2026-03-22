@@ -10,7 +10,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { LiabilityReleasePDF } from '@/components/pdf/LiabilityReleasePDF';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const getResend = () => new Resend(process.env.RESEND_API_KEY || '');
 
 export async function POST(request: NextRequest) {
   try {
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
       const emailCompanyName = (pdfBranding.company_name as string) || 'Pontifex Industries';
       const emailPhone = (pdfBranding.support_phone as string) || '(833) 695-4288';
       const emailSupportAddr = (pdfBranding.support_email as string) || 'support@pontifexindustries.com';
-      const emailResult = await resend.emails.send({
+      const emailResult = await getResend().emails.send({
         from: `${emailCompanyName} <noreply@pontifexindustries.com>`,
         to: customerEmail,
         subject: `Liability Release - Job #${jobNumber || jobId}`,

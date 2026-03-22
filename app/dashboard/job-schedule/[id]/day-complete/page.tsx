@@ -91,16 +91,20 @@ export default function DayCompletePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Save completion photos if any
+      // Save completion photos (await to ensure saved)
       if (completionPhotos.length > 0) {
-        fetch(`/api/job-orders/${jobId}/photos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ photo_urls: completionPhotos })
-        }).catch(err => console.error('Photo save error:', err));
+        try {
+          await fetch(`/api/job-orders/${jobId}/photos`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ photo_urls: completionPhotos })
+          });
+        } catch (err) {
+          console.error('Photo save error:', err);
+        }
       }
 
       // Get work performed from localStorage
@@ -149,23 +153,28 @@ export default function DayCompletePage() {
       // Upload signature to storage
       const signatureUrl = await uploadSignature();
 
-      // Save completion photos
+      // Save completion photos (await to ensure they're saved before completing)
       if (completionPhotos.length > 0) {
-        fetch(`/api/job-orders/${jobId}/photos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ photo_urls: completionPhotos })
-        }).catch(err => console.error('Photo save error:', err));
+        try {
+          await fetch(`/api/job-orders/${jobId}/photos`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ photo_urls: completionPhotos })
+          });
+        } catch (err) {
+          console.error('Photo save error:', err);
+          // Continue even if photos fail — don't block job completion
+        }
       }
 
       // Get work performed from localStorage
       const stored = localStorage.getItem(`work-performed-${jobId}`);
       const workPerformed = stored ? JSON.parse(stored).items : [];
 
-      // Create final daily log entry
+      // Create final daily log entry (also saves work items to DB)
       await fetch(`/api/job-orders/${jobId}/daily-log`, {
         method: 'POST',
         headers: {

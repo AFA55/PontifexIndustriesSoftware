@@ -136,6 +136,22 @@ export async function POST(request: NextRequest) {
       laborHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
     }
 
+    // Default rates by work type (admin can adjust on the invoice)
+    const DEFAULT_RATES: Record<string, { rate: number; unit: string }> = {
+      'Core Drilling': { rate: 150, unit: 'cores' },
+      'Wall Sawing': { rate: 12, unit: 'LF' },
+      'Flat Sawing': { rate: 8, unit: 'LF' },
+      'Wire Sawing': { rate: 25, unit: 'LF' },
+      'Hand Sawing': { rate: 10, unit: 'LF' },
+      'Ring Sawing': { rate: 10, unit: 'LF' },
+      'Chain Sawing': { rate: 15, unit: 'LF' },
+      'GPR Scanning': { rate: 250, unit: 'each' },
+      'Demolition': { rate: 175, unit: 'hours' },
+      'Removal': { rate: 150, unit: 'hours' },
+      'Hauling': { rate: 125, unit: 'hours' },
+    };
+    const DEFAULT_LABOR_RATE = 125; // $/hr
+
     // Build line items from work items
     const lineItems: any[] = [];
     let lineNumber = 1;
@@ -146,7 +162,7 @@ export async function POST(request: NextRequest) {
       const amount = Number(job.estimated_cost);
       lineItems.push({
         line_number: lineNumber++,
-        description: `${job.title} — ${job.job_type || 'Concrete Cutting Services'}`,
+        description: `${job.title || job.job_number} — ${job.job_type || 'Concrete Cutting Services'}`,
         billing_type: 'flat_rate',
         quantity: 1,
         unit: 'job',
@@ -160,20 +176,22 @@ export async function POST(request: NextRequest) {
       // Build from work items with default rates
       if (workItems && workItems.length > 0) {
         for (const item of workItems) {
-          let desc = item.work_type;
+          let desc = item.work_type || 'Concrete Cutting';
           let qty = Number(item.quantity) || 1;
           let unit = 'each';
-          let rate = 0;
+          let rate = DEFAULT_RATES[item.work_type]?.rate || 0;
 
-          // Set rates based on work type
+          // Set quantities and units based on work type specifics
           if (item.core_quantity) {
             desc += ` (${item.core_size || ''} x ${item.core_depth_inches || ''}in)`;
-            qty = item.core_quantity;
+            qty = Number(item.core_quantity);
             unit = 'cores';
+            rate = DEFAULT_RATES['Core Drilling']?.rate || 150;
           } else if (item.linear_feet_cut) {
             desc += ` (${item.cut_depth_inches || ''}in deep)`;
             qty = Number(item.linear_feet_cut);
             unit = 'LF';
+            if (!rate) rate = 10; // Default LF rate if type not found
           }
 
           const amount = qty * rate;
@@ -195,13 +213,30 @@ export async function POST(request: NextRequest) {
 
       // Add labor hours line item
       if (laborHours > 0) {
+        const laborAmount = Number(laborHours.toFixed(2)) * DEFAULT_LABOR_RATE;
         lineItems.push({
           line_number: lineNumber++,
           description: `Labor — ${laborHours.toFixed(1)} hours on-site`,
           billing_type: 'labor',
           quantity: Number(laborHours.toFixed(2)),
           unit: 'hours',
-          unit_rate: 0, // Rate to be set by admin
+          unit_rate: DEFAULT_LABOR_RATE,
+          amount: laborAmount,
+          job_order_id: jobOrderId,
+          taxable: true,
+        });
+        subtotal += laborAmount;
+      }
+
+      // If no work items and no labor, add a generic line item from job type
+      if (lineItems.length === 0) {
+        lineItems.push({
+          line_number: lineNumber++,
+          description: `${job.job_type || 'Concrete Cutting Services'} — ${job.job_number}`,
+          billing_type: 'flat_rate',
+          quantity: 1,
+          unit: 'job',
+          unit_rate: 0,
           amount: 0,
           job_order_id: jobOrderId,
           taxable: true,
