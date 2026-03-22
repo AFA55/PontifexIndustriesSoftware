@@ -30,7 +30,7 @@ const CARDS = [
     key: 'total_revenue' as const,
     label: 'Total Revenue',
     icon: DollarSign,
-    gradient: 'from-purple-500 to-purple-700',
+    gradient: 'from-blue-500 via-indigo-500 to-purple-600',
     format: (v: number) => formatCurrency(v),
     trendKey: 'revenue_trend' as const,
   },
@@ -38,7 +38,7 @@ const CARDS = [
     key: 'active_jobs' as const,
     label: 'Active Jobs',
     icon: Briefcase,
-    gradient: 'from-blue-500 to-blue-700',
+    gradient: 'from-cyan-500 via-blue-500 to-indigo-600',
     format: (v: number) => String(v),
     trendKey: 'jobs_trend' as const,
   },
@@ -46,7 +46,7 @@ const CARDS = [
     key: 'completion_rate' as const,
     label: 'Completion Rate',
     icon: CheckCircle,
-    gradient: 'from-emerald-500 to-emerald-700',
+    gradient: 'from-emerald-500 via-green-500 to-teal-600',
     format: (v: number) => `${v}%`,
     trendKey: 'completion_trend' as const,
   },
@@ -54,7 +54,7 @@ const CARDS = [
     key: 'active_crews' as const,
     label: 'Active Crews',
     icon: Users,
-    gradient: 'from-amber-500 to-amber-700',
+    gradient: 'from-orange-500 via-amber-500 to-yellow-600',
     format: (v: number) => String(v),
     trendKey: 'crews_trend' as const,
   },
@@ -77,20 +77,20 @@ export default function KPIRow({ data, isLoading }: KPIRowProps) {
         const isUp = trend >= 0;
 
         return (
-          <div key={card.key} className={`bg-gradient-to-br ${card.gradient} rounded-2xl p-5 text-white shadow-lg`}>
+          <div key={card.key} className={`bg-gradient-to-br ${card.gradient} rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transform hover:scale-[1.03] transition-all duration-300`}>
             <div className="flex items-start justify-between">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                <card.icon className="w-5 h-5" />
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-lg">
+                <card.icon className="w-6 h-6" />
               </div>
               {trend !== 0 && (
-                <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${isUp ? 'bg-white/20' : 'bg-red-400/30'}`}>
+                <div className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${isUp ? 'bg-white/20' : 'bg-red-400/30'}`}>
                   {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   {Math.abs(trend)}%
                 </div>
               )}
             </div>
-            <p className="text-2xl font-bold mt-3">{card.format(value)}</p>
-            <p className="text-xs text-white/80 mt-1">{card.label}</p>
+            <p className="text-3xl font-bold mt-3 drop-shadow-lg">{card.format(value)}</p>
+            <p className="text-sm text-white/90 font-semibold mt-1">{card.label}</p>
           </div>
         );
       })}

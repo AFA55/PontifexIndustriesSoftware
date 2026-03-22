@@ -30,16 +30,19 @@ export default function DashboardHeader({
   });
 
   return (
-    <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/90 border-b border-gray-200 shadow-sm">
-      <div className="container mx-auto px-4 py-3 max-w-7xl">
+    <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
+      <div className="container mx-auto px-4 py-4 max-w-7xl">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <ArrowLeft className="w-5 h-5 text-gray-700" />
+            <Link
+              href="/dashboard/admin"
+              className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all"
+            >
+              <ArrowLeft className="w-5 h-5 text-white" />
             </Link>
             <div>
-              <h1 className="text-lg font-bold text-gray-900">Analytics Dashboard</h1>
-              <p className="text-xs text-gray-500">{today}</p>
+              <h1 className="text-lg font-bold text-white">Analytics Dashboard</h1>
+              <p className="text-xs text-blue-200">{today}</p>
             </div>
           </div>
 
@@ -48,10 +51,10 @@ export default function DashboardHeader({
 
             <button
               onClick={onToggleEdit}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-2 rounded-xl border transition-all ${
                 editMode
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'hover:bg-gray-100 text-gray-600'
+                  ? 'bg-white/20 text-white border-white/30'
+                  : 'bg-white/10 text-blue-200 border-white/20 hover:bg-white/20 hover:text-white'
               }`}
               title={editMode ? 'Done editing' : 'Edit layout'}
             >
@@ -60,7 +63,7 @@ export default function DashboardHeader({
 
             <button
               onClick={onRefresh}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600"
+              className="p-2 bg-white/10 border border-white/20 rounded-xl text-blue-200 hover:bg-white/20 hover:text-white transition-all"
               title="Refresh data"
             >
               <RefreshCw className="w-4 h-4" />
@@ -69,7 +72,7 @@ export default function DashboardHeader({
             {editMode && onAddWidget && (
               <button
                 onClick={onAddWidget}
-                className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-xl transition-all shadow-lg"
                 title="Add widget"
               >
                 <Plus className="w-4 h-4" />

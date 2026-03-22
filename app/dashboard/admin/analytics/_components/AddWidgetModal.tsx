@@ -26,11 +26,11 @@ export default function AddWidgetModal({ open, onClose, availableWidgets, onAdd 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <h2 className="text-lg font-bold text-gray-900">Add Widget</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
+      <div className="relative bg-gradient-to-br from-white to-gray-50 rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900">
+          <h2 className="text-lg font-bold text-white">Add Widget</h2>
+          <button onClick={onClose} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl border border-white/20 transition-all">
+            <X className="w-5 h-5 text-white" />
           </button>
         </div>
 
@@ -47,13 +47,13 @@ export default function AddWidgetModal({ open, onClose, availableWidgets, onAdd 
                     onAdd(widget.id);
                     onClose();
                   }}
-                  className="w-full flex items-start gap-4 p-4 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-purple-50/30 transition-all text-left"
+                  className="w-full flex items-start gap-4 p-4 rounded-2xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50/30 hover:shadow-md transition-all text-left group"
                 >
-                  <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Icon className="w-5 h-5 text-purple-600" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all">
+                    <Icon className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{widget.title}</p>
+                    <p className="text-sm font-bold text-gray-800">{widget.title}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{widget.description}</p>
                   </div>
                 </button>

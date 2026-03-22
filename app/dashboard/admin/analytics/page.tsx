@@ -231,7 +231,13 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full opacity-10 blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full opacity-10 blur-3xl animate-pulse"></div>
+      </div>
+
       <DashboardHeader
         timeRange={timeRange}
         onTimeRangeChange={setTimeRange}
@@ -241,7 +247,7 @@ export default function AnalyticsPage() {
         onAddWidget={editMode ? () => setShowAddModal(true) : undefined}
       />
 
-      <div className="container mx-auto px-4 py-6 max-w-7xl space-y-6">
+      <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6 relative">
         {/* KPI Row */}
         <KPIRow
           data={dashboardData.kpi ?? null}
