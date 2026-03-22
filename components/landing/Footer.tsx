@@ -80,13 +80,13 @@ export default function Footer() {
           </p>
           <div className="flex items-center gap-6 text-sm">
             <a
-              href="#"
+              href="/privacy"
               className="text-zinc-600 hover:text-zinc-400 transition-colors"
             >
               Privacy
             </a>
             <a
-              href="#"
+              href="/terms"
               className="text-zinc-600 hover:text-zinc-400 transition-colors"
             >
               Terms

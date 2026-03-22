@@ -19,6 +19,7 @@ import {
   Camera,
 } from 'lucide-react';
 import PhotoUploader from '@/components/PhotoUploader';
+import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
 
 export default function DayCompletePage() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function DayCompletePage() {
   const [signatureData, setSignatureData] = useState('');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [completionPhotos, setCompletionPhotos] = useState<string[]>([]);
+  const [esignConsented, setEsignConsented] = useState(false);
 
   // Signature canvas
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -493,10 +495,16 @@ export default function DayCompletePage() {
                 </p>
               </div>
 
+              {/* E-Sign Consent */}
+              <EsignConsentCheckbox
+                onConsentChange={setEsignConsented}
+                consented={esignConsented}
+              />
+
               {/* Complete Button */}
               <button
                 onClick={handleJobComplete}
-                disabled={submitting}
+                disabled={submitting || !esignConsented}
                 className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl py-4 font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {submitting ? (
@@ -510,8 +518,8 @@ export default function DayCompletePage() {
               {/* Skip signature option */}
               <button
                 onClick={handleJobComplete}
-                disabled={submitting}
-                className="w-full text-slate-500 text-sm hover:text-slate-700 py-2"
+                disabled={submitting || !esignConsented}
+                className="w-full text-slate-500 text-sm hover:text-slate-700 py-2 disabled:opacity-40"
               >
                 Skip signature and complete
               </button>
