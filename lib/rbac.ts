@@ -272,7 +272,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     schedule_form: 'full',
     schedule_board: 'full',
     team_management: 'none',
-    analytics: 'none',
+    analytics: 'view',
     equipment_performance: 'none',
     operator_profiles: 'none',
     completed_jobs: 'none',
