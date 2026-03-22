@@ -34,6 +34,7 @@ import JobDetailView from './_components/JobDetailView';
 import DndBoardWrapper from './_components/DndBoardWrapper';
 import OperatorRowView from './_components/OperatorRowView';
 import ViewToggle from './_components/ViewToggle';
+import CrewScheduleGrid from './_components/CrewScheduleGrid';
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
@@ -147,9 +148,9 @@ export default function ScheduleBoardPage() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(toDateString(new Date()));
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
-  const [boardViewMode, setBoardViewMode] = useState<'slots' | 'operators'>(() => {
+  const [boardViewMode, setBoardViewMode] = useState<'slots' | 'operators' | 'crew-grid'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('schedule-board-view-mode') as 'slots' | 'operators') || 'slots';
+      return (localStorage.getItem('schedule-board-view-mode') as 'slots' | 'operators' | 'crew-grid') || 'slots';
     }
     return 'slots';
   });
@@ -324,7 +325,7 @@ export default function ScheduleBoardPage() {
   }, []);
 
   // ═══ BOARD VIEW MODE HANDLER ═══
-  const handleBoardViewModeChange = useCallback((mode: 'slots' | 'operators') => {
+  const handleBoardViewModeChange = useCallback((mode: 'slots' | 'operators' | 'crew-grid') => {
     setBoardViewMode(mode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('schedule-board-view-mode', mode);
@@ -1590,9 +1591,7 @@ export default function ScheduleBoardPage() {
                   <CalendarDays className="w-4 h-4" /> Week
                 </button>
               </div>
-              {viewMode === 'day' && (
-                <ViewToggle viewMode={boardViewMode} onChange={handleBoardViewModeChange} />
-              )}
+              <ViewToggle viewMode={boardViewMode} onChange={handleBoardViewModeChange} />
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -1718,8 +1717,20 @@ export default function ScheduleBoardPage() {
         </div>
       )}
 
+      {/* ═══ CREW GRID VIEW ═══════════════════════════════════════════════ */}
+      {boardViewMode === 'crew-grid' && (
+        <div className="container mx-auto px-4 md:px-6 pb-6">
+          <CrewScheduleGrid
+            onDateClick={(date) => {
+              setSelectedDate(date);
+              setBoardViewMode('slots');
+            }}
+          />
+        </div>
+      )}
+
       {/* ═══ WEEKLY VIEW ═══════════════════════════════════════════════════ */}
-      {viewMode === 'week' && (
+      {viewMode === 'week' && boardViewMode !== 'crew-grid' && (
         <div className="container mx-auto px-4 md:px-6 pb-6">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-x-auto">
             <div className="grid grid-cols-1 md:grid-cols-5 divide-x divide-gray-200 min-w-0 md:min-w-[800px]">
@@ -1793,7 +1804,7 @@ export default function ScheduleBoardPage() {
       )}
 
       {/* ═══ DAY VIEW — OPERATOR ROWS ════════════════════════════════════ */}
-      {viewMode === 'day' && <DndBoardWrapper canDrag={canEdit} onReorder={handleDndReorder}>
+      {viewMode === 'day' && boardViewMode !== 'crew-grid' && <DndBoardWrapper canDrag={canEdit} onReorder={handleDndReorder}>
       <div className="container mx-auto px-4 md:px-6 pb-6 space-y-4">
         {boardViewMode === 'slots' ? (
           <>
