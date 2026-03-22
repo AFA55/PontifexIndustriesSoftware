@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const isDemoOperator = profile?.email === 'demo@patriotcc.com' ||
+    const isDemoOperator = profile?.email === 'demo@pontifex.com' ||
                           profile?.full_name === 'Demo Operator';
 
     console.log('[LIABILITY PDF] Is demo operator:', isDemoOperator);

@@ -9,22 +9,22 @@ export interface User {
 // Demo credentials
 const DEMO_CREDENTIALS = [
   {
-    email: 'demo@patriotcc.com',
+    email: 'demo@pontifex.com',
     password: 'Demo1234!',
     user: {
       id: 'demo-user-1',
       name: 'Demo Operator',
-      email: 'demo@patriotcc.com',
+      email: 'demo@pontifex.com',
       role: 'operator'
     }
   },
   {
-    email: 'admin@patriotcc.com',
+    email: 'admin@pontifex.com',
     password: 'Admin1234!',
     user: {
       id: 'admin-user-1',
       name: 'Admin User',
-      email: 'admin@patriotcc.com',
+      email: 'admin@pontifex.com',
       role: 'admin'
     }
   }
