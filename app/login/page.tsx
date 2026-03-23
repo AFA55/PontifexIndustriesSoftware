@@ -77,11 +77,9 @@ export default function LoginPage() {
       console.log('💾 User stored in localStorage');
 
       // Redirect based on user role
-      if (['admin', 'super_admin', 'salesman', 'operations_manager'].includes(result.user.role)) {
-        console.log(`🔑 ${result.user.role} user, redirecting to admin dashboard...`);
+      if (['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor'].includes(result.user.role)) {
         router.push('/dashboard/admin');
-      } else if (result.user.role === 'operator' || result.user.role === 'apprentice') {
-        console.log('👤 Operator/Apprentice user, redirecting to operator dashboard...');
+      } else if (['operator', 'apprentice', 'shop_manager', 'inventory_manager'].includes(result.user.role)) {
         router.push('/dashboard');
       } else {
         setError('Invalid user role');

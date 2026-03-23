@@ -171,16 +171,17 @@ export default function CompletedJobsArchivePage() {
       const totalStandbyHours = standbyLogs.reduce((sum, log) => sum + (log.duration_hours || 0), 0);
       const totalStandbyCost = totalStandbyHours * 189; // $189/hr standby rate
 
-      // Get work performed from localStorage (if available) or fetch from a work_performed table if you have one
+      // Fetch work items from database (not localStorage — admin doesn't have operator's local data)
       let workPerformed: any[] = [];
       try {
-        const savedWork = localStorage.getItem(`work-performed-${job.id}`);
-        if (savedWork) {
-          const parsed = JSON.parse(savedWork);
-          workPerformed = parsed.items || [];
-        }
+        const { data: workItems } = await supabase
+          .from('work_items')
+          .select('*')
+          .eq('job_order_id', job.id)
+          .order('day_number', { ascending: true });
+        workPerformed = workItems || [];
       } catch (e) {
-        console.log('No work performed data in localStorage');
+        // Fallback: no work items available
       }
 
       // Calculate total job hours

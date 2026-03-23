@@ -79,7 +79,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set(
     'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(self), payment=()'
+    'camera=(self), microphone=(), geolocation=(self), payment=()'
   );
 
   // Prevent caching of API responses with sensitive data
