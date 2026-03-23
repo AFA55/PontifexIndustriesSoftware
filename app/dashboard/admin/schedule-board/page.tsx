@@ -1444,14 +1444,21 @@ export default function ScheduleBoardPage() {
           durationDays: data.durationDays,
           scope: data.scope,
           salesmanName: data.salesmanName,
+          salesmanId: data.salesmanId,
+          jobType: data.jobType,
+          address: data.address,
+          contactName: data.contactName,
+          contactPhone: data.contactPhone,
+          priority: data.priority,
+          estimatedCost: data.estimatedCost,
         }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Failed to create quick-add job');
       }
-      addToast('success', `Quick Add: ${data.contractorName}`, `Pending — reminder sent to ${data.salesmanName} to fill full form`);
-      fetchScheduleData(selectedDate); // refresh to pick up new pending
+      addToast('success', `Quick Add: ${data.contractorName}`, `${data.jobType} job created — ${data.salesmanName} notified to complete Schedule Form`);
+      fetchScheduleData(selectedDate);
     } catch (err: any) {
       addToast('error', 'Quick Add Failed', err.message || 'Could not create job');
     }
