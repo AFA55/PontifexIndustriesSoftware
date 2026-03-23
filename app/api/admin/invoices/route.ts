@@ -99,10 +99,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate invoice number: INV-{year}-{6 digits}
+    // Generate unique invoice number: INV-{year}-{6 digits} with collision retry
     const year = new Date().getFullYear();
-    const randomNum = Math.floor(100000 + Math.random() * 900000);
-    const invoiceNumber = `INV-${year}-${randomNum}`;
+    let invoiceNumber = '';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const randomNum = Math.floor(100000 + Math.random() * 900000);
+      const candidate = `INV-${year}-${randomNum}`;
+      const { data: existing } = await supabaseAdmin
+        .from('invoices')
+        .select('id')
+        .eq('invoice_number', candidate)
+        .limit(1)
+        .maybeSingle();
+      if (!existing) {
+        invoiceNumber = candidate;
+        break;
+      }
+    }
+    if (!invoiceNumber) {
+      // Fallback: use timestamp-based number
+      invoiceNumber = `INV-${year}-${Date.now().toString().slice(-6)}`;
+    }
 
     // Calculate due date (Net 30 by default)
     const invoiceDate = new Date();

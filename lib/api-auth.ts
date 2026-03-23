@@ -146,18 +146,13 @@ export function isTableNotFoundError(error: any): boolean {
     code === 'PGRST204' || code === 'PGRST205' ||
     // PostgREST: relation does not exist (may come as different codes)
     code === 'PGRST301' || code === 'PGRST302' ||
-    // HTTP 404 from PostgREST when table doesn't exist
-    statusCode === 404 ||
-    // Message-based detection
-    message.includes('does not exist') ||
-    message.includes('not found') ||
-    (message.includes('relation') && message.includes('not exist')) ||
+    // Message-based detection — specific to table/relation errors only
+    (message.includes('relation') && message.includes('does not exist')) ||
     message.includes('undefined table') ||
-    message.includes('could not find') ||
-    // Details/hint-based detection
-    details.includes('does not exist') ||
-    details.includes('not found') ||
-    hint.includes('does not exist') ||
+    (message.includes('could not find') && message.includes('relation')) ||
+    // Details/hint-based detection (relation-specific)
+    (details.includes('relation') && details.includes('does not exist')) ||
+    (hint.includes('relation') && hint.includes('does not exist')) ||
     // Full error string fallback for edge cases
     (errorStr.includes('relation') && errorStr.includes('does not exist'))
   );
