@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -42,6 +44,21 @@ interface Invoice {
   po_number: string | null;
   notes: string | null;
   created_at: string;
+  payment_method?: string | null;
+  payment_date?: string | null;
+  reference_number?: string | null;
+}
+
+interface Payment {
+  id: string;
+  invoice_id: string;
+  amount: number;
+  payment_method: string;
+  payment_date: string;
+  reference_number: string | null;
+  notes: string | null;
+  recorded_by: string | null;
+  created_at: string;
 }
 
 interface CompletedJob {
@@ -68,7 +85,19 @@ export default function BillingPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
+  const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    payment_method: 'check' as 'check' | 'cash' | 'card' | 'ach' | 'wire' | 'other',
+    payment_date: new Date().toISOString().split('T')[0],
+    reference_number: '',
+    notes: '',
+  });
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -247,6 +276,95 @@ export default function BillingPage() {
       }
     } catch (err) {
       console.error('Error printing PDF:', err);
+    }
+  };
+
+  const sendInvoice = async () => {
+    if (!selectedInvoice) return;
+    setSendingInvoice(true);
+    setSendResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/admin/invoices/${selectedInvoice.id}/send`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setSendResult({ success: true, message: data.message || 'Invoice sent successfully' });
+        // Refresh invoice to update status to 'sent'
+        await viewInvoice(selectedInvoice.id);
+        fetchData();
+      } else {
+        setSendResult({ success: false, message: data.error || 'Failed to send invoice' });
+      }
+    } catch (err) {
+      console.error('Error sending invoice:', err);
+      setSendResult({ success: false, message: 'Failed to send invoice. Please try again.' });
+    } finally {
+      setSendingInvoice(false);
+    }
+  };
+
+  const openPaymentModal = () => {
+    if (!selectedInvoice) return;
+    setPaymentForm({
+      amount: Number(selectedInvoice.balance_due).toFixed(2),
+      payment_method: 'check',
+      payment_date: new Date().toISOString().split('T')[0],
+      reference_number: '',
+      notes: '',
+    });
+    setPaymentSuccess(null);
+    setShowPaymentModal(true);
+  };
+
+  const submitPayment = async () => {
+    if (!selectedInvoice) return;
+    setSubmittingPayment(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/admin/invoices/${selectedInvoice.id}/payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          amount: Number(paymentForm.amount),
+          payment_method: paymentForm.payment_method,
+          payment_date: paymentForm.payment_date,
+          reference_number: paymentForm.reference_number || undefined,
+          notes: paymentForm.notes || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setPaymentSuccess(`Payment of $${Number(paymentForm.amount).toFixed(2)} recorded successfully.`);
+        // Refresh the invoice detail
+        await viewInvoice(selectedInvoice.id);
+        // Refresh the invoice list
+        fetchData();
+        setTimeout(() => {
+          setShowPaymentModal(false);
+          setPaymentSuccess(null);
+        }, 2000);
+      } else {
+        alert(data.error || 'Failed to record payment');
+      }
+    } catch (err) {
+      console.error('Error recording payment:', err);
+      alert('Failed to record payment');
+    } finally {
+      setSubmittingPayment(false);
     }
   };
 
@@ -599,7 +717,7 @@ export default function BillingPage() {
                       <Printer className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => setSelectedInvoice(null)}
+                      onClick={() => { setSelectedInvoice(null); setSendResult(null); }}
                       className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
                     >
                       <X className="w-5 h-5 text-gray-500" />
@@ -621,10 +739,15 @@ export default function BillingPage() {
                   })()}
                   {selectedInvoice.status === 'draft' && (
                     <button
-                      onClick={() => updateInvoiceStatus(selectedInvoice.id, 'sent')}
-                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-blue-700 text-xs font-semibold transition-all flex items-center gap-1"
+                      onClick={sendInvoice}
+                      disabled={sendingInvoice}
+                      className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm"
                     >
-                      <Send className="w-3.5 h-3.5" /> Mark as Sent
+                      {sendingInvoice ? (
+                        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</>
+                      ) : (
+                        <><Send className="w-3.5 h-3.5" /> Send Invoice</>
+                      )}
                     </button>
                   )}
                   {['sent', 'overdue'].includes(selectedInvoice.status) && (
@@ -635,7 +758,34 @@ export default function BillingPage() {
                       <CheckCircle2 className="w-3.5 h-3.5" /> Mark as Paid
                     </button>
                   )}
+                  {selectedInvoice.status !== 'paid' && Number(selectedInvoice.balance_due) > 0 && (
+                    <button
+                      onClick={openPaymentModal}
+                      className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                    >
+                      <DollarSign className="w-3.5 h-3.5" /> Record Payment
+                    </button>
+                  )}
                 </div>
+
+                {/* Send Result Feedback */}
+                {sendResult && (
+                  <div className={`mb-4 p-3 rounded-xl flex items-start gap-2.5 text-sm font-medium ${
+                    sendResult.success
+                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                      : 'bg-red-50 border border-red-200 text-red-700'
+                  }`}>
+                    {sendResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    )}
+                    <span className="flex-1">{sendResult.message}</span>
+                    <button onClick={() => setSendResult(null)} className="ml-1 hover:opacity-70 flex-shrink-0">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
 
                 {/* Invoice Details */}
                 <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
@@ -734,6 +884,146 @@ export default function BillingPage() {
                   <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl">
                     <p className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-wider">Notes</p>
                     <p className="text-sm text-gray-700 whitespace-pre-line">{selectedInvoice.notes}</p>
+                  </div>
+                )}
+
+                {/* Payment History */}
+                {(selectedInvoice.payments || []).length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Payment History</p>
+                    <div className="bg-white rounded-xl border border-slate-200/60 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50/80 border-b border-slate-100">
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Method</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ref #</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(selectedInvoice.payments as Payment[]).map((pmt) => (
+                            <tr key={pmt.id} className="border-b border-slate-50 last:border-0">
+                              <td className="px-4 py-3 text-gray-700">{pmt.payment_date}</td>
+                              <td className="px-4 py-3 text-gray-700 capitalize">{pmt.payment_method}</td>
+                              <td className="px-4 py-3 text-gray-500">{pmt.reference_number || '—'}</td>
+                              <td className="px-4 py-3 text-right text-emerald-700 font-semibold">
+                                ${Number(pmt.amount).toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Record Payment Modal */}
+        {showPaymentModal && selectedInvoice && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md shadow-2xl">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Record Payment</h3>
+                    <p className="text-sm text-gray-500">{selectedInvoice.invoice_number} — Balance: ${Number(selectedInvoice.balance_due).toFixed(2)}</p>
+                  </div>
+                  <button
+                    onClick={() => { setShowPaymentModal(false); setPaymentSuccess(null); }}
+                    className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+
+                {paymentSuccess ? (
+                  <div className="flex flex-col items-center py-6 gap-3">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+                    <p className="text-gray-900 font-semibold text-center">{paymentSuccess}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Amount <span className="text-red-500">*</span></label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        max={Number(selectedInvoice.balance_due)}
+                        value={paymentForm.amount}
+                        onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: e.target.value }))}
+                        className="w-full text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Method <span className="text-red-500">*</span></label>
+                      <select
+                        value={paymentForm.payment_method}
+                        onChange={(e) => setPaymentForm(prev => ({ ...prev, payment_method: e.target.value as 'check' | 'cash' | 'card' | 'ach' | 'wire' | 'other' }))}
+                        className="w-full text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all cursor-pointer"
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="check">Check</option>
+                        <option value="card">Card</option>
+                        <option value="ach">ACH</option>
+                        <option value="wire">Wire</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Date <span className="text-red-500">*</span></label>
+                      <input
+                        type="date"
+                        value={paymentForm.payment_date}
+                        onChange={(e) => setPaymentForm(prev => ({ ...prev, payment_date: e.target.value }))}
+                        className="w-full text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Reference # <span className="text-gray-400 font-normal">(optional)</span></label>
+                      <input
+                        type="text"
+                        value={paymentForm.reference_number}
+                        onChange={(e) => setPaymentForm(prev => ({ ...prev, reference_number: e.target.value }))}
+                        className="w-full text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all"
+                        placeholder="Check #, transaction ID, etc."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
+                      <textarea
+                        value={paymentForm.notes}
+                        onChange={(e) => setPaymentForm(prev => ({ ...prev, notes: e.target.value }))}
+                        rows={2}
+                        className="w-full text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all resize-none"
+                        placeholder="Optional notes..."
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => { setShowPaymentModal(false); setPaymentSuccess(null); }}
+                        className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={submitPayment}
+                        disabled={submittingPayment || !paymentForm.amount || Number(paymentForm.amount) <= 0}
+                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                      >
+                        {submittingPayment ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <DollarSign className="w-4 h-4" />
+                        )}
+                        Record Payment
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
