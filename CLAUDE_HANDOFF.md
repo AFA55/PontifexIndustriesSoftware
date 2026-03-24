@@ -1,18 +1,21 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 21, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING
+**Date:** March 24, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✓ 176/176 pages
 
 ---
 
 ## CURRENT STATE
 
 ### Git Status
-- **Branch:** `feature/schedule-board-v2` (up to date with `origin/feature/schedule-board-v2`)
-- **Last commit:** `d8740252` — "feat: Global error handling, system health dashboard, SaaS multi-tenant foundation"
+- **Branch:** `feature/schedule-board-v2` (pushed to origin)
+- **Last commit:** `94ab0536` — "fix: use RESEND_FROM_EMAIL env var in invoice send route"
 - **Clean working tree** (all changes committed and pushed)
 
-### Recent Commits (March 21)
+### Recent Commits (March 24)
 ```
-d8740252 feat: Global error handling, system health dashboard, SaaS multi-tenant foundation
+94ab0536 fix: use RESEND_FROM_EMAIL env var in invoice send route
+e24a256a feat: enforce mandatory signature + QuickBooks CSV export
+64547aea fix: add force-dynamic to all client pages + secure remaining API routes
+6d6ceaf4 security: replace manual JWT auth with requireAuth/requireAdmin helpers across all API routes
 ```
 
 ### Previous Session Commits (March 20)
@@ -128,10 +131,10 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 
 ### Week 1 — Core Features COMPLETE
 - [x] Dispatch ticket PDF generation
-- [x] Customer signature capture in job completion flow
+- [x] Customer signature capture in job completion flow (mandatory — enforced March 24)
 - [x] Photo upload during job execution
 - [x] PDF invoice generation
-- [x] ~~QuickBooks CSV export~~ (deprioritized)
+- [x] QuickBooks CSV export from billing page (added March 24)
 
 ### Week 2 — Polish & Launch (In Progress)
 - [x] Mobile responsive audit (critical fixes done)
@@ -140,9 +143,13 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 - [x] System health monitoring dashboard
 - [x] SaaS multi-tenant foundation
 - [x] Backup system (auto daily + manual snapshots)
-- [ ] Apply pending migration (error_logs, tenants, tenant_users, backup_logs)
+- [x] Full API security audit — all routes use requireAuth/requireAdmin (March 24)
+- [x] SSR prerender fix — all 69 client pages have `force-dynamic` (March 24)
+- [x] Invoice email send via Resend (March 24)
+- [x] Invoice payment recording (March 24)
+- [ ] **Apply pending migrations** (requires Supabase dashboard SQL Editor — see below)
 - [ ] E2E workflow testing (schedule → dispatch → execute → complete → invoice)
-- [ ] White-label rebrand finalization (Patriot-specific assets: logos, colors)
+- [ ] Remove `NEXT_PUBLIC_BYPASS_LOCATION_CHECK=true` from production env
 - [ ] Production deployment prep (env vars, custom domain, SSL)
 - [ ] Final build verification & merge to main
 
@@ -151,22 +158,32 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 - [x] AI Smart Fill (voice/text NLP for schedule form)
 - [x] Customer CRM system with autocomplete
 - [x] Drag-and-drop schedule board with operator view
-- [x] Competitive analysis (vs CenPoint, DSM)
 - [x] White-label branding system
 - [x] Global notification system + network monitoring
 - [x] System health dashboard + error tracking
 - [x] Multi-tenant SaaS foundation
 - [x] Manual + automatic backup system
+- [x] Rate limiting for SMS/email endpoints (middleware)
 
 ---
 
 ## WHAT TO DO NEXT
 
 ### Immediate Priority
-1. Apply migration `20260320_add_error_logs_tenants_backups.sql` to Supabase
+1. **Apply pending migrations** — Run SQL in Supabase Dashboard SQL Editor:
+   - `supabase/migrations/20260320_add_error_logs_tenants_backups.sql`
+   - `supabase/migrations/20260324_timecard_job_linkage_and_pnl.sql`
 2. E2E workflow testing — test the full pipeline end-to-end
-3. Apply Patriot branding assets via `/dashboard/admin/settings/branding`
-4. Production deployment prep
+3. Remove `NEXT_PUBLIC_BYPASS_LOCATION_CHECK=true` from `.env.local` before production
+4. Production deployment: configure Vercel env vars from `.env.example`, custom domain, SSL
+
+### Production Env Checklist (all in .env.example)
+- `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` + `SUPABASE_SERVICE_ROLE_KEY`
+- `RESEND_API_KEY` + `RESEND_FROM_EMAIL`
+- `NEXT_PUBLIC_APP_URL` → set to real domain (not localhost)
+- `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_PHONE_NUMBER` (or install twilio package)
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+- **DO NOT** set `NEXT_PUBLIC_BYPASS_LOCATION_CHECK` in production
 
 ### Nice-to-Have (If Time Allows)
 - AR aging warnings on dispatch screen
@@ -179,12 +196,12 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 - ~~Equipment management enhancements~~
 - ~~Certified payroll~~
 - ~~Estimate-to-job pipeline~~
-- ~~QuickBooks CSV export~~
 
 ---
 
 ## UNAPPLIED MIGRATIONS
 1. `20260320_add_error_logs_tenants_backups.sql` — error_logs, tenants, tenant_users, backup_logs tables
+2. `20260324_timecard_job_linkage_and_pnl.sql` — job_order_id on timecards, labor_cost trigger, job_pnl_summary view
 
 ---
 
