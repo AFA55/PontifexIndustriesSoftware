@@ -368,6 +368,34 @@ export default function BillingPage() {
     }
   };
 
+  const exportToCSV = () => {
+    const rows = [
+      ['Invoice Number', 'Customer', 'Invoice Date', 'Due Date', 'PO Number', 'Subtotal', 'Tax', 'Total', 'Balance Due', 'Status', 'Payment Method', 'Payment Date'],
+      ...filteredInvoices.map(inv => [
+        inv.invoice_number,
+        inv.customer_name,
+        inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-US') : '',
+        inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-US') : '',
+        inv.po_number || '',
+        inv.subtotal.toFixed(2),
+        inv.tax_amount.toFixed(2),
+        inv.total_amount.toFixed(2),
+        inv.balance_due.toFixed(2),
+        inv.status.charAt(0).toUpperCase() + inv.status.slice(1),
+        inv.payment_method || '',
+        inv.payment_date ? new Date(inv.payment_date).toLocaleDateString('en-US') : '',
+      ])
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const filteredInvoices = invoices.filter(inv => {
     if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
     if (searchQuery) {
@@ -413,6 +441,15 @@ export default function BillingPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={exportToCSV}
+                disabled={filteredInvoices.length === 0}
+                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-all shadow-sm disabled:opacity-40"
+                title="Export to QuickBooks-compatible CSV"
+              >
+                <Download className="w-4 h-4" />
+                Export CSV
+              </button>
               <button
                 onClick={() => setShowCreateForm(true)}
                 className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-purple-500/25"
