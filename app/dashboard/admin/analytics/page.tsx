@@ -2,578 +2,415 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  ChevronLeft, TrendingUp, TrendingDown, DollarSign, Briefcase,
+  Users, Clock, AlertTriangle, CheckCircle, RefreshCw, Loader2,
+  ArrowUpRight, ArrowDownRight, Calendar, BarChart3, FileText,
+} from 'lucide-react';
+import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+
+interface AnalyticsData {
+  jobs: {
+    thisMonth: number;
+    lastMonth: number;
+    completedThisMonth: number;
+    completedLastMonth: number;
+    scheduledThisMonth: number;
+    ytdTotal: number;
+    momChangePct: string | null;
+    byStatus: Record<string, number>;
+    byType: Record<string, number>;
+  };
+  revenue: {
+    quotedThisMonth: number;
+    quotedLastMonth: number;
+    quotedMomChangePct: string | null;
+    revenueYTD: number;
+    outstandingAR: number;
+    overdueAR: number;
+    totalInvoicesYTD: number;
+    paidInvoicesYTD: number;
+    collectionRate: number;
+  };
+  operators: {
+    total: number;
+    operatorCount: number;
+    helperCount: number;
+    weeklyStats: { id: string; name: string; role: string; hoursThisWeek: number }[];
+    totalHoursThisWeek: number;
+  };
+  trend: { date: string; jobs: number; quoted: number; completed: number }[];
+  asOf: string;
+}
+
+function fmt$(n: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
+function MomBadge({ pct }: { pct: string | null }) {
+  if (!pct) return <span className="text-xs text-gray-400">vs last month</span>;
+  const n = parseFloat(pct);
+  const up = n >= 0;
+  return (
+    <span className={`flex items-center gap-0.5 text-xs font-bold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
+      {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+      {Math.abs(n)}% vs last mo
+    </span>
+  );
+}
+
+function StatCard({
+  label, value, sub, icon: Icon, color, pct,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  icon: React.ElementType;
+  color: string;
+  pct?: string | null;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
+          <Icon className="w-5 h-5 text-white" />
+        </div>
+        {pct !== undefined && <MomBadge pct={pct} />}
+      </div>
+      <p className="text-2xl font-bold text-gray-900">{value}</p>
+      <p className="text-sm font-semibold text-gray-500 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
 
 export default function AnalyticsPage() {
   const router = useRouter();
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      router.push('/login');
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single();
-
-    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(profile?.role || '')) {
+    const user = getCurrentUser();
+    if (!user) { router.push('/login'); return; }
+    if (!['admin', 'super_admin', 'operations_manager', 'salesman'].includes(user.role || '')) {
       router.push('/dashboard');
-      return;
     }
+  }, [router]);
 
-    setLoading(false);
+  const fetchData = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push('/login'); return; }
+
+      const res = await fetch('/api/admin/analytics', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const json = await res.json();
+      if (json.success) {
+        setData(json.data);
+        setError(null);
+      } else {
+        setError(json.error || 'Failed to load analytics');
+      }
+    } catch {
+      setError('Network error — could not load analytics');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [router]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchData();
   };
+
+  const now = new Date();
+  const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading analytics...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
       </div>
     );
   }
 
+  // ── Trend bar chart (last 30 days, max bars = width) ──
+  const trendBars = data?.trend.slice(-30) || [];
+  const maxJobs = Math.max(...trendBars.map(d => d.jobs), 1);
+
+  // Top job types
+  const topTypes = Object.entries(data?.jobs.byType || {})
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5);
+
+  const totalTypes = topTypes.reduce((s, [, n]) => s + n, 0);
+
+  const STATUS_COLORS: Record<string, string> = {
+    completed:  'bg-emerald-500',
+    scheduled:  'bg-blue-500',
+    dispatched: 'bg-indigo-500',
+    in_progress:'bg-amber-500',
+    en_route:   'bg-cyan-500',
+    cancelled:  'bg-red-400',
+    on_hold:    'bg-gray-400',
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="backdrop-blur-xl bg-white/90 border-b border-gray-200 sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold text-gray-800">Business Analytics Hub</h1>
-                <p className="text-sm text-gray-600">Profitability & Performance Tracking</p>
-              </div>
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-purple-600" />
+                Analytics
+              </h1>
+              <p className="text-xs text-gray-500">{monthName} · as of {data ? new Date(data.asOf).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}</p>
             </div>
-            <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full text-xs font-semibold shadow-lg">
-              🚀 System Ready
-            </span>
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-600 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Hero Section */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 rounded-3xl shadow-2xl p-8 mb-6 text-white">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <div className="relative flex items-start gap-6">
-            <div className="w-16 h-16 bg-white/20 backdrop-blur-lg rounded-2xl flex items-center justify-center flex-shrink-0 shadow-xl">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <h2 className="text-3xl font-bold mb-3">Welcome to Your Analytics Hub</h2>
-              <p className="text-white/90 text-lg mb-6 leading-relaxed">
-                Track job profitability, operator performance, and business metrics all in one place. This system automatically calculates costs, revenue, and efficiency once you configure your business parameters.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <div className="px-5 py-2.5 bg-white/20 backdrop-blur-lg rounded-xl text-sm font-semibold shadow-lg">
-                  📊 Job Profitability
-                </div>
-                <div className="px-5 py-2.5 bg-white/20 backdrop-blur-lg rounded-xl text-sm font-semibold shadow-lg">
-                  ⭐ Operator Rankings
-                </div>
-                <div className="px-5 py-2.5 bg-white/20 backdrop-blur-lg rounded-xl text-sm font-semibold shadow-lg">
-                  💰 Revenue Tracking
-                </div>
-                <div className="px-5 py-2.5 bg-white/20 backdrop-blur-lg rounded-xl text-sm font-semibold shadow-lg">
-                  📈 Performance Trends
-                </div>
-              </div>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {error && (
+          <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            {error}
           </div>
-        </div>
+        )}
 
-        {/* Configuration Banner */}
-        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-2xl p-6 mb-6 shadow-xl">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+        {data && (
+          <>
+            {/* ── KPI Row ────────────────────────────────── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                label="Jobs This Month"
+                value={String(data.jobs.thisMonth)}
+                sub={`${data.jobs.completedThisMonth} completed`}
+                icon={Briefcase}
+                color="bg-blue-600"
+                pct={data.jobs.momChangePct}
+              />
+              <StatCard
+                label="Quoted This Month"
+                value={fmt$(data.revenue.quotedThisMonth)}
+                sub={`YTD: ${fmt$(data.revenue.revenueYTD)} collected`}
+                icon={DollarSign}
+                color="bg-emerald-600"
+                pct={data.revenue.quotedMomChangePct}
+              />
+              <StatCard
+                label="Outstanding AR"
+                value={fmt$(data.revenue.outstandingAR)}
+                sub={data.revenue.overdueAR > 0 ? `${fmt$(data.revenue.overdueAR)} overdue` : 'All current'}
+                icon={data.revenue.overdueAR > 0 ? AlertTriangle : CheckCircle}
+                color={data.revenue.overdueAR > 0 ? 'bg-red-500' : 'bg-teal-600'}
+              />
+              <StatCard
+                label="Collection Rate"
+                value={`${data.revenue.collectionRate}%`}
+                sub={`${data.revenue.paidInvoicesYTD} / ${data.revenue.totalInvoicesYTD} invoices paid`}
+                icon={FileText}
+                color="bg-purple-600"
+              />
             </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-yellow-900 mb-2">⚙️ Configuration Required</h3>
-              <p className="text-yellow-800 mb-4 leading-relaxed">
-                To enable automatic profitability calculations, you need to configure your business costs. Once configured, the system will automatically calculate profit margins for every job in real-time.
-              </p>
-              <button className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white rounded-xl font-semibold shadow-lg transition-all transform hover:scale-105">
-                Configure Business Costs →
-              </button>
-            </div>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Job Profitability Card */}
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-6">
-              <div className="flex items-center gap-3 text-white">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-lg rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+            {/* ── Operator Hours + Jobs by Status ──────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Operator Week Summary */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-600" />
+                    Operator Hours (7 days)
+                  </h3>
+                  <span className="text-sm font-bold text-indigo-600">{data.operators.totalHoursThisWeek}h total</span>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Job Profitability</h2>
-                  <p className="text-white/90 text-sm">Automatic profit calculations per job</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {/* How It Works */}
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 mb-4">
-                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  How It Works
-                </h3>
-                <div className="space-y-3 text-sm text-gray-700">
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-600 font-bold text-lg">✓</span>
-                    <span>Salespeople enter <strong className="text-green-700">Job Quote</strong> when creating tickets</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-600 font-bold text-lg">✓</span>
-                    <span>System tracks <strong className="text-blue-700">operator hours</strong> automatically</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-600 font-bold text-lg">✓</span>
-                    <span>Equipment usage is logged during job execution</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-600 font-bold text-lg">✓</span>
-                    <span>Materials used are recorded by operators</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Profit Formula */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border-2 border-blue-200">
-                <h3 className="font-bold text-gray-900 mb-4 text-lg">💡 Profit Calculation Formula</h3>
                 <div className="space-y-2">
-                  <div className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg shadow-lg">
-                    <div className="text-white font-bold mb-1">Revenue:</div>
-                    <div className="text-white/90 text-sm">= Job Quote Amount ($)</div>
-                  </div>
-                  <div className="text-center text-gray-500 font-bold text-xl">−</div>
-                  <div className="p-4 bg-white rounded-lg border-2 border-red-200 shadow-md">
-                    <div className="text-red-600 font-bold mb-2">Total Costs:</div>
-                    <div className="text-gray-700 text-xs space-y-1.5 pl-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                        Labor Cost = Hours × Operator Rate
+                  {data.operators.weeklyStats.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-4">No clock-in data this week</p>
+                  ) : (
+                    data.operators.weeklyStats.slice(0, 6).map(op => (
+                      <div key={op.id} className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {op.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">{op.name}</p>
+                          <div className="w-full bg-gray-100 rounded-full h-1.5 mt-0.5">
+                            <div
+                              className="bg-indigo-500 h-1.5 rounded-full"
+                              style={{ width: `${Math.min((op.hoursThisWeek / 50) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-sm font-bold text-gray-700 flex-shrink-0">{op.hoursThisWeek}h</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                        Equipment Cost = Usage × Hourly Rate
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                        Material Cost = Items Used
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                        Overhead = Fixed % of Revenue
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-center text-gray-500 font-bold text-xl">=</div>
-                  <div className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg text-white shadow-lg">
-                    <div className="font-bold text-lg text-center">💰 Net Profit</div>
-                  </div>
+                    ))
+                  )}
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                  <span>{data.operators.operatorCount} operators · {data.operators.helperCount} helpers</span>
+                  <Link href="/dashboard/admin/timecards" className="text-indigo-600 font-semibold hover:underline">
+                    View all →
+                  </Link>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Operator Performance Card */}
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-br from-purple-500 to-pink-600 p-6">
-              <div className="flex items-center gap-3 text-white">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-lg rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Operator Analytics</h2>
-                  <p className="text-white/90 text-sm">Performance tracking & rankings</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {/* Metrics Tracked */}
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 mb-4">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  Metrics Tracked
+              {/* Jobs by Status */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-4">
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  Jobs by Status (YTD)
                 </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white rounded-xl p-4 border-2 border-gray-200 hover:border-purple-300 transition-all">
-                    <div className="text-3xl mb-2">⭐</div>
-                    <div className="text-xs font-bold text-gray-900">Customer Ratings</div>
-                    <div className="text-xs text-gray-600 mt-1">Overall, Cleanliness, Communication</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 border-2 border-gray-200 hover:border-blue-300 transition-all">
-                    <div className="text-3xl mb-2">⏱️</div>
-                    <div className="text-xs font-bold text-gray-900">Time Efficiency</div>
-                    <div className="text-xs text-gray-600 mt-1">Actual vs Estimated Hours</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 border-2 border-gray-200 hover:border-green-300 transition-all">
-                    <div className="text-3xl mb-2">✅</div>
-                    <div className="text-xs font-bold text-gray-900">Job Completion</div>
-                    <div className="text-xs text-gray-600 mt-1">Success Rate & Quality</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 border-2 border-gray-200 hover:border-orange-300 transition-all">
-                    <div className="text-3xl mb-2">🛠️</div>
-                    <div className="text-xs font-bold text-gray-900">Skill Proficiency</div>
-                    <div className="text-xs text-gray-600 mt-1">By Activity Type</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 border-2 border-gray-200 hover:border-indigo-300 transition-all">
-                    <div className="text-3xl mb-2">⚙️</div>
-                    <div className="text-xs font-bold text-gray-900">Equipment Usage</div>
-                    <div className="text-xs text-gray-600 mt-1">Production Rates & Efficiency</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 border-2 border-gray-200 hover:border-teal-300 transition-all">
-                    <div className="text-3xl mb-2">💎</div>
-                    <div className="text-xs font-bold text-gray-900">Resource Management</div>
-                    <div className="text-xs text-gray-600 mt-1">Blade & Material Efficiency</div>
-                  </div>
+                <div className="space-y-2.5">
+                  {Object.entries(data.jobs.byStatus)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([status, count]) => {
+                      const total = data.jobs.ytdTotal || 1;
+                      const pct = Math.round(count / total * 100);
+                      return (
+                        <div key={status}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold text-gray-600 capitalize">{status.replace('_', ' ')}</span>
+                            <span className="text-xs font-bold text-gray-900">{count} <span className="text-gray-400 font-normal">({pct}%)</span></span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${STATUS_COLORS[status] || 'bg-gray-400'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+                <div className="mt-4 pt-3 border-t border-gray-100">
+                  <p className="text-xs text-gray-500 font-semibold">{data.jobs.ytdTotal} jobs YTD · {data.jobs.completedThisMonth} completed this month</p>
                 </div>
               </div>
 
-              {/* Skill Tracking */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border-2 border-purple-200">
-                <h3 className="font-bold text-gray-900 mb-4">🎯 Operator Skills & Capabilities</h3>
-                <div className="space-y-2.5 text-sm">
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <span className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">1</span>
-                    <span>Track which operators are certified for specific tasks</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <span className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">2</span>
-                    <span>Measure proficiency in drilling, sawing, demolition</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <span className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">3</span>
-                    <span>Smart job assignment based on capabilities</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <span className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">4</span>
-                    <span>Performance rankings within each skill category</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Equipment Performance Analytics Card */}
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-br from-indigo-500 to-blue-600 p-6">
-              <div className="flex items-center gap-3 text-white">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-lg rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Equipment Analytics</h2>
-                  <p className="text-white/90 text-sm">Production rates & resource efficiency</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {/* Equipment Tracking Overview */}
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 mb-4">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Equipment Usage Tracking
+              {/* Job Types */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-4">
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  Top Job Types (YTD)
                 </h3>
-                <div className="space-y-3 text-sm text-gray-700">
-                  <div className="flex items-start gap-2">
-                    <span className="text-indigo-600 font-bold text-lg">✓</span>
-                    <span><strong className="text-indigo-700">Linear Feet Cut</strong> tracked by equipment type and task</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-indigo-600 font-bold text-lg">✓</span>
-                    <span><strong className="text-blue-700">Job Difficulty Rating</strong> (easy/medium/hard/extreme)</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-indigo-600 font-bold text-lg">✓</span>
-                    <span>Blade usage and wear patterns logged per job</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-indigo-600 font-bold text-lg">✓</span>
-                    <span>Resource consumption: hydraulic hose, water hose, power</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-indigo-600 font-bold text-lg">✓</span>
-                    <span>Setup time and location changes tracked</span>
-                  </div>
+                <div className="space-y-2.5">
+                  {topTypes.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-4">No data yet</p>
+                  ) : (
+                    topTypes.map(([type, count]) => {
+                      const pct = totalTypes > 0 ? Math.round(count / totalTypes * 100) : 0;
+                      return (
+                        <div key={type}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold text-gray-600 truncate">{type}</span>
+                            <span className="text-xs font-bold text-gray-900">{count} <span className="text-gray-400 font-normal">({pct}%)</span></span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2">
+                            <div
+                              className="bg-emerald-500 h-2 rounded-full"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
-              </div>
-
-              {/* Production Rate Analysis */}
-              <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-5 border-2 border-indigo-200 mb-4">
-                <h3 className="font-bold text-gray-900 mb-4 text-lg">📊 Production Rate Analysis</h3>
-                <div className="space-y-3">
-                  <div className="bg-white rounded-lg p-4 shadow-md">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-gray-900">Linear Feet per Hour</span>
-                      <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs font-bold rounded-full">Auto-Calculated</span>
-                    </div>
-                    <p className="text-xs text-gray-600">Measures operator efficiency: linear feet cut ÷ time worked</p>
-                  </div>
-
-                  <div className="bg-white rounded-lg p-4 shadow-md">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-gray-900">Difficulty-Adjusted Rates</span>
-                      <span className="px-3 py-1 bg-gradient-to-r from-orange-500 to-red-600 text-white text-xs font-bold rounded-full">Smart Metrics</span>
-                    </div>
-                    <p className="text-xs text-gray-600">Compare performance across easy vs. hard jobs fairly</p>
-                  </div>
-
-                  <div className="bg-white rounded-lg p-4 shadow-md">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-gray-900">Equipment Proficiency</span>
-                      <span className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-600 text-white text-xs font-bold rounded-full">Per Operator</span>
-                    </div>
-                    <p className="text-xs text-gray-600">See which operators excel with specific equipment types</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* View Full Dashboard */}
-              <Link
-                href="/dashboard/admin/equipment-performance"
-                className="block w-full mb-4"
-              >
-                <div className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 rounded-xl p-4 text-white text-center shadow-lg transition-all transform hover:scale-105 cursor-pointer">
-                  <div className="flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <span className="font-bold">View Full Equipment Dashboard →</span>
-                  </div>
-                  <p className="text-xs text-white/80 mt-1">Detailed performance analytics & rankings</p>
-                </div>
-              </Link>
-
-              {/* Resource Efficiency */}
-              <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl p-5 border-2 border-teal-200">
-                <h3 className="font-bold text-gray-900 mb-4">💰 Resource Cost Tracking</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white rounded-lg p-3 shadow-sm">
-                    <div className="text-2xl mb-1">💎</div>
-                    <div className="text-xs font-bold text-gray-900">Blade Costs</div>
-                    <div className="text-xs text-gray-600 mt-1">Usage per job tracked</div>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 shadow-sm">
-                    <div className="text-2xl mb-1">🔌</div>
-                    <div className="text-xs font-bold text-gray-900">Power Usage</div>
-                    <div className="text-xs text-gray-600 mt-1">Hours tracked per job</div>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 shadow-sm">
-                    <div className="text-2xl mb-1">💧</div>
-                    <div className="text-xs font-bold text-gray-900">Water Hose</div>
-                    <div className="text-xs text-gray-600 mt-1">Feet used logged</div>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 shadow-sm">
-                    <div className="text-2xl mb-1">⚙️</div>
-                    <div className="text-xs font-bold text-gray-900">Hydraulic Hose</div>
-                    <div className="text-xs text-gray-600 mt-1">Feet used logged</div>
-                  </div>
+                <div className="mt-4 pt-3 border-t border-gray-100">
+                  <Link href="/dashboard/admin/job-pnl" className="text-sm text-emerald-600 font-semibold hover:underline flex items-center gap-1">
+                    View full P&L report <ArrowUpRight className="w-3 h-3" />
+                  </Link>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Configuration Checklist */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 mb-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Configuration Checklist</h2>
-              <p className="text-gray-600">Set up your business parameters to activate analytics</p>
-            </div>
-          </div>
+            {/* ── 30-Day Job Trend ──────────────────────────── */}
+            {trendBars.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-purple-600" />
+                    Job Volume — Last 30 Days
+                  </h3>
+                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Scheduled</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Completed</span>
+                  </div>
+                </div>
+                <div className="flex items-end gap-0.5 h-32 w-full">
+                  {trendBars.map((d, i) => {
+                    const barHeight = maxJobs > 0 ? (d.jobs / maxJobs) * 100 : 0;
+                    const compRatio = d.jobs > 0 ? d.completed / d.jobs : 0;
+                    return (
+                      <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full group relative">
+                        <div className="w-full rounded-sm overflow-hidden" style={{ height: `${barHeight}%`, minHeight: d.jobs > 0 ? '4px' : '0' }}>
+                          <div className="w-full bg-blue-200 h-full relative">
+                            <div
+                              className="absolute bottom-0 left-0 right-0 bg-emerald-500"
+                              style={{ height: `${compRatio * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        {/* Tooltip */}
+                        <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] rounded px-1.5 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10">
+                          {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: {d.jobs} jobs
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                  <span>{trendBars[0] ? new Date(trendBars[0].date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</span>
+                  <span>Today</span>
+                </div>
+              </div>
+            )}
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Cost Configuration */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="w-8 h-8 bg-gradient-to-br from-red-500 to-pink-600 text-white rounded-lg flex items-center justify-center text-sm font-bold shadow-md">1</span>
-                <h3 className="font-bold text-lg text-gray-900">Business Costs</h3>
-              </div>
-              <div className="space-y-3">
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-blue-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Operator Hourly Rates</div>
-                    <div className="text-sm text-gray-600">Set labor cost per operator ($/hour)</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-blue-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Equipment Hourly Rates</div>
-                    <div className="text-sm text-gray-600">Cost per hour for each equipment type</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-blue-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Material Costs</div>
-                    <div className="text-sm text-gray-600">Price list for blades, bits, consumables</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-blue-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Overhead Percentage</div>
-                    <div className="text-sm text-gray-600">Insurance, admin, vehicle costs, etc.</div>
-                  </div>
-                </label>
-              </div>
+            {/* ── Quick Links ───────────────────────────────── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Job P&L Report', href: '/dashboard/admin/job-pnl', icon: TrendingUp, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+                { label: 'Timecards', href: '/dashboard/admin/timecards', icon: Clock, color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+                { label: 'Billing & AR', href: '/dashboard/admin/billing', icon: DollarSign, color: 'text-amber-700 bg-amber-50 border-amber-200' },
+                { label: 'Operator Profiles', href: '/dashboard/admin/operator-profiles', icon: Users, color: 'text-purple-700 bg-purple-50 border-purple-200' },
+              ].map(({ label, href, icon: Icon, color }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all hover:shadow-sm ${color}`}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-sm font-semibold">{label}</span>
+                </Link>
+              ))}
             </div>
-
-            {/* Operator Configuration */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-lg flex items-center justify-center text-sm font-bold shadow-md">2</span>
-                <h3 className="font-bold text-lg text-gray-900">Operator Setup</h3>
-              </div>
-              <div className="space-y-3">
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-purple-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Skill Certifications</div>
-                    <div className="text-sm text-gray-600">Assign capabilities per operator</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-purple-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Performance Baselines</div>
-                    <div className="text-sm text-gray-600">Set expected productivity rates</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-purple-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Rating Thresholds</div>
-                    <div className="text-sm text-gray-600">Define "excellent" vs "needs improvement"</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-purple-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Training Records</div>
-                    <div className="text-sm text-gray-600">Track certifications and safety training</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Equipment Configuration */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-lg flex items-center justify-center text-sm font-bold shadow-md">3</span>
-                <h3 className="font-bold text-lg text-gray-900">Equipment Setup</h3>
-              </div>
-              <div className="space-y-3">
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-indigo-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Blade Cost Rates</div>
-                    <div className="text-sm text-gray-600">Price per blade by type and size</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-indigo-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Resource Cost Rates</div>
-                    <div className="text-sm text-gray-600">Hose cost per foot, power per hour</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-indigo-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Production Benchmarks</div>
-                    <div className="text-sm text-gray-600">Expected feet/hour by difficulty</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl cursor-pointer hover:from-gray-100 hover:to-gray-200 transition-all border-2 border-gray-200">
-                  <input type="checkbox" className="mt-1 w-5 h-5 text-indigo-600" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Equipment Inventory</div>
-                    <div className="text-sm text-gray-600">Track equipment IDs and availability</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Benefits Section */}
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 border-2 border-green-200 shadow-xl">
-          <h2 className="font-bold text-2xl text-gray-900 mb-6 flex items-center gap-3">
-            <span className="text-3xl">🎯</span>
-            Why This System Helps Your Business
-          </h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-green-200">
-              <div className="text-4xl mb-3">💰</div>
-              <div className="font-bold text-lg text-gray-900 mb-2">Maximize Profit</div>
-              <div className="text-sm text-gray-700 leading-relaxed">See which jobs are most profitable and where you're losing money. Make data-driven pricing decisions.</div>
-            </div>
-            <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-blue-200">
-              <div className="text-4xl mb-3">📊</div>
-              <div className="font-bold text-lg text-gray-900 mb-2">Data-Driven Decisions</div>
-              <div className="text-sm text-gray-700 leading-relaxed">Make informed choices about pricing, staffing, and equipment based on real performance data.</div>
-            </div>
-            <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-purple-200">
-              <div className="text-4xl mb-3">⚡</div>
-              <div className="font-bold text-lg text-gray-900 mb-2">Improve Efficiency</div>
-              <div className="text-sm text-gray-700 leading-relaxed">Identify bottlenecks and optimize operations for maximum productivity and customer satisfaction.</div>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -16,7 +16,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireAdmin(request);
-  if (authResult instanceof NextResponse) return authResult;
+  if (!authResult.authorized) return authResult.response;
 
   const { id: jobId } = await params;
   if (!jobId) {

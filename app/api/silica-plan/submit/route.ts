@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,36 +54,35 @@ export async function POST(request: NextRequest) {
       // Continue even if database save fails
     }
 
-    // Send email to customer (integrate with email service)
-    // TODO: Integrate with actual email service (SendGrid, AWS SES, etc.)
-    console.log('📧 Email to send:');
-    console.log('To:', customerEmail);
-    console.log('Subject: Silica Exposure Control Plan - Job #' + jobId);
-    console.log('Has PDF attachment');
-
-    // In production, you would do something like:
-    /*
-    const sgMail = require('@sendgrid/mail');
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
-    const msg = {
-      to: customerEmail,
-      from: 'noreply@bdconcretecutting.com',
-      subject: `Silica Exposure Control Plan - Job #${jobId}`,
-      text: 'Please find attached the Silica Exposure Control Plan for your job.',
-      html: '<p>Please find attached the Silica Exposure Control Plan for your job.</p>',
-      attachments: [
-        {
-          content: pdfBase64,
-          filename: `Silica_Plan_Job_${jobId}.pdf`,
-          type: 'application/pdf',
-          disposition: 'attachment'
-        }
-      ]
-    };
-
-    await sgMail.send(msg);
-    */
+    // Send email to customer via Resend
+    if (customerEmail && pdfBase64) {
+      const fromAddress = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@resend.dev>';
+      try {
+        await resend.emails.send({
+          from: fromAddress,
+          to: customerEmail,
+          subject: `Silica Exposure Control Plan — Job #${jobId}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
+              <h2 style="color: #0f172a;">Silica Exposure Control Plan</h2>
+              <p>Please find attached the Silica Exposure Control Plan for your job.</p>
+              <p>This document outlines the safety measures and dust control procedures in place to protect workers and comply with OSHA silica regulations.</p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="color: #64748b; font-size: 13px;">Patriot Concrete Cutting<br/>Questions? Contact us at your project manager's number.</p>
+            </div>
+          `,
+          attachments: [
+            {
+              filename: `Silica_Plan_Job_${jobId}.pdf`,
+              content: Buffer.from(pdfBase64, 'base64'),
+            },
+          ],
+        });
+      } catch (emailErr) {
+        console.error('[SILICA PLAN] Failed to send email:', emailErr);
+        // Don't fail the whole request if email fails
+      }
+    }
 
     return NextResponse.json(
       {

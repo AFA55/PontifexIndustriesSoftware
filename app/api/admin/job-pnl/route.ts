@@ -10,7 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAdmin(request);
-  if (authResult instanceof NextResponse) return authResult;
+  if (!authResult.authorized) return authResult.response;
 
   const sp = request.nextUrl.searchParams;
   const startDate = sp.get('startDate');
