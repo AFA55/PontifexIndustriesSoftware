@@ -53,6 +53,8 @@ interface ActiveJob {
   daily_logs_count?: number;
 }
 
+const AUTO_REFRESH_INTERVAL = 30_000; // 30 seconds
+
 export default function ActiveJobsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,8 @@ export default function ActiveJobsPage() {
   const [dailyLogs, setDailyLogs] = useState<Record<string, any[]>>({});
   const [workItems, setWorkItems] = useState<Record<string, any[]>>({});
   const [filter, setFilter] = useState<'all' | 'in_progress' | 'in_route' | 'assigned' | 'multi_day'>('all');
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -71,8 +75,17 @@ export default function ActiveJobsPage() {
     fetchActiveJobs();
   }, []);
 
-  const fetchActiveJobs = async () => {
-    setLoading(true);
+  // Auto-refresh every 30s
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      fetchActiveJobs(true);
+    }, AUTO_REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
+
+  const fetchActiveJobs = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -144,6 +157,7 @@ export default function ActiveJobsPage() {
       }));
 
       setJobs(enrichedJobs);
+      setLastRefreshed(new Date());
     } catch (err) {
       console.error('Error fetching active jobs:', err);
     } finally {
@@ -238,13 +252,30 @@ export default function ActiveJobsPage() {
                 <p className="text-sm text-gray-500">{stats.total} jobs in progress</p>
               </div>
             </div>
-            <button
-              onClick={fetchActiveJobs}
-              disabled={loading}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAutoRefresh(a => !a)}
+                title={autoRefresh ? 'Auto-refresh ON (30s) — click to pause' : 'Auto-refresh paused — click to resume'}
+                className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  autoRefresh
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-gray-100 text-gray-400 border border-gray-200'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                {autoRefresh ? 'Live' : 'Paused'}
+              </button>
+              <span className="hidden sm:block text-[10px] text-gray-400">
+                {lastRefreshed.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+              <button
+                onClick={() => fetchActiveJobs()}
+                disabled={loading}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
