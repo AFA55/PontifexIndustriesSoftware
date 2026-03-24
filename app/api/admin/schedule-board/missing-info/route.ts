@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         type: 'missing_info',
         title: `Missing Info: ${job.customer_name}`,
         message: `Please provide: ${missingItems.join(', ')}${customNote ? `. Note: ${customNote}` : ''}`,
-        metadata: { missing_items: missingItems, custom_note: customNote },
+        metadata: { missing_items: missingItems, custom_note: customNote, flagged_by: auth.userId },
       });
     }
 

@@ -16,6 +16,7 @@ import PendingQueueSidebar from './_components/PendingQueueSidebar';
 import Toast from './_components/Toast';
 import ApprovalModal from './_components/ApprovalModal';
 import MissingInfoModal from './_components/MissingInfoModal';
+import NotificationBell from './_components/NotificationBell';
 import AssignOperatorModal from './_components/AssignOperatorModal';
 import EditJobPanel from './_components/EditJobPanel';
 import ChangeRequestModal from './_components/ChangeRequestModal';
@@ -500,6 +501,9 @@ export default function ScheduleBoardPage() {
         scope_details: j.scope_details || null,
         additional_info: j.additional_info || null,
         special_equipment: j.special_equipment || null,
+        missing_info_flagged: j.missing_info_flagged || false,
+        missing_info_items: j.missing_info_items || [],
+        missing_info_note: j.missing_info_note || null,
       }));
       const willCall = (json.data?.willCall || []).map(toJobCard);
 
@@ -1502,6 +1506,9 @@ export default function ScheduleBoardPage() {
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+              {/* Notification bell for all users */}
+              <NotificationBell />
+
               {canEdit && (
                 <button onClick={() => setShowPendingQueue(true)} className="relative px-3 py-2 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl text-orange-700 text-sm font-semibold transition-all flex items-center gap-2">
                   <Bell className="w-4 h-4" /> Pending

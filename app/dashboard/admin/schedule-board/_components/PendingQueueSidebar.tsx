@@ -55,6 +55,9 @@ export interface PendingJob {
   scope_details: Record<string, Record<string, string>> | null;
   additional_info: string | null;
   special_equipment: string[] | null;
+  missing_info_flagged?: boolean;
+  missing_info_items?: string[];
+  missing_info_note?: string | null;
 }
 
 interface PendingQueueSidebarProps {
@@ -114,9 +117,21 @@ export default function PendingQueueSidebar({
             pendingJobs.map((job) => (
               <div
                 key={job.id}
-                className="bg-white rounded-xl border-2 border-orange-200 hover:border-orange-300 shadow-sm hover:shadow-md transition-all"
+                className={`bg-white rounded-xl border-2 shadow-sm hover:shadow-md transition-all ${
+                  job.missing_info_flagged
+                    ? 'border-red-300 hover:border-red-400'
+                    : 'border-orange-200 hover:border-orange-300'
+                }`}
               >
                 <div className="p-4">
+                  {/* Missing Info Banner */}
+                  {job.missing_info_flagged && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-lg mb-2 text-xs text-red-700 font-semibold">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Missing Info — awaiting update from {job.submitted_by}</span>
+                    </div>
+                  )}
+
                   {/* Customer + Job type + Quoted */}
                   <div className="flex items-start justify-between mb-2">
                     <div>
@@ -208,10 +223,14 @@ export default function PendingQueueSidebar({
                     </button>
                     <button
                       onClick={() => onMissingInfo(job)}
-                      className="flex-1 px-3 py-2.5 bg-gradient-to-r from-orange-400 to-red-400 hover:from-orange-500 hover:to-red-500 text-white rounded-lg text-xs font-bold transition-all hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5"
+                      className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-bold transition-all hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5 ${
+                        job.missing_info_flagged
+                          ? 'bg-red-100 text-red-700 border border-red-300 hover:bg-red-200'
+                          : 'bg-gradient-to-r from-orange-400 to-red-400 hover:from-orange-500 hover:to-red-500 text-white'
+                      }`}
                     >
                       <AlertCircle className="w-3.5 h-3.5" />
-                      Missing Info
+                      {job.missing_info_flagged ? 'Flagged' : 'Missing Info'}
                     </button>
                   </div>
                 </div>
