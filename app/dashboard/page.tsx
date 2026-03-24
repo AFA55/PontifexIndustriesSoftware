@@ -666,6 +666,89 @@ export default function Dashboard() {
     }
   };
 
+  // Called by NfcClockInModal when user taps NFC to clock OUT
+  const performNfcClockOut = async (data: {
+    method: 'nfc' | 'gps';
+    nfc_tag_id?: string;
+    nfc_tag_uid?: string;
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+  }) => {
+    setClockLoading(true);
+    setClockMessage(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setClockMessage({ type: 'error', text: 'Session expired. Please log in again.' });
+        setClockLoading(false);
+        throw new Error('Session expired');
+      }
+
+      const response = await fetch('/api/timecard/clock-out', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          latitude: data.latitude,
+          longitude: data.longitude,
+          accuracy: data.accuracy,
+          clock_out_method: data.method,
+          nfc_tag_id: data.nfc_tag_id,
+          nfc_tag_uid: data.nfc_tag_uid,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 403 && result.block_type) {
+          setClockOutBlock({
+            show: true,
+            blockType: result.block_type,
+            incompleteJobs: result.incomplete_jobs || [],
+          });
+          setClockLoading(false);
+          setShowNfcClockInModal(false);
+          throw new Error(result.error || 'Clock-out blocked');
+        }
+        const errorText = result.error || 'Failed to clock out';
+        setClockMessage({ type: 'error', text: errorText });
+        setClockLoading(false);
+        throw new Error(errorText);
+      }
+
+      setIsClockedIn(false);
+      setCurrentTimecard(null);
+      setCurrentHours(0);
+      setShowNfcClockInModal(false);
+      setClockMessage({
+        type: 'success',
+        text: `${result.message} — Total hours: ${result.data.totalHours}${data.method === 'nfc' ? ' (NFC verified)' : ''}`,
+      });
+
+      fetchWeeklyHours();
+      setTimeout(() => setClockMessage(null), 5000);
+    } catch (error: unknown) {
+      console.error('Error clocking out via NFC:', error);
+      const msg = error instanceof Error ? error.message : 'An error occurred';
+      if (!clockMessage) {
+        setClockMessage({ type: 'error', text: msg });
+      }
+      throw error;
+    } finally {
+      setClockLoading(false);
+    }
+  };
+
+  // When user taps the clock-out button, show the NFC modal in clock-out mode
+  const handleClockOutWithModal = () => {
+    setShowNfcClockInModal(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -689,8 +772,8 @@ export default function Dashboard() {
 
       {/* Clock-Out Block Modal */}
       {clockOutBlock.show && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -743,10 +826,10 @@ export default function Dashboard() {
 
       {/* Demo Operator Walkthrough */}
       {showWalkthrough && isDemoOperator && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-2 sm:p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-8 rounded-t-3xl text-white">
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 sm:p-8 rounded-t-3xl text-white">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
                   <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -761,7 +844,7 @@ export default function Dashboard() {
             </div>
 
             {/* Content */}
-            <div className="p-8 space-y-6">
+            <div className="p-5 sm:p-8 space-y-6">
               <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-6">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
@@ -912,10 +995,10 @@ export default function Dashboard() {
         {/* Modern Animated Greeting */}
         <div className="text-center mb-8 sm:mb-10 animate-fade-in">
           <div className="inline-block">
-            <h1 className="text-3xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
               Welcome back, {user?.name?.split(' ')[0] || 'Demo'}!
             </h1>
-            <p className="text-gray-700 text-lg font-medium">
+            <p className="text-gray-700 text-base sm:text-lg font-medium">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
           </div>
@@ -976,23 +1059,23 @@ export default function Dashboard() {
             HERO CLOCK IN/OUT CARD — Primary Feature
             ═══════════════════════════════════════════════════════ */}
         <div className="max-w-5xl mx-auto mb-10 animate-fade-in">
-          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-white/50">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div className="flex items-center space-x-5">
-                <div className={`w-20 h-20 bg-gradient-to-br ${
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-5 sm:p-8 shadow-2xl border-2 border-white/50">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+              <div className="flex items-center space-x-4">
+                <div className={`w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br ${
                   isClockedIn
                     ? 'from-rose-500 via-red-500 to-pink-600'
                     : 'from-emerald-500 via-green-500 to-teal-600'
                 } rounded-3xl flex items-center justify-center shadow-2xl ring-4 ring-white`}>
-                  <svg className="w-10 h-10 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1">
                     {isClockedIn ? 'Ready to Clock Out?' : 'Start Your Shift'}
                   </h3>
-                  <p className="text-gray-700 font-semibold text-base">
+                  <p className="text-gray-700 font-semibold text-sm sm:text-base">
                     {isClockedIn
                       ? `You've been working for ${currentHours.toFixed(1)} hours`
                       : 'Clock in when you arrive at the shop'
@@ -1046,7 +1129,7 @@ export default function Dashboard() {
                 )}
 
                 <button
-                  onClick={isClockedIn ? handleClockOut : handleClockIn}
+                  onClick={isClockedIn ? handleClockOutWithModal : handleClockIn}
                   disabled={clockLoading}
                   className={`group flex items-center justify-center space-x-3 w-full ${
                     isClockedIn
@@ -1086,7 +1169,7 @@ export default function Dashboard() {
 
               {showDebugPanel && (
                 <div className="mt-3 bg-gray-900 text-green-400 rounded-xl p-4 font-mono text-xs overflow-x-auto">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-1 min-w-0">
                     <div>GPS Status:</div><div className="text-white">{debugInfo.gpsStatus}</div>
                     <div>Your Lat:</div><div className="text-white">{debugInfo.latitude?.toFixed(8) || 'N/A'}</div>
                     <div>Your Lng:</div><div className="text-white">{debugInfo.longitude?.toFixed(8) || 'N/A'}</div>
@@ -1116,11 +1199,11 @@ export default function Dashboard() {
         </div>
 
         {/* Ultra Modern Card Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-5xl mx-auto">
 
           {/* My Schedule - ACTIVE */}
           <Link href="/dashboard/my-jobs" className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 p-1.5 shadow-2xl animate-fade-in-up hover:shadow-3xl transition-all duration-300 hover:scale-[1.02] text-left">
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7">
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-5 sm:p-7">
               <div className="flex items-start justify-between mb-5">
                 <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-red-100 group-hover:ring-red-200 transition-all">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1133,7 +1216,7 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-red-700 transition-colors">My Schedule</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 group-hover:text-red-700 transition-colors">My Schedule</h3>
               <p className="text-gray-700 font-semibold">View today&apos;s dispatched job tickets</p>
               <p className="text-sm text-gray-500 mt-1">Equipment checklists, routes, work logs</p>
             </div>
@@ -1145,7 +1228,7 @@ export default function Dashboard() {
             className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-indigo-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.03] text-left animate-fade-in-up delay-200"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-5 sm:p-7 group-hover:bg-transparent transition-colors duration-500">
               <div className="flex items-start justify-between mb-5">
                 <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-indigo-100 group-hover:ring-white/30">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1156,7 +1239,7 @@ export default function Dashboard() {
                   {weeklyHours.toFixed(1)} HRS
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
                 View Timecard
               </h3>
               <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
@@ -1185,7 +1268,7 @@ export default function Dashboard() {
             }`}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-5 sm:p-7 group-hover:bg-transparent transition-colors duration-500">
               <div className="flex items-start justify-between mb-5">
                 <div className="w-16 h-16 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-purple-100 group-hover:ring-white/30">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1196,7 +1279,7 @@ export default function Dashboard() {
                   AVAILABLE
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
                 Request Time Off
               </h3>
               <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
@@ -1220,7 +1303,7 @@ export default function Dashboard() {
 
           {/* Tools & Equipment - Coming Soon */}
           <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-blue-50 p-1.5 shadow-2xl animate-fade-in-up delay-300">
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7">
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-5 sm:p-7">
               <div className="flex items-start justify-between mb-5">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-blue-100">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1232,7 +1315,7 @@ export default function Dashboard() {
                   COMING SOON
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
                 Tools & Equipment
               </h3>
               <p className="text-gray-700 font-semibold mb-4">
@@ -1265,7 +1348,7 @@ export default function Dashboard() {
             <p className="text-sm font-bold text-gray-600 mb-4 uppercase tracking-wide">QUICK ACTIONS</p>
             <div className="flex gap-3 overflow-x-auto pb-2">
               <button
-                onClick={isClockedIn ? handleClockOut : handleClockIn}
+                onClick={isClockedIn ? handleClockOutWithModal : handleClockIn}
                 disabled={clockLoading}
                 className={`flex items-center gap-2 px-5 py-3 ${
                   isClockedIn
@@ -1366,11 +1449,13 @@ export default function Dashboard() {
         }
       `}</style>
 
-      {/* NFC Clock-In Modal */}
+      {/* NFC Clock-In / Clock-Out Modal */}
       {showNfcClockInModal && (
         <NfcClockInModal
           isShopHours={isShopHours}
+          isClockedIn={isClockedIn}
           onClockIn={performClockIn}
+          onClockOut={performNfcClockOut}
           onClose={() => setShowNfcClockInModal(false)}
         />
       )}
@@ -1381,7 +1466,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-around px-1 py-1">
             {/* Clock In/Out */}
             <button
-              onClick={isClockedIn ? handleClockOut : handleClockIn}
+              onClick={isClockedIn ? handleClockOutWithModal : handleClockIn}
               disabled={clockLoading}
               className="flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl transition-all min-w-[64px] min-h-[56px] disabled:opacity-50"
             >

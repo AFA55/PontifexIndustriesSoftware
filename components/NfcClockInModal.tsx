@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   X, Wifi, WifiOff, MapPin, Camera, Loader2, CheckCircle,
-  AlertTriangle, Building2, Smartphone
+  AlertTriangle, Building2, Smartphone, LogOut
 } from 'lucide-react';
 
 type ClockInMethod = 'nfc' | 'gps' | 'remote';
@@ -18,6 +18,8 @@ interface NfcTagResult {
 
 interface NfcClockInModalProps {
   isShopHours: boolean;
+  /** True if the user is already clocked in — modal becomes clock-OUT modal */
+  isClockedIn?: boolean;
   onClockIn: (data: {
     method: ClockInMethod;
     nfc_tag_id?: string;
@@ -27,10 +29,25 @@ interface NfcClockInModalProps {
     longitude: number;
     accuracy?: number;
   }) => Promise<void>;
+  /** Called when user completes NFC clock-OUT */
+  onClockOut?: (data: {
+    method: 'nfc' | 'gps';
+    nfc_tag_id?: string;
+    nfc_tag_uid?: string;
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+  }) => Promise<void>;
   onClose: () => void;
 }
 
-export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: NfcClockInModalProps) {
+export default function NfcClockInModal({
+  isShopHours,
+  isClockedIn = false,
+  onClockIn,
+  onClockOut,
+  onClose,
+}: NfcClockInModalProps) {
   const [step, setStep] = useState<'choose' | 'nfc_scan' | 'remote_photo' | 'processing'>('choose');
   const [nfcSupported, setNfcSupported] = useState(false);
   const [nfcScanning, setNfcScanning] = useState(false);
@@ -41,11 +58,38 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
   const nfcReaderRef = useRef<unknown>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Determines if we're in clock-out mode
+  const isClockOut = isClockedIn && !!onClockOut;
+
   useEffect(() => {
     if (typeof window !== 'undefined' && 'NDEFReader' in window) {
       setNfcSupported(true);
     }
   }, []);
+
+  // Helper — get GPS location
+  const getLocation = (): Promise<{ latitude: number; longitude: number; accuracy?: number }> => {
+    // Check bypass mode
+    if (process.env.NEXT_PUBLIC_BYPASS_LOCATION_CHECK === 'true') {
+      return Promise.resolve({ latitude: 34.76866, longitude: -82.43563, accuracy: 0 });
+    }
+
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }),
+        (err) => reject(new Error(err.message || 'Location unavailable')),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+  };
 
   // ── NFC Scanning ──
   const startNfcScan = useCallback(async () => {
@@ -55,12 +99,20 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
     setNfcTag(null);
 
     try {
-      const ndef = new (window as unknown as { NDEFReader: new () => { scan: () => Promise<void>; addEventListener: (event: string, handler: (e: unknown) => void) => void } }).NDEFReader();
+      const ndef = new (window as unknown as {
+        NDEFReader: new () => {
+          scan: () => Promise<void>;
+          addEventListener: (event: string, handler: (e: unknown) => void) => void;
+        };
+      }).NDEFReader();
       nfcReaderRef.current = ndef;
       await ndef.scan();
 
       ndef.addEventListener('reading', async (e: unknown) => {
-        const event = e as { serialNumber: string; message?: { records?: { recordType: string; data: BufferSource }[] } };
+        const event = e as {
+          serialNumber: string;
+          message?: { records?: { recordType: string; data: BufferSource }[] };
+        };
         let lookupValue = event.serialNumber;
 
         // Check if message contains our written tag data
@@ -73,6 +125,19 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
                 lookupValue = text;
                 break;
               }
+            }
+            // URL record: extract tag param from written URL
+            if (record.recordType === 'url') {
+              const decoder = new TextDecoder();
+              const urlText = decoder.decode(record.data);
+              try {
+                const url = new URL(urlText);
+                const tagParam = url.searchParams.get('tag');
+                if (tagParam) {
+                  lookupValue = tagParam;
+                  break;
+                }
+              } catch { /* not a valid URL, use serialNumber */ }
             }
           }
         }
@@ -98,8 +163,12 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
 
           if (json.success && json.data) {
             setNfcTag(json.data);
-            // Auto-proceed to clock in
-            handleNfcClockIn(json.data);
+            // Auto-proceed to clock in or clock out
+            if (isClockOut) {
+              handleNfcClockOut(json.data);
+            } else {
+              handleNfcClockIn(json.data);
+            }
           } else {
             setError(json.error || 'NFC tag not recognized');
           }
@@ -117,7 +186,8 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
       setNfcScanning(false);
       setStep('choose');
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClockOut]);
 
   const stopNfcScan = () => {
     nfcReaderRef.current = null;
@@ -125,13 +195,12 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
     setStep('choose');
   };
 
-  // ── Handle NFC Clock In ──
+  // ── Handle NFC Clock IN ──
   const handleNfcClockIn = async (tag: NfcTagResult) => {
     setStep('processing');
     setError(null);
 
     try {
-      // Get location (still useful for logging)
       const location = await getLocation();
 
       await onClockIn({
@@ -148,7 +217,30 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
     }
   };
 
-  // ── Handle GPS Clock In ──
+  // ── Handle NFC Clock OUT ──
+  const handleNfcClockOut = async (tag: NfcTagResult) => {
+    if (!onClockOut) return;
+    setStep('processing');
+    setError(null);
+
+    try {
+      const location = await getLocation();
+
+      await onClockOut({
+        method: 'nfc',
+        nfc_tag_id: tag.tag_id,
+        nfc_tag_uid: tag.tag_uid,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Clock-out failed');
+      setStep('choose');
+    }
+  };
+
+  // ── Handle GPS Clock IN / OUT ──
   const handleGpsClockIn = async () => {
     setStep('processing');
     setError(null);
@@ -214,33 +306,16 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
     setPhotoPreview(URL.createObjectURL(file));
   };
 
-  // Helper — get GPS location
-  const getLocation = (): Promise<{ latitude: number; longitude: number; accuracy?: number }> => {
-    // Check bypass mode
-    if (process.env.NEXT_PUBLIC_BYPASS_LOCATION_CHECK === 'true') {
-      return Promise.resolve({ latitude: 34.76866, longitude: -82.43563, accuracy: 0 });
-    }
-
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation not supported'));
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        }),
-        (err) => reject(new Error(err.message || 'Location unavailable')),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    });
-  };
-
   const tagTypeIcon = () => {
     return <Building2 className="w-5 h-5" />;
   };
+
+  // ── Header color changes based on mode ──
+  const headerGradient = isClockOut
+    ? 'bg-gradient-to-r from-orange-500 to-red-600'
+    : 'bg-gradient-to-r from-emerald-500 to-teal-600';
+
+  const processingText = isClockOut ? 'Clocking you out...' : 'Clocking you in...';
 
   return (
     <>
@@ -249,12 +324,18 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
       <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-5 text-white">
+          <div className={`${headerGradient} p-5 text-white`}>
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold">Clock In</h2>
-                <p className="text-emerald-100 text-sm">
-                  {isShopHours ? '🏭 Shop Hours Mode' : 'Choose verification method'}
+                <h2 className="text-lg font-bold">
+                  {isClockOut ? 'Clock Out' : 'Clock In'}
+                </h2>
+                <p className={`text-sm ${isClockOut ? 'text-orange-100' : 'text-emerald-100'}`}>
+                  {isClockOut
+                    ? 'Scan your NFC tag or use GPS to clock out'
+                    : isShopHours
+                    ? 'Shop Hours Mode'
+                    : 'Choose verification method'}
                 </p>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
@@ -280,49 +361,103 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
                   onClick={startNfcScan}
                   className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${
                     nfcSupported
-                      ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300'
+                      ? isClockOut
+                        ? 'border-orange-200 bg-orange-50 hover:bg-orange-100 hover:border-orange-300'
+                        : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300'
                       : 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
                   }`}
                   disabled={!nfcSupported}
                 >
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${nfcSupported ? 'bg-emerald-500' : 'bg-gray-400'}`}>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    nfcSupported
+                      ? isClockOut ? 'bg-orange-500' : 'bg-emerald-500'
+                      : 'bg-gray-400'
+                  }`}>
                     {nfcSupported ? <Wifi className="w-6 h-6 text-white" /> : <WifiOff className="w-6 h-6 text-white" />}
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-gray-900">Scan NFC Tag</p>
+                    <p className="font-bold text-gray-900">
+                      {isClockOut ? 'Scan NFC Tag to Clock Out' : 'Scan NFC Tag'}
+                    </p>
                     <p className="text-xs text-gray-500">
                       {nfcSupported
-                        ? 'Tap your phone on the shop NFC tag'
+                        ? isClockOut
+                          ? 'Tap your phone on the shop or truck NFC tag'
+                          : 'Tap your phone on the shop NFC tag'
                         : 'NFC not available on this device'}
                     </p>
                   </div>
+                  {nfcSupported && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      isClockOut
+                        ? 'bg-orange-200 text-orange-800'
+                        : 'bg-emerald-200 text-emerald-800'
+                    }`}>
+                      RECOMMENDED
+                    </span>
+                  )}
                 </button>
 
-                {/* Remote Option — Out of Town */}
-                <button
-                  onClick={() => setStep('remote_photo')}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 transition-all text-left"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center">
-                    <Camera className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900">Remote Clock-In</p>
-                    <p className="text-xs text-gray-500">Out of town? Take a selfie + GPS</p>
-                  </div>
-                  <span className="px-2 py-0.5 bg-amber-200 text-amber-800 text-[10px] font-bold rounded-full">
-                    NEEDS APPROVAL
-                  </span>
-                </button>
+                {/* GPS Option */}
+                {isClockOut ? (
+                  // GPS clock-out (must be at shop)
+                  <button
+                    onClick={async () => {
+                      if (!onClockOut) return;
+                      setStep('processing');
+                      setError(null);
+                      try {
+                        const location = await getLocation();
+                        await onClockOut({
+                          method: 'gps',
+                          latitude: location.latitude,
+                          longitude: location.longitude,
+                          accuracy: location.accuracy,
+                        });
+                      } catch (err: unknown) {
+                        setError(err instanceof Error ? err.message : 'Clock-out failed');
+                        setStep('choose');
+                      }
+                    }}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 transition-all text-left"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center">
+                      <MapPin className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900">GPS Clock Out</p>
+                      <p className="text-xs text-gray-500">Must be at the shop — verifies your location</p>
+                    </div>
+                  </button>
+                ) : (
+                  <>
+                    {/* Remote Option — Out of Town (clock-in only) */}
+                    <button
+                      onClick={() => setStep('remote_photo')}
+                      className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 transition-all text-left"
+                    >
+                      <div className="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center">
+                        <Camera className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900">Remote Clock-In</p>
+                        <p className="text-xs text-gray-500">Out of town? Take a selfie + GPS</p>
+                      </div>
+                      <span className="px-2 py-0.5 bg-amber-200 text-amber-800 text-[10px] font-bold rounded-full">
+                        NEEDS APPROVAL
+                      </span>
+                    </button>
 
-                {/* GPS Fallback — small link */}
-                <button
-                  onClick={handleGpsClockIn}
-                  className="w-full text-center text-xs text-gray-400 hover:text-blue-600 py-2 transition-colors"
-                >
-                  <MapPin className="w-3 h-3 inline mr-1" />
-                  GPS fallback (if NFC isn&apos;t working)
-                </button>
+                    {/* GPS Fallback — small link */}
+                    <button
+                      onClick={handleGpsClockIn}
+                      className="w-full text-center text-xs text-gray-400 hover:text-blue-600 py-2 transition-colors"
+                    >
+                      <MapPin className="w-3 h-3 inline mr-1" />
+                      GPS fallback (if NFC isn&apos;t working)
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
@@ -332,14 +467,21 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
                 {nfcScanning && !nfcTag && (
                   <>
                     <div className="relative w-28 h-28 mx-auto mb-4">
-                      <div className="absolute inset-0 bg-emerald-400 rounded-full opacity-20 animate-ping" />
-                      <div className="absolute inset-3 bg-emerald-400 rounded-full opacity-15 animate-ping" style={{ animationDelay: '0.3s' }} />
-                      <div className="relative w-full h-full rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-xl">
+                      <div className={`absolute inset-0 rounded-full opacity-20 animate-ping ${isClockOut ? 'bg-orange-400' : 'bg-emerald-400'}`} />
+                      <div className={`absolute inset-3 rounded-full opacity-15 animate-ping ${isClockOut ? 'bg-orange-400' : 'bg-emerald-400'}`} style={{ animationDelay: '0.3s' }} />
+                      <div className={`relative w-full h-full rounded-full flex items-center justify-center shadow-xl ${
+                        isClockOut
+                          ? 'bg-gradient-to-br from-orange-500 to-red-600'
+                          : 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                      }`}>
                         <Smartphone className="w-12 h-12 text-white" />
                       </div>
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">Scanning...</h3>
-                    <p className="text-sm text-gray-500 mb-4">Hold your phone near the NFC tag</p>
+                    <p className="text-sm text-gray-500 mb-1">Hold your phone near the NFC tag</p>
+                    <p className="text-xs text-gray-400 mb-4">
+                      {isClockOut ? 'This will clock you OUT' : 'This will clock you IN'}
+                    </p>
                     <button
                       onClick={stopNfcScan}
                       className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-colors"
@@ -351,22 +493,29 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
 
                 {nfcTag && (
                   <div className="space-y-3">
-                    <div className="w-16 h-16 mx-auto bg-emerald-100 rounded-full flex items-center justify-center">
-                      <CheckCircle className="w-8 h-8 text-emerald-600" />
+                    <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${
+                      isClockOut ? 'bg-orange-100' : 'bg-emerald-100'
+                    }`}>
+                      {isClockOut
+                        ? <LogOut className={`w-8 h-8 ${isClockOut ? 'text-orange-600' : 'text-emerald-600'}`} />
+                        : <CheckCircle className="w-8 h-8 text-emerald-600" />
+                      }
                     </div>
                     <h3 className="text-lg font-bold text-gray-900">Tag Verified!</h3>
                     <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
                       {tagTypeIcon()}
                       <span className="font-semibold">{nfcTag.label}</span>
                     </div>
-                    <p className="text-xs text-gray-500">Clocking you in...</p>
-                    <Loader2 className="w-5 h-5 animate-spin text-emerald-600 mx-auto" />
+                    <p className="text-xs text-gray-500">
+                      {isClockOut ? 'Clocking you out...' : 'Clocking you in...'}
+                    </p>
+                    <Loader2 className={`w-5 h-5 animate-spin mx-auto ${isClockOut ? 'text-orange-600' : 'text-emerald-600'}`} />
                   </div>
                 )}
               </div>
             )}
 
-            {/* ── STEP: REMOTE PHOTO ── */}
+            {/* ── STEP: REMOTE PHOTO (clock-in only) ── */}
             {step === 'remote_photo' && (
               <div className="space-y-4">
                 <div className="text-center">
@@ -434,9 +583,9 @@ export default function NfcClockInModal({ isShopHours, onClockIn, onClose }: Nfc
             {/* ── STEP: PROCESSING ── */}
             {step === 'processing' && (
               <div className="text-center py-8">
-                <Loader2 className="w-10 h-10 animate-spin text-emerald-600 mx-auto mb-3" />
-                <p className="text-gray-600 font-semibold">Clocking you in...</p>
-                <p className="text-xs text-gray-400 mt-1">Verifying and recording your clock-in</p>
+                <Loader2 className={`w-10 h-10 animate-spin mx-auto mb-3 ${isClockOut ? 'text-orange-600' : 'text-emerald-600'}`} />
+                <p className="text-gray-600 font-semibold">{processingText}</p>
+                <p className="text-xs text-gray-400 mt-1">Verifying and recording your {isClockOut ? 'clock-out' : 'clock-in'}</p>
               </div>
             )}
           </div>
