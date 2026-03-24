@@ -206,11 +206,37 @@ export default function MaintenanceRequestPage() {
         contactPhone: contactPhone.trim() || undefined,
       };
 
-      // TODO: Save to database
-      console.log('Maintenance Request:', request);
+      // Save to equipment_damage_reports via the damage-report API
+      const { data: { session } } = await (await import('@/lib/supabase')).supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const severityMap: Record<PriorityLevel, string> = {
+        low: 'minor', medium: 'moderate', high: 'major', urgent: 'critical'
+      };
+
+      const res = await fetch('/api/equipment/damage-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          equipmentId: selectedEquipment,
+          damageTitle: `${issueCategory.charAt(0).toUpperCase() + issueCategory.slice(1)} Issue — Maintenance Request`,
+          damageDescription: description.trim(),
+          severity: severityMap[priority],
+          incidentType: issueCategory,
+          locationOfIncident: location.trim() || undefined,
+          dateOfIncident: new Date().toISOString().split('T')[0],
+          equipmentOperable: priority !== 'urgent',
+          safetyConcern: priority === 'urgent',
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to submit');
+      }
 
       setSuccess(true);
 
