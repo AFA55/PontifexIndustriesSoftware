@@ -8,11 +8,12 @@
 // ============================================================
 // Permission Levels
 // ============================================================
-export type PermissionLevel = 'none' | 'view' | 'full';
+export type PermissionLevel = 'none' | 'view' | 'submit' | 'full';
 
 export const PERMISSION_LABELS: Record<PermissionLevel, string> = {
   none: 'No Access',
   view: 'View Only',
+  submit: 'Submit',
   full: 'Full Access',
 };
 
@@ -236,18 +237,18 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
   super_admin: allCards('full'),
   operations_manager: allCards('full'),
   admin: {
-    timecards: 'full',
-    schedule_form: 'none',
+    timecards: 'view',
+    schedule_form: 'submit',
     schedule_board: 'view',
-    team_management: 'none',
+    team_management: 'view',
     analytics: 'view',
-    equipment_performance: 'none',
+    equipment_performance: 'view',
     operator_profiles: 'view',
     completed_jobs: 'view',
     blade_inventory: 'none',
     tools_equipment: 'none',
     billing: 'view',
-    customer_profiles: 'view',
+    customer_profiles: 'full',
     operations_hub: 'none',
     settings: 'none',
   },

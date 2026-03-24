@@ -277,7 +277,7 @@ export default function AdminDashboard() {
   const sortedCards = [...ADMIN_CARDS]
     .filter(card => !hiddenByFeatureFlags.has(card.key))
     .sort((a, b) => {
-      const order: Record<PermissionLevel, number> = { full: 0, view: 1, none: 2 };
+      const order: Record<PermissionLevel, number> = { full: 0, submit: 1, view: 2, none: 3 };
       return order[getPermission(a.key)] - order[getPermission(b.key)];
     });
 

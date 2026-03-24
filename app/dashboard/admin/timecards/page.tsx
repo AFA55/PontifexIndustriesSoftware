@@ -532,7 +532,7 @@ export default function AdminTimecardsPage() {
     try {
       const totals = {
         total: totalHours,
-        regular: Math.min(weekdayHours, 40),
+        regular: weekdayHours - weeklyOTHours,
         weeklyOT: weeklyOTHours,
         mandatoryOT: mandatoryOTTotal,
         nightShift: nightShiftTotal,
@@ -571,13 +571,28 @@ export default function AdminTimecardsPage() {
     .reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
   const mandatoryOTEntries = timecards.filter(tc => tc.hour_type === 'mandatory_overtime').length;
 
-  // Mon–Fri hours only (exclude mandatory OT / weekend entries)
-  const weekdayHours = timecards
-    .filter(tc => tc.hour_type !== 'mandatory_overtime')
-    .reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
+  // Per-employee weekly OT calculation:
+  // Group Mon-Fri hours by employee, then sum OT for each who exceeds 40.
+  // This avoids the bug where 5 employees x 10 hrs = 50 hrs total, falsely showing 10 hrs OT.
+  const perEmployeeStats = useMemo(() => {
+    const byUser: Record<string, { weekdayHours: number }> = {};
+    timecards.forEach(tc => {
+      if (!byUser[tc.user_id]) byUser[tc.user_id] = { weekdayHours: 0 };
+      if (tc.hour_type !== 'mandatory_overtime') {
+        byUser[tc.user_id].weekdayHours += tc.total_hours || 0;
+      }
+    });
+    let totalWeekdayHours = 0;
+    let totalWeeklyOT = 0;
+    Object.values(byUser).forEach(({ weekdayHours: wh }) => {
+      totalWeekdayHours += wh;
+      totalWeeklyOT += Math.max(0, wh - 40);
+    });
+    return { totalWeekdayHours, totalWeeklyOT };
+  }, [timecards]);
 
-  // Weekly OT = Mon–Fri hours beyond 40 (weekends don't count toward this threshold)
-  const weeklyOTHours = Math.max(0, weekdayHours - 40);
+  const weekdayHours = perEmployeeStats.totalWeekdayHours;
+  const weeklyOTHours = perEmployeeStats.totalWeeklyOT;
 
   const shopHoursTotal = timecards.filter(tc => tc.is_shop_hours).reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
   const nightShiftTotal = timecards.filter(tc => tc.is_night_shift).reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
@@ -755,7 +770,7 @@ export default function AdminTimecardsPage() {
                 style={{ width: `${Math.min((totalHours / 60) * 100, 100)}%` }}
               />
             </div>
-            <p className="text-[10px] text-blue-300 mt-1">{weeklyOTHours > 0 ? `${weeklyOTHours.toFixed(1)} hrs Mon–Fri OT` : `${(40 - weekdayHours).toFixed(1)} Mon–Fri hrs to OT`}</p>
+            <p className="text-[10px] text-blue-300 mt-1">{weeklyOTHours > 0 ? `${weeklyOTHours.toFixed(1)} hrs combined OT across ${uniqueEmployees} employees` : `${uniqueEmployees} employees tracked`}</p>
           </div>
 
           {/* Employees */}
@@ -798,7 +813,7 @@ export default function AdminTimecardsPage() {
         {/* ── Category Breakdown ─────────────────────────── */}
         <div className="grid grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
           {[
-            { label: 'Regular', value: Math.min(weekdayHours, 40).toFixed(1), icon: <CheckCircle size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+            { label: 'Regular', value: (weekdayHours - weeklyOTHours).toFixed(1), icon: <CheckCircle size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
             { label: 'Weekly OT', value: weeklyOTHours.toFixed(1), icon: <TrendingUp size={14} />, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
             { label: 'Mandatory OT', value: mandatoryOTTotal.toFixed(1), icon: <Briefcase size={14} />, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
             { label: 'Night Shift', value: nightShiftTotal.toFixed(1), icon: <Moon size={14} />, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },

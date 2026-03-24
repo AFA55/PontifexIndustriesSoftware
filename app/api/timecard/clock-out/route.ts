@@ -45,27 +45,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify location is within shop radius
-    const locationCheck = isWithinShopRadius({ latitude, longitude, accuracy });
+    // Verify location is within shop radius — but only enforce for GPS-clocked-in users.
+    // NFC and remote clock-ins may be at jobsites, so we record location but don't block.
+    const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
+    const locationCheck = hasLocation
+      ? isWithinShopRadius({ latitude, longitude, accuracy })
+      : { isWithinRange: false, distance: 0, distanceFormatted: 'unknown' };
 
-    if (!locationCheck.isWithinRange) {
-      return NextResponse.json(
-        {
-          error: `You must be at ${SHOP_LOCATION.name} to clock out.`,
-          details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(ALLOWED_RADIUS_METERS * 3.28084).toFixed(0)} feet (${ALLOWED_RADIUS_METERS}m).`,
-          distance: locationCheck.distance,
-          distanceFormatted: locationCheck.distanceFormatted,
-          allowedRadius: ALLOWED_RADIUS_METERS,
-          shopLocation: {
-            latitude: SHOP_LOCATION.latitude,
-            longitude: SHOP_LOCATION.longitude,
-            name: SHOP_LOCATION.name,
-          },
-          userLocation: { latitude, longitude, accuracy },
-        },
-        { status: 403 }
-      );
-    }
+    // Look up how this user clocked in to decide whether to enforce GPS radius
+    // (We fetch the active timecard below, so we'll do the enforcement check after that)
 
     // Check for incomplete dispatched jobs (work-performed hard block)
     const { data: userProfile } = await supabaseAdmin
@@ -170,6 +158,28 @@ export async function POST(request: NextRequest) {
           details: 'You must clock in before you can clock out.',
         },
         { status: 400 }
+      );
+    }
+
+    // Enforce GPS radius check for GPS-based clock-ins only.
+    // NFC and remote users are at jobsites, so we just record their location.
+    const clockInMethod = activeTimecard.clock_in_method || 'gps';
+    if (clockInMethod === 'gps' && hasLocation && !locationCheck.isWithinRange) {
+      return NextResponse.json(
+        {
+          error: `You must be at ${SHOP_LOCATION.name} to clock out.`,
+          details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(ALLOWED_RADIUS_METERS * 3.28084).toFixed(0)} feet (${ALLOWED_RADIUS_METERS}m).`,
+          distance: locationCheck.distance,
+          distanceFormatted: locationCheck.distanceFormatted,
+          allowedRadius: ALLOWED_RADIUS_METERS,
+          shopLocation: {
+            latitude: SHOP_LOCATION.latitude,
+            longitude: SHOP_LOCATION.longitude,
+            name: SHOP_LOCATION.name,
+          },
+          userLocation: { latitude, longitude, accuracy },
+        },
+        { status: 403 }
       );
     }
 

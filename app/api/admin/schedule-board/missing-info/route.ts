@@ -34,12 +34,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Update job with missing info details
+    // Update job with missing info details and flag status
     const { error: updateError } = await supabaseAdmin
       .from('job_orders')
       .update({
         missing_info_items: missingItems,
         missing_info_note: customNote || null,
+        missing_info_flagged: true,
+        missing_info_flagged_by: auth.userId,
+        missing_info_flagged_at: new Date().toISOString(),
       })
       .eq('id', jobId);
 

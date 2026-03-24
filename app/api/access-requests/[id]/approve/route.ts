@@ -14,7 +14,7 @@ import { ROLES_WITH_LABELS, ALL_CARD_KEYS, type PermissionLevel } from '@/lib/rb
 import crypto from 'crypto';
 
 const VALID_ROLES = ROLES_WITH_LABELS.map(r => r.value);
-const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'full'];
+const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'submit', 'full'];
 
 export async function POST(
   request: NextRequest,

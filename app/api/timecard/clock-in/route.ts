@@ -50,8 +50,10 @@ export async function POST(request: NextRequest) {
       remote_photo_url,           // selfie URL for remote clock-in
     } = body;
 
-    // Validation - location always required
-    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    // Validation - location required for GPS and remote; optional for NFC
+    const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
+
+    if (!hasLocation && clock_in_method !== 'nfc') {
       return NextResponse.json(
         { error: 'Invalid location data. Latitude and longitude are required.' },
         { status: 400 }
