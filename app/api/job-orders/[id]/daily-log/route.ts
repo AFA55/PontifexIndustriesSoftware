@@ -143,7 +143,9 @@ export async function POST(
         core_depth_inches: item.core_depth_inches ? Number(item.core_depth_inches) : null,
         linear_feet_cut: item.linear_feet_cut ? Number(item.linear_feet_cut) : null,
         cut_depth_inches: item.cut_depth_inches ? Number(item.cut_depth_inches) : null,
-        accessibility_rating: item.accessibility_rating || null,
+        accessibility_rating: typeof item.accessibility_rating === 'string'
+          ? ({ easy: 1, moderate: 2, medium: 3, difficult: 4, hard: 5 } as Record<string, number>)[item.accessibility_rating] || null
+          : item.accessibility_rating ? Number(item.accessibility_rating) : null,
         notes: item.notes || null,
       }));
 

@@ -184,7 +184,6 @@ export async function POST(request: NextRequest) {
         quantity: 1,
         unit: 'job',
         unit_rate: amount,
-        amount: amount,
         job_order_id: jobOrderId,
         taxable: true,
       });
@@ -219,7 +218,6 @@ export async function POST(request: NextRequest) {
             quantity: qty,
             unit: unit,
             unit_rate: rate,
-            amount: amount,
             job_order_id: jobOrderId,
             operator_id: item.operator_id,
             taxable: true,
@@ -238,7 +236,6 @@ export async function POST(request: NextRequest) {
           quantity: Number(laborHours.toFixed(2)),
           unit: 'hours',
           unit_rate: DEFAULT_LABOR_RATE,
-          amount: laborAmount,
           job_order_id: jobOrderId,
           taxable: true,
         });
@@ -254,7 +251,6 @@ export async function POST(request: NextRequest) {
           quantity: 1,
           unit: 'job',
           unit_rate: 0,
-          amount: 0,
           job_order_id: jobOrderId,
           taxable: true,
         });
@@ -275,7 +271,7 @@ export async function POST(request: NextRequest) {
         tax_rate: 0,
         tax_amount: 0,
         total_amount: subtotal,
-        balance_due: subtotal,
+        amount_paid: 0,
         status: 'draft',
         payment_terms: 30,
         po_number: job.po_number || null,

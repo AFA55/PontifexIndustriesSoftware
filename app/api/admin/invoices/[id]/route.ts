@@ -72,7 +72,7 @@ export async function PATCH(
       'customer_name', 'customer_email', 'billing_address',
       'due_date', 'subtotal', 'tax_rate', 'tax_amount',
       'discount_amount', 'discount_description', 'total_amount',
-      'balance_due', 'status', 'payment_terms', 'po_number',
+      'amount_paid', 'status', 'payment_terms', 'po_number',
       'contract_number', 'notes', 'internal_notes',
     ];
 
@@ -97,9 +97,17 @@ export async function PATCH(
           if (!body.paid_date) {
             updates.paid_date = now.split('T')[0];
           }
-          // Set balance_due to 0 unless explicitly provided
-          if (body.balance_due === undefined) {
-            updates.balance_due = 0;
+          // Set amount_paid = total_amount so balance_due (generated) becomes 0
+          if (body.amount_paid === undefined) {
+            // Fetch current invoice to get total_amount
+            const { data: currentInvoice } = await supabaseAdmin
+              .from('invoices')
+              .select('total_amount')
+              .eq('id', id)
+              .single();
+            if (currentInvoice) {
+              updates.amount_paid = currentInvoice.total_amount;
+            }
           }
           break;
         case 'overdue':
@@ -144,7 +152,6 @@ export async function PATCH(
           quantity: item.quantity || 1,
           unit: item.unit || 'each',
           unit_rate: item.unit_rate || 0,
-          amount: item.amount || 0,
           job_order_id: item.job_order_id || null,
           operator_id: item.operator_id || null,
           taxable: item.taxable !== false,
