@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getCardPermission, type PermissionLevel } from '@/lib/rbac';
+import { sendSMS, formatPhoneNumber } from '@/lib/sms';
 
 /**
  * POST /api/admin/schedule-board/dispatch
@@ -106,11 +107,15 @@ export async function POST(request: NextRequest) {
 
     const { data: profiles } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name')
+      .select('id, full_name, phone_number')
       .in('id', Array.from(allUserIds));
 
     const nameMap = new Map<string, string>();
-    (profiles || []).forEach(p => nameMap.set(p.id, p.full_name || 'Unknown'));
+    const phoneMap = new Map<string, string>();
+    (profiles || []).forEach(p => {
+      nameMap.set(p.id, p.full_name || 'Unknown');
+      if (p.phone_number) phoneMap.set(p.id, p.phone_number);
+    });
 
     const formattedDate = new Date(targetDate + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'short',
@@ -172,10 +177,54 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 4. Fire-and-forget SMS to operators/helpers who have a phone number
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const smsPromises: Promise<any>[] = [];
+
+    for (const job of jobs) {
+      const formatTime = (t: string | null) => {
+        if (!t) return '';
+        const [h, m] = t.split(':');
+        const hour = parseInt(h);
+        return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
+      };
+
+      const buildMsg = (role: 'operator' | 'helper') => {
+        const lines = [
+          `📋 Job Dispatched — ${formattedDate}`,
+          `Job #: ${job.job_number}`,
+          `Customer: ${job.customer_name}`,
+          `Location: ${job.location}`,
+          job.arrival_time ? `Arrival: ${formatTime(job.arrival_time)}` : null,
+          job.job_type ? `Type: ${job.job_type}` : null,
+          role === 'helper' ? '(You are assigned as Helper)' : null,
+          appUrl ? `View: ${appUrl}/dashboard/job-schedule` : null,
+        ].filter(Boolean);
+        return lines.join('\n');
+      };
+
+      if (job.assigned_to && phoneMap.has(job.assigned_to)) {
+        smsPromises.push(
+          sendSMS({ to: phoneMap.get(job.assigned_to)!, message: buildMsg('operator'), jobId: job.id })
+            .catch(e => console.error(`SMS failed for operator ${job.assigned_to}:`, e))
+        );
+      }
+      if (job.helper_assigned_to && phoneMap.has(job.helper_assigned_to)) {
+        smsPromises.push(
+          sendSMS({ to: phoneMap.get(job.helper_assigned_to)!, message: buildMsg('helper'), jobId: job.id })
+            .catch(e => console.error(`SMS failed for helper ${job.helper_assigned_to}:`, e))
+        );
+      }
+    }
+
+    // Don't await — fire-and-forget (don't block response on SMS delivery)
+    Promise.allSettled(smsPromises).catch(() => {});
+
     return NextResponse.json({
       success: true,
       dispatched_count: jobIds.length,
       notification_count: notificationCount,
+      sms_attempted: smsPromises.length,
       message: `Dispatched ${jobIds.length} job(s) for ${formattedDate}. ${notificationCount} notification(s) sent.`,
     });
   } catch (error) {

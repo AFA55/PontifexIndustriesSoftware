@@ -120,6 +120,36 @@ export function formatPhoneNumber(phone: string): string | null {
 }
 
 /**
+ * Send job dispatch notification to an operator or helper
+ */
+export async function sendJobDispatchSMS(options: {
+  to: string;
+  operatorName: string;
+  jobNumber: string;
+  customerName: string;
+  location: string;
+  scheduledDate: string; // e.g., "Mon, Mar 25"
+  arrivalTime?: string;  // e.g., "7:00 AM"
+  jobType?: string;
+  isHelper?: boolean;
+  appUrl?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const lines = [
+    `📋 Job Dispatched — ${options.scheduledDate}`,
+    `Hi ${options.operatorName},`,
+    `Job #: ${options.jobNumber}`,
+    `Customer: ${options.customerName}`,
+    `Location: ${options.location}`,
+    options.arrivalTime ? `Arrival: ${options.arrivalTime}` : null,
+    options.jobType ? `Type: ${options.jobType}` : null,
+    options.isHelper ? '(You are assigned as Helper)' : null,
+    options.appUrl ? `View: ${options.appUrl}/dashboard/job-schedule` : null,
+  ].filter(Boolean);
+
+  return sendSMS({ to: options.to, message: lines.join('\n') });
+}
+
+/**
  * Send "In Route" notification
  */
 export async function sendInRouteNotification(options: {
