@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Clock, Calendar, ArrowLeft, Users } from 'lucide-react';
+import { Clock, Calendar, ArrowLeft, Users, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 interface Operator {
@@ -188,13 +188,25 @@ export default function OperatorTimecardPage() {
               <p className="text-gray-600 font-medium mt-1">{operator.email}</p>
             </div>
           </div>
-          <Link
-            href="/dashboard/admin/timecards"
-            className="inline-flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-medium shadow-lg"
-          >
-            <Users size={18} />
-            View All Team Timecards
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const mondayStr = monday.toISOString().split('T')[0];
+                window.open(`/api/admin/timecards/${operatorId}/pdf?weekStart=${mondayStr}`, '_blank');
+              }}
+              className="inline-flex items-center gap-2 px-4 py-3 bg-white hover:bg-slate-50 text-blue-700 rounded-xl transition-colors font-medium shadow-lg border border-blue-200"
+            >
+              <FileText size={18} />
+              Download PDF
+            </button>
+            <Link
+              href="/dashboard/admin/timecards"
+              className="inline-flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-medium shadow-lg"
+            >
+              <Users size={18} />
+              View All Team Timecards
+            </Link>
+          </div>
         </div>
 
         {/* Week Navigation */}

@@ -6,9 +6,11 @@ import Link from 'next/link';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import {
   ArrowLeft, Clock, Calendar, CheckCircle, AlertTriangle,
-  ChevronLeft, ChevronRight, Moon, Factory, Briefcase, TrendingUp
+  ChevronLeft, ChevronRight, Moon, Factory, Briefcase, TrendingUp,
+  LogOut, Loader2, FileText
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import NfcClockInButton from '@/components/NfcClockInButton';
 
 interface TimecardEntry {
   id: string;
@@ -56,6 +58,12 @@ export default function TimecardPage() {
   const [timecards, setTimecards] = useState<TimecardEntry[]>([]);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const [weekData, setWeekData] = useState<WeekData | null>(null);
+  const [activeTimecard, setActiveTimecard] = useState<any>(null);
+  const [clockLoading, setClockLoading] = useState(true);
+  const [clockingAction, setClockingAction] = useState(false);
+  const [clockMethod, setClockMethod] = useState<'nfc' | 'gps' | 'remote'>('nfc');
+  const [nfcScanning, setNfcScanning] = useState(false);
+  const [liveHours, setLiveHours] = useState('0.0');
   const router = useRouter();
   const isRedirecting = useRef(false);
 
@@ -78,6 +86,143 @@ export default function TimecardPage() {
     }
     setUser(currentUser);
   }, [router]);
+
+  // Fetch active timecard on mount
+  const fetchActiveTimecard = useCallback(async () => {
+    if (isRedirecting.current) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/timecard/current', {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setActiveTimecard(json.data || null);
+      }
+    } catch (err) {
+      console.error('Error fetching active timecard:', err);
+    }
+    setClockLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (user) fetchActiveTimecard();
+  }, [user, fetchActiveTimecard]);
+
+  // Live hours counter (updates every 30 seconds when clocked in)
+  useEffect(() => {
+    if (!activeTimecard?.clockInTime) return;
+    const update = () => {
+      const start = new Date(activeTimecard.clockInTime).getTime();
+      const hrs = ((Date.now() - start) / 3600000).toFixed(1);
+      setLiveHours(hrs);
+    };
+    update();
+    const interval = setInterval(update, 30000);
+    return () => clearInterval(interval);
+  }, [activeTimecard]);
+
+  const handleClockIn = useCallback(async (nfcTagUid?: string) => {
+    setClockingAction(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Get GPS position
+      let latitude: number | undefined, longitude: number | undefined, accuracy: number | undefined;
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+        });
+        latitude = pos.coords.latitude;
+        longitude = pos.coords.longitude;
+        accuracy = pos.coords.accuracy;
+      } catch { /* GPS optional for NFC */ }
+
+      const body: Record<string, unknown> = {
+        clock_in_method: nfcTagUid ? 'nfc' : clockMethod,
+        latitude, longitude, accuracy,
+      };
+      if (nfcTagUid) {
+        body.nfc_tag_uid = nfcTagUid;
+      }
+
+      const res = await fetch('/api/timecard/clock-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        await fetchActiveTimecard();
+        // fetchTimecards will be called via the user effect when weekData updates
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Clock-in failed');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Clock-in failed');
+    }
+    setClockingAction(false);
+    setNfcScanning(false);
+  }, [clockMethod, fetchActiveTimecard]);
+
+  const handleClockOut = useCallback(async () => {
+    setClockingAction(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      let latitude: number | undefined, longitude: number | undefined, accuracy: number | undefined;
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+        });
+        latitude = pos.coords.latitude;
+        longitude = pos.coords.longitude;
+        accuracy = pos.coords.accuracy;
+      } catch { /* GPS optional */ }
+
+      const res = await fetch('/api/timecard/clock-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ latitude, longitude, accuracy }),
+      });
+
+      if (res.ok) {
+        setActiveTimecard(null);
+        // Refresh weekly data
+        fetchTimecards();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Clock-out failed');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Clock-out failed');
+    }
+    setClockingAction(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleNfcScan = useCallback(async (tagUid: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const verifyRes = await fetch('/api/timecard/verify-nfc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ tag_uid: tagUid }),
+    });
+
+    if (verifyRes.ok) {
+      await handleClockIn(tagUid);
+    } else {
+      const err = await verifyRes.json();
+      alert(err.error || 'NFC tag not recognized');
+      setNfcScanning(false);
+    }
+  }, [handleClockIn]);
 
   const fetchTimecards = useCallback(async () => {
     if (isRedirecting.current) return;
@@ -240,6 +385,81 @@ export default function TimecardPage() {
       </header>
 
       <div className="max-w-[1024px] mx-auto px-6 py-6">
+        {/* ── Clock-In/Out Section ─────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-6">
+          {clockLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            </div>
+          ) : activeTimecard ? (
+            /* CLOCKED IN STATE */
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-sm font-semibold">Clocked In</span>
+                <span className="text-xs text-emerald-600">
+                  since {new Date(activeTimecard.clockInTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-4xl font-bold text-gray-900">{liveHours}</p>
+                <p className="text-sm text-gray-500">hours today</p>
+              </div>
+
+              <button
+                onClick={handleClockOut}
+                disabled={clockingAction}
+                className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {clockingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />}
+                Clock Out
+              </button>
+            </div>
+          ) : (
+            /* NOT CLOCKED IN STATE */
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-full">
+                <div className="w-2 h-2 rounded-full bg-gray-400" />
+                <span className="text-sm font-semibold">Not Clocked In</span>
+              </div>
+
+              {/* Method selector */}
+              <div className="flex justify-center gap-2">
+                {(['nfc', 'gps', 'remote'] as const).map(method => (
+                  <button key={method} onClick={() => setClockMethod(method)}
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                      clockMethod === method ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}>
+                    {method === 'nfc' ? 'NFC Badge' : method === 'gps' ? 'GPS' : 'Remote'}
+                  </button>
+                ))}
+              </div>
+
+              {clockMethod === 'nfc' && !nfcScanning ? (
+                <button onClick={() => setNfcScanning(true)} disabled={clockingAction}
+                  className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
+                  Scan NFC to Clock In
+                </button>
+              ) : clockMethod === 'nfc' && nfcScanning ? (
+                <NfcClockInButton
+                  scanning={nfcScanning}
+                  onScanResult={handleNfcScan}
+                  onError={(err) => { alert(err); setNfcScanning(false); }}
+                  onStartScan={() => setNfcScanning(true)}
+                  onStopScan={() => setNfcScanning(false)}
+                />
+              ) : (
+                <button onClick={() => handleClockIn()} disabled={clockingAction}
+                  className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
+                  {clockingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : <Clock className="w-5 h-5" />}
+                  Clock In ({clockMethod === 'gps' ? 'GPS' : 'Remote'})
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* ── Week Navigation ───────────────────────────── */}
         <div className="mb-5 flex items-center justify-between">
           <button
@@ -268,6 +488,20 @@ export default function TimecardPage() {
           >
             <span className="hidden sm:inline">Next</span>
             <ChevronRight size={16} />
+          </button>
+        </div>
+
+        {/* ── Download PDF ──────────────────────────────── */}
+        <div className="mb-5 flex justify-end">
+          <button
+            onClick={() => {
+              const mondayStr = monday.toISOString().split('T')[0];
+              window.open(`/api/timecard/pdf?weekStart=${mondayStr}`, '_blank');
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-blue-700 rounded-lg transition-all text-sm font-medium border border-blue-200 shadow-sm hover:shadow"
+          >
+            <FileText size={16} />
+            Download My Timecard
           </button>
         </div>
 

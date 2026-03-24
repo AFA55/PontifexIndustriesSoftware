@@ -958,6 +958,17 @@ export default function AdminTimecardsPage() {
                                 Approve
                               </button>
                             )}
+                            <button
+                              onClick={() => {
+                                const mondayStr = monday.toISOString().split('T')[0];
+                                window.open(`/api/admin/timecards/${entry.user_id}/pdf?weekStart=${mondayStr}`, '_blank');
+                              }}
+                              className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1 border border-blue-200/60"
+                              title="Download weekly timecard PDF"
+                            >
+                              <FileText size={11} />
+                              PDF
+                            </button>
                           </div>
                         </td>
                       </tr>
