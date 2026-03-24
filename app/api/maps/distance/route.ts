@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 /**
  * GET /api/maps/distance - Calculate drive time using Google Maps Distance Matrix API
@@ -7,23 +7,9 @@ import { supabase } from '@/lib/supabase';
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { success: false, error: 'Authorization required' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid or expired token' },
-        { status: 401 }
-      );
-    }
+    // SECURITY: Require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const origin = searchParams.get('origin');

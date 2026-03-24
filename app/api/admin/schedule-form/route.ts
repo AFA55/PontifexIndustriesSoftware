@@ -15,26 +15,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
-    }
-
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
     // Verify admin role
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role, full_name')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
 
     if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
@@ -64,7 +55,7 @@ export async function POST(request: NextRequest) {
       title: `${body.customer_name} - ${body.job_type?.split(',')[0]?.trim() || 'Job'}`,
       status: 'pending_approval', // All submissions require super_admin review before going on the board
       priority: 'medium',
-      created_by: user.id,
+      created_by: auth.userId,
       created_via: 'schedule_form',
 
       // ── Step 1: Request Information ─────────────────────────
@@ -158,7 +149,7 @@ export async function POST(request: NextRequest) {
             primary_contact_name: body.site_contact || null,
             primary_contact_phone: body.contact_phone || null,
             address: body.address || null,
-            created_by: user.id,
+            created_by: auth.userId,
           })
           .select('id')
           .single();

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function POST(
   request: NextRequest,
@@ -15,31 +16,14 @@ export async function POST(
     const { id: timecardId } = await params;
 
     // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
     // Get user's role from profiles
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
 
     if (profileError || !profile) {
@@ -84,7 +68,7 @@ export async function POST(
       .from('timecards')
       .update({
         is_approved: true,
-        approved_by: user.id,
+        approved_by: auth.userId,
         approved_at: new Date().toISOString(),
       })
       .eq('id', timecardId)

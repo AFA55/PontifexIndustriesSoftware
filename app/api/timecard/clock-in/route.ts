@@ -17,24 +17,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS } from '@/lib/geolocation';
 
 const NIGHT_SHIFT_START_HOUR = 15;
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
     const {
@@ -112,13 +103,13 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('full_name, email')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
 
     const { data: activeTimecard, error: checkError } = await supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', auth.userId)
       .is('clock_out_time', null)
       .maybeSingle();
 
@@ -155,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     // -- Create timecard entry --
     const insertData: Record<string, unknown> = {
-      user_id: user.id,
+      user_id: auth.userId,
       clock_in_time: now.toISOString(),
       clock_in_latitude: latitude,
       clock_in_longitude: longitude,
@@ -204,7 +195,7 @@ export async function POST(request: NextRequest) {
 
     const locationCheck = isWithinShopRadius({ latitude, longitude, accuracy });
 
-    console.log(`Clock in: ${profile?.full_name || user.email} at ${now.toLocaleTimeString()} [${flags.join(', ')}]`);
+    console.log(`Clock in: ${profile?.full_name || auth.userEmail} at ${now.toLocaleTimeString()} [${flags.join(', ')}]`);
     console.log(`Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (${locationCheck.distanceFormatted} from shop)`);
 
     return NextResponse.json(

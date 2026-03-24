@@ -9,18 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-
-async function getAuthUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  const token = authHeader?.replace('Bearer ', '');
-
-  if (!token) return null;
-
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !user) return null;
-
-  return user;
-}
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET(
   request: NextRequest,
@@ -28,11 +17,10 @@ export async function GET(
 ) {
   try {
     const { id: jobId } = await params;
-    const user = await getAuthUser(request);
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // SECURITY: Require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Fetch job with survey data
     const { data: job, error } = await supabaseAdmin
@@ -45,16 +33,9 @@ export async function GET(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Verify user is assigned to this job
-    if (job.assigned_to !== user.id && job.helper_assigned_to !== user.id) {
-      // Also allow admin roles
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile || !['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
+    // Verify user is assigned to this job or is an admin role
+    if (job.assigned_to !== auth.userId && job.helper_assigned_to !== auth.userId) {
+      if (!['admin', 'super_admin', 'operations_manager'].includes(auth.role)) {
         return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 });
       }
     }
@@ -79,11 +60,10 @@ export async function POST(
 ) {
   try {
     const { id: jobId } = await params;
-    const user = await getAuthUser(request);
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // SECURITY: Require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Fetch job to verify access
     const { data: job, error: jobError } = await supabaseAdmin
@@ -96,15 +76,9 @@ export async function POST(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Verify user is assigned to this job
-    if (job.assigned_to !== user.id && job.helper_assigned_to !== user.id) {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile || !['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
+    // Verify user is assigned to this job or is an admin role
+    if (job.assigned_to !== auth.userId && job.helper_assigned_to !== auth.userId) {
+      if (!['admin', 'super_admin', 'operations_manager'].includes(auth.role)) {
         return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 });
       }
     }
@@ -116,7 +90,7 @@ export async function POST(
     const surveyPayload = {
       ...surveyData,
       submitted_at: new Date().toISOString(),
-      submitted_by: user.id,
+      submitted_by: auth.userId,
     };
 
     // Save to job_orders.job_survey

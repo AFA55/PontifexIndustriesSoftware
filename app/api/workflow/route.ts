@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 
 // Workflow step definitions
 const WORKFLOW_STEPS = [
@@ -21,19 +21,8 @@ const WORKFLOW_STEPS = [
 // GET: Retrieve workflow progress
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
 
@@ -46,7 +35,7 @@ export async function GET(request: NextRequest) {
       .from('workflow_steps')
       .select('*')
       .eq('job_order_id', jobId)
-      .eq('operator_id', user.id)
+      .eq('operator_id', auth.userId)
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
@@ -61,7 +50,7 @@ export async function GET(request: NextRequest) {
         .from('workflow_steps')
         .insert({
           job_order_id: jobId,
-          operator_id: user.id,
+          operator_id: auth.userId,
           current_step: 'equipment_checklist',
           equipment_checklist_completed: false,
           sms_sent: false,
@@ -93,18 +82,8 @@ export async function GET(request: NextRequest) {
 // POST: Update workflow progress
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
     const { jobId, currentStep, completedStep } = body;
@@ -160,7 +139,7 @@ export async function POST(request: NextRequest) {
       .from('workflow_steps')
       .upsert({
         job_order_id: jobId,
-        operator_id: user.id,
+        operator_id: auth.userId,
         ...updateData,
       }, {
         onConflict: 'job_order_id,operator_id'

@@ -12,21 +12,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
     const body = await request.json();
     const {
       job_order_id,
@@ -46,7 +37,7 @@ export async function POST(request: NextRequest) {
       const { data: existingShop } = await supabaseAdmin
         .from('helper_work_logs')
         .select('id, started_at')
-        .eq('helper_id', user.id)
+        .eq('helper_id', auth.userId)
         .eq('log_date', today)
         .eq('is_shop_ticket', true)
         .maybeSingle();
@@ -81,7 +72,7 @@ export async function POST(request: NextRequest) {
         });
       } else {
         const insertData: Record<string, unknown> = {
-          helper_id: user.id,
+          helper_id: auth.userId,
           log_date: today,
           is_shop_ticket: true,
           work_description: work_description || '',
@@ -126,7 +117,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    if (job.helper_assigned_to !== user.id && job.assigned_to !== user.id) {
+    if (job.helper_assigned_to !== auth.userId && job.assigned_to !== auth.userId) {
       return NextResponse.json({ error: 'Not assigned to this job' }, { status: 403 });
     }
 
@@ -135,7 +126,7 @@ export async function POST(request: NextRequest) {
       .from('helper_work_logs')
       .select('id, started_at, completed_at')
       .eq('job_order_id', job_order_id)
-      .eq('helper_id', user.id)
+      .eq('helper_id', auth.userId)
       .eq('log_date', today)
       .maybeSingle();
 
@@ -174,7 +165,7 @@ export async function POST(request: NextRequest) {
       // Create new log
       const insertData: Record<string, unknown> = {
         job_order_id,
-        helper_id: user.id,
+        helper_id: auth.userId,
         log_date: today,
         work_description: work_description || '',
         is_shop_ticket: false,
@@ -194,7 +185,7 @@ export async function POST(request: NextRequest) {
         const { data: lastCompleted } = await supabaseAdmin
           .from('helper_work_logs')
           .select('completed_at')
-          .eq('helper_id', user.id)
+          .eq('helper_id', auth.userId)
           .eq('log_date', today)
           .not('completed_at', 'is', null)
           .order('completed_at', { ascending: false })
@@ -208,7 +199,7 @@ export async function POST(request: NextRequest) {
           const { data: timecard } = await supabaseAdmin
             .from('timecards')
             .select('clock_in')
-            .eq('user_id', user.id)
+            .eq('user_id', auth.userId)
             .eq('date', today)
             .is('clock_out', null)
             .maybeSingle();
@@ -246,17 +237,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const jobOrderId = searchParams.get('job_order_id');
@@ -268,7 +250,7 @@ export async function GET(request: NextRequest) {
       const { data: logs, error } = await supabaseAdmin
         .from('helper_work_logs')
         .select('*')
-        .eq('helper_id', user.id)
+        .eq('helper_id', auth.userId)
         .eq('log_date', logDate)
         .order('started_at', { ascending: true });
 
@@ -293,7 +275,7 @@ export async function GET(request: NextRequest) {
       .from('helper_work_logs')
       .select('*')
       .eq('job_order_id', jobOrderId)
-      .eq('helper_id', user.id)
+      .eq('helper_id', auth.userId)
       .eq('log_date', logDate)
       .maybeSingle();
 

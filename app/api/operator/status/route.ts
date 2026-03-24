@@ -5,30 +5,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
     // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -56,7 +39,7 @@ export async function POST(request: NextRequest) {
     const { data: timecardData, error: timecardError } = await supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', auth.userId)
       .is('clock_out_time', null)
       .order('clock_in_time', { ascending: false })
       .limit(1)
@@ -82,7 +65,7 @@ export async function POST(request: NextRequest) {
     const { data: statusData, error: statusError } = await supabaseAdmin
       .from('operator_status_history')
       .insert([{
-        user_id: user.id,
+        user_id: auth.userId,
         timecard_id: activeTimecard?.id || null,
         status: status,
         timestamp: new Date().toISOString(),
@@ -153,33 +136,15 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Get latest status — gracefully handle missing table
     let latestStatus = null;
     const { data: statusData, error: statusError } = await supabaseAdmin
       .from('operator_status_history')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', auth.userId)
       .order('timestamp', { ascending: false })
       .limit(1)
       .maybeSingle();

@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 
 export async function GET(
   request: NextRequest,
@@ -15,35 +15,12 @@ export async function GET(
     // Await params as required by Next.js 15+
     const { id } = await params;
 
-    // Get user from Supabase session
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    // SECURITY: Require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Check if user is admin or assigned to this job
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    const isAdmin = profile?.role === 'admin';
+    const isAdmin = ['admin', 'super_admin', 'operations_manager'].includes(auth.role);
 
     // Verify user has access to this job
     if (!isAdmin) {
@@ -53,7 +30,7 @@ export async function GET(
         .eq('id', id)
         .single();
 
-      if (!job || job.assigned_to !== user.id) {
+      if (!job || job.assigned_to !== auth.userId) {
         return NextResponse.json(
           { error: 'You do not have access to view this job history' },
           { status: 403 }
@@ -136,32 +113,15 @@ export async function POST(
   try {
     const { id } = await params;
 
-    // Get user from Supabase session
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    // SECURITY: Require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Get user profile for name
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('full_name, role')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
 
     // Parse request body
@@ -181,7 +141,7 @@ export async function POST(
       .insert({
         job_order_id: id,
         change_type: event,
-        changed_by: user.id,
+        changed_by: auth.userId,
         changed_by_name: profile?.full_name || 'Unknown User',
         changed_by_role: profile?.role || 'operator',
         changed_at: timestamp || new Date().toISOString(),

@@ -1,25 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth, requireAdmin } from '@/lib/api-auth';
 
 /**
  * GET /api/equipment/repair-tracking
  * Get repair tracking records (admin sees all, operators see for their equipment)
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth.response;
+
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const equipmentId = searchParams.get('equipmentId');
     const damageReportId = searchParams.get('damageReportId');
@@ -74,32 +65,11 @@ export async function GET(request: Request) {
  * POST /api/equipment/repair-tracking
  * Create a new repair tracking record (admin only)
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.response;
+
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
-
     const body = await request.json();
     const {
       equipmentId,
@@ -136,7 +106,7 @@ export async function POST(request: Request) {
       vendor_name: vendorName,
       vendor_contact: vendorContact,
       vendor_invoice_number: vendorInvoiceNumber,
-      created_by: user.id,
+      created_by: auth.userId,
       status: 'pending'
     };
 
@@ -170,31 +140,17 @@ export async function POST(request: Request) {
  * PATCH /api/equipment/repair-tracking
  * Update repair tracking (admin only)
  */
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.response;
+
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is admin
+    // Get admin profile for full name
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('role, full_name')
-      .eq('id', user.id)
+      .select('full_name')
+      .eq('id', auth.userId)
       .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
 
     const body = await request.json();
     const {
@@ -245,8 +201,8 @@ export async function PATCH(request: Request) {
     if (warrantyExpirationDate) updateData.warranty_expiration_date = warrantyExpirationDate;
     if (qualityCheckPassed !== undefined) {
       updateData.quality_check_passed = qualityCheckPassed;
-      updateData.quality_check_by = user.id;
-      updateData.quality_check_by_name = profile?.full_name || user.email;
+      updateData.quality_check_by = auth.userId;
+      updateData.quality_check_by_name = profile?.full_name || auth.userEmail;
       updateData.quality_check_date = new Date().toISOString();
       if (qualityCheckNotes) updateData.quality_check_notes = qualityCheckNotes;
     }

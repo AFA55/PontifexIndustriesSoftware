@@ -6,21 +6,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
     const body = await request.json();
     const { tag_uid, serial_number } = body;
 
@@ -68,7 +59,7 @@ export async function POST(request: NextRequest) {
         .from('nfc_tags')
         .update({
           last_scanned_at: new Date().toISOString(),
-          last_scanned_by: user.id,
+          last_scanned_by: auth.userId,
         })
         .eq('id', tag.id)
     ).catch(() => {});

@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 
 export async function POST(
   request: NextRequest,
@@ -14,25 +14,9 @@ export async function POST(
   try {
     const { id: jobId } = await params;
 
-    // Get user from authorization token
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // SECURITY: Require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -61,7 +45,7 @@ export async function POST(
     }
 
     // Verify user is assigned to this job
-    if (job.assigned_to !== user.id) {
+    if (job.assigned_to !== auth.userId) {
       return NextResponse.json(
         { error: 'You are not assigned to this job' },
         { status: 403 }
@@ -90,7 +74,7 @@ export async function POST(
     let dailyLog = null;
     const logPayload = {
       job_order_id: jobId,
-      operator_id: user.id,
+      operator_id: auth.userId,
       log_date: today,
       day_number: dayNumber,
       route_started_at: job.route_started_at,
@@ -163,7 +147,7 @@ export async function POST(
           customer_signature_received: false
         })
         .eq('job_order_id', jobId)
-        .eq('operator_id', user.id);
+        .eq('operator_id', auth.userId);
 
       if (workflowError && !(isTableNotFoundError(workflowError))) {
         console.error('Error resetting workflow for next day:', workflowError);
@@ -202,24 +186,9 @@ export async function GET(
   try {
     const { id: jobId } = await params;
 
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // SECURITY: Require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Get all daily logs for this job — gracefully handle missing table
     const { data: logs, error: logsError } = await supabaseAdmin

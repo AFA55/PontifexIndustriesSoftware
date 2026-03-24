@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
 
 export async function PATCH(
   request: NextRequest,
@@ -19,31 +19,14 @@ export async function PATCH(
     const { id } = await params;
 
     // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
     // Get user's role and name from profiles
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role, full_name, email')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
 
     if (profileError || !profile) {
@@ -152,8 +135,8 @@ export async function PATCH(
           .insert({
             job_order_id: id,
             job_number: jobOrder.job_number,
-            changed_by: user.id,
-            changed_by_name: profile.full_name || user.email,
+            changed_by: auth.userId,
+            changed_by_name: profile.full_name || auth.userEmail,
             changed_by_role: profile.role,
             change_type: 'updated',
             changes: changes,
@@ -181,8 +164,8 @@ export async function PATCH(
           .from('job_notes')
           .insert({
             job_order_id: id,
-            author_id: user.id,
-            author_name: profile.full_name || user.email || 'System',
+            author_id: auth.userId,
+            author_name: profile.full_name || auth.userEmail || 'System',
             content: changeDescriptions.join('\n'),
             note_type: 'change_log',
             metadata: { changes },
@@ -231,48 +214,15 @@ export async function DELETE(
     // Await params as required by Next.js 15+
     const { id } = await params;
 
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role and name from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // Get admin profile for audit trail
+    const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role, full_name, email')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin or super_admin
-    if (!['admin', 'super_admin'].includes(profile.role)) {
-      return NextResponse.json(
-        { error: 'Only administrators can delete job orders' },
-        { status: 403 }
-      );
-    }
 
     // Get the job order before deleting (for audit trail)
     const { data: jobOrder, error: fetchError } = await supabaseAdmin
@@ -294,9 +244,9 @@ export async function DELETE(
       .insert({
         job_order_id: id,
         job_number: jobOrder.job_number,
-        changed_by: user.id,
-        changed_by_name: profile.full_name || user.email,
-        changed_by_role: profile.role,
+        changed_by: auth.userId,
+        changed_by_name: profile?.full_name || auth.userEmail,
+        changed_by_role: profile?.role,
         change_type: 'deleted',
         changes: { deleted: { old: jobOrder, new: null } },
         snapshot: jobOrder,
@@ -320,7 +270,7 @@ export async function DELETE(
       );
     }
 
-    console.log(`Job order ${id} deleted by ${profile.full_name}`);
+    console.log(`Job order ${id} deleted by ${profile?.full_name || auth.userEmail}`);
 
     return NextResponse.json(
       {
