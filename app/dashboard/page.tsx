@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
+import { Clock, Briefcase, Calendar, User as UserIcon } from 'lucide-react';
 import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
 import OnboardingTour from '@/components/OnboardingTour';
@@ -905,11 +906,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 relative">
+      <div className="container mx-auto px-4 py-8 pb-28 sm:pb-8 relative">
         {/* Modern Animated Greeting */}
-        <div className="text-center mb-10 animate-fade-in">
+        <div className="text-center mb-8 sm:mb-10 animate-fade-in">
           <div className="inline-block">
-            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
+            <h1 className="text-3xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
               Welcome back, {user?.name?.split(' ')[0] || 'Demo'}!
             </h1>
             <p className="text-gray-700 text-lg font-medium">
@@ -917,14 +918,14 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Quick Stats Bar with Professional Gradients */}
-          <div className="flex justify-center gap-6 mt-8">
-            <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
-              <p className="text-4xl font-bold text-white drop-shadow-lg">{activeJobsCount}</p>
+          {/* Quick Stats Bar — 2-column grid on mobile, horizontal on larger */}
+          <div className="grid grid-cols-2 sm:flex sm:justify-center gap-4 sm:gap-6 mt-8">
+            <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-5 sm:p-6 shadow-xl sm:min-w-[140px] transform hover:scale-105 transition-all">
+              <p className="text-3xl sm:text-4xl font-bold text-white drop-shadow-lg">{activeJobsCount}</p>
               <p className="text-sm text-white/90 font-semibold mt-1">Active Jobs</p>
             </div>
-            <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
-              <p className="text-4xl font-bold text-white drop-shadow-lg">{currentHours.toFixed(1)}</p>
+            <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl p-5 sm:p-6 shadow-xl sm:min-w-[140px] transform hover:scale-105 transition-all">
+              <p className="text-3xl sm:text-4xl font-bold text-white drop-shadow-lg">{currentHours.toFixed(1)}</p>
               <p className="text-sm text-white/90 font-semibold mt-1">Hours Today</p>
             </div>
           </div>
@@ -1003,7 +1004,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-3 w-full sm:w-auto">
+              <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
                 {/* Shop Hours Checkbox — only visible when NOT clocked in (for re-clock-in) */}
                 {!isClockedIn && (
                   <label className="flex items-center gap-3 px-4 py-3 bg-amber-50 border-2 border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100 transition-colors w-full sm:w-auto">
@@ -1045,11 +1046,11 @@ export default function Dashboard() {
                 <button
                   onClick={isClockedIn ? handleClockOut : handleClockIn}
                   disabled={clockLoading}
-                  className={`group flex items-center justify-center space-x-3 w-full sm:w-auto ${
+                  className={`group flex items-center justify-center space-x-3 w-full ${
                     isClockedIn
                       ? 'bg-gradient-to-r from-rose-600 via-red-600 to-pink-600 hover:from-rose-700 hover:via-red-700 hover:to-pink-700'
                       : 'bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700'
-                  } text-white font-bold py-5 px-10 rounded-2xl transition-all duration-300 hover:scale-105 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
+                  } text-white font-bold py-4 sm:py-5 px-10 rounded-2xl transition-all duration-300 sm:hover:scale-105 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 min-h-[52px]`}
                 >
                   {clockLoading ? (
                     <>
@@ -1256,8 +1257,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Quick Actions Bar */}
-        <div className="mt-10 max-w-5xl mx-auto">
+        {/* Quick Actions Bar — hidden on mobile since bottom nav covers it */}
+        <div className="mt-10 max-w-5xl mx-auto hidden sm:block">
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border-2 border-white/50">
             <p className="text-sm font-bold text-gray-600 mb-4 uppercase tracking-wide">QUICK ACTIONS</p>
             <div className="flex gap-3 overflow-x-auto pb-2">
@@ -1370,6 +1371,64 @@ export default function Dashboard() {
           onClockIn={performClockIn}
           onClose={() => setShowNfcClockInModal(false)}
         />
+      )}
+
+      {/* ── Sticky Bottom Navigation (mobile operators only) ── */}
+      {user && !isAdmin() && (
+        <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 z-50 sm:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="flex items-center justify-around px-1 py-1">
+            {/* Clock In/Out */}
+            <button
+              onClick={isClockedIn ? handleClockOut : handleClockIn}
+              disabled={clockLoading}
+              className="flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl transition-all min-w-[64px] min-h-[56px] disabled:opacity-50"
+            >
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${
+                isClockedIn
+                  ? 'bg-gradient-to-br from-rose-500 to-red-600'
+                  : 'bg-gradient-to-br from-emerald-500 to-green-600'
+              }`}>
+                <Clock size={18} className="text-white" />
+              </div>
+              <span className={`text-[10px] font-bold ${isClockedIn ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {isClockedIn ? 'Clock Out' : 'Clock In'}
+              </span>
+            </button>
+
+            {/* My Jobs */}
+            <Link
+              href="/dashboard/my-jobs"
+              className="flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl transition-all min-w-[64px] min-h-[56px]"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-sm">
+                <Briefcase size={18} className="text-white" />
+              </div>
+              <span className="text-[10px] font-bold text-red-600">My Jobs</span>
+            </Link>
+
+            {/* Timecard */}
+            <Link
+              href="/dashboard/timecard"
+              className="flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl transition-all min-w-[64px] min-h-[56px]"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
+                <Calendar size={18} className="text-white" />
+              </div>
+              <span className="text-[10px] font-bold text-indigo-600">Timecard</span>
+            </Link>
+
+            {/* Profile / Logout */}
+            <button
+              onClick={handleLogout}
+              className="flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl transition-all min-w-[64px] min-h-[56px]"
+            >
+              <div className="w-9 h-9 rounded-xl bg-slate-600 flex items-center justify-center shadow-sm">
+                <UserIcon size={18} className="text-white" />
+              </div>
+              <span className="text-[10px] font-bold text-slate-600">Logout</span>
+            </button>
+          </div>
+        </nav>
       )}
     </div>
   );

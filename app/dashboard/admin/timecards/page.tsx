@@ -617,7 +617,7 @@ export default function AdminTimecardsPage() {
     <div className="min-h-screen bg-[#f8fafc]">
       {/* ── Header ─────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
-        <div className="max-w-[1440px] mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/dashboard/admin"
@@ -673,19 +673,19 @@ export default function AdminTimecardsPage() {
         </div>
       </header>
 
-      <div className="max-w-[1440px] mx-auto px-6 py-6">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6">
         {/* ── Week Navigation ───────────────────────────── */}
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-5 flex items-center justify-between gap-2">
           <button
             onClick={() => setWeekOffset(weekOffset - 1)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-lg transition-all text-sm font-medium border border-slate-200 shadow-sm hover:shadow"
+            className="flex items-center gap-1.5 px-4 py-3 sm:px-3.5 sm:py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-lg transition-all text-sm font-medium border border-slate-200 shadow-sm hover:shadow min-h-[44px]"
           >
             <ChevronLeft size={16} />
             <span className="hidden sm:inline">Prev</span>
           </button>
 
-          <div className="text-center">
-            <p className="text-base font-bold text-slate-900">{formatWeekRange(monday, sunday)}</p>
+          <div className="text-center flex-1">
+            <p className="text-sm sm:text-base font-bold text-slate-900">{formatWeekRange(monday, sunday)}</p>
             <p className="text-xs text-slate-400 mt-0.5">
               {weekOffset === 0 ? 'Current Week' : `${Math.abs(weekOffset)} ${Math.abs(weekOffset) === 1 ? 'week' : 'weeks'} ${weekOffset < 0 ? 'ago' : 'ahead'}`}
             </p>
@@ -694,7 +694,7 @@ export default function AdminTimecardsPage() {
           <button
             onClick={() => setWeekOffset(weekOffset + 1)}
             disabled={weekOffset >= 0}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all text-sm font-medium border shadow-sm ${
+            className={`flex items-center gap-1.5 px-4 py-3 sm:px-3.5 sm:py-2 rounded-lg transition-all text-sm font-medium border shadow-sm min-h-[44px] ${
               weekOffset >= 0
                 ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
                 : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:shadow'
@@ -764,7 +764,7 @@ export default function AdminTimecardsPage() {
         </div>
 
         {/* ── Category Breakdown ─────────────────────────── */}
-        <div className="grid grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
           {[
             { label: 'Regular', value: Math.min(weekdayHours, 40).toFixed(1), icon: <CheckCircle size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
             { label: 'Weekly OT', value: weeklyOTHours.toFixed(1), icon: <TrendingUp size={14} />, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
@@ -783,13 +783,13 @@ export default function AdminTimecardsPage() {
         </div>
 
         {/* ── Filters ────────────────────────────────────── */}
-        <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="mb-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
           <div className="flex gap-1 bg-white rounded-lg p-1 border border-slate-200/60 shadow-sm">
             {(['all', 'pending', 'approved'] as const).map((status) => (
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
-                className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                className={`flex-1 sm:flex-none px-3 py-2 sm:px-3.5 sm:py-1.5 rounded-md text-xs font-semibold transition-all min-h-[36px] ${
                   filterStatus === status
                     ? status === 'pending'
                       ? 'bg-amber-500 text-white shadow-sm'
@@ -804,14 +804,14 @@ export default function AdminTimecardsPage() {
             ))}
           </div>
 
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <div className="relative w-full sm:flex-1 sm:min-w-[180px] sm:max-w-xs">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search employee..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200/60 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all"
+              className="w-full pl-9 pr-4 py-3 sm:py-2 bg-white border border-slate-200/60 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all min-h-[44px]"
             />
           </div>
         </div>
@@ -846,8 +846,8 @@ export default function AdminTimecardsPage() {
               <p className="text-slate-400 text-sm mt-1">Try a different week or filter</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-x-auto -mx-px">
+              <table className="w-full min-w-[900px]">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-100">
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Employee</th>
