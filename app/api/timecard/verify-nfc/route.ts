@@ -47,6 +47,43 @@ export async function POST(request: NextRequest) {
     }
 
     if (!tag) {
+      // Fallback: check pontifex_nfc_id
+      const { data: tag2, error: tag2Error } = await supabaseAdmin
+        .from('nfc_tags')
+        .select('*')
+        .eq('pontifex_nfc_id', lookupValue)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (tag2Error) {
+        console.error('Error looking up NFC tag by pontifex_nfc_id:', tag2Error);
+      }
+
+      if (tag2) {
+        // Update last scanned info (fire-and-forget)
+        Promise.resolve(
+          supabaseAdmin
+            .from('nfc_tags')
+            .update({
+              last_scanned_at: new Date().toISOString(),
+              last_scanned_by: user.id,
+            })
+            .eq('id', tag2.id)
+        ).catch(() => {});
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            tag_id: tag2.id,
+            tag_uid: tag2.tag_uid,
+            tag_type: tag2.tag_type,
+            label: tag2.label,
+            truck_number: tag2.truck_number,
+            pontifex_nfc_id: tag2.pontifex_nfc_id,
+          },
+        });
+      }
+
       return NextResponse.json({
         success: false,
         error: 'NFC tag not recognized. This tag is not registered in the system.',

@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
-    const { tag_uid, tag_type, label, truck_number, jobsite_address } = body;
+    const { tag_uid, tag_type, label, truck_number, jobsite_address, operator_id, pontifex_nfc_id } = body;
 
     if (!tag_uid || !label) {
       return NextResponse.json(
@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!['shop', 'truck', 'jobsite'].includes(tag_type || 'shop')) {
+    if (!['shop', 'truck', 'jobsite', 'operator'].includes(tag_type || 'shop')) {
       return NextResponse.json(
-        { error: 'tag_type must be shop, truck, or jobsite' },
+        { error: 'tag_type must be shop, truck, jobsite, or operator' },
         { status: 400 }
       );
     }
@@ -83,6 +83,10 @@ export async function POST(request: NextRequest) {
         truck_number: truck_number || null,
         jobsite_address: jobsite_address || null,
         registered_by: auth.userId,
+        operator_id: operator_id || null,
+        pontifex_nfc_id: pontifex_nfc_id || null,
+        programmed_at: pontifex_nfc_id ? new Date().toISOString() : null,
+        programmed_by: pontifex_nfc_id ? auth.userId : null,
       })
       .select()
       .single();
@@ -109,7 +113,7 @@ export async function PATCH(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
-    const { id, label, is_active, tag_type, truck_number, jobsite_address } = body;
+    const { id, label, is_active, tag_type, truck_number, jobsite_address, operator_id, pontifex_nfc_id } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
@@ -121,6 +125,12 @@ export async function PATCH(request: NextRequest) {
     if (typeof tag_type === 'string') updates.tag_type = tag_type;
     if (typeof truck_number === 'string') updates.truck_number = truck_number;
     if (typeof jobsite_address === 'string') updates.jobsite_address = jobsite_address;
+    if (operator_id !== undefined) updates.operator_id = operator_id || null;
+    if (typeof pontifex_nfc_id === 'string') {
+      updates.pontifex_nfc_id = pontifex_nfc_id || null;
+      updates.programmed_at = new Date().toISOString();
+      updates.programmed_by = auth.userId;
+    }
 
     const { data, error } = await supabaseAdmin
       .from('nfc_tags')
