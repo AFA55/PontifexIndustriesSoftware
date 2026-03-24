@@ -158,6 +158,31 @@ async function updateJobStatus(
       updatedJob = fullUpdateResult;
     }
 
+    // Fire-and-forget: notify admins when job is completed
+    if (status === 'completed') {
+      Promise.resolve((async () => {
+        try {
+          // Find all admin/super_admin/operations_manager profiles
+          const { data: adminProfiles } = await supabaseAdmin
+            .from('profiles')
+            .select('id, full_name')
+            .in('role', ['admin', 'super_admin', 'operations_manager']);
+
+          if (adminProfiles && adminProfiles.length > 0) {
+            const notifications = adminProfiles.map(admin => ({
+              recipient_id: admin.id,
+              recipient_name: admin.full_name,
+              job_order_id: jobId,
+              type: 'job_completed',
+              title: `Job Completed: ${existingJob.job_number || jobId.slice(0, 8)}`,
+              message: `${existingJob.customer_name || 'Job'} — ${existingJob.address || existingJob.location || 'Location N/A'} is ready to invoice.`,
+            }));
+            await supabaseAdmin.from('schedule_notifications').insert(notifications);
+          }
+        } catch { /* never block */ }
+      })()).catch(() => {});
+    }
+
     // Also update operator_status_history for tracking
     const historyData: any = {
       operator_id: auth.userId,
