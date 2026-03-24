@@ -291,23 +291,23 @@ export default function InRoutePage() {
       )}
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-              <MapPin className="w-6 h-6" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center flex-shrink-0">
+              <MapPin className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">In Route</h1>
+              <h1 className="text-xl sm:text-2xl font-bold">In Route</h1>
               <p className="text-blue-100 text-sm">Location revealed - ready to go!</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-5 pb-24 max-w-lg sm:max-w-4xl">
         {/* Job Information */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl border border-gray-200/50 p-8 mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Job Details</h2>
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 sm:p-8 mb-5">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Job Details</h2>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-gray-600">Customer</p>
@@ -324,12 +324,12 @@ export default function InRoutePage() {
 
         {/* Work Description */}
         {job.description && (
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 backdrop-blur-lg rounded-3xl shadow-2xl border-2 border-blue-200 p-8 mb-6">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-blue-200 p-5 sm:p-8 mb-5">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-gray-800">Work Description</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Work Description</h2>
             </div>
             <p className="text-gray-800 text-base leading-relaxed whitespace-pre-wrap">{job.description}</p>
 
@@ -346,7 +346,7 @@ export default function InRoutePage() {
 
         {/* Project Manager */}
         {(job.salesman_name || job.created_by_name) && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl border border-gray-200/50 p-6 mb-6">
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 sm:p-6 mb-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
                 <Briefcase className="w-5 h-5 text-white" />
@@ -356,10 +356,10 @@ export default function InRoutePage() {
                 <p className="text-sm text-gray-500">Contact if you have questions about the work</p>
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <User className="w-5 h-5 text-gray-500" />
-                <span className="font-semibold text-gray-900">{job.salesman_name || job.created_by_name}</span>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3 min-w-0">
+                <User className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                <span className="font-semibold text-gray-900 truncate">{job.salesman_name || job.created_by_name}</span>
               </div>
               {job.created_by_email && (
                 <a
@@ -375,13 +375,13 @@ export default function InRoutePage() {
         )}
 
         {/* Location Information - NOW VISIBLE */}
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 backdrop-blur-lg rounded-3xl shadow-2xl border-2 border-green-300 p-8 mb-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-14 h-14 bg-green-600 rounded-2xl flex items-center justify-center">
-              <MapPin className="w-7 h-7 text-white" />
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-green-300 p-5 sm:p-8 mb-5">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <MapPin className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Location Details</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Location Details</h2>
               <p className="text-sm text-green-700">Equipment checklist completed ✓</p>
             </div>
           </div>
@@ -442,12 +442,12 @@ export default function InRoutePage() {
         </div>
 
         {/* Start In Process Button */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl border border-gray-200/50 p-8">
-          <div className="text-center mb-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 sm:p-8">
+          <div className="text-center mb-5">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">
               Ready to Start Work?
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-sm sm:text-base">
               Click below when you arrive at the job site to log your arrival time
             </p>
           </div>
@@ -455,7 +455,7 @@ export default function InRoutePage() {
           <button
             onClick={handleStartInProcess}
             disabled={submitting}
-            className={`w-full px-8 py-5 rounded-2xl font-bold text-xl transition-all shadow-2xl flex items-center justify-center gap-3 ${
+            className={`w-full px-6 py-4 rounded-2xl font-bold text-lg min-h-[56px] transition-all shadow-xl flex items-center justify-center gap-3 ${
               submitting
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white transform hover:scale-[1.02]'
@@ -498,8 +498,8 @@ export default function InRoutePage() {
 
       {/* Work Differs Modal */}
       {showWorkDiffersModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="w-8 h-8 text-amber-600" />
@@ -541,8 +541,8 @@ export default function InRoutePage() {
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

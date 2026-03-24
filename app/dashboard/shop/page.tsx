@@ -557,12 +557,12 @@ export default function ShopDashboard() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
+      <div className="container mx-auto px-4 py-5 pb-24 sm:pb-6 max-w-7xl">
         {/* ============================================================ */}
         {/* Welcome + Stats Row */}
         {/* ============================================================ */}
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-1">
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-1">
             Shop Dashboard
           </h1>
           <p className="text-gray-500 font-medium">
@@ -571,8 +571,8 @@ export default function ShopDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          <div className="bg-white rounded-2xl border border-yellow-200 p-5 shadow-lg hover:shadow-xl transition-shadow">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white rounded-2xl border border-yellow-200 p-4 sm:p-5 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <Clock size={20} className="text-yellow-600" />
               <span className="text-xs font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full">QUEUE</span>
@@ -581,7 +581,7 @@ export default function ShopDashboard() {
             <p className="text-sm text-gray-500 mt-1">Pending</p>
           </div>
 
-          <div className="bg-white rounded-2xl border border-orange-200 p-5 shadow-lg hover:shadow-xl transition-shadow">
+          <div className="bg-white rounded-2xl border border-orange-200 p-4 sm:p-5 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <Wrench size={20} className="text-orange-600" />
               <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">ACTIVE</span>
@@ -590,7 +590,7 @@ export default function ShopDashboard() {
             <p className="text-sm text-gray-500 mt-1">In Progress</p>
           </div>
 
-          <div className="bg-white rounded-2xl border border-green-200 p-5 shadow-lg hover:shadow-xl transition-shadow">
+          <div className="bg-white rounded-2xl border border-green-200 p-4 sm:p-5 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <CheckCircle size={20} className="text-green-600" />
               <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">DONE</span>
@@ -599,7 +599,7 @@ export default function ShopDashboard() {
             <p className="text-sm text-gray-500 mt-1">Completed Today</p>
           </div>
 
-          <div className="bg-white rounded-2xl border border-red-200 p-5 shadow-lg hover:shadow-xl transition-shadow">
+          <div className="bg-white rounded-2xl border border-red-200 p-4 sm:p-5 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <AlertTriangle size={20} className="text-red-600" />
               <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">URGENT</span>
@@ -608,7 +608,7 @@ export default function ShopDashboard() {
             <p className="text-sm text-gray-500 mt-1">Critical</p>
           </div>
 
-          <div className="bg-white rounded-2xl border border-purple-200 p-5 shadow-lg hover:shadow-xl transition-shadow">
+          <div className="bg-white rounded-2xl border border-purple-200 p-4 sm:p-5 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <Calendar size={20} className="text-purple-600" />
               <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">SCHED</span>
@@ -622,27 +622,27 @@ export default function ShopDashboard() {
         {/* Active Work Timer Banner */}
         {/* ============================================================ */}
         {activeTicket && !showCompletionForm && (
-          <div className="mb-6 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-5 shadow-xl text-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
-                  <Wrench size={28} />
+          <div className="mb-6 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-4 sm:p-5 shadow-xl text-white">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <Wrench size={24} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-green-100">Currently Working On</p>
-                  <p className="text-xl font-bold">
+                  <p className="text-base sm:text-xl font-bold truncate">
                     {workOrders.find(wo => wo.id === activeTicket)?.title || 'Work Order'}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between sm:justify-end gap-4">
                 <div className="text-center">
-                  <p className="text-3xl font-mono font-bold">{formatTimer(ticketTimer)}</p>
+                  <p className="text-2xl sm:text-3xl font-mono font-bold">{formatTimer(ticketTimer)}</p>
                   <p className="text-xs text-green-200">Elapsed Time</p>
                 </div>
                 <button
                   onClick={stopWorkTicket}
-                  className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg transition-colors"
+                  className="px-4 py-2.5 min-h-[44px] bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg transition-colors text-sm sm:text-base flex-shrink-0"
                 >
                   Stop & Complete
                 </button>
@@ -655,9 +655,9 @@ export default function ShopDashboard() {
         {/* Completion Form Modal */}
         {/* ============================================================ */}
         {showCompletionForm && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-8 pb-8">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4">
-              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50 rounded-t-3xl">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-start justify-center overflow-y-auto sm:pt-8 pb-0 sm:pb-8">
+            <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-2xl sm:mx-4 max-h-[95vh] overflow-y-auto">
+              <div className="p-5 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50 rounded-t-3xl">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
                   <FileText className="text-green-600" size={28} />
                   Complete Work Order
@@ -712,42 +712,44 @@ export default function ShopDashboard() {
                   ) : (
                     <div className="space-y-2">
                       {completionForm.parts_used.map((part, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
+                        <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                           <input
                             type="text"
                             value={part.name}
                             onChange={e => updatePart(idx, 'name', e.target.value)}
-                            className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                            className="w-full sm:flex-1 px-3 py-2 min-h-[44px] rounded-lg border border-gray-300 text-sm"
                             placeholder="Part name"
                           />
-                          <input
-                            type="number"
-                            value={part.quantity}
-                            onChange={e => updatePart(idx, 'quantity', parseInt(e.target.value) || 0)}
-                            className="w-20 px-3 py-2 rounded-lg border border-gray-300 text-sm text-center"
-                            placeholder="Qty"
-                            min="1"
-                          />
-                          <div className="relative">
-                            <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
+                          <div className="flex items-center gap-2 w-full sm:w-auto">
                             <input
                               type="number"
-                              value={part.unit_cost || ''}
-                              onChange={e => updatePart(idx, 'unit_cost', parseFloat(e.target.value) || 0)}
-                              className="w-28 px-3 py-2 pl-7 rounded-lg border border-gray-300 text-sm"
-                              placeholder="Unit cost"
-                              step="0.01"
+                              value={part.quantity}
+                              onChange={e => updatePart(idx, 'quantity', parseInt(e.target.value) || 0)}
+                              className="w-16 sm:w-20 px-3 py-2 min-h-[44px] rounded-lg border border-gray-300 text-sm text-center"
+                              placeholder="Qty"
+                              min="1"
                             />
+                            <div className="relative flex-1 sm:flex-none">
+                              <span className="absolute left-3 top-3 text-gray-400 text-sm">$</span>
+                              <input
+                                type="number"
+                                value={part.unit_cost || ''}
+                                onChange={e => updatePart(idx, 'unit_cost', parseFloat(e.target.value) || 0)}
+                                className="w-full sm:w-28 px-3 py-2 pl-7 min-h-[44px] rounded-lg border border-gray-300 text-sm"
+                                placeholder="Unit cost"
+                                step="0.01"
+                              />
+                            </div>
+                            <span className="text-sm font-bold text-gray-600 whitespace-nowrap">
+                              ${(part.quantity * part.unit_cost).toFixed(2)}
+                            </span>
+                            <button
+                              onClick={() => removePart(idx)}
+                              className="p-2 min-h-[44px] min-w-[44px] text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center"
+                            >
+                              <X size={16} />
+                            </button>
                           </div>
-                          <span className="text-sm font-bold text-gray-600 w-20 text-right">
-                            ${(part.quantity * part.unit_cost).toFixed(2)}
-                          </span>
-                          <button
-                            onClick={() => removePart(idx)}
-                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <X size={16} />
-                          </button>
                         </div>
                       ))}
                       <div className="text-right text-sm font-bold text-gray-700 pr-10">
@@ -787,7 +789,7 @@ export default function ShopDashboard() {
               </div>
 
               {/* Actions */}
-              <div className="p-6 border-t border-gray-200 flex items-center justify-between bg-gray-50 rounded-b-3xl">
+              <div className="p-5 sm:p-6 border-t border-gray-200 flex items-center justify-between gap-3 bg-gray-50 rounded-b-3xl">
                 <button
                   onClick={() => {
                     setShowCompletionForm(false);
@@ -822,8 +824,8 @@ export default function ShopDashboard() {
         {/* Create Work Order Modal */}
         {/* ============================================================ */}
         {showCreateWO && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-8 pb-8">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-start justify-center overflow-y-auto sm:pt-8 pb-0 sm:pb-8">
+            <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg sm:mx-4 max-h-[95vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-amber-50 rounded-t-3xl">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">

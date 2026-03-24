@@ -241,7 +241,7 @@ export default function TimecardPage() {
         </div>
       </header>
 
-      <div className="max-w-[1024px] mx-auto px-4 sm:px-6 py-6 pb-24 sm:pb-6">
+      <div className="max-w-[1024px] mx-auto px-4 sm:px-6 py-6 pb-28 sm:pb-6">
         {/* ── Week Navigation ───────────────────────────── */}
         <div className="mb-5 flex items-center justify-between gap-2">
           <button
@@ -331,7 +331,7 @@ export default function TimecardPage() {
         </div>
 
         {/* ── Category Breakdown ─────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-5">
           {[
             { label: 'Regular', value: (weekData?.regularHours || 0).toFixed(1), icon: <CheckCircle size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
             { label: 'Weekly OT', value: (weekData?.weeklyOvertimeHours || 0).toFixed(1), icon: <TrendingUp size={14} />, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },

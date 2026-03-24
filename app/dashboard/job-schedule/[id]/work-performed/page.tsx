@@ -1271,7 +1271,7 @@ export default function WorkPerformed() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-5 max-w-lg">
+      <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
         {/* Quick Access Buttons */}
         <QuickAccessButtons jobId={params.id as string} />
 

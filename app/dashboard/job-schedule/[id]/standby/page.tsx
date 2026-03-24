@@ -228,22 +228,22 @@ export default function StandbyPage() {
       {/* Header */}
       <div className="bg-white border-b-4 border-yellow-500 shadow-lg sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <Link
               href={`/dashboard/job-schedule/${jobId}`}
-              className="flex items-center gap-3 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all duration-200 font-medium shadow-lg"
+              className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all duration-200 font-medium shadow-lg flex-shrink-0"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back to Job
+              Back
             </Link>
 
-            <h1 className="text-xl font-bold text-gray-800 text-center flex-1 mx-4">
-              ⏱️ Standby Time
+            <h1 className="text-base sm:text-xl font-bold text-gray-800 text-center flex-1 mx-2 truncate">
+              Standby Time
             </h1>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{user?.name?.charAt(0) || 'U'}</span>
               </div>
@@ -252,7 +252,7 @@ export default function StandbyPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 pb-24">
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-6 shadow-lg mb-6">
@@ -269,8 +269,8 @@ export default function StandbyPage() {
 
         {/* Step 1: Select Reason */}
         {step === 'reason' && (
-          <div className="bg-white rounded-2xl shadow-xl border-2 border-yellow-100 p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Report Standby Time</h2>
+          <div className="bg-white rounded-2xl shadow-xl border-2 border-yellow-100 p-5 sm:p-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">Report Standby Time</h2>
             <p className="text-gray-600 mb-6">
               Please select the reason why work cannot proceed at this time.
             </p>
@@ -333,8 +333,8 @@ export default function StandbyPage() {
 
         {/* Step 2: Policy Acknowledgment */}
         {step === 'policy' && (
-          <div className="bg-white rounded-2xl shadow-xl border-2 border-yellow-100 p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Standby Time Policy</h2>
+          <div className="bg-white rounded-2xl shadow-xl border-2 border-yellow-100 p-5 sm:p-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">Standby Time Policy</h2>
             <p className="text-gray-600 mb-6">
               The client representative must acknowledge the standby policy before the timer begins.
             </p>
@@ -392,7 +392,7 @@ export default function StandbyPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setStep('reason')}
-                className="flex-1 px-6 py-4 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold text-lg transition-all duration-200"
+                className="flex-1 px-4 py-3 min-h-[44px] bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold text-base transition-all duration-200"
                 disabled={submitting}
               >
                 Back
@@ -400,7 +400,7 @@ export default function StandbyPage() {
               <button
                 onClick={handlePolicyAcknowledge}
                 disabled={submitting}
-                className="flex-1 px-6 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-3 min-h-[44px] bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-bold text-base shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Starting...' : 'Start Standby Timer'}
               </button>
@@ -423,8 +423,8 @@ export default function StandbyPage() {
               <p className="text-gray-600 mb-6">Timer started at {standbyStartTime.toLocaleTimeString()}</p>
 
               {/* Large Timer Display */}
-              <div className="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-2xl p-8 mb-6">
-                <div className="text-6xl font-bold text-yellow-900 font-mono">
+              <div className="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-2xl p-5 sm:p-8 mb-6">
+                <div className="text-4xl sm:text-6xl font-bold text-yellow-900 font-mono">
                   {formatDuration()}
                 </div>
                 <p className="text-gray-700 font-semibold mt-4">

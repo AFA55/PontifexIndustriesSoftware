@@ -324,7 +324,7 @@ export default function DayCompletePage() {
 
       {/* Notification */}
       {notification && (
-        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${
+        <div className={`fixed top-20 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium text-center ${
           notification.type === 'success' ? 'bg-emerald-500' :
           notification.type === 'error' ? 'bg-red-500' : 'bg-amber-500'
         }`}>
@@ -332,7 +332,7 @@ export default function DayCompletePage() {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-6 max-w-lg space-y-6">
+      <div className="container mx-auto px-4 py-6 pb-24 max-w-lg space-y-6">
         {/* Hours Worked Today */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
@@ -470,8 +470,8 @@ export default function DayCompletePage() {
                 <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50">
                   <canvas
                     ref={canvasRef}
-                    width={350}
-                    height={150}
+                    width={320}
+                    height={140}
                     className="w-full touch-none cursor-crosshair"
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
