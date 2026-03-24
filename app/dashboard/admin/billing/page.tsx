@@ -495,6 +495,37 @@ export default function BillingPage() {
           </div>
         </div>
 
+        {/* AR Aging — only show when there's outstanding AR */}
+        {stats.totalOutstanding > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-5 mb-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">AR Aging Report</h3>
+              <span className="text-xs text-slate-400">Total Outstanding: <span className="font-bold text-slate-700">${(stats.totalOutstanding || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                { label: 'Current', value: stats.aging?.current || 0, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+                { label: '1–30 Days', value: stats.aging?.days1_30 || 0, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+                { label: '31–60 Days', value: stats.aging?.days31_60 || 0, color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+                { label: '61–90 Days', value: stats.aging?.days61_90 || 0, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
+                { label: '90+ Days', value: stats.aging?.days90plus || 0, color: 'text-red-800', bg: 'bg-red-100', border: 'border-red-300' },
+              ].map(bucket => (
+                <div key={bucket.label} className={`rounded-lg border ${bucket.border} ${bucket.bg} p-3`}>
+                  <p className={`text-lg font-bold ${bucket.value > 0 ? bucket.color : 'text-slate-300'}`}>
+                    ${bucket.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">{bucket.label}</p>
+                </div>
+              ))}
+            </div>
+            {(stats.aging?.days90plus || 0) > 0 && (
+              <p className="mt-3 text-xs text-red-600 font-medium">
+                ⚠️ ${(stats.aging.days90plus).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} is 90+ days past due — consider escalating collection.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex gap-2 mb-5">
           <button
@@ -612,9 +643,19 @@ export default function BillingPage() {
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 truncate">{inv.customer_name}</p>
-                        <p className="text-xs text-gray-400">
-                          {inv.invoice_date} {inv.po_number ? `| PO: ${inv.po_number}` : ''}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-gray-400">
+                            {inv.invoice_date} {inv.po_number ? `| PO: ${inv.po_number}` : ''}
+                          </p>
+                          {inv.status === 'overdue' && inv.due_date && (() => {
+                            const days = Math.floor((Date.now() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24));
+                            return days > 0 ? (
+                              <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">
+                                {days}d overdue
+                              </span>
+                            ) : null;
+                          })()}
+                        </div>
                       </button>
                       <div className="flex items-center gap-3 ml-4">
                         <div className="text-right">

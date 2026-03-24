@@ -178,7 +178,12 @@ export default function MyProfilePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-1">Phone Number</label>
+                <label className="block text-sm font-semibold text-gray-400 mb-1">
+                  Phone Number
+                  <span className="ml-2 text-[10px] font-normal text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded-full">
+                    📱 Used for SMS job notifications
+                  </span>
+                </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <input
@@ -189,6 +194,11 @@ export default function MyProfilePage() {
                     className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                   />
                 </div>
+                {!phone && (
+                  <p className="text-xs text-amber-400 mt-1">
+                    Add your phone number to receive SMS alerts when jobs are dispatched to you.
+                  </p>
+                )}
               </div>
 
               <div>

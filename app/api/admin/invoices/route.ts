@@ -13,6 +13,17 @@ export async function GET(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    // Auto-mark overdue: flip any sent invoices past due_date to 'overdue' (fire-and-forget)
+    const today = new Date().toISOString().split('T')[0];
+    Promise.resolve(
+      supabaseAdmin
+        .from('invoices')
+        .update({ status: 'overdue' })
+        .eq('status', 'sent')
+        .lt('due_date', today)
+        .gt('balance_due', 0)
+    ).then(() => {}).catch(() => {});
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status'); // draft, sent, paid, overdue, void
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -34,20 +45,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 });
     }
 
-    // Calculate summary stats
+    // Calculate summary stats + AR aging buckets
     const allInvoices = invoices || [];
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const daysOverdue = (inv: any) => {
+      if (!inv.due_date) return 0;
+      const due = new Date(inv.due_date);
+      return Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+    };
+
+    const outstanding = allInvoices.filter(i => ['sent', 'overdue'].includes(i.status) && Number(i.balance_due) > 0);
+
+    const aging = {
+      current: outstanding.filter(i => daysOverdue(i) <= 0).reduce((s, i) => s + Number(i.balance_due), 0),
+      days1_30: outstanding.filter(i => daysOverdue(i) > 0 && daysOverdue(i) <= 30).reduce((s, i) => s + Number(i.balance_due), 0),
+      days31_60: outstanding.filter(i => daysOverdue(i) > 30 && daysOverdue(i) <= 60).reduce((s, i) => s + Number(i.balance_due), 0),
+      days61_90: outstanding.filter(i => daysOverdue(i) > 60 && daysOverdue(i) <= 90).reduce((s, i) => s + Number(i.balance_due), 0),
+      days90plus: outstanding.filter(i => daysOverdue(i) > 90).reduce((s, i) => s + Number(i.balance_due), 0),
+    };
+
     const stats = {
       total: allInvoices.length,
       draft: allInvoices.filter(i => i.status === 'draft').length,
       sent: allInvoices.filter(i => i.status === 'sent').length,
       paid: allInvoices.filter(i => i.status === 'paid').length,
       overdue: allInvoices.filter(i => i.status === 'overdue').length,
-      totalOutstanding: allInvoices
-        .filter(i => ['sent', 'overdue'].includes(i.status))
-        .reduce((sum, i) => sum + Number(i.balance_due || 0), 0),
+      totalOutstanding: outstanding.reduce((sum, i) => sum + Number(i.balance_due || 0), 0),
       totalPaid: allInvoices
         .filter(i => i.status === 'paid')
         .reduce((sum, i) => sum + Number(i.total_amount || 0), 0),
+      aging,
     };
 
     return NextResponse.json({
