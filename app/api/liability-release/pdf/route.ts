@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       const emailPhone = (pdfBranding.support_phone as string) || '(833) 695-4288';
       const emailSupportAddr = (pdfBranding.support_email as string) || 'support@pontifexindustries.com';
       const emailResult = await resend.emails.send({
-        from: `${emailCompanyName} <noreply@pontifexindustries.com>`,
+        from: process.env.RESEND_FROM_EMAIL || `${emailCompanyName} <noreply@resend.dev>`,
         to: customerEmail,
         subject: `Liability Release - Job #${jobNumber || jobId}`,
         html: `
