@@ -83,7 +83,7 @@ interface QuickStats {
 const FEATURE_FLAG_CARD_MAP: Record<string, string[]> = {
   show_billing_module: ['billing'],
   show_analytics_module: ['analytics'],
-  show_inventory_module: ['blade_inventory', 'tools_equipment', 'equipment_performance'],
+  show_inventory_module: ['blade_inventory'],
   show_customer_crm: ['customer_profiles'],
 };
 

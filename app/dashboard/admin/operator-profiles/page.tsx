@@ -87,6 +87,9 @@ interface JobRecord {
   end_date: string | null;
   work_completed_at: string | null;
   estimated_duration: number | null;
+  hours_worked: number | null;
+  estimated_cost: number | null;
+  customer_rating: number | null;
 }
 
 interface OperatorNote {
@@ -823,7 +826,7 @@ export default function OperatorProfilesPage() {
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Job #</th>
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Customer</th>
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Type</th>
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hours</th>
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
                               </tr>
                             </thead>
@@ -834,7 +837,7 @@ export default function OperatorProfilesPage() {
                                   <td className="px-4 py-2.5 text-sm font-medium text-gray-900 whitespace-nowrap">{job.job_number}</td>
                                   <td className="px-4 py-2.5 text-sm text-gray-700 max-w-[200px] truncate">{job.customer_name}</td>
                                   <td className="px-4 py-2.5 text-sm text-gray-500 whitespace-nowrap">{job.job_type?.split(',')[0]?.trim()}</td>
-                                  <td className="px-4 py-2.5 text-sm text-gray-500 max-w-[150px] truncate">{job.location || '--'}</td>
+                                  <td className="px-4 py-2.5 text-sm font-medium text-gray-700 tabular-nums whitespace-nowrap">{(job as any).hours_worked != null ? `${(job as any).hours_worked}h` : '--'}</td>
                                   <td className="px-4 py-2.5 whitespace-nowrap">
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusColor(job.status)}`}>
                                       {job.status.replace(/_/g, ' ')}
@@ -1140,7 +1143,7 @@ function AddNoteModal({ onSubmit, onClose }: {
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
           <div className="p-5 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-blue-600" />

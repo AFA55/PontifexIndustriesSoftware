@@ -793,7 +793,6 @@ export default function Dashboard() {
                     </p>
                     <ul className="text-orange-800 text-sm space-y-1 list-disc list-inside">
                       <li>Request time off and vacation</li>
-                      <li>Access tools and equipment management</li>
                       <li>And much more...</li>
                     </ul>
                   </div>
@@ -1162,45 +1161,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Tools & Equipment - Coming Soon */}
-          <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-blue-50 p-1.5 shadow-2xl animate-fade-in-up delay-300">
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7">
-              <div className="flex items-start justify-between mb-5">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-blue-100">
-                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <span className="px-4 py-2 bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-700 text-xs font-bold rounded-full shadow-md">
-                  COMING SOON
-                </span>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                Tools & Equipment
-              </h3>
-              <p className="text-gray-700 font-semibold mb-4">
-                Manage and track your equipment
-              </p>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Track equipment usage, maintenance schedules, and inventory. Check out tools, report issues, and view equipment history all in one place.
-              </p>
-            </div>
-            {/* Coming Soon Overlay */}
-            <div className="absolute inset-0 bg-white/60 backdrop-blur-md rounded-3xl flex items-center justify-center">
-              <div className="text-center p-6">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl mb-4 shadow-2xl">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-                <p className="text-2xl font-bold text-gray-900 mb-2">Coming Soon</p>
-                <p className="text-sm text-gray-600 max-w-xs mx-auto">
-                  We're working on this feature to help you manage your tools more efficiently
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Quick Actions Bar */}

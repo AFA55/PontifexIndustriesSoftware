@@ -21,9 +21,13 @@ import { VoiceMicButton } from '@/components/ui/VoiceMicButton';
 import AISmartFillModal from './_components/AISmartFillModal';
 // Equipment presets no longer displayed as grid; now using SERVICE_EQUIPMENT config
 import PhotoUploader from '@/components/PhotoUploader';
-import {
-  type EquipmentDetail,
-} from '@/lib/equipment-recommendations';
+// Equipment detail type (inline after equipment-recommendations removal)
+interface EquipmentDetail {
+  selected: boolean;
+  quantity?: number;
+  value?: string;
+  selections?: string[];
+}
 
 // ── Constants ─────────────────────────────────────────────────
 const STEPS = [

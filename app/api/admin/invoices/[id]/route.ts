@@ -84,9 +84,33 @@ export async function PATCH(
     }
 
     // Handle status transitions
-    if (updates.status === 'sent' && !body.sent_at) {
-      updates.sent_at = new Date().toISOString();
-      updates.sent_by = auth.userId;
+    if (updates.status) {
+      const now = new Date().toISOString();
+      switch (updates.status) {
+        case 'sent':
+          if (!body.sent_at) {
+            updates.sent_at = now;
+            updates.sent_by = auth.userId;
+          }
+          break;
+        case 'paid':
+          if (!body.paid_date) {
+            updates.paid_date = now.split('T')[0];
+          }
+          // Set balance_due to 0 unless explicitly provided
+          if (body.balance_due === undefined) {
+            updates.balance_due = 0;
+          }
+          break;
+        case 'overdue':
+          // No extra fields needed
+          break;
+        case 'void':
+          if (!body.void_reason) {
+            updates.internal_notes = (body.internal_notes || '') + `\nVoided on ${now.split('T')[0]} by user ${auth.userId}`;
+          }
+          break;
+      }
     }
 
     updates.updated_at = new Date().toISOString();

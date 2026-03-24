@@ -68,6 +68,19 @@ export async function GET(
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const firstOfMonthStr = firstOfMonth.toISOString().split('T')[0];
 
+    // Helper to safely query a table that may not exist yet
+    const safeQuery = async (queryFn: () => PromiseLike<{ data: any; error: any }>): Promise<{ data: any; error: any }> => {
+      try {
+        const result = await queryFn();
+        if (result.error && isTableNotFoundError(result.error)) {
+          return { data: null, error: null };
+        }
+        return result;
+      } catch (err) {
+        return { data: null, error: err };
+      }
+    };
+
     // Build all parallel queries
     const [
       jobHistoryResult,
@@ -79,71 +92,81 @@ export async function GET(
       thisMonthTimecardsResult,
     ] = await Promise.all([
       // 1. Job history: last 100 jobs (includes helper jobs)
-      (() => {
+      safeQuery(() => {
         let q = supabaseAdmin
           .from('job_orders')
-          .select('id, job_number, customer_name, job_type, status, scheduled_date, estimated_hours, estimated_cost, total_time, customer_overall_rating, total_revenue')
+          .select('id, job_number, customer_name, job_type, status, scheduled_date, estimated_hours, estimated_cost, total_time, customer_overall_rating, total_revenue, jobsite_address')
           .or(`assigned_to.eq.${operatorId},helper_assigned_to.eq.${operatorId}`)
           .is('deleted_at', null)
           .order('scheduled_date', { ascending: false })
           .limit(100);
         if (dateFilter) q = q.gte('scheduled_date', dateFilter);
         return q;
-      })(),
+      }),
 
       // 2. Timecard data for monthly summary (last 12 months)
-      supabaseAdmin
-        .from('timecards')
-        .select('id, date, total_hours, hour_type, clock_in_time, clock_out_time')
-        .eq('user_id', operatorId)
-        .gte('date', twelveMonthsAgoStr)
-        .order('date', { ascending: false }),
+      safeQuery(() =>
+        supabaseAdmin
+          .from('timecards')
+          .select('id, date, total_hours, hour_type, clock_in_time, clock_out_time')
+          .eq('user_id', operatorId)
+          .gte('date', twelveMonthsAgoStr)
+          .order('date', { ascending: false })
+      ),
 
       // 3. Pay history from operator_pay_rates
-      supabaseAdmin
-        .from('operator_pay_rates')
-        .select('id, effective_date, end_date, regular_rate, overtime_rate, double_time_rate, rate_type, reason, approved_by, notes, created_at')
-        .eq('operator_id', operatorId)
-        .order('effective_date', { ascending: false })
-        .limit(50),
+      safeQuery(() =>
+        supabaseAdmin
+          .from('operator_pay_rates')
+          .select('id, effective_date, end_date, regular_rate, overtime_rate, double_time_rate, rate_type, reason, approved_by, notes, created_at')
+          .eq('operator_id', operatorId)
+          .order('effective_date', { ascending: false })
+          .limit(50)
+      ),
 
       // 4. Status changes: last 50 from operator_status_history
-      supabaseAdmin
-        .from('operator_status_history')
-        .select('id, status, created_at, job_order_id')
-        .eq('operator_id', operatorId)
-        .order('created_at', { ascending: false })
-        .limit(50),
+      safeQuery(() =>
+        supabaseAdmin
+          .from('operator_status_history')
+          .select('id, status, created_at, job_order_id')
+          .eq('operator_id', operatorId)
+          .order('created_at', { ascending: false })
+          .limit(50)
+      ),
 
       // 5. Ratings from completed_jobs_archive
-      (() => {
+      safeQuery(() => {
         let q = supabaseAdmin
           .from('completed_jobs_archive')
           .select('customer_feedback_rating, on_time_arrival, work_completed_at')
           .eq('operator_id', operatorId);
         if (dateFilter) q = q.gte('work_completed_at', dateFilter);
         return q;
-      })(),
+      }),
 
       // 6. Monthly timecard aggregation (last 12 months)
-      supabaseAdmin
-        .from('timecards')
-        .select('id, date, total_hours, hour_type')
-        .eq('user_id', operatorId)
-        .gte('date', twelveMonthsAgoStr),
+      safeQuery(() =>
+        supabaseAdmin
+          .from('timecards')
+          .select('id, date, total_hours, hour_type')
+          .eq('user_id', operatorId)
+          .gte('date', twelveMonthsAgoStr)
+      ),
 
       // 7. This month timecard hours
-      supabaseAdmin
-        .from('timecards')
-        .select('total_hours')
-        .eq('user_id', operatorId)
-        .gte('date', firstOfMonthStr),
+      safeQuery(() =>
+        supabaseAdmin
+          .from('timecards')
+          .select('total_hours')
+          .eq('user_id', operatorId)
+          .gte('date', firstOfMonthStr)
+      ),
     ]);
 
     // ---- Process job data ----
-    const allJobs = jobHistoryResult.data || [];
+    const allJobs: any[] = jobHistoryResult.data || [];
     const completedStatuses = ['completed', 'invoiced', 'paid'];
-    const completedJobs = allJobs.filter(j => completedStatuses.includes(j.status));
+    const completedJobs = allJobs.filter((j: any) => completedStatuses.includes(j.status));
 
     // Stats from jobs
     const totalJobs = completedJobs.length;
@@ -159,6 +182,7 @@ export async function GET(
       job_type: job.job_type,
       status: job.status,
       scheduled_date: job.scheduled_date,
+      location: job.jobsite_address || null,
       hours_worked: job.total_time
         ? Math.round((job.total_time / 60) * 100) / 100
         : job.estimated_hours || null,
