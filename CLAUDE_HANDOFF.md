@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 24, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✓ 176/176 pages
+**Date:** March 24, 2026 (Session 2) | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✓ 177/177 pages
 
 ---
 
@@ -7,10 +7,22 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2` (pushed to origin)
-- **Last commit:** `94ab0536` — "fix: use RESEND_FROM_EMAIL env var in invoice send route"
+- **Last commit:** `a0d9050d` — "feat: auto-refresh Active Jobs page every 30s with live indicator"
 - **Clean working tree** (all changes committed and pushed)
 
-### Recent Commits (March 24)
+### Recent Commits (March 24, Session 2)
+```
+a0d9050d feat: auto-refresh Active Jobs page every 30s with live indicator
+fbad6012 fix: use RESEND_FROM_EMAIL env var in liability release + fix husky warning
+d42c3e0f feat: send payment receipt email when invoice is paid in full
+eab0ec00 feat: notify admins when job is completed (ready to invoice)
+a8f92226 feat: real-time analytics dashboard + security fixes + silica plan email
+2fc57a8c fix: mobile responsiveness audit — remaining 8 operator pages
+03d2cb05 fix: mobile responsiveness audit — operator pages
+ed89cbef fix: wire maintenance request form to damage-report API
+```
+
+### Previous Session Commits (March 24, Session 1)
 ```
 94ab0536 fix: use RESEND_FROM_EMAIL env var in invoice send route
 e24a256a feat: enforce mandatory signature + QuickBooks CSV export
@@ -124,6 +136,49 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 - **Platform Management** card → `/dashboard/admin/tenant-management`
 - **System Health** card → `/dashboard/admin/system-health`
 - Both added to `ADMIN_CARDS` array in `lib/rbac.ts`
+
+---
+
+## WHAT WAS BUILT (March 24, Session 2)
+
+### 1. Real Analytics Dashboard
+- **API:** `GET /api/admin/analytics` — live business metrics from DB
+- **Page:** `/dashboard/admin/analytics` — replaced placeholder with real data
+- KPI cards: jobs this month, quoted revenue, AR outstanding, collection rate
+- Operator utilization bars (7-day hours per operator)
+- Job status breakdown chart (YTD)
+- Job type breakdown (top 5 types)
+- 30-day job volume bar chart with completed overlay
+- MoM comparison badges on key metrics
+- Quick links to P&L, Timecards, Billing, Operator Profiles
+
+### 2. Security Fix — P&L API Auth
+- `app/api/admin/job-pnl/route.ts` and `[id]/route.ts` had `instanceof NextResponse` check (always false) — fixed to `!auth.authorized` pattern
+- This was silently letting unauthenticated requests through
+
+### 3. Silica Plan Email — Wired to Resend
+- `app/api/silica-plan/submit/route.ts` previously had console.log stub
+- Now sends real email via Resend with PDF attachment when `customerEmail` provided
+
+### 4. Payment Receipt Email
+- `app/api/admin/invoices/[id]/payment/route.ts` — sends receipt email to customer when invoice fully paid
+- Includes invoice #, payment date, method, amount, zero balance confirmation
+
+### 5. Admin Job Completion Notifications
+- `app/api/job-orders/[id]/status/route.ts` — fire-and-forget: when job → 'completed', creates `schedule_notifications` for all admin/super_admin/ops_manager users
+- Type: 'job_completed', prompts admin to invoice
+
+### 6. Liability Release Email Fix
+- Was hardcoded to `noreply@pontifexindustries.com`
+- Now uses `RESEND_FROM_EMAIL` env var (consistent with all other routes)
+
+### 7. Active Jobs Auto-Refresh
+- `app/dashboard/admin/active-jobs/page.tsx` — auto-refreshes every 30s silently
+- 'Live' green pulse badge + last-refreshed timestamp in header
+- Toggle button to pause auto-refresh
+
+### 8. Husky Pre-commit Fix
+- Removed deprecated `#!/usr/bin/env sh` and `. husky.sh` lines (was printing DEPRECATED warning on every commit)
 
 ---
 
