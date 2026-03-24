@@ -79,6 +79,8 @@ export default function Dashboard() {
   const [isShopHours, setIsShopHours] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showNfcClockInModal, setShowNfcClockInModal] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string>('');
+  const [todaysJobs, setTodaysJobs] = useState<{ id: string; job_number: string; customer_name: string; title: string }[]>([]);
   const [clockOutBlock, setClockOutBlock] = useState<{
     show: boolean;
     blockType: string;
@@ -142,6 +144,7 @@ export default function Dashboard() {
 
     checkClockStatus();
     fetchActiveJobs();
+    fetchTodaysJobs();
     fetchWeeklyHours();
 
     // Check if user should see onboarding tour
@@ -305,6 +308,33 @@ export default function Dashboard() {
     }
   };
 
+  // Fetch today's assigned jobs for the job selector
+  const fetchTodaysJobs = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const today = new Date().toISOString().split('T')[0];
+      const response = await fetch('/api/job-orders', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      const result = await response.json();
+      if (result.success && result.data) {
+        const jobs = result.data.filter((j: any) => {
+          const jDate = j.scheduled_date ? new Date(j.scheduled_date).toISOString().split('T')[0] : null;
+          return jDate === today && j.status !== 'completed' && j.status !== 'cancelled';
+        });
+        setTodaysJobs(jobs.map((j: any) => ({
+          id: j.id,
+          job_number: j.job_number,
+          customer_name: j.customer_name,
+          title: j.title,
+        })));
+      }
+    } catch (err) {
+      console.error('Error fetching today\'s jobs:', err);
+    }
+  };
+
   // Update operator status
   const updateStatus = async (newStatus: OperatorStatus) => {
     setStatusLoading(true);
@@ -448,6 +478,7 @@ export default function Dashboard() {
           longitude: data.longitude,
           accuracy: data.accuracy,
           is_shop_hours: isShopHours,
+          job_order_id: (!isShopHours && selectedJobId) ? selectedJobId : null,
           clock_in_method: data.method,
           nfc_tag_id: data.nfc_tag_id,
           nfc_tag_uid: data.nfc_tag_uid,
@@ -979,7 +1010,10 @@ export default function Dashboard() {
                     <input
                       type="checkbox"
                       checked={isShopHours}
-                      onChange={(e) => setIsShopHours(e.target.checked)}
+                      onChange={(e) => {
+                        setIsShopHours(e.target.checked);
+                        if (e.target.checked) setSelectedJobId('');
+                      }}
                       className="w-5 h-5 rounded border-2 border-amber-400 text-amber-600 focus:ring-amber-500"
                     />
                     <div>
@@ -987,6 +1021,25 @@ export default function Dashboard() {
                       <p className="text-xs text-amber-700">Check if working at the shop</p>
                     </div>
                   </label>
+                )}
+
+                {/* Job Selector — only visible when NOT clocked in and NOT shop hours */}
+                {!isClockedIn && !isShopHours && todaysJobs.length > 0 && (
+                  <div className="w-full sm:w-auto">
+                    <select
+                      value={selectedJobId}
+                      onChange={(e) => setSelectedJobId(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-blue-200 bg-blue-50 rounded-xl text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400"
+                    >
+                      <option value="">📋 Select today&apos;s job (optional)</option>
+                      {todaysJobs.map(j => (
+                        <option key={j.id} value={j.id}>
+                          {j.job_number} — {j.customer_name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1 px-1">Link this shift to a job for P&amp;L tracking</p>
+                  </div>
                 )}
 
                 <button

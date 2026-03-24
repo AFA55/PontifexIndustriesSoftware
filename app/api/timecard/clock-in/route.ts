@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       longitude,
       accuracy,
       is_shop_hours,
+      job_order_id,               // UUID of the job being worked (null = shop/general)
       // NFC fields
       clock_in_method = 'gps',   // 'nfc' | 'gps' | 'remote'
       nfc_tag_id,                 // UUID of the verified NFC tag
@@ -168,6 +169,7 @@ export async function POST(request: NextRequest) {
       nfc_tag_id: nfc_tag_id || null,
       nfc_tag_uid: nfc_tag_uid || null,
       remote_photo_url: remote_photo_url || null,
+      job_order_id: (job_order_id && !is_shop_hours) ? job_order_id : null,
     };
 
     if (clock_in_method === 'remote') {
@@ -218,6 +220,7 @@ export async function POST(request: NextRequest) {
           isNightShift: timecard.is_night_shift,
           hourType: timecard.hour_type,
           clockInMethod: timecard.clock_in_method,
+          jobOrderId: timecard.job_order_id || null,
           needsVerification: clock_in_method === 'remote',
           location: {
             latitude: timecard.clock_in_latitude,

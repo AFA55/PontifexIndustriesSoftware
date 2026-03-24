@@ -182,6 +182,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     features: ['Service monitoring', 'Error tracking', 'User activity', 'Backup status'],
   },
   {
+    key: 'job_pnl',
+    title: 'Job P&L Report',
+    description: 'Labor cost vs. quoted revenue per job — track profitability and gross margin',
+    icon: '📊',
+    href: '/dashboard/admin/job-pnl',
+    bgColor: 'from-emerald-600 to-teal-700',
+    iconBg: 'bg-emerald-600',
+    features: ['Labor cost per job', 'Gross profit & margin', 'Per-worker breakdown', 'CSV export'],
+  },
+  {
     key: 'settings',
     title: 'Settings',
     description: 'Configure schedule board, capacity, and system preferences',

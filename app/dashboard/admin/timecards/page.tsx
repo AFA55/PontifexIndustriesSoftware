@@ -32,6 +32,9 @@ interface TimecardWithUser {
   is_shop_hours: boolean;
   is_night_shift: boolean;
   hour_type: string;
+  job_order_id: string | null;
+  job_number: string | null;
+  job_customer_name: string | null;
 }
 
 // ── Week helpers ──────────────────────────────────────────────
@@ -853,6 +856,7 @@ export default function AdminTimecardsPage() {
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clock Out</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hours</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Category</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Job</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Location</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Actions</th>
@@ -914,6 +918,20 @@ export default function AdminTimecardsPage() {
                               <span className="text-[10px] text-slate-400 font-medium">Regular</span>
                             )}
                           </div>
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell">
+                          {entry.job_order_id ? (
+                            <a
+                              href={`/dashboard/admin/job-pnl/${entry.job_order_id}`}
+                              className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <ExternalLink size={10} />
+                              {entry.job_number || 'View Job'}
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">{entry.is_shop_hours ? 'Shop' : '—'}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {entry.clock_in_latitude && entry.clock_in_longitude ? (
