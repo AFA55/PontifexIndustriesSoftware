@@ -234,8 +234,9 @@ export async function POST(
 </html>`;
 
     // 5. Send email via Resend
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@resend.dev>';
     await resend.emails.send({
-      from: 'billing@patriotconcretecutting.com',
+      from: fromAddress,
       to: invoice.customer_email,
       subject: `Invoice ${invoice.invoice_number} from Patriot Concrete Cutting`,
       html,
