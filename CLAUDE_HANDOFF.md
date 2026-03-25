@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 24, 2026 (Session 2) | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✓ 177/177 pages
+**Date:** March 24, 2026 (Session 3) | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✓ 178/178 pages
 
 ---
 
@@ -7,11 +7,20 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2` (pushed to origin)
-- **Last commit:** `a0d9050d` — "feat: auto-refresh Active Jobs page every 30s with live indicator"
+- **Last commit:** `1f583993` — "fix: completed jobs page — load work_performed from DB not localStorage"
 - **Clean working tree** (all changes committed and pushed)
+
+### Recent Commits (March 24, Session 3)
+```
+1f583993 fix: completed jobs page — load work_performed from DB not localStorage
+07764629 fix: make last_reminder_sent_at update fire-and-forget
+88932f85 fix: operator notification banner + billing reminder enhancements
+fa5b6c92 feat: invoice reminders, AR dispatch warnings, operator assignment notifications
+```
 
 ### Recent Commits (March 24, Session 2)
 ```
+1fe9a5a2 docs: update handoff — March 24 session 2 complete
 a0d9050d feat: auto-refresh Active Jobs page every 30s with live indicator
 fbad6012 fix: use RESEND_FROM_EMAIL env var in liability release + fix husky warning
 d42c3e0f feat: send payment receipt email when invoice is paid in full
@@ -139,6 +148,53 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 
 ---
 
+## WHAT WAS BUILT (March 24, Session 3)
+
+### 1. Invoice Payment Reminders
+- **API:** `POST /api/admin/invoices/[id]/remind` — sends HTML reminder email via Resend
+- Red urgency styling for overdue, amber for sent/due-soon
+- Shows balance due prominently, days overdue, billing contact info
+- Tracks `last_reminder_sent_at` on invoice (fire-and-forget so it works before migration)
+- Audits to `audit_logs` table
+
+### 2. Bulk "Send Reminders" on Billing Page
+- Billing page AR Aging section now has "Send Reminders (N)" button for all overdue
+- Loops through overdue/sent invoices with email addresses, calls remind API for each
+- Shows count of sent/failed results
+- Invoice list rows show "Reminded Xd ago" timestamp badge when recently reminded
+
+### 3. AR Aging Warnings in Dispatch Modal
+- `GET /api/admin/schedule-board/dispatch?date=` now returns `ar_warnings[]`
+- Each entry: customer name, total outstanding balance, days overdue
+- Schedule board dispatch modal shows red warning section if any customers have AR
+- Admin can see "⚠️ AR Warning — 2 customers with outstanding balances" before pushing tickets
+
+### 4. Operator Assignment Notifications
+- `POST /api/admin/schedule-board/assign` now creates `schedule_notifications` for operator and helper
+- Type: `job_assigned`, includes customer name, location, date, arrival time, job type
+- Operators see notification banner in my-jobs page as soon as they're assigned (before dispatch)
+
+### 5. Notification Banner Bug Fix
+- `NotificationBanner.tsx` had wrong column names: `operator_id` → `recipient_id`, `is_read` → `read`
+- Was only fetching `dispatched` type; now also fetches `job_assigned` and `assigned`
+- Assignment notifications show orange/red gradient to distinguish from dispatch blue
+- Shows message count if multiple unread notifications
+
+### 6. New Migration: `20260324_notification_types_and_invoice_reminder.sql`
+- Expands `schedule_notifications.type` CHECK to include `job_assigned` and `job_completed`
+- Adds UPDATE RLS policy: users can mark their own notifications as read (needed for banner dismiss)
+- Adds `last_reminder_sent_at TIMESTAMPTZ` column to `invoices` table
+
+### 7. Completed Jobs Page Fix
+- Was loading work_performed from `localStorage` — the operator's browser, not admin's
+- Fixed to query `daily_job_logs.work_performed` JSONB from Supabase directly
+- Aggregates across all daily log entries for multi-day jobs
+- Parallel fetch for profile, standby logs, daily logs (faster)
+- Added "Create Invoice" button → `/dashboard/admin/billing`
+- Removed 10+ console.log statements and `alert()` error handling
+
+---
+
 ## WHAT WAS BUILT (March 24, Session 2)
 
 ### 1. Real Analytics Dashboard
@@ -225,9 +281,10 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 ## WHAT TO DO NEXT
 
 ### Immediate Priority
-1. **Apply pending migrations** — Run SQL in Supabase Dashboard SQL Editor:
+1. **Apply pending migrations** — Run SQL in Supabase Dashboard SQL Editor in order:
    - `supabase/migrations/20260320_add_error_logs_tenants_backups.sql`
    - `supabase/migrations/20260324_timecard_job_linkage_and_pnl.sql`
+   - `supabase/migrations/20260324_notification_types_and_invoice_reminder.sql`
 2. E2E workflow testing — test the full pipeline end-to-end
 3. Remove `NEXT_PUBLIC_BYPASS_LOCATION_CHECK=true` from `.env.local` before production
 4. Production deployment: configure Vercel env vars from `.env.example`, custom domain, SSL
@@ -257,6 +314,9 @@ c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
 ## UNAPPLIED MIGRATIONS
 1. `20260320_add_error_logs_tenants_backups.sql` — error_logs, tenants, tenant_users, backup_logs tables
 2. `20260324_timecard_job_linkage_and_pnl.sql` — job_order_id on timecards, labor_cost trigger, job_pnl_summary view
+3. `20260324_notification_types_and_invoice_reminder.sql` — expands notification type CHECK, adds UPDATE RLS policy, adds last_reminder_sent_at on invoices
+
+**All migrations safe to run in order.** Apply in Supabase Dashboard → SQL Editor.
 
 ---
 
