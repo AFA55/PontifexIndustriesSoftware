@@ -251,7 +251,7 @@ export async function GET(request: NextRequest) {
   try {
     const { data: jobs, error } = await supabaseAdmin
       .from('job_orders')
-      .select('id, dispatched_at, assigned_to, status')
+      .select('id, dispatched_at, assigned_to, status, customer_name')
       .eq('scheduled_date', targetDate)
       .not('assigned_to', 'is', null)
       .is('deleted_at', null)
@@ -265,12 +265,55 @@ export async function GET(request: NextRequest) {
     const dispatched = jobs?.filter(j => j.dispatched_at !== null).length || 0;
     const undispatched = total - dispatched;
 
+    // Check AR: find overdue balances for customers being dispatched
+    const customerNames = [...new Set((jobs || []).map(j => j.customer_name).filter(Boolean))];
+    let arWarnings: { customer_name: string; balance_due: number; days_overdue: number }[] = [];
+
+    if (customerNames.length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: overdueInvoices } = await supabaseAdmin
+        .from('invoices')
+        .select('customer_name, balance_due, due_date')
+        .in('customer_name', customerNames)
+        .in('status', ['overdue', 'sent'])
+        .gt('balance_due', 0);
+
+      if (overdueInvoices && overdueInvoices.length > 0) {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const warningMap = new Map<string, { balance_due: number; days_overdue: number }>();
+
+        for (const inv of overdueInvoices) {
+          const dueDate = inv.due_date ? new Date(inv.due_date) : null;
+          const daysOverdue = dueDate
+            ? Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
+            : 0;
+
+          const existing = warningMap.get(inv.customer_name);
+          if (!existing) {
+            warningMap.set(inv.customer_name, { balance_due: Number(inv.balance_due), days_overdue: daysOverdue });
+          } else {
+            warningMap.set(inv.customer_name, {
+              balance_due: existing.balance_due + Number(inv.balance_due),
+              days_overdue: Math.max(existing.days_overdue, daysOverdue),
+            });
+          }
+        }
+
+        arWarnings = Array.from(warningMap.entries()).map(([customer_name, data]) => ({
+          customer_name,
+          ...data,
+        }));
+      }
+    }
+
     return NextResponse.json({
       success: true,
       date: targetDate,
       total,
       dispatched,
       undispatched,
+      ar_warnings: arWarnings,
     });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });

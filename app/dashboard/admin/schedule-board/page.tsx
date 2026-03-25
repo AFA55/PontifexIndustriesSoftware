@@ -202,7 +202,7 @@ export default function ScheduleBoardPage() {
   // Dispatch state
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [dispatchLoading, setDispatchLoading] = useState(false);
-  const [dispatchInfo, setDispatchInfo] = useState<{ total: number; dispatched: number; undispatched: number } | null>(null);
+  const [dispatchInfo, setDispatchInfo] = useState<{ total: number; dispatched: number; undispatched: number; ar_warnings?: { customer_name: string; balance_due: number; days_overdue: number }[] } | null>(null);
 
   // Modal states
   const [approvalTarget, setApprovalTarget] = useState<PendingJob | null>(null);
@@ -243,7 +243,7 @@ export default function ScheduleBoardPage() {
       const res = await apiFetch(`/api/admin/schedule-board/dispatch?date=${date}`);
       if (res.ok) {
         const json = await res.json();
-        setDispatchInfo({ total: json.total, dispatched: json.dispatched, undispatched: json.undispatched });
+        setDispatchInfo({ total: json.total, dispatched: json.dispatched, undispatched: json.undispatched, ar_warnings: json.ar_warnings || [] });
       }
     } catch { /* ignore */ }
   }, []);
@@ -2206,6 +2206,33 @@ export default function ScheduleBoardPage() {
                         <div>
                           <p className="text-sm font-bold text-orange-800">{dispatchInfo.undispatched} job(s) ready to dispatch</p>
                           <p className="text-xs text-orange-600">This will notify all assigned operators and helpers.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AR Aging Warnings */}
+                    {dispatchInfo.ar_warnings && dispatchInfo.ar_warnings.length > 0 && (
+                      <div className="border border-red-200 rounded-xl overflow-hidden">
+                        <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border-b border-red-200">
+                          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                          <p className="text-xs font-bold text-red-700 uppercase tracking-wide">
+                            AR Warning — {dispatchInfo.ar_warnings.length} customer{dispatchInfo.ar_warnings.length !== 1 ? 's' : ''} with outstanding balance{dispatchInfo.ar_warnings.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <div className="divide-y divide-red-100">
+                          {dispatchInfo.ar_warnings.map((w, i) => (
+                            <div key={i} className="flex items-center justify-between px-4 py-2.5 bg-white">
+                              <span className="text-sm font-medium text-gray-800 truncate">{w.customer_name}</span>
+                              <div className="text-right flex-shrink-0 ml-3">
+                                <span className="text-sm font-bold text-red-600">
+                                  ${w.balance_due.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </span>
+                                {w.days_overdue > 0 && (
+                                  <span className="ml-2 text-xs text-red-500 font-medium">{w.days_overdue}d overdue</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}

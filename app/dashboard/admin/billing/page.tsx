@@ -98,6 +98,7 @@ export default function BillingPage() {
   });
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
+  const [sendingReminder, setSendingReminder] = useState(false);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -276,6 +277,29 @@ export default function BillingPage() {
       }
     } catch (err) {
       console.error('Error printing PDF:', err);
+    }
+  };
+
+  const sendReminder = async () => {
+    if (!selectedInvoice) return;
+    setSendingReminder(true);
+    setSendResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/admin/invoices/${selectedInvoice.id}/remind`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      setSendResult({
+        success: res.ok,
+        message: res.ok ? (data.message || 'Reminder sent') : (data.error || 'Failed to send reminder'),
+      });
+    } catch {
+      setSendResult({ success: false, message: 'Failed to send reminder. Please try again.' });
+    } finally {
+      setSendingReminder(false);
     }
   };
 
@@ -829,12 +853,26 @@ export default function BillingPage() {
                     </button>
                   )}
                   {['sent', 'overdue'].includes(selectedInvoice.status) && (
-                    <button
-                      onClick={() => updateInvoiceStatus(selectedInvoice.id, 'paid')}
-                      className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Mark as Paid
-                    </button>
+                    <>
+                      <button
+                        onClick={sendReminder}
+                        disabled={sendingReminder}
+                        className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm"
+                        title="Send payment reminder email"
+                      >
+                        {sendingReminder ? (
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</>
+                        ) : (
+                          <><AlertCircle className="w-3.5 h-3.5" /> Send Reminder</>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => updateInvoiceStatus(selectedInvoice.id, 'paid')}
+                        className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Mark as Paid
+                      </button>
+                    </>
                   )}
                   {selectedInvoice.status !== 'paid' && Number(selectedInvoice.balance_due) > 0 && (
                     <button

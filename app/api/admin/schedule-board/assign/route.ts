@@ -69,6 +69,71 @@ export async function POST(request: NextRequest) {
       request,
     });
 
+    // Fire-and-forget: notify assigned operator via in-app notification
+    if (operatorId && updated) {
+      Promise.resolve((async () => {
+        // Fetch the full job to build a meaningful message
+        const { data: job } = await supabaseAdmin
+          .from('job_orders')
+          .select('customer_name, location, scheduled_date, arrival_time, job_type')
+          .eq('id', jobOrderId)
+          .single();
+
+        const scheduledDate = job?.scheduled_date
+          ? new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+          : 'TBD';
+
+        const msg = job
+          ? `${job.customer_name} at ${job.location || 'TBD'} on ${scheduledDate}.`
+          : `Job ${updated.job_number} has been assigned to you.`;
+
+        await supabaseAdmin.from('schedule_notifications').insert({
+          recipient_id: operatorId,
+          job_order_id: jobOrderId,
+          type: 'job_assigned',
+          title: `You've been assigned: ${updated.job_number}`,
+          message: msg,
+          metadata: {
+            job_number: updated.job_number,
+            customer_name: job?.customer_name,
+            location: job?.location,
+            scheduled_date: job?.scheduled_date,
+            arrival_time: job?.arrival_time,
+            job_type: job?.job_type,
+          },
+        });
+      })()).catch(() => {});
+    }
+
+    // Fire-and-forget: notify assigned helper
+    if (helperId && updated) {
+      Promise.resolve((async () => {
+        const { data: job } = await supabaseAdmin
+          .from('job_orders')
+          .select('customer_name, location, scheduled_date, arrival_time')
+          .eq('id', jobOrderId)
+          .single();
+
+        const scheduledDate = job?.scheduled_date
+          ? new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+          : 'TBD';
+
+        await supabaseAdmin.from('schedule_notifications').insert({
+          recipient_id: helperId,
+          job_order_id: jobOrderId,
+          type: 'job_assigned',
+          title: `You've been assigned as helper: ${updated.job_number}`,
+          message: job
+            ? `${job.customer_name} at ${job.location || 'TBD'} on ${scheduledDate} (helper role).`
+            : `Job ${updated.job_number} — assigned as helper.`,
+          metadata: {
+            job_number: updated.job_number,
+            is_helper: true,
+          },
+        });
+      })()).catch(() => {});
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Job assigned successfully',
