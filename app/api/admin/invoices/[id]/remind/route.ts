@@ -178,11 +178,13 @@ export async function POST(
       html,
     });
 
-    // Track last reminder sent
-    await supabaseAdmin
-      .from('invoices')
-      .update({ last_reminder_sent_at: new Date().toISOString() })
-      .eq('id', id);
+    // Track last reminder sent (fire-and-forget — column may not exist until migration applied)
+    Promise.resolve(
+      supabaseAdmin
+        .from('invoices')
+        .update({ last_reminder_sent_at: new Date().toISOString() })
+        .eq('id', id)
+    ).then(() => {}).catch(() => {});
 
     // Fire-and-forget audit log
     Promise.resolve(
