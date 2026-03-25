@@ -47,6 +47,7 @@ interface Invoice {
   payment_method?: string | null;
   payment_date?: string | null;
   reference_number?: string | null;
+  last_reminder_sent_at?: string | null;
 }
 
 interface Payment {
@@ -99,6 +100,8 @@ export default function BillingPage() {
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
   const [sendingReminder, setSendingReminder] = useState(false);
+  const [sendingBulkReminder, setSendingBulkReminder] = useState(false);
+  const [bulkReminderResult, setBulkReminderResult] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -300,6 +303,39 @@ export default function BillingPage() {
       setSendResult({ success: false, message: 'Failed to send reminder. Please try again.' });
     } finally {
       setSendingReminder(false);
+    }
+  };
+
+  const sendBulkReminders = async () => {
+    setSendingBulkReminder(true);
+    setBulkReminderResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const overdueWithEmail = invoices.filter(
+        inv => ['sent', 'overdue'].includes(inv.status) && inv.customer_email && Number(inv.balance_due) > 0
+      );
+      if (overdueWithEmail.length === 0) {
+        setBulkReminderResult('No outstanding invoices with email addresses found.');
+        return;
+      }
+      let sent = 0;
+      let failed = 0;
+      for (const inv of overdueWithEmail) {
+        try {
+          const res = await fetch(`/api/admin/invoices/${inv.id}/remind`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${session.access_token}` },
+          });
+          if (res.ok) sent++; else failed++;
+        } catch { failed++; }
+      }
+      setBulkReminderResult(`Sent ${sent} reminder${sent !== 1 ? 's' : ''}${failed > 0 ? `, ${failed} failed` : ''}.`);
+      fetchData();
+    } catch {
+      setBulkReminderResult('Failed to send bulk reminders.');
+    } finally {
+      setSendingBulkReminder(false);
     }
   };
 
@@ -524,8 +560,30 @@ export default function BillingPage() {
           <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-5 mb-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">AR Aging Report</h3>
-              <span className="text-xs text-slate-400">Total Outstanding: <span className="font-bold text-slate-700">${(stats.totalOutstanding || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-400">Total: <span className="font-bold text-slate-700">${(stats.totalOutstanding || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                {(stats.overdue || 0) > 0 && (
+                  <button
+                    onClick={sendBulkReminders}
+                    disabled={sendingBulkReminder}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm"
+                    title="Send reminder emails to all customers with outstanding invoices"
+                  >
+                    {sendingBulkReminder ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</>
+                    ) : (
+                      <><Send className="w-3.5 h-3.5" /> Send Reminders ({stats.overdue})</>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
+            {bulkReminderResult && (
+              <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs font-medium text-amber-800 flex items-center justify-between">
+                <span>{bulkReminderResult}</span>
+                <button onClick={() => setBulkReminderResult(null)} className="ml-2 hover:opacity-60"><X className="w-3 h-3" /></button>
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
                 { label: 'Current', value: stats.aging?.current || 0, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
@@ -679,6 +737,11 @@ export default function BillingPage() {
                               </span>
                             ) : null;
                           })()}
+                          {inv.last_reminder_sent_at && (
+                            <span className="text-[10px] text-amber-600 font-medium">
+                              Reminded {Math.floor((Date.now() - new Date(inv.last_reminder_sent_at).getTime()) / (1000 * 60 * 60 * 24))}d ago
+                            </span>
+                          )}
                         </div>
                       </button>
                       <div className="flex items-center gap-3 ml-4">
