@@ -54,6 +54,19 @@ export async function GET(request: NextRequest) {
     const milliseconds = now.getTime() - clockInTime.getTime();
     const currentHours = milliseconds / (1000 * 60 * 60);
 
+    // Fetch linked job info if present
+    let jobInfo: { job_number: string; customer_name: string } | null = null;
+    if (activeTimecard.job_order_id) {
+      const { data: job } = await supabaseAdmin
+        .from('job_orders')
+        .select('job_number, customer_name')
+        .eq('id', activeTimecard.job_order_id)
+        .maybeSingle();
+      if (job) {
+        jobInfo = { job_number: job.job_number, customer_name: job.customer_name };
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -68,6 +81,13 @@ export async function GET(request: NextRequest) {
           },
           currentHours: parseFloat(currentHours.toFixed(2)),
           date: activeTimecard.date,
+          isShopHours: activeTimecard.is_shop_hours || false,
+          isNightShift: activeTimecard.is_night_shift || false,
+          hourType: activeTimecard.hour_type || 'regular',
+          clockInMethod: activeTimecard.clock_in_method || 'gps',
+          jobOrderId: activeTimecard.job_order_id || null,
+          jobNumber: jobInfo?.job_number || null,
+          jobCustomerName: jobInfo?.customer_name || null,
         },
       },
       { status: 200 }

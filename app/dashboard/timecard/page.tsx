@@ -8,7 +8,8 @@ import Link from 'next/link';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import {
   ArrowLeft, Clock, Calendar, CheckCircle, AlertTriangle,
-  ChevronLeft, ChevronRight, Moon, Factory, Briefcase, TrendingUp
+  ChevronLeft, ChevronRight, Moon, Factory, Briefcase, TrendingUp,
+  MapPin, Smartphone, Wifi
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -23,6 +24,10 @@ interface TimecardEntry {
   is_night_shift: boolean;
   hour_type: string;
   notes: string | null;
+  job_order_id: string | null;
+  job_number: string | null;
+  job_customer_name: string | null;
+  clock_in_method: string | null;
 }
 
 interface WeekData {
@@ -403,6 +408,7 @@ export default function TimecardPage() {
                     <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Out</th>
                     <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hrs</th>
                     <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Category</th>
+                    <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">Project</th>
                     <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
@@ -452,6 +458,26 @@ export default function TimecardPage() {
                               <span className="text-[10px] text-slate-400 font-medium">Regular</span>
                             )}
                           </div>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 hidden md:table-cell">
+                          {entry.job_number ? (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600">
+                                <MapPin size={9} />
+                                {entry.job_number}
+                              </span>
+                              {entry.job_customer_name && (
+                                <p className="text-[9px] text-slate-400 truncate max-w-[100px]">{entry.job_customer_name}</p>
+                              )}
+                            </div>
+                          ) : entry.is_shop_hours ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600">
+                              <Factory size={9} />
+                              Shop
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">--</span>
+                          )}
                         </td>
                         <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
                           {entry.is_approved ? (

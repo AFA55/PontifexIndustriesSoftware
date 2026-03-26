@@ -54,18 +54,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Enrich timecards with job info
+    const jobOrderIds = [...new Set((timecards || []).filter(tc => tc.job_order_id).map(tc => tc.job_order_id))];
+    let jobMap: Record<string, { job_number: string; customer_name: string }> = {};
+    if (jobOrderIds.length > 0) {
+      const { data: jobs } = await supabaseAdmin
+        .from('job_orders')
+        .select('id, job_number, customer_name')
+        .in('id', jobOrderIds);
+      if (jobs) {
+        jobs.forEach(j => { jobMap[j.id] = { job_number: j.job_number, customer_name: j.customer_name }; });
+      }
+    }
+
+    const enrichedTimecards = (timecards || []).map(tc => ({
+      ...tc,
+      job_number: tc.job_order_id ? (jobMap[tc.job_order_id]?.job_number || null) : null,
+      job_customer_name: tc.job_order_id ? (jobMap[tc.job_order_id]?.customer_name || null) : null,
+    }));
+
     // Calculate totals
-    const totalHours = timecards?.reduce((sum, tc) => sum + (tc.total_hours || 0), 0) || 0;
-    const completedEntries = timecards?.filter(tc => tc.clock_out_time !== null).length || 0;
-    const activeEntry = timecards?.find(tc => tc.clock_out_time === null);
+    const totalHours = enrichedTimecards.reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
+    const completedEntries = enrichedTimecards.filter(tc => tc.clock_out_time !== null).length;
+    const activeEntry = enrichedTimecards.find(tc => tc.clock_out_time === null);
 
     return NextResponse.json(
       {
         success: true,
         data: {
-          timecards: timecards || [],
+          timecards: enrichedTimecards,
           summary: {
-            totalEntries: timecards?.length || 0,
+            totalEntries: enrichedTimecards.length,
             completedEntries,
             activeEntry: activeEntry ? {
               id: activeEntry.id,

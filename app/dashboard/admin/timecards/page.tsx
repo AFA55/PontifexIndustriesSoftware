@@ -10,7 +10,7 @@ import {
   ArrowLeft, Clock, MapPin, CheckCircle, XCircle, Calendar,
   User as UserIcon, ExternalLink, Edit, FileText, Download,
   ChevronLeft, ChevronRight, AlertTriangle, Moon, Factory, Briefcase,
-  Search, Filter, TrendingUp, Users, BarChart3
+  Search, Filter, TrendingUp, Users, BarChart3, LayoutGrid, List, Bell
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getGoogleMapsLink } from '@/lib/geolocation';
@@ -391,6 +391,8 @@ export default function AdminTimecardsPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
+  const [notifyLoading, setNotifyLoading] = useState(false);
   const router = useRouter();
   const isRedirecting = useRef(false);
 
@@ -597,6 +599,104 @@ export default function AdminTimecardsPage() {
     return badges;
   };
 
+  // ── Notify Admin ──────────────────────────────────
+  const handleNotifyAdmin = async () => {
+    setNotifyLoading(true);
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+
+      // Create a notification record for super_admin/ops_manager
+      const weekRange = formatWeekRange(monday, sunday);
+      const summary = `Weekly timecard report for ${weekRange}: ${totalHours.toFixed(1)} total hours across ${uniqueEmployees} employees. ${pendingCount} entries pending approval.`;
+
+      await fetch('/api/admin/timecards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'notify', summary }),
+      }).catch(() => {});
+
+      alert(`Timecard report notification sent!\n\nSummary: ${summary}`);
+    } catch (err) {
+      alert('Failed to send notification.');
+    } finally {
+      setNotifyLoading(false);
+    }
+  };
+
+  // ── Weekly Grid Data ──────────────────────────────
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+  const weekDates: Date[] = useMemo(() => {
+    const dates: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(d.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  }, [monday]);
+
+  interface EmployeeWeekRow {
+    userId: string;
+    fullName: string;
+    email: string;
+    role: string;
+    days: (TimecardWithUser[] | null)[];
+    totalHours: number;
+    regularHours: number;
+    weeklyOT: number;
+    mandatoryOT: number;
+    nightShift: number;
+    shopHours: number;
+    pendingCount: number;
+  }
+
+  const employeeWeekRows: EmployeeWeekRow[] = useMemo(() => {
+    // Group by employee
+    const grouped: Record<string, TimecardWithUser[]> = {};
+    (searchQuery ? filteredTimecards : timecards).forEach(tc => {
+      if (!grouped[tc.user_id]) grouped[tc.user_id] = [];
+      grouped[tc.user_id].push(tc);
+    });
+
+    return Object.entries(grouped).map(([userId, entries]) => {
+      const first = entries[0];
+      // For each day of the week, find matching entries
+      const days = weekDates.map(date => {
+        const dateStr = date.toISOString().split('T')[0];
+        const dayEntries = entries.filter(e => e.date === dateStr);
+        return dayEntries.length > 0 ? dayEntries : null;
+      });
+
+      const total = entries.reduce((s, e) => s + (e.total_hours || 0), 0);
+      const mandOT = entries.filter(e => e.hour_type === 'mandatory_overtime').reduce((s, e) => s + (e.total_hours || 0), 0);
+      const weekday = entries.filter(e => e.hour_type !== 'mandatory_overtime').reduce((s, e) => s + (e.total_hours || 0), 0);
+      const nightSh = entries.filter(e => e.is_night_shift).reduce((s, e) => s + (e.total_hours || 0), 0);
+      const shopH = entries.filter(e => e.is_shop_hours).reduce((s, e) => s + (e.total_hours || 0), 0);
+      const pending = entries.filter(e => !e.is_approved).length;
+
+      return {
+        userId,
+        fullName: first.full_name,
+        email: first.email,
+        role: first.role,
+        days,
+        totalHours: total,
+        regularHours: Math.min(weekday, 40),
+        weeklyOT: Math.max(0, weekday - 40),
+        mandatoryOT: mandOT,
+        nightShift: nightSh,
+        shopHours: shopH,
+        pendingCount: pending,
+      };
+    }).sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }, [timecards, filteredTimecards, searchQuery, weekDates]);
+
+  const formatDayHours = (entries: TimecardWithUser[] | null) => {
+    if (!entries) return null;
+    return entries.reduce((s, e) => s + (e.total_hours || 0), 0);
+  };
+
   // ── Loading state ──────────────────────────────────
   if (!user) {
     return (
@@ -638,6 +738,25 @@ export default function AdminTimecardsPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Notify Admin */}
+            <button
+              onClick={handleNotifyAdmin}
+              disabled={notifyLoading || timecards.length === 0}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                notifyLoading || timecards.length === 0
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-amber-500 hover:bg-amber-600 text-white shadow-md hover:shadow-lg'
+              }`}
+              title="Send timecard report notification"
+            >
+              {notifyLoading ? (
+                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <Bell size={15} />
+              )}
+              <span className="hidden sm:inline">Notify</span>
+            </button>
+
             {/* PDF Export */}
             <button
               onClick={handleExportPDF}
@@ -818,6 +937,252 @@ export default function AdminTimecardsPage() {
           </div>
         </div>
 
+        {/* ── View Toggle ──────────────────────────────── */}
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex gap-1 bg-white rounded-lg p-1 border border-slate-200/60 shadow-sm">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                viewMode === 'grid' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <LayoutGrid size={13} />
+              Weekly Grid
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <List size={13} />
+              Detailed List
+            </button>
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════
+            WEEKLY GRID VIEW
+            ══════════════════════════════════════════════════ */}
+        {viewMode === 'grid' && (
+          <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden mb-5">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-slate-800">Weekly Employee Grid</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{employeeWeekRows.length} employees &middot; {formatWeekRange(monday, sunday)}</p>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+                <span>= Weekend/Mandatory OT</span>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="p-16 text-center">
+                <div className="w-10 h-10 mx-auto mb-3 relative">
+                  <div className="absolute inset-0 rounded-full border-[3px] border-slate-100"></div>
+                  <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-blue-600 animate-spin"></div>
+                </div>
+                <p className="text-slate-400 text-sm">Loading timecards...</p>
+              </div>
+            ) : employeeWeekRows.length === 0 ? (
+              <div className="p-16 text-center">
+                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Clock className="text-slate-300" size={28} />
+                </div>
+                <p className="text-slate-600 font-semibold">No timecards found</p>
+                <p className="text-slate-400 text-sm mt-1">Try a different week or filter</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px]">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-100">
+                      <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider min-w-[180px]">Employee</th>
+                      {weekDates.map((date, i) => {
+                        const dayOfWeek = date.getDay();
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                        return (
+                          <th key={i} className={`px-2 py-3 text-center text-[10px] font-bold uppercase tracking-wider min-w-[80px] ${
+                            isWeekend ? 'text-red-500 bg-red-50/50' : 'text-slate-500'
+                          }`}>
+                            <div>{dayNames[i]}</div>
+                            <div className="text-[9px] font-normal mt-0.5">
+                              {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </div>
+                          </th>
+                        );
+                      })}
+                      <th className="px-3 py-3 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-blue-50/50 min-w-[60px]">Total</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider min-w-[60px]">Reg</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold text-orange-500 uppercase tracking-wider min-w-[50px]">OT</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold text-red-500 uppercase tracking-wider min-w-[55px]">Mand</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold text-amber-500 uppercase tracking-wider min-w-[50px]">Shop</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider min-w-[60px]">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {employeeWeekRows.map((row) => (
+                      <tr key={row.userId} className="group hover:bg-blue-50/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0 shadow-sm">
+                              {row.fullName?.charAt(0) || '?'}
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-slate-800 leading-tight">{row.fullName}</p>
+                              <p className="text-[10px] text-slate-400 capitalize">{row.role}</p>
+                            </div>
+                          </div>
+                        </td>
+                        {row.days.map((dayEntries, i) => {
+                          const hrs = formatDayHours(dayEntries);
+                          const hasNightShift = dayEntries?.some(e => e.is_night_shift);
+                          const hasShop = dayEntries?.some(e => e.is_shop_hours);
+                          const isMandOT = dayEntries?.some(e => e.hour_type === 'mandatory_overtime');
+                          const isActive = dayEntries?.some(e => !e.clock_out_time);
+                          const dayOfWeek = weekDates[i].getDay();
+                          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+                          return (
+                            <td
+                              key={i}
+                              className={`px-2 py-3 text-center ${isWeekend ? 'bg-red-50/30' : ''}`}
+                            >
+                              {hrs !== null ? (
+                                <div className="space-y-0.5">
+                                  <span className={`text-sm font-bold tabular-nums ${
+                                    isMandOT ? 'text-red-600' : hasNightShift ? 'text-indigo-600' : 'text-slate-800'
+                                  }`}>
+                                    {hrs.toFixed(1)}
+                                  </span>
+                                  {isActive && (
+                                    <span className="block">
+                                      <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[8px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                                        <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />
+                                        Active
+                                      </span>
+                                    </span>
+                                  )}
+                                  <div className="flex justify-center gap-0.5">
+                                    {hasShop && <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" title="Shop hours" />}
+                                    {hasNightShift && <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full" title="Night shift" />}
+                                    {isMandOT && <span className="w-1.5 h-1.5 bg-red-400 rounded-full" title="Mandatory OT" />}
+                                  </div>
+                                  {/* Show clock in/out times */}
+                                  {dayEntries && dayEntries.map((entry, entryIdx) => (
+                                    <div key={entryIdx} className="text-[8px] text-slate-400 tabular-nums leading-tight">
+                                      {new Date(entry.clock_in_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                      {entry.clock_out_time && (
+                                        <>-{new Date(entry.clock_out_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {/* Show project/job */}
+                                  {dayEntries && dayEntries.filter(e => e.job_number).map((entry, entryIdx) => (
+                                    <div key={`job-${entryIdx}`} className="text-[8px] text-blue-500 font-medium truncate max-w-[80px]" title={entry.job_customer_name || ''}>
+                                      {entry.job_number}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-200">--</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        {/* Total */}
+                        <td className="px-3 py-3 text-center bg-blue-50/30">
+                          <span className="text-sm font-bold text-blue-700 tabular-nums">{row.totalHours.toFixed(1)}</span>
+                        </td>
+                        {/* Regular */}
+                        <td className="px-3 py-3 text-center">
+                          <span className="text-xs font-bold text-emerald-600 tabular-nums">{row.regularHours.toFixed(1)}</span>
+                        </td>
+                        {/* Weekly OT */}
+                        <td className="px-3 py-3 text-center">
+                          <span className={`text-xs font-bold tabular-nums ${row.weeklyOT > 0 ? 'text-orange-600' : 'text-slate-300'}`}>
+                            {row.weeklyOT.toFixed(1)}
+                          </span>
+                        </td>
+                        {/* Mandatory OT */}
+                        <td className="px-3 py-3 text-center">
+                          <span className={`text-xs font-bold tabular-nums ${row.mandatoryOT > 0 ? 'text-red-600' : 'text-slate-300'}`}>
+                            {row.mandatoryOT.toFixed(1)}
+                          </span>
+                        </td>
+                        {/* Shop */}
+                        <td className="px-3 py-3 text-center">
+                          <span className={`text-xs font-bold tabular-nums ${row.shopHours > 0 ? 'text-amber-600' : 'text-slate-300'}`}>
+                            {row.shopHours.toFixed(1)}
+                          </span>
+                        </td>
+                        {/* Status */}
+                        <td className="px-3 py-3 text-center">
+                          {row.pendingCount > 0 ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
+                              {row.pendingCount} pending
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                              <CheckCircle size={9} />
+                              All approved
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Grand Total Row */}
+                    {employeeWeekRows.length > 1 && (
+                      <tr className="bg-slate-50 border-t-2 border-slate-200 font-bold">
+                        <td className="px-4 py-3 text-xs text-slate-600 uppercase tracking-wider">Grand Total ({employeeWeekRows.length} employees)</td>
+                        {weekDates.map((_, i) => {
+                          const dayTotal = employeeWeekRows.reduce((sum, row) => {
+                            const hrs = formatDayHours(row.days[i]);
+                            return sum + (hrs || 0);
+                          }, 0);
+                          return (
+                            <td key={i} className="px-2 py-3 text-center">
+                              <span className={`text-xs font-bold tabular-nums ${dayTotal > 0 ? 'text-slate-700' : 'text-slate-300'}`}>
+                                {dayTotal > 0 ? dayTotal.toFixed(1) : '--'}
+                              </span>
+                            </td>
+                          );
+                        })}
+                        <td className="px-3 py-3 text-center bg-blue-50/30">
+                          <span className="text-sm font-bold text-blue-800 tabular-nums">{totalHours.toFixed(1)}</span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className="text-xs font-bold text-emerald-700 tabular-nums">{Math.min(weekdayHours, 40).toFixed(1)}</span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={`text-xs font-bold tabular-nums ${weeklyOTHours > 0 ? 'text-orange-700' : 'text-slate-300'}`}>{weeklyOTHours.toFixed(1)}</span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={`text-xs font-bold tabular-nums ${mandatoryOTTotal > 0 ? 'text-red-700' : 'text-slate-300'}`}>{mandatoryOTTotal.toFixed(1)}</span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={`text-xs font-bold tabular-nums ${shopHoursTotal > 0 ? 'text-amber-700' : 'text-slate-300'}`}>{shopHoursTotal.toFixed(1)}</span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={`text-xs font-bold ${pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {pendingCount > 0 ? `${pendingCount} pending` : 'All done'}
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════
+            DETAILED LIST VIEW
+            ══════════════════════════════════════════════════ */}
+        {viewMode === 'list' && (
+        <>
         {/* ── Timecards Table ────────────────────────────── */}
         <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -1004,6 +1369,8 @@ export default function AdminTimecardsPage() {
             </div>
           ))}
         </div>
+        </>
+        )}
       </div>
 
       {/* ══════════════════════════════════════════════════
