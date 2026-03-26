@@ -8,8 +8,6 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
@@ -58,6 +56,7 @@ export async function POST(request: NextRequest) {
     if (customerEmail && pdfBase64) {
       const fromAddress = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@resend.dev>';
       try {
+        const resend = new Resend(process.env.RESEND_API_KEY);
         await resend.emails.send({
           from: fromAddress,
           to: customerEmail,

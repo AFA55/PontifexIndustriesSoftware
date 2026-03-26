@@ -106,13 +106,12 @@ export default function MyEquipmentPage() {
   const loadEquipment = () => {
     // Refresh button - just reset any errors
     setError(null);
-    console.log('Equipment refreshed (UI only - no database fetch)');
+    // refreshed
   };
 
   const handleAssignToMe = (equipmentItem: Equipment) => {
     if (!currentUser) return;
 
-    console.log(`Assigning ${equipmentItem.name} to ${currentUser.name} (UI only)`);
 
     // Update local state only - no database call
     setEquipment(prev => prev.map(item =>
@@ -123,7 +122,6 @@ export default function MyEquipmentPage() {
   };
 
   const handleUnassign = (equipmentItem: Equipment) => {
-    console.log(`Unassigning ${equipmentItem.name} (UI only)`);
 
     // Update local state only - no database call
     setEquipment(prev => prev.map(item =>

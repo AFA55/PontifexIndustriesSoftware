@@ -8,8 +8,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { requireAuth } from '@/lib/api-auth';
 
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
-
 // Allowed domains for PDF URL fetching (SSRF protection)
 const ALLOWED_PDF_DOMAINS = [
   'pontifexindustries.com',
@@ -106,6 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send email using Resend
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const { data, error } = await resend.emails.send(emailOptions);
 
     if (error) {

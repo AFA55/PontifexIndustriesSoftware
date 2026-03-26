@@ -11,8 +11,6 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { LiabilityReleasePDF } from '@/components/pdf/LiabilityReleasePDF';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(request: NextRequest) {
   try {
     console.log('[LIABILITY PDF] Starting PDF generation...');
@@ -138,6 +136,7 @@ export async function POST(request: NextRequest) {
       const emailCompanyName = (pdfBranding.company_name as string) || 'Pontifex Industries';
       const emailPhone = (pdfBranding.support_phone as string) || '(833) 695-4288';
       const emailSupportAddr = (pdfBranding.support_email as string) || 'support@pontifexindustries.com';
+      const resend = new Resend(process.env.RESEND_API_KEY);
       const emailResult = await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL || `${emailCompanyName} <noreply@resend.dev>`,
         to: customerEmail,

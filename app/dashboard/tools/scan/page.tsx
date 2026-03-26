@@ -28,7 +28,7 @@ export default function QRScanPage() {
         try {
           readerRef.current.reset();
         } catch (e) {
-          console.log('Reader cleanup error (expected):', e);
+          // silent
         }
       }
     };
@@ -38,8 +38,6 @@ export default function QRScanPage() {
     try {
       setError(null);
       setScannedEquipment(null);
-      console.log('🎥 Starting camera scan...');
-      
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('Camera not supported in this browser');
       }
@@ -67,7 +65,6 @@ export default function QRScanPage() {
         videoRef.current!,
         (result, error) => {
           if (result) {
-            console.log('📱 QR Code detected:', result.getText());
             handleQRCodeScanned(result.getText());
           }
           if (error && !(error.name === 'NotFoundException')) {
@@ -84,14 +81,13 @@ export default function QRScanPage() {
   };
 
   const stopScanning = () => {
-    console.log('⏹️ Stopping camera scan...');
     setIsScanning(false);
     
     if (readerRef.current) {
       try {
         readerRef.current.reset();
       } catch (e) {
-        console.log('Reader reset error (expected):', e);
+        // silent
       }
     }
 
@@ -105,17 +101,14 @@ export default function QRScanPage() {
 
   const handleQRCodeScanned = async (qrCode: string) => {
     try {
-      console.log('🔍 Looking up equipment for QR:', qrCode);
       setIsLoading(true);
       
       const equipment = await getEquipmentByQR(qrCode);
       
       if (equipment) {
-        console.log('✅ Equipment found:', equipment);
         setScannedEquipment(equipment);
         stopScanning();
       } else {
-        console.log('❌ No equipment found for QR:', qrCode);
         setError(`No equipment found with QR code: ${qrCode}`);
       }
     } catch (err: any) {
@@ -138,14 +131,12 @@ export default function QRScanPage() {
     if (!scannedEquipment) return;
 
     try {
-      console.log(`🔄 Assigning equipment ${scannedEquipment.id} to ${currentUser.name}`);
       setIsLoading(true);
       setError(null);
 
       const updatedEquipment = await updateEquipmentStatus(scannedEquipment.id, 'assigned', currentUser.name);
 
       setScannedEquipment(updatedEquipment);
-      console.log('✅ Equipment assigned successfully');
 
     } catch (err: any) {
       console.error('💥 Error assigning equipment:', err);
@@ -159,17 +150,15 @@ export default function QRScanPage() {
     if (!scannedEquipment) return;
 
     try {
-      console.log(`🔄 Unassigning equipment ${scannedEquipment.id}`);
       setIsLoading(true);
       setError(null);
 
       const updatedEquipment = await updateEquipmentStatus(scannedEquipment.id, 'available', '');
 
       setScannedEquipment(updatedEquipment);
-      console.log('✅ Equipment unassigned successfully');
 
     } catch (err: any) {
-      console.error('💥 Error unassigning equipment:', err);
+      console.error('Error unassigning equipment:', err);
       setError(`Error unassigning equipment: ${err.message}`);
     } finally {
       setIsLoading(false);

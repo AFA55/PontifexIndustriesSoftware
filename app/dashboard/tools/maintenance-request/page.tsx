@@ -58,7 +58,7 @@ export default function MaintenanceRequestPage() {
         try {
           readerRef.current.reset();
         } catch (e) {
-          console.log('Reader cleanup error (expected):', e);
+          // silent
         }
       }
     };
@@ -82,8 +82,6 @@ export default function MaintenanceRequestPage() {
   const startScanning = async () => {
     try {
       setError(null);
-      console.log('🎥 Starting camera scan...');
-
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('Camera not supported in this browser');
       }
@@ -111,7 +109,6 @@ export default function MaintenanceRequestPage() {
         videoRef.current!,
         (result, error) => {
           if (result) {
-            console.log('📱 QR Code detected:', result.getText());
             handleQRCodeScanned(result.getText());
           }
           if (error && !(error.name === 'NotFoundException')) {
@@ -128,14 +125,13 @@ export default function MaintenanceRequestPage() {
   };
 
   const stopScanning = () => {
-    console.log('⏹️ Stopping camera scan...');
     setIsScanning(false);
 
     if (readerRef.current) {
       try {
         readerRef.current.reset();
       } catch (e) {
-        console.log('Reader reset error (expected):', e);
+        // silent
       }
     }
 
@@ -149,13 +145,11 @@ export default function MaintenanceRequestPage() {
 
   const handleQRCodeScanned = async (qrCode: string) => {
     try {
-      console.log('🔍 Looking up equipment for QR:', qrCode);
       setIsScanningEquipment(true);
 
       const scannedEquipment = await getEquipmentByQR(qrCode);
 
       if (scannedEquipment) {
-        console.log('✅ Equipment found:', scannedEquipment);
         setSelectedEquipment(scannedEquipment.id);
         setSearchTerm(scannedEquipment.name); // Update search term to show the scanned equipment
         stopScanning();
@@ -167,7 +161,6 @@ export default function MaintenanceRequestPage() {
         document.body.appendChild(successMsg);
         setTimeout(() => successMsg.remove(), 3000);
       } else {
-        console.log('❌ No equipment found for QR:', qrCode);
         setError(`No equipment found with QR code: ${qrCode}`);
       }
     } catch (err: any) {

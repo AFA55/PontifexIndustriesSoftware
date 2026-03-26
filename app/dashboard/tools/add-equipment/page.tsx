@@ -82,11 +82,8 @@ export default function AddEquipmentPage() {
     try {
       setIsLoading(true);
       setError(null);
-      console.log('🚀 Starting equipment save process...');
-
       // Simple validation - only name is required
       if (!form.name.trim()) {
-        console.log('❌ Validation failed: name is required');
         setError('Equipment name is required');
         setIsLoading(false);
         return;
@@ -114,8 +111,6 @@ export default function AddEquipmentPage() {
         created_at: new Date().toISOString()
       };
 
-      console.log('✅ Equipment data prepared:', equipmentData);
-
       // Generate QR code image
       const qrImageData = await generateQRCode(qrCodeValue);
       setQrImage(qrImageData);
@@ -136,7 +131,6 @@ export default function AddEquipmentPage() {
       setShowOtherAssignment(false);
       setOtherAssignment('');
 
-      console.log('🎉 Equipment saved successfully (UI only)');
     } catch (err: any) {
       console.error('💥 Unexpected error during save:', err);
       setError(`Unexpected error: ${err.message || err}`);

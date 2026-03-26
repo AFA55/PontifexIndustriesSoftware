@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    // Note: Using supabaseAdmin for server-side operations
-    // Authentication should be handled by middleware or client-side
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
 
     const { equipment } = await request.json()
 

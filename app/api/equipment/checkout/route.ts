@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+
     const { equipment_id, operator_id, assignment_date, notes } = await request.json()
 
     if (!equipment_id || !operator_id) {
@@ -51,14 +55,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to update equipment status' }, { status: 500 })
     }
 
-    // Log checkout session
-    await supabaseAdmin
-      .from('equipment_checkout_sessions')
-      .insert({
-        equipment_id,
-        scan_action: 'assign_equipment',
-        notes: `Assigned to operator ${operator_id}`
-      })
+    // Log checkout session (fire-and-forget — table may not exist)
+    Promise.resolve(
+      supabaseAdmin
+        .from('equipment_checkout_sessions')
+        .insert({
+          equipment_id,
+          scan_action: 'assign_equipment',
+          notes: `Assigned to operator ${operator_id}`
+        })
+    ).then(() => {}).catch(() => {})
 
     return NextResponse.json({
       success: true,

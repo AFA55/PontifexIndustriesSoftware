@@ -8,8 +8,6 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -169,6 +167,7 @@ export async function POST(
 </body>
 </html>`;
 
+    const resend = new Resend(process.env.RESEND_API_KEY);
     await resend.emails.send({
       from: fromAddress,
       to: invoice.customer_email,

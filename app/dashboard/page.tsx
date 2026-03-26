@@ -111,20 +111,15 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('🔍 Checking authentication status...');
     const currentUser = getCurrentUser();
 
     if (!currentUser) {
-      console.log('❌ No authenticated user found, redirecting to login...');
       router.push('/login');
       return;
     }
 
-    console.log('✅ User authenticated:', currentUser);
-
     // Redirect based on role
     if (currentUser.role === 'admin') {
-      console.log('🔑 Admin user, redirecting to admin dashboard...');
       router.push('/dashboard/admin');
       return;
     }
@@ -171,14 +166,12 @@ export default function Dashboard() {
 
     // Demo accounts: always show tour
     if (isDemoAccount) {
-      console.log('🎯 Demo account detected - showing onboarding tour');
       setShowOnboarding(true);
       return;
     }
 
     // Regular accounts: only show on first login
     if (!hasSeenOnboarding) {
-      console.log('🆕 New user detected - showing onboarding tour');
       setShowOnboarding(true);
     }
   };
@@ -421,7 +414,6 @@ export default function Dashboard() {
   }, [isClockedIn, currentTimecard]);
 
   const handleLogout = () => {
-    console.log('🚪 Logging out user...');
     logout();
     router.push('/login');
   };
@@ -561,7 +553,6 @@ export default function Dashboard() {
     setClockMessage(null);
 
     try {
-      console.log('📍 Getting location for clock out...');
       setDebugInfo(prev => ({ ...prev, gpsStatus: 'requesting...', timestamp: new Date().toISOString() }));
 
       // Get Supabase session token
@@ -595,8 +586,6 @@ export default function Dashboard() {
         setClockLoading(false);
         return;
       }
-
-      console.log('✅ Location verified:', verification.distanceFormatted, 'from shop');
 
       // Call clock-out API with auth token
       const response = await fetch('/api/timecard/clock-out', {
@@ -640,7 +629,6 @@ export default function Dashboard() {
         return;
       }
 
-      console.log('✅ Clocked out successfully. Total hours:', result.data.totalHours);
       setIsClockedIn(false);
       setCurrentTimecard(null);
       setCurrentHours(0);
