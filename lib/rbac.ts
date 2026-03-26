@@ -231,6 +231,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     iconBg: 'bg-gray-600',
     features: ['Schedule slots', 'Shop notes row', 'Capacity warnings', 'System config'],
   },
+  {
+    key: 'form_builder',
+    title: 'Form Builder',
+    description: 'Create custom forms for waivers, signatures, and compliance',
+    icon: '📋',
+    href: '/dashboard/admin/form-builder',
+    bgColor: 'from-fuchsia-500 to-purple-600',
+    iconBg: 'bg-fuchsia-500',
+    features: ['Custom form templates', 'Signature requests', 'Waiver forms', 'Completion forms'],
+  },
 ];
 
 // All card keys for iteration
@@ -292,6 +302,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     facilities: 'view',
     operations_hub: 'none',
     nfc_management: 'none',
+    form_builder: 'none',
     settings: 'none',
   },
   supervisor: {
@@ -311,6 +322,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     facilities: 'none',
     operations_hub: 'none',
     nfc_management: 'none',
+    form_builder: 'none',
     settings: 'none',
   },
   salesman: {
@@ -330,6 +342,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     facilities: 'none',
     operations_hub: 'none',
     nfc_management: 'none',
+    form_builder: 'none',
     settings: 'none',
   },
   operator: allCards('none'),

@@ -332,6 +332,10 @@ interface FormData {
   facility_id: string;
   facility_name: string;
   facility_requirements: string;
+  // Step 6 — Forms & Signatures
+  require_waiver_signature: boolean;
+  require_completion_signature: boolean;
+  assigned_form_template_ids: string[];
   // Step 7
   difficulty_rating: number;
   additional_notes: string;
@@ -407,6 +411,9 @@ const initialFormData: FormData = {
   facility_id: '',
   facility_name: '',
   facility_requirements: '',
+  require_waiver_signature: false,
+  require_completion_signature: false,
+  assigned_form_template_ids: [],
   difficulty_rating: 1,
   additional_notes: '',
   water_available: false,
@@ -556,7 +563,7 @@ export default function ScheduleFormPage() {
   const [error, setError] = useState('');
   // Customer/contact autocomplete state
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
-  const [contactSuggestions, setContactSuggestions] = useState<{ contact_name: string; contact_phone: string }[]>([]);
+  const [contactSuggestions, setContactSuggestions] = useState<{ contact_name: string; contact_phone: string; role?: string; is_primary?: boolean }[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showContactDropdown, setShowContactDropdown] = useState(false);
   const [allCustomers, setAllCustomers] = useState<string[]>([]);
@@ -578,6 +585,8 @@ export default function ScheduleFormPage() {
   // Facilities list for step 6
   const [facilities, setFacilities] = useState<{ id: string; name: string; address: string; special_requirements: string }[]>([]);
   const [showCreateFacility, setShowCreateFacility] = useState(false);
+  // Form templates for step 6
+  const [formTemplates, setFormTemplates] = useState<{ id: string; name: string; form_type: string; description: string }[]>([]);
 
   // PO lookup state
   const [poMatch, setPoMatch] = useState<{
@@ -651,6 +660,20 @@ export default function ScheduleFormPage() {
       } catch {}
     };
     loadFacilities();
+
+    // Load form templates for step 6
+    const loadFormTemplates = async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return;
+      try {
+        const res = await fetch('/api/admin/form-templates?is_active=true', {
+          headers: { 'Authorization': `Bearer ${session.session.access_token}` },
+        });
+        const data = await res.json();
+        if (data.data) setFormTemplates(data.data);
+      } catch {}
+    };
+    loadFormTemplates();
   }, [router]);
 
   // Close dropdowns on outside click
@@ -689,12 +712,13 @@ export default function ScheduleFormPage() {
 
   // When a customer is selected from CRM autocomplete
   const selectCrmCustomer = useCallback(async (customer: { id: string; company_name: string; primary_contact_name: string | null; primary_contact_phone: string | null; address: string | null }) => {
+    // Set customer info first (contact will be set conditionally after fetching contacts)
     updateForm({
       contractor_name: customer.company_name,
       customer_id: customer.id,
-      site_contact: customer.primary_contact_name || '',
-      contact_phone: customer.primary_contact_phone || '',
       site_address: customer.address || '',
+      site_contact: '',
+      contact_phone: '',
     });
     setShowCustomerDropdown(false);
     // Fetch CRM contacts for this customer
@@ -705,13 +729,45 @@ export default function ScheduleFormPage() {
         headers: { 'Authorization': `Bearer ${session.session.access_token}` },
       });
       const data = await res.json();
-      if (data.data) {
-        setContactSuggestions(data.data.map((c: any) => ({
+      if (data.data && data.data.length > 0) {
+        const contacts = data.data.map((c: any) => ({
           contact_name: c.name,
           contact_phone: c.phone || '',
-        })));
+          role: c.role || (c.is_primary ? 'Primary' : ''),
+          is_primary: c.is_primary || false,
+        }));
+        setContactSuggestions(contacts);
+
+        if (contacts.length === 1) {
+          // Only 1 contact: auto-fill (current behavior)
+          updateForm({
+            site_contact: contacts[0].contact_name,
+            contact_phone: contacts[0].contact_phone,
+          });
+        } else {
+          // Multiple contacts: leave empty so user must choose, show dropdown
+          setShowContactDropdown(true);
+        }
+      } else {
+        // No contacts: fallback to primary_contact from customer record
+        setContactSuggestions([]);
+        if (customer.primary_contact_name) {
+          updateForm({
+            site_contact: customer.primary_contact_name,
+            contact_phone: customer.primary_contact_phone || '',
+          });
+        }
       }
-    } catch {}
+    } catch {
+      // On error, fallback to customer primary contact
+      setContactSuggestions([]);
+      if (customer.primary_contact_name) {
+        updateForm({
+          site_contact: customer.primary_contact_name,
+          contact_phone: customer.primary_contact_phone || '',
+        });
+      }
+    }
   }, [updateForm]);
 
   // When a customer is selected from legacy suggestions, load their contacts
@@ -733,11 +789,16 @@ export default function ScheduleFormPage() {
   // Handle contact name input with autocomplete
   const handleContactChange = useCallback((value: string) => {
     updateForm({ site_contact: value });
-    if (value.trim().length > 0 && contactSuggestions.length > 0) {
-      const filtered = contactSuggestions.filter(c =>
-        c.contact_name?.toLowerCase().includes(value.toLowerCase())
-      );
-      setShowContactDropdown(filtered.length > 0);
+    if (contactSuggestions.length > 0) {
+      // Show dropdown if there are suggestions — even with empty input, show all
+      if (value.trim().length === 0) {
+        setShowContactDropdown(true);
+      } else {
+        const filtered = contactSuggestions.filter(c =>
+          c.contact_name?.toLowerCase().includes(value.toLowerCase())
+        );
+        setShowContactDropdown(filtered.length > 0);
+      }
     } else {
       setShowContactDropdown(false);
     }
@@ -1094,6 +1155,9 @@ export default function ScheduleFormPage() {
         facility_id: form.facility_id || null,
         permit_required: form.permit_required,
         permits: form.permits.length > 0 ? form.permits : undefined,
+        require_waiver_signature: form.require_waiver_signature,
+        require_completion_signature: form.require_completion_signature,
+        assigned_form_template_ids: form.assigned_form_template_ids.length > 0 ? form.assigned_form_template_ids : undefined,
         difficulty_rating: form.difficulty_rating,
         additional_notes: form.additional_notes || null,
         jobsite_conditions: {
@@ -1153,6 +1217,27 @@ export default function ScheduleFormPage() {
               contact_phone: form.contact_phone?.trim() || null,
             }),
           }).catch(() => {}); // ignore errors — non-critical
+
+          // Fire-and-forget: auto-save new contact to CRM customer_contacts if applicable
+          if (form.customer_id && form.site_contact?.trim()) {
+            const contactName = form.site_contact.trim();
+            const isExisting = contactSuggestions.some(
+              c => c.contact_name?.toLowerCase() === contactName.toLowerCase()
+            );
+            if (!isExisting) {
+              fetch(`/api/admin/customers/${form.customer_id}/contacts`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${sessionForContacts.session.access_token}`,
+                },
+                body: JSON.stringify({
+                  name: contactName,
+                  phone: form.contact_phone?.trim() || null,
+                }),
+              }).catch(() => {}); // ignore errors — non-critical
+            }
+          }
         }
       }
     } catch (err: any) {
@@ -1446,7 +1531,7 @@ export default function ScheduleFormPage() {
                   autoComplete="off"
                 />
                 {showContactDropdown && contactSuggestions.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150">
                     {contactSuggestions
                       .filter(c => c.contact_name && (!form.site_contact.trim() || c.contact_name.toLowerCase().includes(form.site_contact.toLowerCase())))
                       .map((contact, idx) => (
@@ -1456,12 +1541,38 @@ export default function ScheduleFormPage() {
                         onClick={() => selectContact(contact)}
                         className="w-full flex items-center justify-between px-4 py-3 text-sm text-left text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-all"
                       >
-                        <span className="font-medium">{contact.contact_name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{contact.contact_name}</span>
+                          {(contact.role || contact.is_primary) && (
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                              contact.is_primary
+                                ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                : contact.role?.toLowerCase() === 'billing'
+                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                  : 'bg-slate-50 text-slate-500 border-slate-200'
+                            }`}>
+                              {contact.is_primary ? 'Primary' : contact.role}
+                            </span>
+                          )}
+                        </div>
                         {contact.contact_phone && (
-                          <span className="text-xs text-slate-400">{contact.contact_phone}</span>
+                          <span className="text-xs text-slate-400 ml-2 flex-shrink-0">{contact.contact_phone}</span>
                         )}
                       </button>
                     ))}
+                    {/* Add New Contact option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowContactDropdown(false);
+                        // Clear so user can free-type a new name
+                        updateForm({ site_contact: '', contact_phone: '' });
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-3 text-sm text-left text-blue-600 hover:bg-blue-50 border-t border-slate-100 font-semibold"
+                    >
+                      <Plus size={14} />
+                      Add New Contact
+                    </button>
                   </div>
                 )}
               </div>
@@ -2786,6 +2897,61 @@ export default function ScheduleFormPage() {
                     <Check size={16} />
                     Save Facility
                   </button>
+                </div>
+              )}
+            </SectionCard>
+
+            {/* ── Forms & Signatures ────────────── */}
+            <SectionCard>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Forms & Signatures</p>
+              <Toggle
+                checked={form.require_waiver_signature}
+                onChange={v => updateForm({ require_waiver_signature: v })}
+                label="Require utility waiver signature"
+                icon={FileText}
+              />
+              <Toggle
+                checked={form.require_completion_signature}
+                onChange={v => updateForm({ require_completion_signature: v })}
+                label="Require work completion signature"
+                icon={FileText}
+              />
+
+              {formTemplates.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  <p className="text-xs text-slate-400 font-semibold">Assign Form Templates</p>
+                  {formTemplates.map(t => {
+                    const isSelected = form.assigned_form_template_ids.includes(t.id);
+                    const typeLabel = t.form_type === 'pre_work' ? 'Pre-Work' : t.form_type === 'post_work' ? 'Post-Work' : 'Custom';
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            updateForm({ assigned_form_template_ids: form.assigned_form_template_ids.filter(id => id !== t.id) });
+                          } else {
+                            updateForm({ assigned_form_template_ids: [...form.assigned_form_template_ids, t.id] });
+                          }
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                          isSelected
+                            ? 'border-purple-400 bg-purple-50 text-purple-800 ring-2 ring-offset-1 ring-purple-300'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                          isSelected ? 'border-purple-500 bg-purple-500' : 'border-slate-300'
+                        }`}>
+                          {isSelected && <Check size={12} className="text-white" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold">{t.name}</p>
+                          <p className="text-xs text-slate-400">{typeLabel}{t.description ? ` — ${t.description}` : ''}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </SectionCard>

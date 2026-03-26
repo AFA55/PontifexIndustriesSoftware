@@ -99,6 +99,8 @@ export async function POST(request: NextRequest) {
       site_compliance: body.site_compliance || {},
       permit_required: body.permit_required || false,
       permits: body.permits || [],
+      require_waiver_signature: body.require_waiver_signature || false,
+      require_completion_signature: body.require_completion_signature || false,
 
       // ── Step 7: Job Difficulty & Notes ──────────────────────
       job_difficulty_rating: body.difficulty_rating || null,
@@ -135,6 +137,19 @@ export async function POST(request: NextRequest) {
         form_snapshot: body,
       })
     ).catch(() => {});
+
+    // ── Create job form assignments if templates were selected ────
+    if (body.assigned_form_template_ids && Array.isArray(body.assigned_form_template_ids) && body.assigned_form_template_ids.length > 0) {
+      Promise.resolve(
+        supabaseAdmin.from('job_form_assignments').insert(
+          body.assigned_form_template_ids.map((templateId: string) => ({
+            job_order_id: jobOrder.id,
+            form_template_id: templateId,
+            status: 'pending',
+          }))
+        )
+      ).catch((err: any) => console.error('Error creating form assignments:', err));
+    }
 
     // ── Customer CRM: auto-link or create customer ────────────
     try {

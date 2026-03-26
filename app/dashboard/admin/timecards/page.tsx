@@ -1025,15 +1025,16 @@ export default function AdminTimecardsPage() {
                     {employeeWeekRows.map((row) => (
                       <tr key={row.userId} className="group hover:bg-blue-50/30 transition-colors">
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
+                          <Link href={`/dashboard/admin/timecards/operator/${row.userId}`} className="flex items-center gap-2.5 group/name">
                             <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0 shadow-sm">
                               {row.fullName?.charAt(0) || '?'}
                             </div>
                             <div>
-                              <p className="text-xs font-semibold text-slate-800 leading-tight">{row.fullName}</p>
+                              <p className="text-xs font-semibold text-slate-800 leading-tight group-hover/name:text-blue-600 group-hover/name:underline transition-colors">{row.fullName}</p>
                               <p className="text-[10px] text-slate-400 capitalize">{row.role}</p>
                             </div>
-                          </div>
+                            <ExternalLink size={10} className="text-slate-300 group-hover/name:text-blue-500 transition-colors flex-shrink-0" />
+                          </Link>
                         </td>
                         {row.days.map((dayEntries, i) => {
                           const hrs = formatDayHours(dayEntries);
@@ -1240,15 +1241,15 @@ export default function AdminTimecardsPage() {
                         }`}
                       >
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
+                          <Link href={`/dashboard/admin/timecards/operator/${entry.user_id}`} className="flex items-center gap-2.5 group/name">
                             <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0 shadow-sm">
                               {entry.full_name?.charAt(0) || '?'}
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-slate-800 leading-tight">{entry.full_name}</p>
+                              <p className="text-sm font-semibold text-slate-800 leading-tight group-hover/name:text-blue-600 group-hover/name:underline transition-colors">{entry.full_name}</p>
                               <p className="text-[10px] text-slate-400">{entry.email}</p>
                             </div>
-                          </div>
+                          </Link>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm text-slate-700">{formatDate(entry.date)}</span>
