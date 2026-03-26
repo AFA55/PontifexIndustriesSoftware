@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, User, Mail, Phone, Calendar, Briefcase, MapPin, Clock, AlertCircle, Shield } from 'lucide-react';
+import { X, User, Mail, Phone, Calendar, Briefcase, MapPin, Clock, AlertCircle, Shield, BadgeCheck, Building2, ExternalLink, Loader2 } from 'lucide-react';
 
 interface ProfileDetail {
   id: string;
@@ -30,6 +30,18 @@ interface ProfileDetail {
   }>;
 }
 
+interface OperatorBadge {
+  id: string;
+  facility_id: string;
+  badge_number: string | null;
+  issued_date: string | null;
+  expiry_date: string | null;
+  status: string;
+  operator_name: string;
+  facility_name: string;
+  expiry_status: string;
+}
+
 interface ProfileDetailDrawerProps {
   profileId: string;
   onClose: () => void;
@@ -39,6 +51,8 @@ interface ProfileDetailDrawerProps {
 export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: ProfileDetailDrawerProps) {
   const [profile, setProfile] = useState<ProfileDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [badges, setBadges] = useState<OperatorBadge[]>([]);
+  const [badgesLoading, setBadgesLoading] = useState(true);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -55,6 +69,23 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
       }
     }
     fetchProfile();
+  }, [profileId, apiFetch]);
+
+  useEffect(() => {
+    async function fetchBadges() {
+      try {
+        const res = await apiFetch(`/api/admin/badges?operator_id=${profileId}`);
+        if (res.ok) {
+          const json = await res.json();
+          setBadges(json.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch badges:', err);
+      } finally {
+        setBadgesLoading(false);
+      }
+    }
+    fetchBadges();
   }, [profileId, apiFetch]);
 
   const formatDate = (d: string | null) => {
@@ -148,6 +179,78 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
                   </div>
                 </div>
               )}
+
+              {/* Facility Badges */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <BadgeCheck className="w-4 h-4 text-purple-500" />
+                  Facility Badges
+                  {!badgesLoading && (
+                    <span className="px-2 py-0.5 bg-purple-100 rounded-full text-xs text-purple-700 font-bold">
+                      {badges.length}
+                    </span>
+                  )}
+                </h3>
+                {badgesLoading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                  </div>
+                ) : badges.length > 0 ? (
+                  <div className="space-y-2">
+                    {badges.map((badge) => {
+                      const expiryColorClass =
+                        badge.expiry_status === 'valid' ? 'bg-green-100 text-green-700 border-green-200' :
+                        badge.expiry_status === 'expiring_soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                        badge.expiry_status === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
+                        'bg-gray-100 text-gray-600 border-gray-200';
+                      const expiryText =
+                        badge.expiry_status === 'valid' ? 'Valid' :
+                        badge.expiry_status === 'expiring_soon' ? 'Expiring Soon' :
+                        badge.expiry_status === 'expired' ? 'Expired' : 'No Expiry';
+                      const statusColor =
+                        badge.status === 'active' ? 'bg-green-100 text-green-700' :
+                        badge.status === 'revoked' ? 'bg-gray-100 text-gray-700' :
+                        'bg-yellow-100 text-yellow-700';
+                      return (
+                        <div key={badge.id} className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                              <Building2 className="w-3.5 h-3.5 text-gray-400" />
+                              {badge.facility_name}
+                            </span>
+                            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${statusColor}`}>
+                              {badge.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {badge.badge_number && (
+                              <span className="text-xs text-gray-500">#{badge.badge_number}</span>
+                            )}
+                            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full border ${expiryColorClass}`}>
+                              {expiryText}
+                            </span>
+                            {badge.expiry_date && (
+                              <span className="text-[10px] text-gray-400">Exp: {formatDate(badge.expiry_date)}</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-400">
+                    <BadgeCheck className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm">No facility badges</p>
+                  </div>
+                )}
+                <a
+                  href="/dashboard/admin/facilities"
+                  className="inline-flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Manage badges in Facilities
+                </a>
+              </div>
 
               {/* Project History */}
               <div className="space-y-3">
