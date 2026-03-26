@@ -29,8 +29,8 @@ import {
 
 // ── Constants ─────────────────────────────────────────────────
 const STEPS = [
-  { num: 1, title: 'Request Info', icon: ClipboardList, color: 'from-blue-500 to-blue-600' },
-  { num: 2, title: 'Customer & Location', icon: MapPin, color: 'from-indigo-500 to-purple-600' },
+  { num: 1, title: 'Customer', icon: UserIcon, color: 'from-blue-500 to-blue-600' },
+  { num: 2, title: 'Project & Contact', icon: MapPin, color: 'from-indigo-500 to-purple-600' },
   { num: 3, title: 'Scope of Work', icon: Wrench, color: 'from-violet-500 to-purple-600' },
   { num: 4, title: 'Equipment', icon: HardHat, color: 'from-amber-500 to-orange-600' },
   { num: 5, title: 'Scheduling', icon: Calendar, color: 'from-cyan-500 to-blue-600' },
@@ -279,14 +279,18 @@ interface FormData {
   submitted_by: string;
   date_submitted: string;
   po_number: string;
-  // Step 2
+  // Step 1 (Customer)
   contractor_name: string;
+  customer_id: string;
+  save_as_customer: boolean;
+  // Step 2 (Project & Contact)
   site_contact: string;
   site_address: string;
   contact_phone: string;
   location_name: string;
-  customer_id: string;
-  save_as_customer: boolean;
+  project_name: string;
+  po_number_step2: string; // PO moved to step 2
+  jobsite_photo_urls: string[];
   // Step 3
   description: string;
   service_types: string[];
@@ -324,6 +328,10 @@ interface FormData {
   permit_required: boolean;
   permits: { type: string; details: string }[];
   permit_other_text: string;
+  // Step 6 — Compliance Docs
+  facility_id: string;
+  facility_name: string;
+  facility_requirements: string;
   // Step 7
   difficulty_rating: number;
   additional_notes: string;
@@ -354,12 +362,15 @@ const initialFormData: FormData = {
   date_submitted: new Date().toISOString().split('T')[0],
   po_number: '',
   contractor_name: '',
+  customer_id: '',
+  save_as_customer: false,
   site_contact: '',
   site_address: '',
   contact_phone: '',
   location_name: '',
-  customer_id: '',
-  save_as_customer: false,
+  project_name: '',
+  po_number_step2: '',
+  jobsite_photo_urls: [],
   description: '',
   service_types: [],
   estimated_cost: '',
@@ -393,6 +404,9 @@ const initialFormData: FormData = {
   permit_required: false,
   permits: [],
   permit_other_text: '',
+  facility_id: '',
+  facility_name: '',
+  facility_requirements: '',
   difficulty_rating: 1,
   additional_notes: '',
   water_available: false,
@@ -554,6 +568,17 @@ export default function ScheduleFormPage() {
   // AI Smart Fill state
   const [showAISmartFill, setShowAISmartFill] = useState(false);
 
+  // New Customer modal state
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
+  const [newCustomerData, setNewCustomerData] = useState({ company_name: '', primary_contact_name: '', primary_contact_phone: '', primary_contact_email: '', address: '', city: '', state: '', zip: '', notes: '' });
+  const [newCustomerSaving, setNewCustomerSaving] = useState(false);
+  // CRM customers list (for step 1 selection)
+  const [crmCustomers, setCrmCustomers] = useState<{ id: string; company_name: string; primary_contact_name: string | null; primary_contact_phone: string | null; address: string | null }[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  // Facilities list for step 6
+  const [facilities, setFacilities] = useState<{ id: string; name: string; address: string; special_requirements: string }[]>([]);
+  const [showCreateFacility, setShowCreateFacility] = useState(false);
+
   // PO lookup state
   const [poMatch, setPoMatch] = useState<{
     customer_name: string; address: string; location: string;
@@ -592,6 +617,40 @@ export default function ScheduleFormPage() {
       } catch {}
     };
     loadCustomers();
+
+    // Load CRM customers for step 1 customer selection
+    const loadCrmCustomers = async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return;
+      try {
+        const res = await fetch('/api/admin/customers?limit=500', {
+          headers: { 'Authorization': `Bearer ${session.session.access_token}` },
+        });
+        const data = await res.json();
+        if (data.data) setCrmCustomers(data.data.map((c: any) => ({
+          id: c.id,
+          company_name: c.company_name || c.name || '',
+          primary_contact_name: c.primary_contact_name || c.contact_persons?.[0]?.name || null,
+          primary_contact_phone: c.primary_contact_phone || c.phone || null,
+          address: c.address || null,
+        })));
+      } catch {}
+    };
+    loadCrmCustomers();
+
+    // Load facilities for step 6
+    const loadFacilities = async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return;
+      try {
+        const res = await fetch('/api/admin/facilities', {
+          headers: { 'Authorization': `Bearer ${session.session.access_token}` },
+        });
+        const data = await res.json();
+        if (data.data) setFacilities(data.data);
+      } catch {}
+    };
+    loadFacilities();
   }, [router]);
 
   // Close dropdowns on outside click
@@ -692,6 +751,89 @@ export default function ScheduleFormPage() {
     });
     setShowContactDropdown(false);
   }, [updateForm]);
+
+  // ── Create new customer handler ────────────────────────────
+  const handleCreateCustomer = async () => {
+    if (!newCustomerData.company_name.trim()) return;
+    setNewCustomerSaving(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return;
+      const res = await fetch('/api/admin/customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.session.access_token}`,
+        },
+        body: JSON.stringify({
+          company_name: newCustomerData.company_name.trim(),
+          name: newCustomerData.company_name.trim(),
+          primary_contact_name: newCustomerData.primary_contact_name || null,
+          primary_contact_phone: newCustomerData.primary_contact_phone || null,
+          primary_contact_email: newCustomerData.primary_contact_email || null,
+          address: newCustomerData.address || null,
+          city: newCustomerData.city || null,
+          state: newCustomerData.state || null,
+          zip: newCustomerData.zip || null,
+          notes: newCustomerData.notes || null,
+        }),
+      });
+      const result = await res.json();
+      if (res.ok && result.data) {
+        const created = result.data;
+        // Add to CRM list
+        setCrmCustomers(prev => [{
+          id: created.id,
+          company_name: created.company_name || created.name || newCustomerData.company_name,
+          primary_contact_name: created.primary_contact_name || newCustomerData.primary_contact_name || null,
+          primary_contact_phone: created.primary_contact_phone || newCustomerData.primary_contact_phone || null,
+          address: created.address || newCustomerData.address || null,
+        }, ...prev]);
+        // Select the new customer
+        updateForm({
+          contractor_name: created.company_name || created.name || newCustomerData.company_name,
+          customer_id: created.id,
+          site_contact: newCustomerData.primary_contact_name || '',
+          contact_phone: newCustomerData.primary_contact_phone || '',
+          site_address: newCustomerData.address ? `${newCustomerData.address}${newCustomerData.city ? ', ' + newCustomerData.city : ''}${newCustomerData.state ? ', ' + newCustomerData.state : ''}${newCustomerData.zip ? ' ' + newCustomerData.zip : ''}` : '',
+        });
+        setShowNewCustomerModal(false);
+        setNewCustomerData({ company_name: '', primary_contact_name: '', primary_contact_phone: '', primary_contact_email: '', address: '', city: '', state: '', zip: '', notes: '' });
+      } else {
+        setError(result.error || 'Failed to create customer');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to create customer');
+    } finally {
+      setNewCustomerSaving(false);
+    }
+  };
+
+  // ── Create facility handler ──────────────────────────────────
+  const handleCreateFacility = async () => {
+    if (!form.facility_name.trim()) return;
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return;
+      const res = await fetch('/api/admin/facilities', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: form.facility_name.trim(),
+          special_requirements: form.facility_requirements || null,
+        }),
+      });
+      const result = await res.json();
+      if (res.ok && result.data) {
+        setFacilities(prev => [...prev, result.data]);
+        updateForm({ facility_id: result.data.id });
+        setShowCreateFacility(false);
+      }
+    } catch {}
+  };
 
   // ── Voice input for description ─────────────────────────────
   const voiceInput = useVoiceInput({
@@ -804,8 +946,8 @@ export default function ScheduleFormPage() {
   // ── Validation per step ────────────────────────────────────
   const validateStep = (step: number): string | null => {
     switch (step) {
-      case 2:
-        if (!form.contractor_name.trim()) return 'Contractor / Customer name is required.';
+      case 1:
+        if (!form.contractor_name.trim()) return 'Please select or create a customer.';
         break;
       case 3:
         if (form.service_types.length === 0) return 'Select at least one service type.';
@@ -896,18 +1038,20 @@ export default function ScheduleFormPage() {
       if (!sessionData.session) { router.push('/login'); return; }
 
       const payload = {
-        // Step 1
+        // Step 1 (Customer)
         submitted_by: form.submitted_by || null,
         date_submitted: form.date_submitted,
-        po_number: form.po_number || null,
-        // Step 2
         customer_name: form.contractor_name.trim(),
         customer_id: form.customer_id || null,
         save_as_customer: form.save_as_customer || false,
+        // Step 2 (Project & Contact)
+        po_number: form.po_number || form.po_number_step2 || null,
         site_contact: form.site_contact || null,
         contact_phone: form.contact_phone || null,
         address: form.site_address || null,
         location_name: form.location_name || null,
+        project_name: form.project_name || null,
+        jobsite_photo_urls: form.jobsite_photo_urls.length > 0 ? form.jobsite_photo_urls : [],
         // Step 3
         description: form.description || null,
         job_type: form.service_types.join(', '),
@@ -943,7 +1087,11 @@ export default function ScheduleFormPage() {
           badging_type: form.badging_type || null,
           special_instructions: form.special_instructions || null,
           attachment_urls: form.compliance_attachment_urls.length > 0 ? form.compliance_attachment_urls : undefined,
+          facility_id: form.facility_id || null,
+          facility_name: form.facility_name || null,
+          facility_requirements: form.facility_requirements || null,
         },
+        facility_id: form.facility_id || null,
         permit_required: form.permit_required,
         permits: form.permits.length > 0 ? form.permits : undefined,
         difficulty_rating: form.difficulty_rating,
@@ -1085,100 +1233,204 @@ export default function ScheduleFormPage() {
   // ══════════════════════════════════════════════════════════════
   const renderStep = () => {
     switch (currentStep) {
-      // ── STEP 1: Request Information ───────────────────────
-      case 1:
+      // ── STEP 1: Customer Selection ──────────────────────────
+      case 1: {
+        const filteredCrmCustomers = customerSearch.trim()
+          ? crmCustomers.filter(c => c.company_name.toLowerCase().includes(customerSearch.toLowerCase()))
+          : crmCustomers;
         return (
           <div className="space-y-6">
-            {/* Auto-filled Submitted By */}
-            <div>
-              <Label>Submitted By</Label>
-              <div className="flex items-center gap-3 px-4 py-3.5 sm:py-4 bg-slate-50/80 border border-slate-200 rounded-xl">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-sm font-bold text-white shadow-sm">
-                  {(user?.name || '').split(' ').map(n => n[0]).join('')}
-                </div>
-                <span className="text-slate-800 font-medium text-base">{user?.name || '—'}</span>
-                <CheckCircle size={18} className="ml-auto text-green-500" />
+            {/* Submitted By (compact) */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50/80 border border-slate-200 rounded-xl">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white">
+                {(user?.name || '').split(' ').map(n => n[0]).join('')}
               </div>
+              <span className="text-sm text-slate-600">Submitted by <span className="font-semibold text-slate-800">{user?.name}</span> on {new Date().toLocaleDateString()}</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <Label>Date Submitted</Label>
-                <InputField
-                  icon={Calendar}
-                  type="date"
-                  value={form.date_submitted}
-                  readOnly
-                  className="bg-slate-50/80 text-slate-500 cursor-default"
-                />
+            {/* Selected customer badge */}
+            {form.customer_id && form.contractor_name && (
+              <div className="flex items-center gap-3 px-5 py-4 bg-emerald-50 border-2 border-emerald-200 rounded-xl">
+                <CheckCircle size={22} className="text-emerald-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-base font-bold text-emerald-800">{form.contractor_name}</p>
+                  <p className="text-xs text-emerald-600">Customer selected — click Next Step to continue</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => updateForm({ contractor_name: '', customer_id: '', save_as_customer: false })}
+                  className="px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                >
+                  Change
+                </button>
               </div>
-              <div>
-                <Label>PO Number</Label>
-                <InputField
-                  icon={FileText}
-                  placeholder="Enter PO # (optional)"
-                  value={form.po_number}
-                  onChange={e => handlePoChange(e.target.value)}
-                />
-                {poLookupLoading && (
-                  <p className="mt-1.5 text-xs text-blue-500 font-medium flex items-center gap-1.5">
-                    <Loader2 size={12} className="animate-spin" /> Looking up PO...
-                  </p>
-                )}
-                {poMatch && (
-                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                    <p className="text-xs font-bold text-blue-700 mb-1">📋 Found existing job with this PO</p>
-                    <p className="text-xs text-blue-600">Customer: <span className="font-semibold">{poMatch.customer_name}</span></p>
-                    {poMatch.address && <p className="text-xs text-blue-600">Address: {poMatch.address}</p>}
-                    <button
-                      type="button"
-                      onClick={applyPoAutofill}
-                      className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all"
-                    >
-                      Auto-fill Customer & Location →
-                    </button>
+            )}
+
+            {/* Search + Add New */}
+            {!form.customer_id && (
+              <>
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <InputField
+                      icon={UserIcon}
+                      placeholder="Search existing customers..."
+                      value={customerSearch}
+                      onChange={e => setCustomerSearch(e.target.value)}
+                      autoFocus
+                    />
                   </div>
-                )}
-              </div>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewCustomerModal(true)}
+                    className="flex items-center gap-2 px-5 py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all whitespace-nowrap"
+                  >
+                    <Plus size={18} />
+                    New Customer
+                  </button>
+                </div>
+
+                {/* Customer list */}
+                <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
+                  {filteredCrmCustomers.length === 0 && customerSearch.trim() && (
+                    <div className="text-center py-8 text-slate-400">
+                      <p className="text-sm font-medium">No customers matching &quot;{customerSearch}&quot;</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewCustomerData(d => ({ ...d, company_name: customerSearch }));
+                          setShowNewCustomerModal(true);
+                        }}
+                        className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                      >
+                        + Create &quot;{customerSearch}&quot; as new customer
+                      </button>
+                    </div>
+                  )}
+                  {filteredCrmCustomers.length === 0 && !customerSearch.trim() && (
+                    <div className="text-center py-8 text-slate-400">
+                      <p className="text-sm">No customers in database yet.</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewCustomerModal(true)}
+                        className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                      >
+                        + Create your first customer
+                      </button>
+                    </div>
+                  )}
+                  {filteredCrmCustomers.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        selectCrmCustomer(c);
+                        setCustomerSearch('');
+                      }}
+                      className="w-full flex items-center gap-4 px-5 py-4 bg-white border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm transition-all text-left group"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 group-hover:from-blue-100 group-hover:to-blue-200 flex items-center justify-center text-sm font-bold text-slate-500 group-hover:text-blue-600 transition-colors">
+                        {c.company_name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-base font-semibold text-slate-800 truncate">{c.company_name}</p>
+                        <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
+                          {c.primary_contact_name && <span>{c.primary_contact_name}</span>}
+                          {c.address && <span className="truncate">{c.address}</span>}
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                    </button>
+                  ))}
+                </div>
+
+                {/* Or type freely */}
+                <div className="border-t border-slate-200 pt-4">
+                  <p className="text-xs text-slate-400 mb-2 font-medium">Or type a customer name directly:</p>
+                  <CustomerAutocomplete
+                    value={form.contractor_name}
+                    onChange={(value) => {
+                      handleCustomerChange(value);
+                      if (form.customer_id) updateForm({ customer_id: '' });
+                    }}
+                    onSelect={(customer) => selectCrmCustomer(customer)}
+                    onCreateNew={() => setShowNewCustomerModal(true)}
+                  />
+                  {form.contractor_name.trim() && !form.customer_id && (
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.save_as_customer}
+                        onChange={e => updateForm({ save_as_customer: e.target.checked })}
+                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-slate-500">Save as new customer on submit</span>
+                    </label>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         );
+      }
 
-      // ── STEP 2: Customer & Job Location ───────────────────
+      // ── STEP 2: Project & Contact ─────────────────────────
       case 2:
         return (
           <div className="space-y-6">
-            {/* Customer Name with CRM Autocomplete */}
+            {/* Customer auto-populated from Step 1 */}
+            {form.contractor_name && (
+              <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
+                <UserIcon size={16} className="text-blue-600" />
+                <span className="text-sm font-semibold text-blue-800">Customer: {form.contractor_name}</span>
+                {form.customer_id && <CheckCircle size={14} className="text-emerald-500 ml-auto" />}
+              </div>
+            )}
+
+            {/* PO Number (moved from old step 1) */}
             <div>
-              <Label required>Contractor / Customer Name</Label>
-              <CustomerAutocomplete
-                value={form.contractor_name}
-                onChange={(value) => {
-                  handleCustomerChange(value);
-                  // Clear customer_id if user types freely
-                  if (form.customer_id) updateForm({ customer_id: '' });
+              <Label>PO Number</Label>
+              <InputField
+                icon={FileText}
+                placeholder="Enter PO # (optional)"
+                value={form.po_number || form.po_number_step2}
+                onChange={e => {
+                  handlePoChange(e.target.value);
+                  updateForm({ po_number_step2: e.target.value });
                 }}
-                onSelect={(customer) => selectCrmCustomer(customer)}
-                onCreateNew={() => updateForm({ save_as_customer: true })}
-                autoFocus
               />
-              {form.customer_id && (
-                <p className="mt-1.5 text-xs text-emerald-500 font-medium flex items-center gap-1">
-                  <CheckCircle size={12} /> Linked to customer record
+              {poLookupLoading && (
+                <p className="mt-1.5 text-xs text-blue-500 font-medium flex items-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin" /> Looking up PO...
                 </p>
               )}
-              {!form.customer_id && form.contractor_name.trim() && (
-                <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.save_as_customer}
-                    onChange={e => updateForm({ save_as_customer: e.target.checked })}
-                    className="w-3.5 h-3.5 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <span className="text-xs text-slate-500">Save as new customer on submit</span>
-                </label>
+              {poMatch && (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                  <p className="text-xs font-bold text-blue-700 mb-1">Found existing job with this PO</p>
+                  <p className="text-xs text-blue-600">Customer: <span className="font-semibold">{poMatch.customer_name}</span></p>
+                  {poMatch.address && <p className="text-xs text-blue-600">Address: {poMatch.address}</p>}
+                  <button
+                    type="button"
+                    onClick={applyPoAutofill}
+                    className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all"
+                  >
+                    Auto-fill Details
+                  </button>
+                </div>
               )}
             </div>
+
+            {/* Project Name (replaces location name as primary) */}
+            <div>
+              <Label>Project Name</Label>
+              <InputField
+                icon={Clipboard}
+                placeholder="e.g. Building A Renovation, Phase 2 Demo..."
+                value={form.project_name}
+                onChange={e => updateForm({ project_name: e.target.value })}
+              />
+              <p className="text-xs text-slate-400 mt-1">Groups multiple jobs at the same site. If existing project, it will auto-populate address.</p>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {/* Site Contact with Autocomplete */}
               <div ref={contactDropdownRef} className="relative">
@@ -1224,6 +1476,8 @@ export default function ScheduleFormPage() {
                 />
               </div>
             </div>
+
+            {/* Site Address */}
             <div>
               <Label>Site Address</Label>
               <GoogleAddressAutocomplete
@@ -1232,13 +1486,30 @@ export default function ScheduleFormPage() {
                 placeholder="Start typing an address..."
               />
             </div>
+
+            {/* Location Name (secondary) */}
             <div>
-              <Label>Location Name</Label>
+              <Label>Location Details</Label>
               <InputField
                 icon={MapPin}
-                placeholder="Building name, floor, area, etc."
+                placeholder="Building name, floor, area, etc. (optional)"
                 value={form.location_name}
                 onChange={e => updateForm({ location_name: e.target.value })}
+              />
+            </div>
+
+            {/* Jobsite Area Photos */}
+            <div>
+              <Label>Jobsite Area Photos / Documents</Label>
+              <p className="text-xs sm:text-sm text-slate-400 mb-3 -mt-1">Optional — upload photos or docs so operators can navigate to the jobsite</p>
+              <PhotoUploader
+                bucket="jobsite-area-docs"
+                pathPrefix="jobsite"
+                photos={form.jobsite_photo_urls}
+                onPhotosChange={(urls) => updateForm({ jobsite_photo_urls: urls })}
+                maxPhotos={5}
+                label="Add Area Photos"
+                lightMode
               />
             </div>
           </div>
@@ -2430,9 +2701,98 @@ export default function ScheduleFormPage() {
               />
             </div>
 
+            {/* ── Create Compliance Documents ────────────── */}
+            <SectionCard>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Compliance Documents</p>
+              <p className="text-xs text-slate-400 -mt-2">Create or select facility compliance requirements</p>
+
+              {/* Select existing facility */}
+              {facilities.length > 0 && !showCreateFacility && (
+                <div>
+                  <Label>Select Facility</Label>
+                  <select
+                    value={form.facility_id}
+                    onChange={e => {
+                      const fac = facilities.find(f => f.id === e.target.value);
+                      updateForm({
+                        facility_id: e.target.value,
+                        facility_name: fac?.name || '',
+                        facility_requirements: fac?.special_requirements || '',
+                      });
+                    }}
+                    className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-base text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  >
+                    <option value="">— None —</option>
+                    {facilities.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}{f.address ? ` — ${f.address}` : ''}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {form.facility_id && (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <p className="text-sm font-bold text-emerald-800">
+                    {form.facility_name}
+                  </p>
+                  {form.facility_requirements && (
+                    <p className="text-xs text-emerald-700 mt-1">{form.facility_requirements}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Create new facility */}
+              {!showCreateFacility ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateFacility(true)}
+                  className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl border border-dashed border-blue-300 transition-all w-full justify-center"
+                >
+                  <Plus size={16} />
+                  Create New Facility Compliance Document
+                </button>
+              ) : (
+                <div className="space-y-3 p-4 bg-blue-50/50 border border-blue-200 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-blue-800">New Facility</p>
+                    <button type="button" onClick={() => setShowCreateFacility(false)} className="text-slate-400 hover:text-slate-600">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div>
+                    <Label required>Facility Name</Label>
+                    <InputField
+                      icon={Building2}
+                      placeholder="e.g. Intel Chandler Campus"
+                      value={form.facility_name}
+                      onChange={e => updateForm({ facility_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Special Requirements</Label>
+                    <TextArea
+                      rows={4}
+                      placeholder="e.g. TWIC badge required, must complete 4-hour safety orientation, no cell phones past gate 3..."
+                      value={form.facility_requirements}
+                      onChange={e => updateForm({ facility_requirements: e.target.value })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreateFacility}
+                    disabled={!form.facility_name.trim()}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all"
+                  >
+                    <Check size={16} />
+                    Save Facility
+                  </button>
+                </div>
+              )}
+            </SectionCard>
+
             {/* ── Compliance Attachments ────────────── */}
             <div>
-              <Label>Site Compliance Documents</Label>
+              <Label>Upload Compliance Documents</Label>
               <p className="text-xs sm:text-sm text-slate-400 mb-3 -mt-1">Upload any site certs, permits, or compliance docs</p>
               <PhotoUploader
                 bucket="site-compliance-docs"
@@ -2803,8 +3163,8 @@ export default function ScheduleFormPage() {
                   {currentStepData.title}
                 </h2>
                 <p className="text-white/70 text-xs sm:text-sm font-medium">
-                  {currentStep === 1 && 'Enter request and submission details'}
-                  {currentStep === 2 && 'Customer information and job location'}
+                  {currentStep === 1 && 'Select an existing customer or create a new one'}
+                  {currentStep === 2 && 'Project details, contacts, and site information'}
                   {currentStep === 3 && 'Define the services needed for this job'}
                   {currentStep === 4 && 'Select equipment for this project'}
                   {currentStep === 5 && 'Set dates and scheduling flexibility'}
@@ -2882,6 +3242,133 @@ export default function ScheduleFormPage() {
         </div>
         <p className="text-center text-xs text-slate-400 mt-2 font-medium">{Math.round((currentStep / 8) * 100)}% complete</p>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* NEW CUSTOMER MODAL                                          */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      {showNewCustomerModal && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowNewCustomerModal(false)} />
+          <div className="relative mt-8 sm:mt-16 mx-4 w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Plus size={20} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">New Customer</h3>
+                  <p className="text-xs text-blue-200">Add to your customer database</p>
+                </div>
+              </div>
+              <button onClick={() => setShowNewCustomerModal(false)} className="w-9 h-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors">
+                <X size={18} className="text-white" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div>
+                <Label required>Company / Customer Name</Label>
+                <InputField
+                  icon={Building2}
+                  placeholder="e.g. ABC General Contractors"
+                  value={newCustomerData.company_name}
+                  onChange={e => setNewCustomerData(d => ({ ...d, company_name: e.target.value }))}
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label>Primary Contact Name</Label>
+                  <InputField
+                    icon={UserIcon}
+                    placeholder="Contact person"
+                    value={newCustomerData.primary_contact_name}
+                    onChange={e => setNewCustomerData(d => ({ ...d, primary_contact_name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Contact Phone</Label>
+                  <InputField
+                    icon={Phone}
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={newCustomerData.primary_contact_phone}
+                    onChange={e => setNewCustomerData(d => ({ ...d, primary_contact_phone: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Contact Email</Label>
+                <InputField
+                  placeholder="email@company.com"
+                  type="email"
+                  value={newCustomerData.primary_contact_email}
+                  onChange={e => setNewCustomerData(d => ({ ...d, primary_contact_email: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Street Address</Label>
+                <InputField
+                  icon={MapPin}
+                  placeholder="123 Main St"
+                  value={newCustomerData.address}
+                  onChange={e => setNewCustomerData(d => ({ ...d, address: e.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label>City</Label>
+                  <InputField
+                    placeholder="City"
+                    value={newCustomerData.city}
+                    onChange={e => setNewCustomerData(d => ({ ...d, city: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>State</Label>
+                  <InputField
+                    placeholder="AZ"
+                    value={newCustomerData.state}
+                    onChange={e => setNewCustomerData(d => ({ ...d, state: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>ZIP</Label>
+                  <InputField
+                    placeholder="85001"
+                    value={newCustomerData.zip}
+                    onChange={e => setNewCustomerData(d => ({ ...d, zip: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Notes</Label>
+                <TextArea
+                  rows={3}
+                  placeholder="Any notes about this customer (optional)"
+                  value={newCustomerData.notes}
+                  onChange={e => setNewCustomerData(d => ({ ...d, notes: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowNewCustomerModal(false)}
+                className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateCustomer}
+                disabled={!newCustomerData.company_name.trim() || newCustomerSaving}
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-semibold shadow-md disabled:opacity-50 transition-all"
+              >
+                {newCustomerSaving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                {newCustomerSaving ? 'Creating...' : 'Create Customer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════ */}
       {/* SCHEDULE PREVIEW MODAL                                     */}
