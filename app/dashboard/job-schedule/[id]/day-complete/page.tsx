@@ -19,6 +19,10 @@ import {
   Trophy,
   PenTool,
   Camera,
+  Send,
+  Copy,
+  Link2,
+  ClipboardCheck,
 } from 'lucide-react';
 import PhotoUploader from '@/components/PhotoUploader';
 
@@ -37,12 +41,27 @@ export default function DayCompletePage() {
   const [completionPhotos, setCompletionPhotos] = useState<string[]>([]);
   const [confirmSkipSignature, setConfirmSkipSignature] = useState(false);
 
+  // Work performed check (C4)
+  const [hasWorkPerformed, setHasWorkPerformed] = useState<boolean | null>(null);
+  const [checkingWork, setCheckingWork] = useState(true);
+
+  // Remote signature request (C1)
+  const [showRemoteSignature, setShowRemoteSignature] = useState(false);
+  const [remoteContactName, setRemoteContactName] = useState('');
+  const [remoteContactPhone, setRemoteContactPhone] = useState('');
+  const [requestingSignature, setRequestingSignature] = useState(false);
+  const [signatureLink, setSignatureLink] = useState('');
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [linkCopied, setLinkCopied] = useState(false);
+
   // Signature canvas
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
     fetchJob();
+    checkWorkPerformed();
+    fetchPendingRequests();
   }, []);
 
   const fetchJob = async () => {
@@ -56,9 +75,14 @@ export default function DayCompletePage() {
 
       if (res.ok) {
         const data = await res.json();
-        setJob(data.data || data);
+        const jobData = data.data || data;
+        setJob(jobData);
+        // Pre-fill remote contact info from job
+        if (jobData?.customer_contact) setRemoteContactName(jobData.customer_contact);
+        if (jobData?.site_contact_phone || jobData?.foreman_phone) {
+          setRemoteContactPhone(jobData.site_contact_phone || jobData.foreman_phone || '');
+        }
       } else {
-        // Fallback: fetch directly from supabase
         const { data } = await supabase
           .from('job_orders')
           .select('*, profiles!job_orders_assigned_to_fkey(full_name)')
@@ -73,18 +97,115 @@ export default function DayCompletePage() {
     }
   };
 
+  // C4: Check if work performed data exists
+  const checkWorkPerformed = async () => {
+    try {
+      // Check localStorage first
+      const stored = localStorage.getItem(`work-performed-${jobId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.items && parsed.items.length > 0) {
+          setHasWorkPerformed(true);
+          setCheckingWork(false);
+          return;
+        }
+      }
+
+      // Check server for work items
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const res = await fetch(`/api/job-orders/${jobId}/work-items`, {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const items = data.data || data || [];
+          if (Array.isArray(items) && items.length > 0) {
+            setHasWorkPerformed(true);
+            setCheckingWork(false);
+            return;
+          }
+        }
+      }
+
+      setHasWorkPerformed(false);
+    } catch {
+      // If we can't check, allow through (don't block)
+      setHasWorkPerformed(true);
+    } finally {
+      setCheckingWork(false);
+    }
+  };
+
+  // C1: Fetch pending signature requests
+  const fetchPendingRequests = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/job-orders/${jobId}/request-signature`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPendingRequests((data.data || []).filter((r: any) => ['pending', 'sent', 'opened'].includes(r.status)));
+      }
+    } catch {}
+  };
+
   const showNotif = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // Calculate hours worked today
   const getHoursWorked = () => {
     if (!job) return 0;
     const start = job.work_started_at ? new Date(job.work_started_at) :
                   job.route_started_at ? new Date(job.route_started_at) : null;
     if (!start) return 0;
     return ((Date.now() - start.getTime()) / (1000 * 60 * 60)).toFixed(1);
+  };
+
+  // C1: Request remote signature
+  const handleRequestRemoteSignature = async () => {
+    setRequestingSignature(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/job-orders/${jobId}/request-signature`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          contact_name: remoteContactName || undefined,
+          contact_phone: remoteContactPhone || undefined,
+          request_type: 'completion',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSignatureLink(data.data.sign_url);
+        showNotif('Signature link generated!', 'success');
+        fetchPendingRequests();
+      } else {
+        const data = await res.json();
+        showNotif(data.error || 'Failed to create link', 'error');
+      }
+    } catch {
+      showNotif('Failed to generate link', 'error');
+    } finally {
+      setRequestingSignature(false);
+    }
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(signatureLink).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
   };
 
   // ─── DONE FOR TODAY (Continue Tomorrow) ───────────────────
@@ -94,7 +215,6 @@ export default function DayCompletePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Save completion photos if any
       if (completionPhotos.length > 0) {
         fetch(`/api/job-orders/${jobId}/photos`, {
           method: 'POST',
@@ -106,7 +226,6 @@ export default function DayCompletePage() {
         }).catch(err => console.error('Photo save error:', err));
       }
 
-      // Get work performed from localStorage
       const stored = localStorage.getItem(`work-performed-${jobId}`);
       const workPerformed = stored ? JSON.parse(stored).items : [];
 
@@ -127,7 +246,6 @@ export default function DayCompletePage() {
 
       if (res.ok) {
         showNotif('Day logged! Job will continue tomorrow.', 'success');
-        // Clear localStorage work data for this job
         localStorage.removeItem(`work-performed-${jobId}`);
         setTimeout(() => router.push('/dashboard/my-jobs'), 1500);
       } else {
@@ -149,10 +267,8 @@ export default function DayCompletePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Upload signature to storage
       const signatureUrl = await uploadSignature();
 
-      // Save completion photos
       if (completionPhotos.length > 0) {
         fetch(`/api/job-orders/${jobId}/photos`, {
           method: 'POST',
@@ -164,11 +280,9 @@ export default function DayCompletePage() {
         }).catch(err => console.error('Photo save error:', err));
       }
 
-      // Get work performed from localStorage
       const stored = localStorage.getItem(`work-performed-${jobId}`);
       const workPerformed = stored ? JSON.parse(stored).items : [];
 
-      // Create final daily log entry
       await fetch(`/api/job-orders/${jobId}/daily-log`, {
         method: 'POST',
         headers: {
@@ -186,7 +300,6 @@ export default function DayCompletePage() {
         })
       }).catch(() => {});
 
-      // Mark job as completed via status API
       const statusRes = await fetch(`/api/job-orders/${jobId}/status`, {
         method: 'PATCH',
         headers: {
@@ -217,11 +330,9 @@ export default function DayCompletePage() {
     }
   };
 
-  // ─── UPLOAD SIGNATURE TO STORAGE ─────────────────────────
   const uploadSignature = async (): Promise<string | null> => {
     if (!signatureData) return null;
     try {
-      // Convert base64 to blob
       const res = await fetch(signatureData);
       const blob = await res.blob();
       const fileName = `${jobId}/signatures/completion-${Date.now()}.png`;
@@ -232,7 +343,7 @@ export default function DayCompletePage() {
 
       if (uploadError) {
         console.error('Signature upload error:', uploadError);
-        return signatureData; // Fallback to base64
+        return signatureData;
       }
 
       const { data } = supabase.storage
@@ -241,7 +352,7 @@ export default function DayCompletePage() {
 
       return data?.publicUrl || signatureData;
     } catch {
-      return signatureData; // Fallback to base64
+      return signatureData;
     }
   };
 
@@ -302,6 +413,8 @@ export default function DayCompletePage() {
     );
   }
 
+  const workCheckBlocked = !checkingWork && hasWorkPerformed === false;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
@@ -333,6 +446,30 @@ export default function DayCompletePage() {
       )}
 
       <div className="container mx-auto px-4 py-6 pb-24 max-w-lg space-y-6">
+        {/* C4: Work Performed Warning */}
+        {workCheckBlocked && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-100 rounded-xl">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-red-800">Work Performed Required</h3>
+                <p className="text-xs text-red-600 mt-1">
+                  Please log work performed before completing the day.
+                </p>
+                <Link
+                  href={`/dashboard/job-schedule/${jobId}/work-performed`}
+                  className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-all"
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5" />
+                  Log Work Performed
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Hours Worked Today */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
@@ -375,6 +512,28 @@ export default function DayCompletePage() {
           />
         </div>
 
+        {/* Pending Signature Requests */}
+        {pendingRequests.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+            <p className="text-xs font-bold text-blue-700 mb-2">Pending Signature Requests</p>
+            {pendingRequests.map(req => (
+              <div key={req.id} className="flex items-center justify-between py-1.5">
+                <div>
+                  <p className="text-xs text-blue-800 font-medium">{req.contact_name || 'Unknown'}</p>
+                  <p className="text-[10px] text-blue-500">{req.status} &bull; {req.request_type}</p>
+                </div>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                  req.status === 'opened' ? 'bg-amber-100 text-amber-700' :
+                  req.status === 'sent' ? 'bg-blue-100 text-blue-700' :
+                  'bg-slate-100 text-slate-600'
+                }`}>
+                  {req.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Main Decision */}
         {!showSignature ? (
           <div className="space-y-4">
@@ -385,7 +544,7 @@ export default function DayCompletePage() {
             {/* Done for Today */}
             <button
               onClick={handleDoneForToday}
-              disabled={submitting}
+              disabled={submitting || workCheckBlocked}
               className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
             >
               <div className="flex items-center gap-4">
@@ -405,7 +564,7 @@ export default function DayCompletePage() {
             {/* Job Fully Complete */}
             <button
               onClick={() => setShowSignature(true)}
-              disabled={submitting}
+              disabled={submitting || workCheckBlocked}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
             >
               <div className="flex items-center gap-4">
@@ -426,7 +585,7 @@ export default function DayCompletePage() {
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-2">
               <button
-                onClick={() => setShowSignature(false)}
+                onClick={() => { setShowSignature(false); setShowRemoteSignature(false); }}
                 className="p-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all"
               >
                 <ArrowLeft className="w-4 h-4 text-slate-600" />
@@ -435,6 +594,80 @@ export default function DayCompletePage() {
                 Customer Signature
               </h2>
             </div>
+
+            {/* C1: Request Remote Signature */}
+            {!showRemoteSignature ? (
+              <button
+                onClick={() => setShowRemoteSignature(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-all"
+              >
+                <Send className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-700">Request Remote Signature</span>
+                <span className="text-xs text-blue-500 ml-auto">Send a link</span>
+              </button>
+            ) : (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-bold text-blue-800">Send Signature Link</p>
+                <div>
+                  <label className="block text-xs font-medium text-blue-700 mb-1">Contact Name</label>
+                  <input
+                    type="text"
+                    value={remoteContactName}
+                    onChange={e => setRemoteContactName(e.target.value)}
+                    placeholder="Site contact name"
+                    className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-blue-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={remoteContactPhone}
+                    onChange={e => setRemoteContactPhone(e.target.value)}
+                    placeholder="Phone number"
+                    className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {signatureLink ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-emerald-700 font-semibold">Link generated!</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={signatureLink}
+                        readOnly
+                        className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-600 truncate"
+                      />
+                      <button
+                        onClick={copyLink}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center gap-1"
+                      >
+                        {linkCopied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        {linkCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-blue-500">Send this link to the site contact. It expires in 7 days.</p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleRequestRemoteSignature}
+                    disabled={requestingSignature}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {requestingSignature ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                    {requestingSignature ? 'Generating...' : 'Generate Link'}
+                  </button>
+                )}
+
+                <button
+                  onClick={() => { setShowRemoteSignature(false); setSignatureLink(''); }}
+                  className="w-full text-xs text-blue-500 hover:text-blue-700 py-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
 
             <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
               {/* Signer Name */}
@@ -483,7 +716,7 @@ export default function DayCompletePage() {
                   />
                 </div>
                 <p className="text-xs text-slate-400 mt-1 text-center">
-                  {signatureData ? '✓ Signature captured' : 'Have customer sign above to complete job'}
+                  {signatureData ? 'Signature captured' : 'Have customer sign above to complete job'}
                 </p>
               </div>
 
