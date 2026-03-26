@@ -21,6 +21,7 @@ import MissingInfoModal from './_components/MissingInfoModal';
 import AssignOperatorModal from './_components/AssignOperatorModal';
 import EditJobPanel from './_components/EditJobPanel';
 import ChangeRequestModal from './_components/ChangeRequestModal';
+import RejectFormModal from './_components/RejectFormModal';
 import NotesDrawer from './_components/NotesDrawer';
 import QuickAddModal, { type QuickAddData } from './_components/QuickAddModal';
 import ConflictModal from './_components/ConflictModal';
@@ -207,6 +208,8 @@ export default function ScheduleBoardPage() {
   // Modal states
   const [approvalTarget, setApprovalTarget] = useState<PendingJob | null>(null);
   const [missingInfoTarget, setMissingInfoTarget] = useState<PendingJob | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<PendingJob | null>(null);
+  const [rejectLoading, setRejectLoading] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ job: JobCardData; source: 'unassigned' | 'willcall' } | null>(null);
   const [editTarget, setEditTarget] = useState<{ job: JobCardData; rowIndex: number | null } | null>(null);
   const [changeRequestTarget, setChangeRequestTarget] = useState<JobCardData | null>(null);
@@ -951,6 +954,31 @@ export default function ScheduleBoardPage() {
     const itemList = missingItems.join(', ');
     addToast('info', `${missingInfoTarget.customer_name} — Missing Info`, `Salesman notified: ${itemList}`);
     setMissingInfoTarget(null);
+    if (pendingJobs.length <= 1) setShowPendingQueue(false);
+  };
+
+  // --- Pending: Reject ---
+  const handleReject = async (data: { rejection_reason: string; rejection_notes: string }) => {
+    if (!rejectTarget) return;
+    setRejectLoading(true);
+    try {
+      const res = await apiFetch(`/api/admin/job-orders/${rejectTarget.id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error || 'Failed to reject');
+      }
+    } catch (e: any) {
+      addToast('error', 'Rejection Failed', e.message || 'Could not reject form');
+      setRejectLoading(false);
+      return;
+    }
+    setPendingJobs(prev => prev.filter(p => p.id !== rejectTarget.id));
+    addToast('info', `${rejectTarget.customer_name} — Rejected`, `Form rejected: ${data.rejection_reason.replace(/_/g, ' ')}`);
+    setRejectTarget(null);
+    setRejectLoading(false);
     if (pendingJobs.length <= 1) setShowPendingQueue(false);
   };
 
@@ -1931,12 +1959,14 @@ export default function ScheduleBoardPage() {
         onClose={() => setShowPendingQueue(false)}
         pendingJobs={pendingJobs}
         onApprove={(job) => { setShowPendingQueue(false); setApprovalTarget(job); }}
+        onReject={(job) => { setShowPendingQueue(false); setRejectTarget(job); }}
         onMissingInfo={(job) => { setShowPendingQueue(false); setMissingInfoTarget(job); }}
       />
 
       {/* ═══ MODALS ════════════════════════════════════════════════════ */}
       {approvalTarget && <ApprovalModal job={approvalTarget} onConfirm={handleApprove} onClose={() => setApprovalTarget(null)} />}
       {missingInfoTarget && <MissingInfoModal job={missingInfoTarget} onConfirm={handleMissingInfo} onClose={() => setMissingInfoTarget(null)} />}
+      {rejectTarget && <RejectFormModal job={rejectTarget} onConfirm={handleReject} onClose={() => setRejectTarget(null)} loading={rejectLoading} />}
       {assignTarget && (
         <AssignOperatorModal
           job={assignTarget.job}

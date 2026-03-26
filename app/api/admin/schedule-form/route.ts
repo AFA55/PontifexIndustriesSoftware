@@ -91,6 +91,10 @@ export async function POST(request: NextRequest) {
       end_date: body.end_date || null,
       scheduling_flexibility: body.scheduling_flexibility || {},
 
+      // ── Step 2 additions ───────────────────────────────────
+      project_name: body.project_name || null,
+      facility_id: body.facility_id || null,
+
       // ── Step 6: Site Access & Compliance ─────────────────────
       site_compliance: body.site_compliance || {},
       permit_required: body.permit_required || false,
@@ -120,6 +124,17 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Schedule Form job created: ${jobNumber} by ${profile.full_name}`);
+
+    // ── Track submission in schedule_form_submissions ──────────
+    Promise.resolve(
+      supabaseAdmin.from('schedule_form_submissions').insert({
+        job_order_id: jobOrder.id,
+        submitted_by: auth.userId,
+        submitted_by_name: profile.full_name,
+        action: 'submitted',
+        form_snapshot: body,
+      })
+    ).catch(() => {});
 
     // ── Customer CRM: auto-link or create customer ────────────
     try {

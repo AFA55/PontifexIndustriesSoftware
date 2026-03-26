@@ -55,6 +55,8 @@ export interface PendingJob {
   scope_details: Record<string, Record<string, string>> | null;
   additional_info: string | null;
   special_equipment: string[] | null;
+  last_submitted_at?: string | null;
+  rejection_reason?: string | null;
 }
 
 interface PendingQueueSidebarProps {
@@ -63,6 +65,7 @@ interface PendingQueueSidebarProps {
   pendingJobs: PendingJob[];
   onApprove: (job: PendingJob) => void;
   onMissingInfo: (job: PendingJob) => void;
+  onReject?: (job: PendingJob) => void;
 }
 
 export default function PendingQueueSidebar({
@@ -71,6 +74,7 @@ export default function PendingQueueSidebar({
   pendingJobs,
   onApprove,
   onMissingInfo,
+  onReject,
 }: PendingQueueSidebarProps) {
   if (!open) return null;
 
@@ -198,7 +202,18 @@ export default function PendingQueueSidebar({
                     </div>
                   )}
 
-                  {/* Action buttons — Approve or Missing Info */}
+                  {/* Resubmitted badge */}
+                  {job.last_submitted_at && (
+                    <div className="mb-2 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                      <span className="text-xs font-semibold text-blue-700">Resubmitted</span>
+                      <span className="text-xs text-blue-500">
+                        {new Date(job.last_submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Action buttons — Approve, Reject, or Missing Info */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => onApprove(job)}
@@ -206,12 +221,20 @@ export default function PendingQueueSidebar({
                     >
                       ✓ Approve
                     </button>
+                    {onReject && (
+                      <button
+                        onClick={() => onReject(job)}
+                        className="flex-1 px-3 py-2.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-lg text-xs font-bold transition-all hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Reject
+                      </button>
+                    )}
                     <button
                       onClick={() => onMissingInfo(job)}
-                      className="flex-1 px-3 py-2.5 bg-gradient-to-r from-orange-400 to-red-400 hover:from-orange-500 hover:to-red-500 text-white rounded-lg text-xs font-bold transition-all hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5"
+                      className="px-3 py-2.5 bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white rounded-lg text-xs font-bold transition-all hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5"
                     >
                       <AlertCircle className="w-3.5 h-3.5" />
-                      Missing Info
                     </button>
                   </div>
                 </div>
