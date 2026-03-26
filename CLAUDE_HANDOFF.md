@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 25, 2026 (Session 4) | **Branch:** `claude/admiring-mahavira` (worktree) | **Build Status:** PASSING
+**Date:** March 26, 2026 (Session 5) | **Branch:** `claude/admiring-mahavira` (worktree) | **Build Status:** PASSING
 
 ---
 
@@ -9,54 +9,74 @@
 - **Branch:** `claude/admiring-mahavira` (worktree off main)
 - **Last commits:**
 ```
-a36c9a79 feat: schedule form redesign — customer-first flow, project name, facility compliance
-b8e48dc5 feat: enhanced timecard system — weekly view, NFC management, job-linked time tracking
-ac83484f feat: approval workflow — reject/approve/resubmit with notes, form history page
-39d7dbb8 feat: facilities & badging system — facility management, operator badge tracking, expiration alerts
+27c19674 feat: per-operator timecard breakdown, contact dropdown fix, RBAC updates
+2c7aa72e feat: customer portal, signature requests, form builder, work-performed gate
+12cf0ca0 feat: schedule board enhancements — all operators view, time-off, skill warnings, realtime status colors, inline editing, work history
+0def15f8 docs: update handoff — March 25 session 4 complete
 ```
-- **Clean working tree** (all changes committed)
-- **Migrations applied to Supabase:** `tables_columns_triggers` + `views_update` + `recreate_schedule_board_view`
+- **Clean working tree** (all changes committed + pushed)
+- **Migrations applied to Supabase:** All previous + `time_off_and_status_tracking` + `signature_requests_forms`
 
-### What Was Built This Session (4 Major Feature Sets)
+### What Was Built This Session (5 Major Feature Areas)
 
-#### 1. Schedule Form Redesign
-- **Step 1 → Customer:** Full CRM customer selection (search, create new inline, free-type with autocomplete)
-- **Step 2 → Project & Contact:** PO number moved here, project name field, smart contact autofill from DB, jobsite photo upload
-- **Step 6 → Compliance:** Facility selector with "Create New Facility" inline form, facility requirements display
-- Files: `app/dashboard/admin/schedule-form/page.tsx`, `app/api/admin/schedule-form/route.ts`
+#### 1. Schedule Board Enhancements
+- **All Operators View:** Shows every operator in Operator View (not just assigned), with "Available" status
+- **Time-Off System:** PTO/unpaid/worked_last_night/sick shown as dark grey blocks on schedule board
+- **Skill Match Warnings:** "Only X of Y operators qualified for Wall Saw at difficulty 7" in assignment modal
+- **Real-time Status Colors:** Job cards change color as operators progress (grey→yellow→blue→orange→green)
+- **Supabase Realtime:** Live board updates when operators change status from their phone
+- **Status Timeline:** Visual loading→route→progress→done timeline in job detail header
 
-#### 2. Timecard + NFC System
-- Admin timecards page: weekly grid view + detailed list view, hour categorization (regular, OT, mandatory OT, night shift, shop)
-- NFC management page (super_admin only): program/manage NFC clock-in tags
-- Operator timecard: shop/jobsite selection at clock-in, job linking for P&L
-- PDF export, admin notifications, GPS tracking, remote clock-in with photo
-- Files: `app/dashboard/admin/timecards/page.tsx`, `app/dashboard/admin/nfc-management/page.tsx`, `app/dashboard/timecard/page.tsx`, `app/api/timecard/`
+#### 2. Job Detail View Redesign
+- **2-column layout:** 70% job details (left) + 30% notes sidebar (right)
+- **Notes sidebar:** Chronological feed with "Add Note" input, inline CRUD
+- **Inline editing:** Toggle edit mode — date, time, PO, description, equipment become editable inputs
+- **Save/Cancel** buttons replace Edit button in editing mode
+- **Work History tab:** Day-by-day breakdown with load→route→done times per day
 
-#### 3. Facilities & Badging System
-- Facilities CRUD: manage compliance requirements, badging rules, special instructions
-- Operator badge tracking: per-facility badges with expiry dates, auto-expire function
-- Badge status in operator profile drawer
-- Files: `app/dashboard/admin/facilities/page.tsx`, `app/api/admin/facilities/`, `app/api/admin/badges/`, `app/dashboard/admin/operator-profiles/_components/ProfileDetailDrawer.tsx`
+#### 3. Customer Portal & Signature System
+- **Public portal:** `/sign/[token]` — no auth required, renders utility waiver / completion form / custom form
+- **Signature requests:** Generate unique token, SMS link to site contact
+- **Survey integration:** After completion signature, show cleanliness/communication/overall ratings
+- **Operator ratings:** Survey results feed into operator profile averages
+- **Remote signature:** "Request Remote Signature" button on day-complete page
 
-#### 4. Approval Workflow
-- Schedule forms → `pending_approval` status, require super_admin review
-- Reject with reason categories + detailed notes
-- Admin gets notification, can edit and resubmit rejected forms
-- Full history page: pending, approved, rejected with audit trail
-- Files: `app/api/admin/job-orders/[id]/approve/`, `reject/`, `resubmit/`, `app/dashboard/admin/schedule-form-history/page.tsx`, `app/dashboard/admin/schedule-board/_components/RejectFormModal.tsx`, `PendingQueueSidebar.tsx`
+#### 4. Custom Form Builder
+- **Form templates:** Admin creates reusable forms (pre_work, post_work, custom)
+- **Drag-and-drop fields:** text, textarea, checkbox, signature, select, date, number
+- **Form assignment:** Link templates to jobs, track completion status
+- **Work-performed gate:** Blocks "Done for Day" / "Job Complete" until work performed is logged
+
+#### 5. Timecards & Contact Fix
+- **Per-operator breakdown:** Regular/Weekly OT/Mandatory OT/Night Shift/Shop hour cards
+- **Daily grid:** Mon-Sun with clock in/out, job linkage, hour type color-coding
+- **"View Details" links** per operator in main timecards page
+- **Contact dropdown fix:** Don't auto-fill when customer has multiple contacts; show dropdown with role badges
 
 ### Database Changes (Applied to Supabase)
-- `timecards.labor_cost` column + auto-calculate trigger
-- `facilities` table (compliance, badging requirements)
-- `operator_facility_badges` table (badge tracking with auto-expire)
-- `schedule_form_submissions` table (approval workflow history)
-- `job_orders` new columns: `rejection_reason`, `rejection_notes`, `rejected_by`, `rejected_at`, `last_submitted_at`, `project_name`, `facility_id`
-- `rejected` added to job_orders status constraint
-- Views updated: `timecards_with_users`, `job_pnl_summary`, `badges_with_details`, `schedule_board_view`
+- `operator_time_off` table (PTO, unpaid, sick, worked_last_night)
+- `signature_requests` table (token-based public access)
+- `customer_surveys` table (post-completion feedback)
+- `form_templates` table (custom form builder)
+- `job_form_assignments` table (link templates to jobs)
+- `job_orders` new columns: `loading_started_at`, `done_for_day_at`, `require_waiver_signature`, `require_completion_signature`
 - RLS policies for all new tables
 
-### RBAC Updates
-- New dashboard cards: Timecard Management, NFC Management (super_admin), Facilities & Badges, Schedule Form History
+### New API Routes
+| Route | Purpose |
+|-------|---------|
+| `CRUD /api/admin/schedule-board/time-off` | Operator time-off management |
+| `GET /api/job-orders/[id]/work-history` | Work performed history |
+| `CRUD /api/admin/form-templates` | Form template management |
+| `POST /api/admin/job-orders/[id]/forms` | Assign forms to jobs |
+| `POST /api/job-orders/[id]/request-signature` | Generate signature request |
+| `GET/POST /api/public/signature/[token]` | Public signature portal API |
+
+### New Pages
+| Page | Access |
+|------|--------|
+| `/sign/[token]` | Public (no auth) |
+| `/dashboard/admin/form-builder` | admin+ |
 
 ---
 
@@ -75,7 +95,7 @@ ac83484f feat: approval workflow — reject/approve/resubmit with notes, form hi
 - [ ] Final build verification & merge to main
 
 ### Polish Items
-- [ ] Customer signature capture in job completion flow
+- [x] Customer signature capture in job completion flow (DONE — portal + inline signature)
 - [ ] Photo upload during job execution
 - [ ] PDF invoice generation
 - [ ] QuickBooks CSV export from billing page
@@ -85,26 +105,14 @@ ac83484f feat: approval workflow — reject/approve/resubmit with notes, form hi
 
 ## ARCHITECTURE NOTES
 
-### New Tables
+### All New Tables (Sessions 4-5)
 | Table | Purpose |
 |-------|---------|
 | `facilities` | Jobsite compliance, badging rules |
 | `operator_facility_badges` | Per-operator per-facility badge tracking |
 | `schedule_form_submissions` | Approval workflow audit trail |
-
-### New API Routes
-| Route | Purpose |
-|-------|---------|
-| `POST /api/admin/facilities` | CRUD facilities |
-| `POST /api/admin/badges` | Manage operator badges |
-| `POST /api/admin/job-orders/[id]/approve` | Approve pending job |
-| `POST /api/admin/job-orders/[id]/reject` | Reject with notes |
-| `POST /api/admin/job-orders/[id]/resubmit` | Resubmit rejected job |
-| `GET /api/admin/schedule-forms` | Form submission history |
-
-### New Pages
-| Page | Access |
-|------|--------|
-| `/dashboard/admin/facilities` | admin+ |
-| `/dashboard/admin/nfc-management` | super_admin |
-| `/dashboard/admin/schedule-form-history` | admin+ |
+| `operator_time_off` | PTO/unpaid/sick/worked_last_night tracking |
+| `signature_requests` | Token-based signature requests for customer portal |
+| `customer_surveys` | Post-completion customer feedback |
+| `form_templates` | Custom form builder templates |
+| `job_form_assignments` | Links forms to jobs with completion tracking |
