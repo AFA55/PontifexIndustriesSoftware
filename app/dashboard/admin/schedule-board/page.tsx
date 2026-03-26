@@ -9,7 +9,7 @@ import {
   Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
   UserCheck, UserX, Eye, FolderOpen, Timer, Loader2, Settings, Search, X,
-  Megaphone, CheckCircle2, Sparkles, Zap, Brain
+  Megaphone, CheckCircle2, Sparkles, Zap, Brain, CalendarOff
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -37,6 +37,7 @@ import JobDetailView from './_components/JobDetailView';
 import DndBoardWrapper from './_components/DndBoardWrapper';
 import OperatorRowView from './_components/OperatorRowView';
 import ViewToggle from './_components/ViewToggle';
+import AddTimeOffModal from './_components/AddTimeOffModal';
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
@@ -112,6 +113,9 @@ function toJobCard(job: any): JobCardData {
     po_number: job.po_number || null,
     day_label: computeDayLabel(job),
     status: job.status || null,
+    loading_started_at: job.loading_started_at || null,
+    route_started_at: job.route_started_at || null,
+    done_for_day_at: job.done_for_day_at || null,
   };
 }
 
@@ -192,6 +196,10 @@ export default function ScheduleBoardPage() {
     Array.from({ length: 8 }, () => ({ operator: null, helper: null }))
   );
   const NUM_ROWS = capacityMaxSlots;
+
+  // ═══ TIME-OFF STATE ═══
+  const [timeOffMap, setTimeOffMap] = useState<Record<string, { type: string; notes: string | null }>>({});
+  const [showTimeOffModal, setShowTimeOffModal] = useState(false);
 
   // ═══ UI STATE ═══
   const [showPendingQueue, setShowPendingQueue] = useState(false);
@@ -610,6 +618,92 @@ export default function ScheduleBoardPage() {
     }
     fetchDailyNotes();
   }, [selectedDate]);
+
+  // ═══ FETCH TIME-OFF DATA ═══
+  useEffect(() => {
+    async function fetchTimeOff() {
+      try {
+        const res = await apiFetch(`/api/admin/schedule-board/time-off?date=${selectedDate}`);
+        if (res.ok) {
+          const json = await res.json();
+          const map: Record<string, { type: string; notes: string | null }> = {};
+          for (const entry of json.data || []) {
+            map[entry.operator_id] = { type: entry.type, notes: entry.notes };
+          }
+          setTimeOffMap(map);
+        }
+      } catch { setTimeOffMap({}); }
+    }
+    fetchTimeOff();
+  }, [selectedDate]);
+
+  // ═══ REALTIME SUBSCRIPTION FOR JOB STATUS CHANGES ═══
+  useEffect(() => {
+    if (viewMode !== 'day') return;
+
+    const channel = supabase
+      .channel('board-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'job_orders',
+          filter: `scheduled_date=eq.${selectedDate}`,
+        },
+        (payload: any) => {
+          const updated = payload.new;
+          if (!updated?.id) return;
+
+          // Update in operatorJobs
+          setOperatorJobs(prev => {
+            const next = { ...prev };
+            for (const key in next) {
+              const idx = parseInt(key);
+              const jobs = next[idx];
+              if (jobs) {
+                const jobIdx = jobs.findIndex(j => j.id === updated.id);
+                if (jobIdx >= 0) {
+                  next[idx] = jobs.map(j =>
+                    j.id === updated.id
+                      ? {
+                          ...j,
+                          status: updated.status || j.status,
+                          loading_started_at: updated.loading_started_at || j.loading_started_at,
+                          route_started_at: updated.route_started_at || j.route_started_at,
+                          done_for_day_at: updated.done_for_day_at || j.done_for_day_at,
+                        }
+                      : j
+                  );
+                  return next;
+                }
+              }
+            }
+            return prev;
+          });
+
+          // Also update in unassignedJobs
+          setUnassignedJobs(prev =>
+            prev.map(j =>
+              j.id === updated.id
+                ? {
+                    ...j,
+                    status: updated.status || j.status,
+                    loading_started_at: updated.loading_started_at || j.loading_started_at,
+                    route_started_at: updated.route_started_at || j.route_started_at,
+                    done_for_day_at: updated.done_for_day_at || j.done_for_day_at,
+                  }
+                : j
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedDate, viewMode]);
 
   // ═══ FETCH CAPACITY SETTINGS ═══
   useEffect(() => {
@@ -1573,6 +1667,12 @@ export default function ScheduleBoardPage() {
                     <Plus className="w-4 h-4" /> Quick Add
                   </button>
                   <button
+                    onClick={() => setShowTimeOffModal(true)}
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-slate-700 text-sm font-semibold transition-all flex items-center gap-1.5"
+                  >
+                    <CalendarOff className="w-4 h-4" /> Time Off
+                  </button>
+                  <button
                     onClick={() => {
                       fetchDispatchStatus(selectedDate);
                       setShowDispatchModal(true);
@@ -1841,6 +1941,7 @@ export default function ScheduleBoardPage() {
                 allHelpers={allHelpersList}
                 busyOperators={busyOperators}
                 busyHelpers={busyHelpers}
+                timeOff={rowAssignments[idx]?.operator && operatorIdMap[rowAssignments[idx]?.operator!] ? timeOffMap[operatorIdMap[rowAssignments[idx]?.operator!]] : undefined}
                 onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setChangeRequestTarget(job)}
                 onRequestChange={(job) => setChangeRequestTarget(job)}
                 onViewNotes={(job) => handleViewNotes(job)}
@@ -1859,6 +1960,8 @@ export default function ScheduleBoardPage() {
             rowAssignments={rowAssignments}
             operatorIdMap={operatorIdMap}
             operatorSkillMap={operatorSkillMap}
+            allOperatorsList={allOperatorsList}
+            timeOffMap={timeOffMap}
             canDrag={canEdit}
             canEdit={canEdit}
             onEditJob={(job, rowIndex) => canEdit ? setEditTarget({ job, rowIndex }) : setChangeRequestTarget(job)}
@@ -1999,6 +2102,29 @@ export default function ScheduleBoardPage() {
       {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSubmit={handleChangeRequest} onClose={() => setChangeRequestTarget(null)} />}
       {notesTarget && <NotesDrawer job={notesTarget} notes={jobNotes[notesTarget.id] || []} onAddNote={handleAddNote} onClose={() => setNotesTarget(null)} />}
       {showQuickAdd && <QuickAddModal salesmen={SALESMEN} onSubmit={handleQuickAdd} onClose={() => setShowQuickAdd(false)} />}
+      {showTimeOffModal && (
+        <AddTimeOffModal
+          operators={allOperatorsList.map(name => ({ id: operatorIdMap[name] || '', name }))}
+          defaultDate={selectedDate}
+          onSuccess={() => {
+            setShowTimeOffModal(false);
+            addToast('success', 'Time Off Added', 'Operator marked as unavailable');
+            // Refresh time-off data
+            apiFetch(`/api/admin/schedule-board/time-off?date=${selectedDate}`).then(res => {
+              if (res.ok) return res.json();
+            }).then(json => {
+              if (json?.data) {
+                const map: Record<string, { type: string; notes: string | null }> = {};
+                for (const entry of json.data) {
+                  map[entry.operator_id] = { type: entry.type, notes: entry.notes };
+                }
+                setTimeOffMap(map);
+              }
+            }).catch(() => {});
+          }}
+          onClose={() => setShowTimeOffModal(false)}
+        />
+      )}
 
       {/* ═══ AI AUTO-SCHEDULE RESULTS MODAL ═══ */}
       {autoScheduleResults && (

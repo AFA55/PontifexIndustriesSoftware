@@ -24,7 +24,42 @@ export interface JobCardData {
   po_number: string | null;
   day_label?: string; // e.g. "Day 2 of 5"
   status?: string;
+  loading_started_at?: string | null;
+  route_started_at?: string | null;
+  done_for_day_at?: string | null;
 }
+
+function getStatusColor(job: JobCardData): { border: string; dot: string; bg: string } {
+  if (job.status === 'completed') {
+    return { border: 'border-emerald-600', dot: 'bg-emerald-500', bg: 'bg-emerald-50/40' };
+  }
+  if (job.done_for_day_at) {
+    const doneDate = new Date(job.done_for_day_at).toDateString();
+    const today = new Date().toDateString();
+    if (doneDate === today) {
+      return { border: 'border-emerald-400', dot: 'bg-emerald-400', bg: '' };
+    }
+  }
+  if (job.status === 'in_progress') {
+    return { border: 'border-orange-500', dot: 'bg-orange-500', bg: '' };
+  }
+  if (job.status === 'in_route') {
+    return { border: 'border-blue-500', dot: 'bg-blue-500', bg: '' };
+  }
+  if (job.loading_started_at && !job.route_started_at) {
+    return { border: 'border-amber-400', dot: 'bg-amber-400', bg: '' };
+  }
+  // scheduled or assigned with no activity
+  return { border: '', dot: 'bg-slate-300', bg: '' };
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  scheduled: 'Scheduled',
+  assigned: 'Assigned',
+  in_route: 'In Route',
+  in_progress: 'Working',
+  completed: 'Completed',
+};
 
 interface JobCardProps {
   job: JobCardData;
@@ -45,6 +80,8 @@ interface JobCardProps {
 export default function JobCard({ job, colorScheme, canEdit, assignedOperator, assignedHelper, onEdit, onRequestChange, onViewNotes }: JobCardProps) {
   const router = useRouter();
   const isCompleted = job.status === 'completed';
+  const statusColor = getStatusColor(job);
+  const statusLabel = STATUS_LABELS[job.status || ''] || '';
 
   const formatTime = (time: string | null) => {
     if (!time) return null;
@@ -68,10 +105,12 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
     <div
       className={`relative group rounded-xl border-2 transition-all duration-200 hover:shadow-lg hover:scale-[1.01] cursor-pointer ${
         isCompleted
-          ? 'border-green-400 bg-green-50/70'
+          ? `${statusColor.border} ${statusColor.bg || 'bg-green-50/70'}`
           : job.is_will_call
             ? 'border-amber-400 bg-amber-50/50'
-            : `${colorScheme.border} bg-white`
+            : statusColor.border
+              ? `${statusColor.border} ${statusColor.bg || 'bg-white'}`
+              : `${colorScheme.border} bg-white`
       }`}
       onClick={handleClick}
     >
@@ -89,7 +128,8 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
         {/* Top row: Customer + badges */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
-            <h4 className="font-bold text-gray-900 text-sm sm:text-base truncate">
+            <h4 className="font-bold text-gray-900 text-sm sm:text-base truncate flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColor.dot}`} title={statusLabel} />
               {job.customer_name}
             </h4>
             <div className="flex items-center gap-2 flex-wrap mt-0.5">

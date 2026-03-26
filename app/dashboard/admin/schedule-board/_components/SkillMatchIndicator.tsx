@@ -6,9 +6,10 @@ import { useState } from 'react';
 interface SkillMatchIndicatorProps {
   operatorSkill: number | null;
   jobDifficulty: number | null;
+  isQualified?: boolean;
 }
 
-export default function SkillMatchIndicator({ operatorSkill, jobDifficulty }: SkillMatchIndicatorProps) {
+export default function SkillMatchIndicator({ operatorSkill, jobDifficulty, isQualified }: SkillMatchIndicatorProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
   if (operatorSkill === null || jobDifficulty === null) return null;
@@ -51,7 +52,7 @@ export default function SkillMatchIndicator({ operatorSkill, jobDifficulty }: Sk
 
   return (
     <div
-      className="relative inline-flex"
+      className="relative inline-flex items-center gap-1"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
@@ -60,10 +61,25 @@ export default function SkillMatchIndicator({ operatorSkill, jobDifficulty }: Sk
         {operatorSkill}
       </span>
 
+      {isQualified !== undefined && (
+        <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border text-[10px] font-bold ${
+          isQualified
+            ? 'bg-green-50 border-green-200 text-green-600'
+            : 'bg-red-50 border-red-200 text-red-600'
+        }`}>
+          {isQualified ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+        </span>
+      )}
+
       {showTooltip && (
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-[100]">
           <p className="font-bold">{c.label}</p>
           <p className="text-gray-300 text-[10px]">{c.desc}</p>
+          {isQualified !== undefined && (
+            <p className="text-gray-300 text-[10px]">
+              {isQualified ? 'Qualified for this task type' : 'Not qualified for this task type'}
+            </p>
+          )}
           <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900" />
         </div>
       )}

@@ -63,6 +63,11 @@ async function updateJobStatus(
     const now = new Date().toISOString();
 
     // Set timestamps based on status change
+    // Set loading_started_at when first transitioning from assigned/scheduled to any active state
+    if (['in_route', 'in_progress'].includes(status) && !existingJob.loading_started_at) {
+      updateData.loading_started_at = now;
+    }
+
     if (status === 'in_route' && !existingJob.route_started_at) {
       updateData.route_started_at = now;
       updateData.route_start_latitude = latitude;
@@ -83,6 +88,11 @@ async function updateJobStatus(
       updateData.work_completed_at = now;
       updateData.work_end_latitude = latitude;
       updateData.work_end_longitude = longitude;
+    }
+
+    // Set done_for_day_at when status indicates done for the day (but not completed)
+    if (additionalFields.done_for_day === true && !existingJob.done_for_day_at) {
+      updateData.done_for_day_at = now;
     }
 
     // Allow additional known fields to be updated (whitelisted for safety)
@@ -110,6 +120,11 @@ async function updateJobStatus(
       'equipment_confirmed_by',
       // Job survey (smart post-work survey)
       'job_survey',
+      // Done for day flag (sets done_for_day_at)
+      'done_for_day',
+      // Loading timestamp
+      'loading_started_at',
+      'done_for_day_at',
     ];
 
     for (const field of allowedExtraFields) {

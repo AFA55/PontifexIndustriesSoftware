@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required query param: jobId' }, { status: 400 });
     }
 
-    // Fetch job difficulty
+    // Fetch job difficulty and job_type
     const { data: job, error: jobError } = await supabaseAdmin
       .from('job_orders')
-      .select('id, difficulty_rating')
+      .select('id, difficulty_rating, job_type')
       .eq('id', jobId)
       .single();
 
@@ -29,11 +29,12 @@ export async function GET(request: NextRequest) {
     }
 
     const difficulty = job.difficulty_rating || 5; // default to 5 if not set
+    const jobTypes = (job.job_type || '').split(',').map((t: string) => t.trim().toLowerCase()).filter(Boolean);
 
-    // Fetch all operators with skill levels
+    // Fetch all operators with skill levels and tasks_qualified_for
     const { data: operators, error: opError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, skill_level_numeric')
+      .select('id, full_name, skill_level_numeric, tasks_qualified_for')
       .eq('role', 'operator')
       .order('full_name');
 
@@ -41,6 +42,9 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching operators for skill match:', opError);
       return NextResponse.json({ error: 'Failed to fetch operators' }, { status: 500 });
     }
+
+    let qualifiedCount = 0;
+    const totalOperators = (operators || []).length;
 
     // Calculate match quality for each operator
     const results = (operators || []).map((op) => {
@@ -55,11 +59,20 @@ export async function GET(request: NextRequest) {
         match_quality = 'over';
       }
 
+      // Check task qualification
+      const qualifiedFor: string[] = Array.isArray(op.tasks_qualified_for) ? op.tasks_qualified_for : [];
+      const qualifiedLower = qualifiedFor.map((t: string) => t.toLowerCase());
+      const isQualified = jobTypes.length === 0 || jobTypes.some((jt: string) => qualifiedLower.includes(jt));
+
+      if (isQualified) qualifiedCount++;
+
       return {
         id: op.id,
         full_name: op.full_name,
         skill_level_numeric: op.skill_level_numeric,
         match_quality,
+        is_qualified: isQualified,
+        tasks_qualified_for: qualifiedFor,
       };
     });
 
@@ -71,6 +84,9 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         job_difficulty: difficulty,
+        job_types: jobTypes,
+        qualified_count: qualifiedCount,
+        total_operators: totalOperators,
         operators: results,
       },
     });

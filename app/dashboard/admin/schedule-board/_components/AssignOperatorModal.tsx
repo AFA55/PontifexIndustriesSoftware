@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Users, MapPin, UserCheck, AlertTriangle } from 'lucide-react';
 import type { JobCardData } from './JobCard';
 
@@ -19,9 +19,41 @@ export default function AssignOperatorModal({
 }: AssignOperatorModalProps) {
   const [selectedOperator, setSelectedOperator] = useState<string>('');
   const [selectedHelper, setSelectedHelper] = useState<string>('');
+  const [skillMatchData, setSkillMatchData] = useState<{
+    qualified_count: number;
+    total_operators: number;
+    job_types: string[];
+    job_difficulty: number;
+  } | null>(null);
 
   const operatorBusy = selectedOperator ? busyOperators[selectedOperator] : null;
   const helperBusy = selectedHelper ? busyHelpers[selectedHelper] : null;
+
+  // Fetch skill match data on mount
+  useEffect(() => {
+    async function fetchSkillMatch() {
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data: session } = await supabase.auth.getSession();
+        const token = session.session?.access_token || '';
+        const res = await fetch(`/api/admin/schedule-board/skill-match?jobId=${job.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            setSkillMatchData({
+              qualified_count: json.data.qualified_count,
+              total_operators: json.data.total_operators,
+              job_types: json.data.job_types || [],
+              job_difficulty: json.data.job_difficulty,
+            });
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    fetchSkillMatch();
+  }, [job.id]);
 
   return (
     <>
@@ -58,6 +90,25 @@ export default function AssignOperatorModal({
                 </p>
               )}
             </div>
+
+            {/* Skill match warning */}
+            {skillMatchData && skillMatchData.qualified_count < Math.ceil(skillMatchData.total_operators * 0.5) && (
+              <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 rounded-xl border border-amber-200">
+                <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-amber-800 font-semibold">
+                    Only {skillMatchData.qualified_count} of {skillMatchData.total_operators} operators qualified
+                    {skillMatchData.job_types.length > 0 && (
+                      <> for {skillMatchData.job_types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')}</>
+                    )}
+                    {skillMatchData.job_difficulty > 0 && (
+                      <> at difficulty {skillMatchData.job_difficulty}</>
+                    )}
+                  </p>
+                  <p className="text-xs text-amber-600 mt-0.5">Consider scheduling carefully</p>
+                </div>
+              </div>
+            )}
 
             {/* Operator dropdown */}
             <div>

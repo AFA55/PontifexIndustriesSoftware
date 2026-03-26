@@ -19,6 +19,8 @@ interface OperatorRowViewProps {
   rowAssignments: { operator: string | null; helper: string | null }[];
   operatorIdMap: Record<string, string>;
   operatorSkillMap: Record<string, number | null>;
+  allOperatorsList: string[];
+  timeOffMap: Record<string, { type: string; notes: string | null }>;
   canDrag: boolean;
   canEdit: boolean;
   onEditJob?: (job: JobCardData, rowIndex: number | null) => void;
@@ -26,6 +28,14 @@ interface OperatorRowViewProps {
   onViewNotes?: (job: JobCardData) => void;
   onPreviewJob?: (job: JobCardData) => void;
 }
+
+const TIME_OFF_LABELS: Record<string, string> = {
+  pto: 'PTO',
+  unpaid: 'Unpaid',
+  worked_last_night: 'Worked Last Night',
+  sick: 'Sick',
+  other: 'Other',
+};
 
 const OPERATOR_COLORS = [
   { border: 'border-purple-500', bg: 'bg-purple-100', text: 'text-purple-700', badge: 'bg-purple-500', icon: 'text-purple-600' },
@@ -44,6 +54,8 @@ export default function OperatorRowView({
   rowAssignments,
   operatorIdMap,
   operatorSkillMap,
+  allOperatorsList,
+  timeOffMap,
   canDrag,
   canEdit,
   onEditJob,
@@ -51,25 +63,57 @@ export default function OperatorRowView({
   onViewNotes,
   onPreviewJob,
 }: OperatorRowViewProps) {
-  // Build operator list from row assignments that have names
+  // Build operator list — show ALL operators, not just those with jobs
   const operators = useMemo(() => {
-    const ops: (OperatorInfo & { rowIndex: number; jobs: JobCardData[]; helper: string | null })[] = [];
+    // First, build a map of operators who have row assignments with jobs
+    const assignedOps = new Map<string, { rowIndex: number; jobs: JobCardData[]; helper: string | null }>();
     for (let i = 0; i < rowAssignments.length; i++) {
       const assignment = rowAssignments[i];
       if (assignment.operator) {
-        const opId = operatorIdMap[assignment.operator] || `row-${i}`;
-        ops.push({
-          id: opId,
-          name: assignment.operator,
-          skillLevel: operatorSkillMap[assignment.operator] ?? null,
+        assignedOps.set(assignment.operator, {
           rowIndex: i,
           jobs: operatorJobs[i] || [],
           helper: assignment.helper,
         });
       }
     }
+
+    // Build full list from allOperatorsList
+    const ops: (OperatorInfo & { rowIndex: number; jobs: JobCardData[]; helper: string | null; timeOff?: { type: string; notes: string | null } })[] = [];
+    const seenNames = new Set<string>();
+
+    // First add operators with assignments (they have row indices)
+    for (const [name, data] of assignedOps) {
+      const opId = operatorIdMap[name] || `row-${data.rowIndex}`;
+      seenNames.add(name);
+      ops.push({
+        id: opId,
+        name,
+        skillLevel: operatorSkillMap[name] ?? null,
+        rowIndex: data.rowIndex,
+        jobs: data.jobs,
+        helper: data.helper,
+        timeOff: operatorIdMap[name] ? timeOffMap[operatorIdMap[name]] : undefined,
+      });
+    }
+
+    // Then add remaining operators from the full list
+    for (const name of allOperatorsList) {
+      if (seenNames.has(name)) continue;
+      const opId = operatorIdMap[name] || `op-${name}`;
+      ops.push({
+        id: opId,
+        name,
+        skillLevel: operatorSkillMap[name] ?? null,
+        rowIndex: -1, // not assigned to a row
+        jobs: [],
+        helper: null,
+        timeOff: operatorIdMap[name] ? timeOffMap[operatorIdMap[name]] : undefined,
+      });
+    }
+
     return ops;
-  }, [rowAssignments, operatorJobs, operatorIdMap, operatorSkillMap]);
+  }, [rowAssignments, operatorJobs, operatorIdMap, operatorSkillMap, allOperatorsList, timeOffMap]);
 
   const getInitials = (name: string) => {
     return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -157,13 +201,36 @@ export default function OperatorRowView({
                     )}
                   </div>
 
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${colorScheme.bg} ${colorScheme.text}`}>
-                    {op.jobs.length} {op.jobs.length === 1 ? 'job' : 'jobs'}
-                  </span>
+                  {(op as any).timeOff ? (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-600">
+                      {TIME_OFF_LABELS[(op as any).timeOff.type] || (op as any).timeOff.type}
+                    </span>
+                  ) : (
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                      op.jobs.length > 0
+                        ? `${colorScheme.bg} ${colorScheme.text}`
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {op.jobs.length > 0
+                        ? `${op.jobs.length} ${op.jobs.length === 1 ? 'job' : 'jobs'}`
+                        : 'Available'}
+                    </span>
+                  )}
                 </div>
 
-                {/* Jobs — horizontal scrolling */}
-                {op.jobs.length > 0 ? (
+                {/* Time-off block */}
+                {(op as any).timeOff ? (
+                  <div className="flex items-center gap-3 py-3 px-4 rounded-lg bg-slate-600/20 border border-slate-400 text-slate-700">
+                    <div className="w-8 h-8 rounded-lg bg-slate-500/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm">&#128564;</span>
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold">{TIME_OFF_LABELS[(op as any).timeOff.type] || (op as any).timeOff.type}</span>
+                      {(op as any).timeOff.notes && <p className="text-xs text-slate-500 mt-0.5">{(op as any).timeOff.notes}</p>}
+                    </div>
+                  </div>
+                ) : op.jobs.length > 0 ? (
+                  /* Jobs — horizontal scrolling */
                   <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
                     {op.jobs.map((job) => (
                       <div key={job.id} className="flex-shrink-0 w-64">

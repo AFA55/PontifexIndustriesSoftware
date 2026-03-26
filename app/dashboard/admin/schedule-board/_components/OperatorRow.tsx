@@ -31,7 +31,16 @@ interface OperatorRowProps {
   onChangeOperator?: (name: string | null) => void;
   onChangeHelper?: (name: string | null) => void;
   onDropJob?: (jobData: string, targetRowIndex: number) => void;
+  timeOff?: { type: string; notes: string | null };
 }
+
+const TIME_OFF_LABELS: Record<string, string> = {
+  pto: 'PTO',
+  unpaid: 'Unpaid',
+  worked_last_night: 'Worked Last Night',
+  sick: 'Sick',
+  other: 'Other',
+};
 
 // ── Inline dropdown for picking operator or helper ──────────────────────
 function PersonDropdown({
@@ -132,6 +141,7 @@ export default function OperatorRow({
   onChangeOperator,
   onChangeHelper,
   onDropJob,
+  timeOff,
 }: OperatorRowProps) {
   const hasJobs = jobs.length > 0;
   const [dragOver, setDragOver] = useState(false);
@@ -224,8 +234,21 @@ export default function OperatorRow({
           </div>
         </div>
 
+        {/* Time-off overlay */}
+        {timeOff && (
+          <div className="flex items-center gap-3 py-3 px-4 mb-3 rounded-lg bg-slate-600/20 border border-slate-400 text-slate-700">
+            <div className="w-8 h-8 rounded-lg bg-slate-500/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-sm">&#128564;</span>
+            </div>
+            <div>
+              <span className="text-sm font-bold">{TIME_OFF_LABELS[timeOff.type] || timeOff.type}</span>
+              {timeOff.notes && <p className="text-xs text-slate-500 mt-0.5">{timeOff.notes}</p>}
+            </div>
+          </div>
+        )}
+
         {/* Jobs grid */}
-        {jobs.length > 0 ? (
+        {!timeOff && jobs.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {jobs.map((job) => (
               <div
@@ -256,7 +279,8 @@ export default function OperatorRow({
               </div>
             ))}
           </div>
-        ) : (
+        )}
+        {!timeOff && jobs.length === 0 && (
           <div className={`flex items-center justify-center py-3 rounded-lg border-2 border-dashed transition-all ${
             dragOver ? 'bg-purple-50 border-purple-400' : 'bg-green-50/50 border-green-200'
           }`}>
