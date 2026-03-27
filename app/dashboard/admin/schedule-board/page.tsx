@@ -38,6 +38,7 @@ import DndBoardWrapper from './_components/DndBoardWrapper';
 import OperatorRowView from './_components/OperatorRowView';
 import ViewToggle from './_components/ViewToggle';
 import AddTimeOffModal from './_components/AddTimeOffModal';
+import BatchPrintModal from './_components/BatchPrintModal';
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
@@ -226,6 +227,7 @@ export default function ScheduleBoardPage() {
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
   const [previewJob, setPreviewJob] = useState<{ job: JobCardData; operatorName?: string | null; helperName?: string | null } | null>(null);
   const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null } | null>(null);
+  const [showBatchPrint, setShowBatchPrint] = useState(false);
 
   // ═══ AI AUTO-SCHEDULE STATE ═══
   const [autoScheduleLoading, setAutoScheduleLoading] = useState(false);
@@ -1229,7 +1231,12 @@ export default function ScheduleBoardPage() {
     const apiPayload: Record<string, unknown> = {};
     if (jobUpdates.arrival_time !== undefined) apiPayload.arrival_time = jobUpdates.arrival_time;
     if (jobUpdates.scheduled_date !== undefined) apiPayload.scheduled_date = jobUpdates.scheduled_date;
+    if (jobUpdates.end_date !== undefined) apiPayload.end_date = jobUpdates.end_date;
     if (jobUpdates.description !== undefined) apiPayload.description = jobUpdates.description;
+    if (jobUpdates.po_number !== undefined) apiPayload.po_number = jobUpdates.po_number;
+    if (jobUpdates.equipment_needed !== undefined) apiPayload.equipment_needed = jobUpdates.equipment_needed;
+    if ((jobUpdates as any).customer_contact !== undefined) apiPayload.customer_contact = (jobUpdates as any).customer_contact;
+    if ((jobUpdates as any).site_contact_phone !== undefined) apiPayload.site_contact_phone = (jobUpdates as any).site_contact_phone;
 
     const currentOp = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.operator : null;
     const operatorChanged = newOpName !== undefined && newOpName !== currentOp;
@@ -1673,6 +1680,12 @@ export default function ScheduleBoardPage() {
                     <CalendarOff className="w-4 h-4" /> Time Off
                   </button>
                   <button
+                    onClick={() => setShowBatchPrint(true)}
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-slate-700 text-sm font-semibold transition-all flex items-center gap-1.5"
+                  >
+                    <FileText className="w-4 h-4" /> Print Schedules
+                  </button>
+                  <button
                     onClick={() => {
                       fetchDispatchStatus(selectedDate);
                       setShowDispatchModal(true);
@@ -1942,7 +1955,7 @@ export default function ScheduleBoardPage() {
                 busyOperators={busyOperators}
                 busyHelpers={busyHelpers}
                 timeOff={rowAssignments[idx]?.operator && operatorIdMap[rowAssignments[idx]?.operator!] ? timeOffMap[operatorIdMap[rowAssignments[idx]?.operator!]] : undefined}
-                onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setChangeRequestTarget(job)}
+                onEditJob={(job) => canEdit ? setEditTarget({ job, rowIndex: idx }) : setChangeRequestTarget(job)}
                 onRequestChange={(job) => setChangeRequestTarget(job)}
                 onViewNotes={(job) => handleViewNotes(job)}
                 onPreviewJob={(job) => setPreviewJob({ job, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
@@ -2017,7 +2030,7 @@ export default function ScheduleBoardPage() {
                       (e.currentTarget as HTMLElement).style.opacity = '0.5';
                     }}
                     onDragEnd={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-                    onClick={() => setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null })}
+                    onClick={() => setEditTarget({ job, rowIndex: null })}
                     className={`rounded-xl border-2 border-orange-200 bg-orange-50/50 p-4 hover:shadow-md transition-all cursor-pointer ${canEdit ? 'active:cursor-grabbing' : ''}`}
                   >
                     <h4 className="font-bold text-gray-900 text-sm mb-1">{job.customer_name}</h4>
@@ -2097,6 +2110,35 @@ export default function ScheduleBoardPage() {
           onViewNotes={() => { setEditTarget(null); handleViewNotes(editTarget.job); }}
           onMakeWillCall={handleMakeWillCall}
           onRemoveFromSchedule={handleRemoveFromSchedule}
+          onRefresh={() => fetchScheduleData(selectedDate)}
+        />
+      )}
+      {showBatchPrint && (
+        <BatchPrintModal
+          jobs={[
+            ...Object.values(operatorJobs).flat().map(j => ({
+              id: j.id,
+              job_number: j.job_number,
+              customer_name: j.customer_name,
+              job_type: j.job_type,
+              location: j.location,
+              assigned_to_name: (() => {
+                for (const [idx, jobs] of Object.entries(operatorJobs)) {
+                  if (jobs.some(jj => jj.id === j.id)) return rowAssignments[Number(idx)]?.operator || null;
+                }
+                return null;
+              })(),
+            })),
+            ...unassignedJobs.map(j => ({
+              id: j.id,
+              job_number: j.job_number,
+              customer_name: j.customer_name,
+              job_type: j.job_type,
+              location: j.location,
+              assigned_to_name: null,
+            })),
+          ]}
+          onClose={() => setShowBatchPrint(false)}
         />
       )}
       {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSubmit={handleChangeRequest} onClose={() => setChangeRequestTarget(null)} />}
@@ -2261,21 +2303,7 @@ export default function ScheduleBoardPage() {
         />
       )}
 
-      {/* ═══ JOB DETAIL VIEW (full-page overlay) ═══════════════════════ */}
-      {jobDetailTarget && (
-        <JobDetailView
-          job={jobDetailTarget.job}
-          operatorName={jobDetailTarget.operatorName}
-          helperName={jobDetailTarget.helperName}
-          rowIndex={jobDetailTarget.rowIndex}
-          onClose={() => setJobDetailTarget(null)}
-          onEdit={() => {
-            const target = jobDetailTarget;
-            setJobDetailTarget(null);
-            setEditTarget({ job: target.job, rowIndex: target.rowIndex });
-          }}
-        />
-      )}
+      {/* JobDetailView sidebar removed — all editing goes through EditJobPanel */}
 
       {/* ═══ NEXT AVAILABLE DATE BANNER ════════════════════════════════ */}
       {nextAvailableDate && (
