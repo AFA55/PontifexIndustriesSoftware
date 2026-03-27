@@ -24,6 +24,9 @@ Next.js 15 (App Router) + React 19 + TypeScript + Supabase (PostgreSQL) + Tailwi
 - User can request multiple features built simultaneously using parallel agents
 - Each agent works in an isolated worktree to avoid conflicts
 - Batch by layer when possible: all backend API routes → all UI pages → all migrations
+- **CRITICAL**: Worktree branches MUST be merged back to `feature/schedule-board-v2` before session ends. User's localhost runs from the main repo, not worktrees.
+- **CRITICAL**: Worktrees do NOT inherit `.env.local` — copy it from the main repo or Supabase calls will fail.
+- If `.next/` cache causes "routes-manifest.json" errors, delete `.next/` and restart the dev server.
 
 ## Key Conventions
 - API routes use `requireAuth()`, `requireAdmin()`, `requireSuperAdmin()`, or `requireScheduleBoardAccess()` from `lib/api-auth.ts`
@@ -64,13 +67,22 @@ npm run build      # Production build check (must pass with 0 errors)
 
 ## Sprint Backlog (Target: April 2, 2026)
 
-### Week 1 — Core Feature Completion (March 19–25)
-- [ ] Finish dispatch ticket PDF generation (in progress — component + API route exist)
-- [ ] Apply permit fields migration to Supabase
-- [ ] Customer signature capture in job completion flow
-- [ ] Photo upload during job execution (Supabase Storage buckets exist)
-- [ ] PDF invoice generation (using @react-pdf/renderer — already in deps)
-- [ ] QuickBooks CSV export from billing page
+### Week 1 — Core Feature Completion (March 19–25) ✅ COMPLETE
+- [x] Finish dispatch ticket PDF generation
+- [x] Apply permit fields migration to Supabase
+- [x] Customer signature capture in job completion flow
+- [x] Photo upload during job execution
+- [x] PDF invoice generation (using @react-pdf/renderer)
+- [x] QuickBooks CSV export from billing page
+
+### Sessions 4-6 — Major Features (March 25-26) ✅ COMPLETE
+- [x] Schedule board: all operators view, time-off, skill warnings, realtime colors, inline editing
+- [x] Schedule form redesign: customer-first flow, project name, smart contact dropdown, facility compliance
+- [x] Timecard + NFC system: weekly view, per-operator breakdown, NFC management
+- [x] Facilities & badging: facility CRUD, badge tracking, auto-expiration
+- [x] Approval workflow: reject/approve/resubmit, form history
+- [x] Customer portal: public signature page, form builder, surveys
+- [x] Work-performed gate: block completion without logging work
 
 ### Week 2 — Polish, Rebrand & Launch Prep (March 26 – April 2)
 - [ ] White-label rebrand: Pontifex → Patriot Concrete Cutting (logos, names, colors)
@@ -84,3 +96,4 @@ npm run build      # Production build check (must pass with 0 errors)
 - [ ] Add audit logging to remaining admin API routes
 - [ ] Schedule board performance optimization
 - [ ] Notification system polish (SMS/email for job assignments)
+- [ ] SMS integration for signature request delivery
