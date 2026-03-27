@@ -98,6 +98,9 @@ export async function PATCH(
       zip: 'zip',
       customer_type: 'customer_type',
       payment_terms: 'payment_terms',
+      payment_method: 'payment_method',
+      tax_id: 'tax_id',
+      website: 'website',
       notes: 'notes',
       is_active: 'is_active',
     };

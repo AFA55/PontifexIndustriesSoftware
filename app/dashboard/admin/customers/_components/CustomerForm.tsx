@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Building2, Loader2 } from 'lucide-react';
+import { X, Building2, Loader2, User, DollarSign, MapPin, FileText, CreditCard } from 'lucide-react';
 
 interface CustomerFormProps {
   customer?: {
@@ -19,6 +19,9 @@ interface CustomerFormProps {
     zip?: string | null;
     customer_type?: string | null;
     payment_terms?: number | string | null;
+    payment_method?: string | null;
+    tax_id?: string | null;
+    website?: string | null;
     notes?: string | null;
   } | null;
   onSubmit: (data: Record<string, any>) => Promise<void>;
@@ -31,16 +34,30 @@ const CUSTOMER_TYPES = [
   { value: 'subcontractor', label: 'Subcontractor' },
   { value: 'direct_client', label: 'Direct Client' },
   { value: 'government', label: 'Government' },
+  { value: 'property_manager', label: 'Property Manager' },
+  { value: 'homeowner', label: 'Homeowner' },
   { value: 'other', label: 'Other' },
 ];
 
 const PAYMENT_TERMS = [
   { value: '', label: 'Select terms...' },
+  { value: 'cod', label: 'COD (Cash on Delivery)' },
+  { value: '0', label: 'Due on Receipt' },
   { value: '15', label: 'Net 15' },
   { value: '30', label: 'Net 30' },
   { value: '45', label: 'Net 45' },
   { value: '60', label: 'Net 60' },
-  { value: '0', label: 'Due on Receipt' },
+  { value: '90', label: 'Net 90' },
+];
+
+const PAYMENT_METHODS = [
+  { value: '', label: 'Select method...' },
+  { value: 'check', label: 'Check' },
+  { value: 'credit_card', label: 'Credit Card' },
+  { value: 'ach', label: 'ACH / Bank Transfer' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'wire', label: 'Wire Transfer' },
+  { value: 'other', label: 'Other' },
 ];
 
 export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFormProps) {
@@ -62,6 +79,9 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
     zip: customer?.zip || '',
     customer_type: customer?.customer_type || '',
     payment_terms: customer?.payment_terms?.toString() || '',
+    payment_method: customer?.payment_method || '',
+    tax_id: customer?.tax_id || '',
+    website: customer?.website || '',
     notes: customer?.notes || '',
   });
 
@@ -85,15 +105,19 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
   };
 
   const inputClass = 'w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-xl text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all placeholder-gray-400';
-  const labelClass = 'block text-xs font-bold text-gray-300 mb-1.5';
+  const labelClass = 'block text-xs font-bold text-gray-300 mb-1.5 uppercase tracking-wider';
+  const sectionClass = 'border border-white/10 rounded-xl p-4 space-y-3';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
+      <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-white/10 sticky top-0 bg-slate-800 z-10 rounded-t-2xl">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-purple-400" />
-            {isEdit ? 'Edit Customer' : 'Add Customer'}
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+              <Building2 className="w-4 h-4 text-white" />
+            </div>
+            {isEdit ? 'Edit Customer' : 'New Customer'}
           </h2>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
             <X className="w-5 h-5 text-gray-400" />
@@ -107,107 +131,158 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
             </div>
           )}
 
-          {/* Company Name */}
-          <div>
-            <label className={labelClass}>Company Name *</label>
-            <input
-              type="text"
-              className={inputClass}
-              placeholder="Enter company name"
-              value={form.company_name}
-              onChange={e => update('company_name', e.target.value)}
-              autoFocus
-            />
-          </div>
-
-          {/* Primary Contact */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className={labelClass}>Primary Contact</label>
-              <input type="text" className={inputClass} placeholder="Name" value={form.primary_contact_name} onChange={e => update('primary_contact_name', e.target.value)} />
+          {/* Company Info Section */}
+          <div className={sectionClass}>
+            <div className="flex items-center gap-2 mb-1">
+              <Building2 className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-bold text-white">Company Information</h3>
             </div>
-            <div>
-              <label className={labelClass}>Contact Email</label>
-              <input type="email" className={inputClass} placeholder="email@example.com" value={form.primary_contact_email} onChange={e => update('primary_contact_email', e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>Contact Phone</label>
-              <input type="tel" className={inputClass} placeholder="(555) 123-4567" value={form.primary_contact_phone} onChange={e => update('primary_contact_phone', e.target.value)} />
-            </div>
-          </div>
-
-          {/* Billing Contact */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className={labelClass}>Billing Contact</label>
-              <input type="text" className={inputClass} placeholder="Name" value={form.billing_contact_name} onChange={e => update('billing_contact_name', e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>Billing Email</label>
-              <input type="email" className={inputClass} placeholder="billing@example.com" value={form.billing_contact_email} onChange={e => update('billing_contact_email', e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>Billing Phone</label>
-              <input type="tel" className={inputClass} placeholder="(555) 123-4567" value={form.billing_contact_phone} onChange={e => update('billing_contact_phone', e.target.value)} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Company / Customer Name *</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  placeholder="e.g. ABC General Contractors"
+                  value={form.company_name}
+                  onChange={e => update('company_name', e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Customer Type</label>
+                <select className={inputClass} value={form.customer_type} onChange={e => update('customer_type', e.target.value)}>
+                  {CUSTOMER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Website</label>
+                <input type="url" className={inputClass} placeholder="https://example.com" value={form.website} onChange={e => update('website', e.target.value)} />
+              </div>
             </div>
           </div>
 
-          {/* Address */}
-          <div>
-            <label className={labelClass}>Address</label>
-            <input type="text" className={inputClass} placeholder="Street address" value={form.address} onChange={e => update('address', e.target.value)} />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className={labelClass}>City</label>
-              <input type="text" className={inputClass} placeholder="City" value={form.city} onChange={e => update('city', e.target.value)} />
+          {/* Primary Contact Section */}
+          <div className={sectionClass}>
+            <div className="flex items-center gap-2 mb-1">
+              <User className="w-4 h-4 text-blue-400" />
+              <h3 className="text-sm font-bold text-white">Main Contact</h3>
+              <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">Primary point of contact</span>
             </div>
-            <div>
-              <label className={labelClass}>State</label>
-              <input type="text" className={inputClass} placeholder="State" value={form.state} onChange={e => update('state', e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>ZIP</label>
-              <input type="text" className={inputClass} placeholder="ZIP" value={form.zip} onChange={e => update('zip', e.target.value)} />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>Contact Name</label>
+                <input type="text" className={inputClass} placeholder="John Smith" value={form.primary_contact_name} onChange={e => update('primary_contact_name', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>Email</label>
+                <input type="email" className={inputClass} placeholder="john@example.com" value={form.primary_contact_email} onChange={e => update('primary_contact_email', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>Phone</label>
+                <input type="tel" className={inputClass} placeholder="(555) 123-4567" value={form.primary_contact_phone} onChange={e => update('primary_contact_phone', e.target.value)} />
+              </div>
             </div>
           </div>
 
-          {/* Type & Terms */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>Customer Type</label>
-              <select className={inputClass} value={form.customer_type} onChange={e => update('customer_type', e.target.value)}>
-                {CUSTOMER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+          {/* Billing Contact Section */}
+          <div className={sectionClass + ' border-emerald-500/20 bg-emerald-500/5'}>
+            <div className="flex items-center gap-2 mb-1">
+              <DollarSign className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-sm font-bold text-white">Billing Contact</h3>
+              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">For invoices & payments</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>Billing Contact Name</label>
+                <input type="text" className={inputClass} placeholder="Jane Doe" value={form.billing_contact_name} onChange={e => update('billing_contact_name', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>Billing Email *</label>
+                <input type="email" className={inputClass} placeholder="billing@example.com" value={form.billing_contact_email} onChange={e => update('billing_contact_email', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>Billing Phone</label>
+                <input type="tel" className={inputClass} placeholder="(555) 123-4567" value={form.billing_contact_phone} onChange={e => update('billing_contact_phone', e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          {/* Payment & Billing Section */}
+          <div className={sectionClass}>
+            <div className="flex items-center gap-2 mb-1">
+              <CreditCard className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-bold text-white">Payment & Billing</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>Payment Terms</label>
+                <select className={inputClass} value={form.payment_terms} onChange={e => update('payment_terms', e.target.value)}>
+                  {PAYMENT_TERMS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Payment Method</label>
+                <select className={inputClass} value={form.payment_method} onChange={e => update('payment_method', e.target.value)}>
+                  {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Tax ID / EIN</label>
+                <input type="text" className={inputClass} placeholder="XX-XXXXXXX" value={form.tax_id} onChange={e => update('tax_id', e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          {/* Address Section */}
+          <div className={sectionClass}>
+            <div className="flex items-center gap-2 mb-1">
+              <MapPin className="w-4 h-4 text-red-400" />
+              <h3 className="text-sm font-bold text-white">Address</h3>
             </div>
             <div>
-              <label className={labelClass}>Payment Terms</label>
-              <select className={inputClass} value={form.payment_terms} onChange={e => update('payment_terms', e.target.value)}>
-                {PAYMENT_TERMS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+              <label className={labelClass}>Street Address</label>
+              <input type="text" className={inputClass} placeholder="123 Main St" value={form.address} onChange={e => update('address', e.target.value)} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>City</label>
+                <input type="text" className={inputClass} placeholder="City" value={form.city} onChange={e => update('city', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>State</label>
+                <input type="text" className={inputClass} placeholder="SC" value={form.state} onChange={e => update('state', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>ZIP</label>
+                <input type="text" className={inputClass} placeholder="29601" value={form.zip} onChange={e => update('zip', e.target.value)} />
+              </div>
             </div>
           </div>
 
           {/* Notes */}
-          <div>
-            <label className={labelClass}>Notes</label>
+          <div className={sectionClass}>
+            <div className="flex items-center gap-2 mb-1">
+              <FileText className="w-4 h-4 text-gray-400" />
+              <h3 className="text-sm font-bold text-white">Internal Notes</h3>
+            </div>
             <textarea
               className={inputClass + ' min-h-[80px] resize-y'}
-              placeholder="Internal notes about this customer..."
+              placeholder="Any notes about this customer (internal only)..."
               value={form.notes}
               onChange={e => update('notes', e.target.value)}
             />
           </div>
 
           {/* Submit */}
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm font-bold text-gray-400 hover:text-white transition-colors">
+          <div className="flex justify-end gap-3 pt-2 border-t border-white/10">
+            <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-gray-400 hover:text-white transition-colors">
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 rounded-xl font-bold text-sm text-white transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
+              className="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 rounded-xl font-bold text-sm text-white transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {isEdit ? 'Save Changes' : 'Create Customer'}
