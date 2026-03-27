@@ -8,7 +8,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
   ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer,
-  Paperclip, Upload, Trash2, PauseCircle, X, Image, File
+  Paperclip, Upload, Trash2, PauseCircle, X, Image, File, MapPin, Phone, Eye
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
@@ -64,10 +64,12 @@ export default function JobDetailPage() {
 
   // Documents state
   const [documents, setDocuments] = useState<any[]>([]);
-  const [docsOpen, setDocsOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(true); // Open by default now
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docCategory, setDocCategory] = useState('other');
   const [docNotes, setDocNotes] = useState('');
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
 
   const isHelper = userRole === 'apprentice';
 
@@ -149,8 +151,6 @@ export default function JobDetailPage() {
   const hasEquipmentSelections = !!(job?.equipment_selections &&
     Object.keys(job.equipment_selections).length > 0);
 
-  // Per-operator equipment confirmation check
-  // Skip checklist if this operator has already confirmed equipment for this job
   const hasOperatorConfirmedEquipment = (): boolean => {
     if (!job || !userId) return false;
     const confirmedBy = job.equipment_confirmed_by || [];
@@ -159,8 +159,6 @@ export default function JobDetailPage() {
 
   const equipmentAlreadyConfirmed = job ? hasOperatorConfirmedEquipment() : false;
 
-  // New-style jobs (schedule form): ALL items must be confirmed
-  // Old-style jobs (quick add): only mandatory items gate the button
   const canStartRoute = equipmentAlreadyConfirmed ||
     (hasEquipmentSelections
       ? checkAllConfirmed(unifiedItems, checkedItems)
@@ -170,6 +168,10 @@ export default function JobDetailPage() {
   const isInProgress = job ? ['in_route', 'in_progress'].includes(job.status) : false;
   const jobIsHelper = job?.isHelper || isHelper;
 
+  // Split documents into admin-attached and operator-uploaded
+  const adminDocs = documents.filter(d => d.uploaded_by !== userId);
+  const operatorDocs = documents.filter(d => d.uploaded_by === userId);
+
   const handleStartRoute = async () => {
     if (!canStartRoute || !job) return;
     setStartingRoute(true);
@@ -177,8 +179,6 @@ export default function JobDetailPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Build the updated equipment_confirmed_by array
-      // Append current userId if not already present
       const currentConfirmed = job.equipment_confirmed_by || [];
       const updatedConfirmed = currentConfirmed.includes(userId)
         ? currentConfirmed
@@ -196,7 +196,6 @@ export default function JobDetailPage() {
         }),
       });
 
-      // Navigate to jobsite page
       router.push(`/dashboard/my-jobs/${job.id}/jobsite`);
     } catch (err) {
       console.error('Error starting route:', err);
@@ -245,8 +244,6 @@ export default function JobDetailPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Upload to Supabase Storage
-      const ext = file.name.split('.').pop();
       const path = `${jobId}/documents/${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('job-photos')
@@ -260,7 +257,6 @@ export default function JobDetailPage() {
       const { data: urlData } = supabase.storage.from('job-photos').getPublicUrl(path);
       const fileUrl = urlData?.publicUrl;
 
-      // Save document record
       const res = await fetch(`/api/job-orders/${jobId}/documents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
@@ -277,13 +273,13 @@ export default function JobDetailPage() {
 
       if (res.ok) {
         setDocNotes('');
+        setShowUploadForm(false);
         fetchDocuments();
       }
     } catch (err) {
       console.error('Error uploading document:', err);
     } finally {
       setUploadingDoc(false);
-      // Reset file input
       e.target.value = '';
     }
   };
@@ -331,6 +327,60 @@ export default function JobDetailPage() {
   const shopArrival = formatTime(job.shop_arrival_time);
   const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
 
+  const categoryLabels: Record<string, string> = {
+    site_photo: 'Site Photo', before_after: 'Before/After',
+    permit: 'Permit', customer_doc: 'Customer Doc',
+    scope: 'Scope', other: 'Other',
+  };
+
+  const renderDocCard = (doc: any, canDelete: boolean = false) => {
+    const isImage = doc.file_type?.startsWith('image/');
+    return (
+      <div key={doc.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Clickable preview area */}
+        <a
+          href={doc.file_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block p-4 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-start gap-4">
+            <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              isImage ? 'bg-indigo-100' : 'bg-gray-100'
+            }`}>
+              {isImage ? <Image className="w-7 h-7 text-indigo-500" /> : <File className="w-7 h-7 text-gray-400" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-bold text-gray-900 truncate">{doc.file_name}</p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-xs font-semibold text-white bg-indigo-500 px-2 py-0.5 rounded-full">
+                  {categoryLabels[doc.category] || doc.category}
+                </span>
+                {doc.uploaded_by_name && (
+                  <span className="text-xs text-gray-500">by {doc.uploaded_by_name}</span>
+                )}
+              </div>
+              {doc.notes && (
+                <p className="text-sm text-gray-600 mt-1">{doc.notes}</p>
+              )}
+            </div>
+            <Eye className="w-5 h-5 text-blue-500 flex-shrink-0 mt-1" />
+          </div>
+        </a>
+        {canDelete && (
+          <div className="border-t border-gray-100 px-4 py-2">
+            <button
+              onClick={() => handleDeleteDocument(doc.id)}
+              className="text-xs text-red-500 hover:text-red-700 font-semibold flex items-center gap-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Remove
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Professional Header */}
@@ -355,7 +405,6 @@ export default function JobDetailPage() {
                 Team Member
               </span>
             )}
-            {/* Print Dispatch Ticket */}
             <button
               onClick={async () => {
                 try {
@@ -387,129 +436,190 @@ export default function JobDetailPage() {
 
         {/* Equipment already confirmed banner */}
         {equipmentAlreadyConfirmed && (
-          <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            Equipment already confirmed — checklist not required
+          <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-4 py-3 rounded-xl text-base font-semibold flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5" />
+            Equipment confirmed — checklist not required
           </div>
         )}
 
         {/* Special Arrival Time */}
         {(arrivalDisplay || shopArrival) && !isCompleted && (
-          <div className="bg-gradient-to-r from-red-500 via-red-500 to-orange-500 text-white px-4 py-3 rounded-2xl flex items-center gap-3 shadow-lg">
-            <Clock className="w-5 h-5 flex-shrink-0" />
-            <div className="text-sm font-bold">
+          <div className="bg-gradient-to-r from-red-500 via-red-500 to-orange-500 text-white px-5 py-4 rounded-2xl flex items-center gap-4 shadow-lg">
+            <Clock className="w-6 h-6 flex-shrink-0" />
+            <div className="text-base font-bold">
               {shopArrival && <span>Shop: {shopArrival}</span>}
-              {shopArrival && arrivalDisplay && <span className="mx-1.5">&bull;</span>}
+              {shopArrival && arrivalDisplay && <span className="mx-2">&bull;</span>}
               {arrivalDisplay && <span>Arrive: {arrivalDisplay}</span>}
             </div>
           </div>
         )}
 
-        {/* Status Badges */}
+        {/* Status & Priority Badges */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${getStatusStyle(job.status)}`}>
+          <span className={`text-sm px-3 py-1.5 rounded-full border font-bold ${getStatusStyle(job.status)}`}>
             {job.readable_status}
           </span>
           {isMultiDay && (
-            <span className="text-xs px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full font-semibold border border-purple-200">
+            <span className="text-sm px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full font-bold border border-purple-200">
               Multi-Day
             </span>
           )}
           {jobIsHelper && (
-            <span className="text-xs px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full font-semibold border border-emerald-200">
+            <span className="text-sm px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-full font-bold border border-emerald-200">
               Team Member
             </span>
           )}
           {job.priority === 'urgent' && (
-            <span className="text-xs px-2.5 py-1 bg-red-500 text-white rounded-full font-bold">URGENT</span>
+            <span className="text-sm px-3 py-1.5 bg-red-500 text-white rounded-full font-bold">URGENT</span>
           )}
           {job.priority === 'high' && (
-            <span className="text-xs px-2.5 py-1 bg-orange-500 text-white rounded-full font-bold">HIGH</span>
+            <span className="text-sm px-3 py-1.5 bg-orange-500 text-white rounded-full font-bold">HIGH</span>
           )}
         </div>
 
         {/* On-Hold Banner */}
         {isOnHold && (
-          <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-4 shadow-sm">
+          <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-5 shadow-sm">
             <div className="flex items-start gap-3">
-              <PauseCircle className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+              <PauseCircle className="w-6 h-6 text-purple-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <p className="text-sm font-bold text-purple-800">Job On Hold</p>
+                <p className="text-base font-bold text-purple-800">Job On Hold</p>
                 {job.pause_reason && (
-                  <p className="text-xs text-purple-600 mt-0.5">{job.pause_reason}</p>
+                  <p className="text-sm text-purple-600 mt-1">{job.pause_reason}</p>
                 )}
                 {job.return_date && (
-                  <p className="text-xs text-purple-500 mt-0.5">Expected return: {job.return_date}</p>
+                  <p className="text-sm text-purple-500 mt-1">Expected return: {job.return_date}</p>
                 )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Crew Info */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="w-4 h-4 text-blue-600" />
-            <h3 className="text-sm font-bold text-gray-800">Crew</h3>
+        {/* Job Location Card */}
+        {(job.address || job.location) && (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-gray-800 mb-1">Location</h3>
+                <p className="text-base text-gray-700 font-medium">{job.address || job.location}</p>
+              </div>
+            </div>
+            {job.address && (
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors border border-blue-200"
+              >
+                <MapPin className="w-4 h-4" /> Open in Maps
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Site Contact Card */}
+        {(job.foreman_name || job.customer_contact || job.site_contact_phone) && (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Phone className="w-5 h-5 text-green-600" />
+              <h3 className="text-base font-bold text-gray-800">Site Contact</h3>
+            </div>
+            <div className="space-y-3">
+              {job.foreman_name && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="text-xs text-gray-500 font-semibold uppercase">Contact</p>
+                    <p className="text-base font-bold text-gray-900">{job.foreman_name}</p>
+                  </div>
+                  {job.foreman_phone && (
+                    <a href={`tel:${job.foreman_phone}`} className="flex items-center gap-1.5 px-4 py-2.5 bg-green-500 text-white rounded-xl text-sm font-bold hover:bg-green-600 transition-colors">
+                      <Phone className="w-4 h-4" /> Call
+                    </a>
+                  )}
+                </div>
+              )}
+              {job.site_contact_phone && !job.foreman_phone && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="text-xs text-gray-500 font-semibold uppercase">Site Phone</p>
+                    <p className="text-base font-bold text-gray-900">{job.site_contact_phone}</p>
+                  </div>
+                  <a href={`tel:${job.site_contact_phone}`} className="flex items-center gap-1.5 px-4 py-2.5 bg-green-500 text-white rounded-xl text-sm font-bold hover:bg-green-600 transition-colors">
+                    <Phone className="w-4 h-4" /> Call
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Crew Info - Bigger cards */}
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-blue-600" />
+            <h3 className="text-base font-bold text-gray-800">Crew</h3>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center gap-2 p-2.5 bg-blue-50 rounded-xl border border-blue-100">
-              <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+              <div className="w-11 h-11 bg-blue-500 text-white rounded-full flex items-center justify-center text-base font-bold flex-shrink-0">
                 {(job.operator_name || 'O')[0].toUpperCase()}
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-wider">Operator</p>
-                <p className="text-sm font-bold text-gray-900 truncate">{job.operator_name || 'Unassigned'}</p>
+                <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider">Operator</p>
+                <p className="text-base font-bold text-gray-900 truncate">{job.operator_name || 'Unassigned'}</p>
               </div>
             </div>
             {job.helper_name && (
-              <div className="flex items-center gap-2 p-2.5 bg-emerald-50 rounded-xl border border-emerald-100">
-                <div className="w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                <div className="w-11 h-11 bg-emerald-500 text-white rounded-full flex items-center justify-center text-base font-bold flex-shrink-0">
                   {job.helper_name[0].toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider">Team Member</p>
-                  <p className="text-sm font-bold text-gray-900 truncate">{job.helper_name}</p>
+                  <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wider">Team Member</p>
+                  <p className="text-base font-bold text-gray-900 truncate">{job.helper_name}</p>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Work Details Panel */}
+        {/* Work Details Panel - Bigger text */}
         <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
           <button
             onClick={() => setWorkDetailsOpen(!workDetailsOpen)}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-bold text-gray-800">Work Details</span>
+              <FileText className="w-5 h-5 text-blue-600" />
+              <span className="text-base font-bold text-gray-800">Work Details</span>
             </div>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${workDetailsOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${workDetailsOpen ? 'rotate-180' : ''}`} />
           </button>
           {workDetailsOpen && (
-            <div className="px-4 pb-4 space-y-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-bold">
+            <div className="px-5 pb-5 space-y-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="px-4 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-base font-bold">
                   {job.job_type}
                 </span>
                 {job.estimated_hours && (
-                  <span className="text-sm text-gray-500">Est. {job.estimated_hours} hrs</span>
+                  <span className="text-base text-gray-500">Est. {job.estimated_hours} hrs</span>
                 )}
                 {job.po_number && (
-                  <span className="text-xs text-gray-500">PO: {job.po_number}</span>
+                  <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">PO: {job.po_number}</span>
                 )}
               </div>
-              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">
                   {job.description || 'No description provided'}
                 </p>
               </div>
               {/* Scope Details (quantities) */}
               {job.scope_details && Object.keys(job.scope_details).length > 0 && (
                 <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Scope Quantities</p>
+                  <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Scope Quantities</p>
                   <ScopeDetailsDisplay scopeDetails={job.scope_details} />
                 </div>
               )}
@@ -522,8 +632,8 @@ export default function JobDetailPage() {
                 <PhotoViewer photos={job.site_compliance.attachment_urls} label="Compliance Documents" />
               )}
               {(job.salesman_name || job.created_by_name) && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <User className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2 text-base text-gray-600">
+                  <User className="w-4 h-4" />
                   <span>Submitted by: <strong>{job.salesman_name || job.created_by_name}</strong></span>
                 </div>
               )}
@@ -536,11 +646,11 @@ export default function JobDetailPage() {
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
             <button
               onClick={() => setEquipmentOpen(!equipmentOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-bold text-gray-800">Equipment Confirmation</span>
+                <Wrench className="w-5 h-5 text-green-600" />
+                <span className="text-base font-bold text-gray-800">Equipment Confirmation</span>
                 {!equipmentAlreadyConfirmed && !isCompleted && (
                   <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                     canStartRoute ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
@@ -549,10 +659,10 @@ export default function JobDetailPage() {
                   </span>
                 )}
               </div>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${equipmentOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${equipmentOpen ? 'rotate-180' : ''}`} />
             </button>
             {equipmentOpen && (
-              <div className="px-4 pb-4">
+              <div className="px-5 pb-5">
                 <UnifiedEquipmentPanel
                   equipmentSelections={job.equipment_selections}
                   equipmentNeeded={allEquipment}
@@ -591,33 +701,63 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Documents Section */}
+        {/* Admin Documents & Photos - Prominent section */}
+        {adminDocs.length > 0 && (
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl shadow-xl border-2 border-indigo-200 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Paperclip className="w-5 h-5 text-indigo-600" />
+              <h3 className="text-base font-bold text-indigo-900">Job Documents & Photos</h3>
+              <span className="text-xs px-2 py-0.5 bg-indigo-500 text-white rounded-full font-bold">
+                {adminDocs.length}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {adminDocs.map(doc => renderDocCard(doc, false))}
+            </div>
+          </div>
+        )}
+
+        {/* Operator Documents - Collapsible upload section */}
         <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
           <button
-            onClick={() => { setDocsOpen(!docsOpen); }}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+            onClick={() => setDocsOpen(!docsOpen)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <Paperclip className="w-4 h-4 text-indigo-600" />
-              <span className="text-sm font-bold text-gray-800">Documents & Photos</span>
-              {documents.length > 0 && (
+              <Upload className="w-5 h-5 text-indigo-600" />
+              <span className="text-base font-bold text-gray-800">My Uploads</span>
+              {operatorDocs.length > 0 && (
                 <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-semibold">
-                  {documents.length}
+                  {operatorDocs.length}
                 </span>
               )}
             </div>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${docsOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${docsOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {docsOpen && (
-            <div className="px-4 pb-4 space-y-3">
-              {/* Upload controls */}
-              <div className="space-y-2">
-                <div className="flex gap-2">
+            <div className="px-5 pb-5 space-y-3">
+              {/* Operator docs list */}
+              {operatorDocs.length > 0 && (
+                <div className="space-y-3">
+                  {operatorDocs.map(doc => renderDocCard(doc, true))}
+                </div>
+              )}
+
+              {/* Upload toggle */}
+              {!showUploadForm ? (
+                <button
+                  onClick={() => setShowUploadForm(true)}
+                  className="w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                >
+                  <Upload className="w-4 h-4" /> Upload Document or Photo
+                </button>
+              ) : (
+                <div className="space-y-2 p-4 bg-gray-50 rounded-xl border border-gray-200">
                   <select
                     value={docCategory}
                     onChange={e => setDocCategory(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="site_photo">Site Photo</option>
                     <option value="before_after">Before / After</option>
@@ -626,77 +766,33 @@ export default function JobDetailPage() {
                     <option value="scope">Scope of Work</option>
                     <option value="other">Other</option>
                   </select>
-                </div>
-                <input
-                  type="text"
-                  value={docNotes}
-                  onChange={e => setDocNotes(e.target.value)}
-                  placeholder="Notes (optional)"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-                <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-semibold cursor-pointer hover:bg-indigo-100 transition-all ${uploadingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  {uploadingDoc ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
-                  ) : (
-                    <><Upload className="w-4 h-4" /> Tap to upload file or photo</>
-                  )}
                   <input
-                    type="file"
-                    accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                    disabled={uploadingDoc}
+                    type="text"
+                    value={docNotes}
+                    onChange={e => setDocNotes(e.target.value)}
+                    placeholder="Notes (optional)"
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
-                </label>
-              </div>
-
-              {/* Document list */}
-              {documents.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-3">No documents yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {documents.map(doc => {
-                    const isImage = doc.file_type?.startsWith('image/');
-                    const categoryLabels: Record<string, string> = {
-                      site_photo: 'Site Photo', before_after: 'Before/After',
-                      permit: 'Permit', customer_doc: 'Customer Doc',
-                      scope: 'Scope', other: 'Other',
-                    };
-                    return (
-                      <div key={doc.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                        <div className="p-1.5 bg-white rounded-lg border border-slate-200 flex-shrink-0">
-                          {isImage ? <Image className="w-4 h-4 text-indigo-500" /> : <File className="w-4 h-4 text-slate-400" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <a
-                            href={doc.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm font-semibold text-indigo-700 hover:underline truncate block"
-                          >
-                            {doc.file_name}
-                          </a>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                              {categoryLabels[doc.category] || doc.category}
-                            </span>
-                            {doc.notes && (
-                              <span className="text-xs text-slate-500 truncate max-w-[150px]">{doc.notes}</span>
-                            )}
-                          </div>
-                          {doc.uploaded_by_name && (
-                            <p className="text-[10px] text-slate-400 mt-0.5">by {doc.uploaded_by_name}</p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => handleDeleteDocument(doc.id)}
-                          className="p-1.5 text-slate-300 hover:text-red-500 transition-colors flex-shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
+                  <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-semibold cursor-pointer hover:bg-indigo-100 transition-all ${uploadingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    {uploadingDoc ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+                    ) : (
+                      <><Upload className="w-4 h-4" /> Tap to select file</>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={uploadingDoc}
+                    />
+                  </label>
+                  <button
+                    onClick={() => setShowUploadForm(false)}
+                    className="w-full text-sm text-gray-500 hover:text-gray-700 py-1"
+                  >
+                    Cancel
+                  </button>
                 </div>
               )}
             </div>
@@ -709,27 +805,27 @@ export default function JobDetailPage() {
             {isInProgress ? (
               <button
                 onClick={handleContinueJob}
-                className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2"
+                className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
               >
-                <PlayCircle className="w-5 h-5" />
+                <PlayCircle className="w-6 h-6" />
                 {job.status === 'in_route' ? 'Continue to Jobsite' : 'Continue Work'}
               </button>
             ) : (
               <button
                 onClick={handleStartRoute}
                 disabled={!canStartRoute || startingRoute}
-                className={`w-full py-4 rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2 ${
+                className={`w-full py-5 rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3 ${
                   canStartRoute
                     ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
                     : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                 }`}
               >
                 {startingRoute ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Starting...</>
+                  <><Loader2 className="w-6 h-6 animate-spin" /> Starting...</>
                 ) : canStartRoute ? (
-                  <><PlayCircle className="w-5 h-5" /> Start In Route</>
+                  <><PlayCircle className="w-6 h-6" /> Start In Route</>
                 ) : (
-                  <><Wrench className="w-5 h-5" /> Complete Required Equipment First</>
+                  <><Wrench className="w-6 h-6" /> Complete Required Equipment First</>
                 )}
               </button>
             )}
@@ -741,9 +837,9 @@ export default function JobDetailPage() {
           <div className="pt-2">
             <button
               onClick={handleResumeJob}
-              className="w-full py-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2"
+              className="w-full py-5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
             >
-              <PlayCircle className="w-5 h-5" />
+              <PlayCircle className="w-6 h-6" />
               Resume This Job
             </button>
           </div>
@@ -754,9 +850,9 @@ export default function JobDetailPage() {
           <div className="pt-2">
             <button
               onClick={handleViewCompleted}
-              className="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold text-sm transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold text-base transition-all flex items-center justify-center gap-2"
             >
-              <FileText className="w-4 h-4" /> View Work Performed
+              <FileText className="w-5 h-5" /> View Work Performed
             </button>
           </div>
         )}
