@@ -588,6 +588,12 @@ export default function ScheduleFormPage() {
   // Form templates for step 6
   const [formTemplates, setFormTemplates] = useState<{ id: string; name: string; form_type: string; description: string }[]>([]);
 
+  // Draft state
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [showDraftPicker, setShowDraftPicker] = useState(false);
+  const [savedDrafts, setSavedDrafts] = useState<{ id: string; customer: string; step: number; date: string }[]>([]);
+  const [draftSaved, setDraftSaved] = useState(false);
+
   // PO lookup state
   const [poMatch, setPoMatch] = useState<{
     customer_name: string; address: string; location: string;
@@ -674,7 +680,89 @@ export default function ScheduleFormPage() {
       } catch {}
     };
     loadFormTemplates();
+
+    // Load saved drafts from localStorage
+    try {
+      const draftsRaw = localStorage.getItem('schedule_form_drafts');
+      if (draftsRaw) {
+        const drafts = JSON.parse(draftsRaw) as Record<string, { form: FormData; step: number; savedAt: string }>;
+        const draftList = Object.entries(drafts).map(([id, d]) => ({
+          id,
+          customer: d.form.contractor_name || 'Untitled',
+          step: d.step,
+          date: d.savedAt,
+        })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        if (draftList.length > 0) {
+          setSavedDrafts(draftList);
+          setShowDraftPicker(true);
+        }
+      }
+    } catch {}
   }, [router]);
+
+  // Auto-save draft on form or step changes
+  useEffect(() => {
+    if (!user || submitted) return;
+    // Don't save if form is still at initial state with no customer
+    if (!form.contractor_name && currentStep === 1) return;
+
+    const id = draftId || `draft-${Date.now()}`;
+    if (!draftId) setDraftId(id);
+
+    try {
+      const draftsRaw = localStorage.getItem('schedule_form_drafts');
+      const drafts = draftsRaw ? JSON.parse(draftsRaw) : {};
+      drafts[id] = { form, step: currentStep, savedAt: new Date().toISOString() };
+      localStorage.setItem('schedule_form_drafts', JSON.stringify(drafts));
+    } catch {}
+  }, [form, currentStep, user, submitted, draftId]);
+
+  const handleSaveAndExit = () => {
+    const id = draftId || `draft-${Date.now()}`;
+    try {
+      const draftsRaw = localStorage.getItem('schedule_form_drafts');
+      const drafts = draftsRaw ? JSON.parse(draftsRaw) : {};
+      drafts[id] = { form, step: currentStep, savedAt: new Date().toISOString() };
+      localStorage.setItem('schedule_form_drafts', JSON.stringify(drafts));
+    } catch {}
+    setDraftSaved(true);
+    setTimeout(() => router.push('/dashboard/admin'), 800);
+  };
+
+  const handleLoadDraft = (id: string) => {
+    try {
+      const draftsRaw = localStorage.getItem('schedule_form_drafts');
+      if (draftsRaw) {
+        const drafts = JSON.parse(draftsRaw);
+        const draft = drafts[id];
+        if (draft) {
+          setForm(draft.form);
+          setCurrentStep(draft.step);
+          setDraftId(id);
+        }
+      }
+    } catch {}
+    setShowDraftPicker(false);
+  };
+
+  const handleDeleteDraft = (id: string) => {
+    try {
+      const draftsRaw = localStorage.getItem('schedule_form_drafts');
+      if (draftsRaw) {
+        const drafts = JSON.parse(draftsRaw);
+        delete drafts[id];
+        localStorage.setItem('schedule_form_drafts', JSON.stringify(drafts));
+        setSavedDrafts(prev => prev.filter(d => d.id !== id));
+      }
+    } catch {}
+  };
+
+  const handleStartNew = () => {
+    setDraftId(null);
+    setForm({ ...initialFormData, submitted_by: user?.name || '' });
+    setCurrentStep(1);
+    setShowDraftPicker(false);
+  };
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -1200,6 +1288,18 @@ export default function ScheduleFormPage() {
 
       setCreatedJobNumber(result.data.job_number);
       setSubmitted(true);
+
+      // Clean up draft on successful submit
+      if (draftId) {
+        try {
+          const draftsRaw = localStorage.getItem('schedule_form_drafts');
+          if (draftsRaw) {
+            const drafts = JSON.parse(draftsRaw);
+            delete drafts[draftId];
+            localStorage.setItem('schedule_form_drafts', JSON.stringify(drafts));
+          }
+        } catch {}
+      }
 
       // Fire-and-forget: save contact info for autocomplete
       if (form.contractor_name.trim()) {
@@ -3266,7 +3366,17 @@ export default function ScheduleFormPage() {
               <span className="hidden sm:inline">Schedule Form</span>
             </h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/admin/schedule-form-history"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all text-xs font-semibold">
+              <FileText size={14} />
+              Previous Forms
+            </Link>
+            <button onClick={handleSaveAndExit}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg transition-all text-xs font-bold">
+              {draftSaved ? <CheckCircle size={14} /> : <ArrowLeft size={14} />}
+              {draftSaved ? 'Saved!' : 'Save & Exit'}
+            </button>
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
               <span className="text-xs font-bold text-slate-500">STEP</span>
               <span className={`text-sm font-bold bg-gradient-to-r ${currentStepData.color} bg-clip-text text-transparent`}>
@@ -3408,6 +3518,47 @@ export default function ScheduleFormPage() {
         </div>
         <p className="text-center text-xs text-slate-400 mt-2 font-medium">{Math.round((currentStep / 8) * 100)}% complete</p>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* DRAFT PICKER MODAL                                          */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      {showDraftPicker && savedDrafts.length > 0 && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleStartNew} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 text-white">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <FileText size={20} /> Continue a Draft?
+              </h2>
+              <p className="text-blue-200 text-sm mt-0.5">You have saved schedule forms in progress</p>
+            </div>
+            <div className="max-h-[40vh] overflow-y-auto divide-y divide-gray-100">
+              {savedDrafts.map(draft => (
+                <div key={draft.id} className="flex items-center gap-3 px-6 py-3 hover:bg-blue-50 transition-colors">
+                  <button onClick={() => handleLoadDraft(draft.id)} className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-gray-900">{draft.customer}</p>
+                    <p className="text-xs text-gray-500">Step {draft.step}/8 · Saved {new Date(draft.date).toLocaleDateString()} {new Date(draft.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </button>
+                  <button onClick={() => handleLoadDraft(draft.id)}
+                    className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs font-bold transition-colors">
+                    Resume
+                  </button>
+                  <button onClick={() => handleDeleteDraft(draft.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-gray-200 px-6 py-3 flex justify-end">
+              <button onClick={handleStartNew}
+                className="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md">
+                <Plus size={14} className="inline mr-1.5" /> Start New Form
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════ */}
       {/* NEW CUSTOMER MODAL                                          */}
