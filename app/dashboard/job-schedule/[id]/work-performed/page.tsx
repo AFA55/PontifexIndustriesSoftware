@@ -10,7 +10,8 @@ import QuickAccessButtons from '@/components/QuickAccessButtons';
 import EquipmentUsageForm from '@/components/EquipmentUsageForm';
 import RecommendedItems from './_components/RecommendedItems';
 import PhotoUploader from '@/components/PhotoUploader';
-import { Camera } from 'lucide-react';
+import { Camera, Mic } from 'lucide-react';
+import VoiceMemoNotes from './_components/VoiceMemoNotes';
 
 // Organized work item categories based on DSM screenshots
 const WORK_CATEGORIES = {
@@ -212,6 +213,7 @@ export default function WorkPerformed() {
   const [jobType, setJobType] = useState<string>('');
   const [currentDayNumber, setCurrentDayNumber] = useState<number>(1);
   const [jobPhotos, setJobPhotos] = useState<string[]>([]);
+  const [voiceNotes, setVoiceNotes] = useState<string>('');
 
   // Fetch job type and day number for smart recommendations + correct work item tracking
   useEffect(() => {
@@ -1156,7 +1158,8 @@ export default function WorkPerformed() {
           },
           body: JSON.stringify({
             items: selectedItems,
-            dayNumber: currentDayNumber
+            dayNumber: currentDayNumber,
+            notes: voiceNotes || undefined
           })
         });
 
@@ -1209,6 +1212,7 @@ export default function WorkPerformed() {
         jobId: params.id,
         items: selectedItems,
         photos: jobPhotos,
+        notes: voiceNotes || '',
         timestamp: new Date().toISOString()
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
@@ -1226,6 +1230,7 @@ export default function WorkPerformed() {
         jobId: params.id,
         items: selectedItems,
         photos: jobPhotos,
+        notes: voiceNotes || '',
         timestamp: new Date().toISOString()
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
@@ -1803,6 +1808,23 @@ export default function WorkPerformed() {
             maxPhotos={10}
             label="Add Job Photos"
             lightMode={true}
+          />
+        </div>
+
+        {/* Voice Memo Notes */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mx-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Mic className="w-5 h-5 text-blue-600" />
+            <h3 className="text-sm font-bold text-slate-700">Job Notes</h3>
+            <span className="text-xs text-slate-400">(voice or typed)</span>
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            Describe work performed, conditions encountered, or anything noteworthy. Use the mic button to dictate notes hands-free.
+          </p>
+          <VoiceMemoNotes
+            notes={voiceNotes}
+            onNotesChange={setVoiceNotes}
+            placeholder="Tap the mic and describe what you did today..."
           />
         </div>
 
