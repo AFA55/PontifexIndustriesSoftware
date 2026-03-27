@@ -1,118 +1,476 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 26, 2026 (Session 5) | **Branch:** `claude/admiring-mahavira` (worktree) | **Build Status:** PASSING
+**Date:** March 25, 2026 (Session 4) | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✓ 178/178 pages
 
 ---
 
 ## CURRENT STATE
 
 ### Git Status
-- **Branch:** `claude/admiring-mahavira` (worktree off main)
-- **Last commits:**
+- **Branch:** `feature/schedule-board-v2` (pushed to origin)
+- **Last commit:** `1f583993` — "fix: completed jobs page — load work_performed from DB not localStorage"
+- **Clean working tree** (all changes committed and pushed)
+
+### Recent Commits (March 24, Session 3)
 ```
-27c19674 feat: per-operator timecard breakdown, contact dropdown fix, RBAC updates
-2c7aa72e feat: customer portal, signature requests, form builder, work-performed gate
-12cf0ca0 feat: schedule board enhancements — all operators view, time-off, skill warnings, realtime status colors, inline editing, work history
-0def15f8 docs: update handoff — March 25 session 4 complete
+1f583993 fix: completed jobs page — load work_performed from DB not localStorage
+07764629 fix: make last_reminder_sent_at update fire-and-forget
+88932f85 fix: operator notification banner + billing reminder enhancements
+fa5b6c92 feat: invoice reminders, AR dispatch warnings, operator assignment notifications
 ```
-- **Clean working tree** (all changes committed + pushed)
-- **Migrations applied to Supabase:** All previous + `time_off_and_status_tracking` + `signature_requests_forms`
 
-### What Was Built This Session (5 Major Feature Areas)
+### Recent Commits (March 24, Session 2)
+```
+1fe9a5a2 docs: update handoff — March 24 session 2 complete
+a0d9050d feat: auto-refresh Active Jobs page every 30s with live indicator
+fbad6012 fix: use RESEND_FROM_EMAIL env var in liability release + fix husky warning
+d42c3e0f feat: send payment receipt email when invoice is paid in full
+eab0ec00 feat: notify admins when job is completed (ready to invoice)
+a8f92226 feat: real-time analytics dashboard + security fixes + silica plan email
+2fc57a8c fix: mobile responsiveness audit — remaining 8 operator pages
+03d2cb05 fix: mobile responsiveness audit — operator pages
+ed89cbef fix: wire maintenance request form to damage-report API
+```
 
-#### 1. Schedule Board Enhancements
-- **All Operators View:** Shows every operator in Operator View (not just assigned), with "Available" status
-- **Time-Off System:** PTO/unpaid/worked_last_night/sick shown as dark grey blocks on schedule board
-- **Skill Match Warnings:** "Only X of Y operators qualified for Wall Saw at difficulty 7" in assignment modal
-- **Real-time Status Colors:** Job cards change color as operators progress (grey→yellow→blue→orange→green)
-- **Supabase Realtime:** Live board updates when operators change status from their phone
-- **Status Timeline:** Visual loading→route→progress→done timeline in job detail header
+### Previous Session Commits (March 24, Session 1)
+```
+94ab0536 fix: use RESEND_FROM_EMAIL env var in invoice send route
+e24a256a feat: enforce mandatory signature + QuickBooks CSV export
+64547aea fix: add force-dynamic to all client pages + secure remaining API routes
+6d6ceaf4 security: replace manual JWT auth with requireAuth/requireAdmin helpers across all API routes
+```
 
-#### 2. Job Detail View Redesign
-- **2-column layout:** 70% job details (left) + 30% notes sidebar (right)
-- **Notes sidebar:** Chronological feed with "Add Note" input, inline CRUD
-- **Inline editing:** Toggle edit mode — date, time, PO, description, equipment become editable inputs
-- **Save/Cancel** buttons replace Edit button in editing mode
-- **Work History tab:** Day-by-day breakdown with load→route→done times per day
+### Previous Session Commits (March 20)
+```
+935573c0 docs: Update handoff — March 20 session (photos, mobile, error handling)
+3b1ab8cb fix: Add error handling with retry banners across key pages
+58007779 fix: Mobile responsive audit — critical issues across admin pages
+97975d0f feat: Photo upload during job execution + enhanced signature capture
+6494f198 fix: Improve AI parser accuracy for customer names and addresses
+```
 
-#### 3. Customer Portal & Signature System
-- **Public portal:** `/sign/[token]` — no auth required, renders utility waiver / completion form / custom form
-- **Signature requests:** Generate unique token, SMS link to site contact
-- **Survey integration:** After completion signature, show cleanliness/communication/overall ratings
-- **Operator ratings:** Survey results feed into operator profile averages
-- **Remote signature:** "Request Remote Signature" button on day-complete page
-
-#### 4. Custom Form Builder
-- **Form templates:** Admin creates reusable forms (pre_work, post_work, custom)
-- **Drag-and-drop fields:** text, textarea, checkbox, signature, select, date, number
-- **Form assignment:** Link templates to jobs, track completion status
-- **Work-performed gate:** Blocks "Done for Day" / "Job Complete" until work performed is logged
-
-#### 5. Timecards & Contact Fix
-- **Per-operator breakdown:** Regular/Weekly OT/Mandatory OT/Night Shift/Shop hour cards
-- **Daily grid:** Mon-Sun with clock in/out, job linkage, hour type color-coding
-- **"View Details" links** per operator in main timecards page
-- **Contact dropdown fix:** Don't auto-fill when customer has multiple contacts; show dropdown with role badges
-
-### Database Changes (Applied to Supabase)
-- `operator_time_off` table (PTO, unpaid, sick, worked_last_night)
-- `signature_requests` table (token-based public access)
-- `customer_surveys` table (post-completion feedback)
-- `form_templates` table (custom form builder)
-- `job_form_assignments` table (link templates to jobs)
-- `job_orders` new columns: `loading_started_at`, `done_for_day_at`, `require_waiver_signature`, `require_completion_signature`
-- RLS policies for all new tables
-
-### New API Routes
-| Route | Purpose |
-|-------|---------|
-| `CRUD /api/admin/schedule-board/time-off` | Operator time-off management |
-| `GET /api/job-orders/[id]/work-history` | Work performed history |
-| `CRUD /api/admin/form-templates` | Form template management |
-| `POST /api/admin/job-orders/[id]/forms` | Assign forms to jobs |
-| `POST /api/job-orders/[id]/request-signature` | Generate signature request |
-| `GET/POST /api/public/signature/[token]` | Public signature portal API |
-
-### New Pages
-| Page | Access |
-|------|--------|
-| `/sign/[token]` | Public (no auth) |
-| `/dashboard/admin/form-builder` | admin+ |
+### Previous Session Commits (March 19)
+```
+87b3389d docs: Update handoff — AI auto-schedule + AI smart fill complete
+d99d4027 feat: AI Smart Fill — voice/text job parsing for schedule form
+528a35b9 feat: AI Auto-Scheduling Engine with one-click operator assignment
+d9ecc37a docs: Deep competitive analysis — Pontifex vs CenPoint vs DSM
+feddc0a7 feat: Professional invoice PDF generation + create invoice form
+2e9b0d13 feat: Apply white-label branding across entire application
+bb3d9eb5 feat: White-label branding system with full settings UI
+f83b4c15 feat: Customer CRM system with profiles, contacts, and schedule form integration
+ab330d34 feat: Drag-and-drop schedule board with operator view + smart skill matching
+c17f185f feat: Dispatch ticket PDF redesign + full-page job detail view
+```
 
 ---
 
-## NEXT SESSION PRIORITIES
+## WHAT WAS BUILT (March 21 Session)
 
-### Immediate (merge to feature branch)
-- [ ] Merge `claude/admiring-mahavira` worktree commits into `feature/schedule-board-v2`
-- [ ] Push merged branch to origin
+### 1. Global Toast Notification System
+- **File:** `contexts/NotificationContext.tsx`
+- `useNotifications()` hook — available app-wide via root layout
+- Methods: `success()`, `error()`, `warning()`, `info()`, `notify()`
+- 5 notification types: success, error, warning, info, offline, reconnected
+- Auto-dismiss with animated progress bar (8s errors, 6s warnings, 4s info/success)
+- Max 5 visible, stacked bottom-right, support for persistent + action buttons
+- Wired into root layout: `ThemeProvider > BrandingProvider > NotificationProvider > ErrorBoundary`
 
-### Week 2 Sprint Items (March 26 – April 2)
-- [ ] White-label rebrand: Pontifex → Patriot Concrete Cutting (logos, names, colors)
-- [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
-- [ ] Mobile responsive audit on all operator pages
-- [ ] Loading states & error handling audit across all pages
+### 2. Network/Connection Monitor
+- **File:** `components/NetworkMonitor.tsx`
+- Detects browser offline/online transitions instantly
+- Persistent top banner when offline: "No internet connection"
+- "Back online" toast when reconnecting
+- Monitors ALL fetch() calls globally — counts 500 errors
+- After 3+ server errors → shows "Server issues detected" + retry action
+- Periodic health check every 30s when unhealthy (hits `/api/health`)
+- Amber animated banner during server degradation
+
+### 3. Global Error Boundary
+- **File:** `components/ErrorBoundary.tsx`
+- Prevents white screen crashes — catches React render errors
+- Full-page recovery UI: "Try Again", "Reload Page", "Go to Dashboard"
+- Collapsible technical details section
+- Auto-logs crashes to `/api/log-error`
+- Also exports `SectionErrorBoundary` — compact inline version for individual sections
+
+### 4. API Error Handling Hook
+- **File:** `hooks/useApi.ts`
+- `useApi()` hook wraps authenticated fetch with auto error notifications
+- Handles: 401 (session expired → redirect), 403 (access denied), 404, 429 (rate limit), 500+
+- Methods: `get()`, `post()`, `put()`, `patch()`, `del()`
+- Auto-attaches Bearer token from `supabase.auth.getSession()`
+- `silent` option to suppress notifications for background calls
+
+### 5. System Health Dashboard
+- **Page:** `/dashboard/admin/system-health` (super_admin only)
+- **API:** `GET /api/admin/system-health`
+- Real-time monitoring: Database, Authentication, Storage services with latency bars
+- Color-coded: green (<500ms), amber (<1500ms), red (>1500ms)
+- Quick stats: Total Users, Active (24h), Jobs Today, Jobs This Week, Errors (24h)
+- Users by role breakdown, Jobs by status with progress bars
+- Recent logins timeline, Recent errors with details
+- Infrastructure info card: daily backups, SSL/TLS, edge network
+- Auto-refresh every 30 seconds (toggle on/off)
+
+### 6. Health Check & Error Logging Endpoints
+- **`GET /api/health`** — Public health check, no auth. Returns DB/Auth/Storage status + latency
+- **`POST /api/log-error`** — Client error logging, no auth. Stores in `error_logs` table
+
+### 7. SaaS Multi-Tenant Foundation
+- **Page:** `/dashboard/admin/tenant-management` (super_admin only)
+- **API:** `GET/POST /api/admin/tenants` + `GET/PATCH/DELETE /api/admin/tenants/[id]`
+- Create tenants: name, slug, custom domain, plan (starter/professional/enterprise)
+- Feature flags per tenant: billing, analytics, inventory, NFC, CRM, AI scheduling
+- Max users and jobs/month limits
+- Suspend/reactivate tenants with audit logging
+- Owner assignment by email, billing email tracking
+- Soft delete (status → 'cancelled') not hard delete
+
+### 8. Automated Backup System
+- **API:** `GET/POST /api/admin/backups`
+- Manual backup: exports critical tables (profiles, job_orders, customers, invoices, work_items, daily_job_logs) as JSON to Supabase Storage `backups` bucket
+- Auto-creates storage bucket if missing
+- Tracks: type, status, size, duration, storage path
+- Supabase automatic daily backups info displayed (point-in-time recovery, 7-day retention)
+- Backup history UI with size/duration details
+
+### 9. Database Migration (UNAPPLIED)
+- **File:** `supabase/migrations/20260320_add_error_logs_tenants_backups.sql`
+- Creates 4 tables: `error_logs`, `tenants`, `tenant_users`, `backup_logs`
+- RLS policies for all tables
+- Supabase MCP had network errors — need to apply when connection restores
+- **To apply:** Use Supabase MCP `apply_migration` or run SQL directly in Supabase Dashboard
+
+### 10. Admin Dashboard Cards Added
+- **Platform Management** card → `/dashboard/admin/tenant-management`
+- **System Health** card → `/dashboard/admin/system-health`
+- Both added to `ADMIN_CARDS` array in `lib/rbac.ts`
+
+---
+
+## WHAT WAS BUILT (March 25, Session 4)
+
+### 1. Job Pause / Resume System (On-Hold)
+- **Migration:** `20260325_job_on_hold_and_documents.sql`
+  - Adds `on_hold` to `job_orders.status` CHECK constraint
+  - Adds `pause_reason TEXT`, `return_date DATE`, `paused_at TIMESTAMPTZ`, `paused_by UUID` to `job_orders`
+- **Status API update:** `on_hold` added to `validStatuses`; sets `paused_at` + `paused_by` automatically; `pause_reason` and `return_date` added to `allowedExtraFields`
+- **Day-complete page** (`app/dashboard/job-schedule/[id]/day-complete/page.tsx`):
+  - New purple "Put On Hold" button between "Done for Today" and "Job Fully Complete"
+  - Modal: enter hold reason (required) + expected return date (optional)
+  - Saves daily log entry, then sets status → `on_hold`, stores pause_reason + return_date
+- **My Jobs page** (`app/dashboard/my-jobs/page.tsx`):
+  - New "Continuing Projects" section at top — fetches all `on_hold` and `in_progress` jobs from past dates regardless of currently selected date
+  - Shows hold reason, return date, status badge, and "Resume" link per job
+- **Job Detail page** (`app/dashboard/my-jobs/[id]/page.tsx`):
+  - On-hold banner: shows hold reason + return date in purple
+  - `on_hold` status style added to `getStatusStyle()`
+  - "Resume This Job" button → calls PATCH status → `in_progress`, navigates to work-performed
+  - `pause_reason`, `return_date`, `paused_at` added to `JobTicketData` type
+
+### 2. Documents & Photos Area
+- **Migration:** (same `20260325_job_on_hold_and_documents.sql`)
+  - New `job_documents` table: id, job_order_id, file_name, file_url, file_size, file_type, category, notes, uploaded_by, uploaded_by_name, created_at
+  - RLS: admins full access; operators can view/insert for their own jobs
+  - Categories: `site_photo`, `before_after`, `permit`, `customer_doc`, `scope`, `other`
+  - Indexes on `job_order_id`
+- **Documents API:**
+  - `GET /api/job-orders/[id]/documents` — list documents for job
+  - `POST /api/job-orders/[id]/documents` — attach new document
+  - `DELETE /api/job-orders/[id]/documents/[docId]` — delete (uploader or admin only)
+- **Job Detail page** — Documents & Photos collapsible section:
+  - Category selector (site photo, before/after, permit, customer doc, scope, other)
+  - Optional notes field
+  - File upload button (accepts images, PDF, Word, Excel) → uploads to Supabase Storage `job-photos` bucket under `{jobId}/documents/`
+  - Document list with file type icon, download link, category badge, delete button
+  - Document count badge on section header
+
+### 3. New Migration File
+- **File:** `supabase/migrations/20260325_job_on_hold_and_documents.sql`
+- **STATUS: NOT YET APPLIED** — needs to be run in Supabase Dashboard SQL Editor
+
+---
+
+## WHAT WAS BUILT (March 24, Session 3)
+
+### 1. Invoice Payment Reminders
+- **API:** `POST /api/admin/invoices/[id]/remind` — sends HTML reminder email via Resend
+- Red urgency styling for overdue, amber for sent/due-soon
+- Shows balance due prominently, days overdue, billing contact info
+- Tracks `last_reminder_sent_at` on invoice (fire-and-forget so it works before migration)
+- Audits to `audit_logs` table
+
+### 2. Bulk "Send Reminders" on Billing Page
+- Billing page AR Aging section now has "Send Reminders (N)" button for all overdue
+- Loops through overdue/sent invoices with email addresses, calls remind API for each
+- Shows count of sent/failed results
+- Invoice list rows show "Reminded Xd ago" timestamp badge when recently reminded
+
+### 3. AR Aging Warnings in Dispatch Modal
+- `GET /api/admin/schedule-board/dispatch?date=` now returns `ar_warnings[]`
+- Each entry: customer name, total outstanding balance, days overdue
+- Schedule board dispatch modal shows red warning section if any customers have AR
+- Admin can see "⚠️ AR Warning — 2 customers with outstanding balances" before pushing tickets
+
+### 4. Operator Assignment Notifications
+- `POST /api/admin/schedule-board/assign` now creates `schedule_notifications` for operator and helper
+- Type: `job_assigned`, includes customer name, location, date, arrival time, job type
+- Operators see notification banner in my-jobs page as soon as they're assigned (before dispatch)
+
+### 5. Notification Banner Bug Fix
+- `NotificationBanner.tsx` had wrong column names: `operator_id` → `recipient_id`, `is_read` → `read`
+- Was only fetching `dispatched` type; now also fetches `job_assigned` and `assigned`
+- Assignment notifications show orange/red gradient to distinguish from dispatch blue
+- Shows message count if multiple unread notifications
+
+### 6. New Migration: `20260324_notification_types_and_invoice_reminder.sql`
+- Expands `schedule_notifications.type` CHECK to include `job_assigned` and `job_completed`
+- Adds UPDATE RLS policy: users can mark their own notifications as read (needed for banner dismiss)
+- Adds `last_reminder_sent_at TIMESTAMPTZ` column to `invoices` table
+
+### 7. Completed Jobs Page Fix
+- Was loading work_performed from `localStorage` — the operator's browser, not admin's
+- Fixed to query `daily_job_logs.work_performed` JSONB from Supabase directly
+- Aggregates across all daily log entries for multi-day jobs
+- Parallel fetch for profile, standby logs, daily logs (faster)
+- Added "Create Invoice" button → `/dashboard/admin/billing`
+- Removed 10+ console.log statements and `alert()` error handling
+
+---
+
+## WHAT WAS BUILT (March 24, Session 2)
+
+### 1. Real Analytics Dashboard
+- **API:** `GET /api/admin/analytics` — live business metrics from DB
+- **Page:** `/dashboard/admin/analytics` — replaced placeholder with real data
+- KPI cards: jobs this month, quoted revenue, AR outstanding, collection rate
+- Operator utilization bars (7-day hours per operator)
+- Job status breakdown chart (YTD)
+- Job type breakdown (top 5 types)
+- 30-day job volume bar chart with completed overlay
+- MoM comparison badges on key metrics
+- Quick links to P&L, Timecards, Billing, Operator Profiles
+
+### 2. Security Fix — P&L API Auth
+- `app/api/admin/job-pnl/route.ts` and `[id]/route.ts` had `instanceof NextResponse` check (always false) — fixed to `!auth.authorized` pattern
+- This was silently letting unauthenticated requests through
+
+### 3. Silica Plan Email — Wired to Resend
+- `app/api/silica-plan/submit/route.ts` previously had console.log stub
+- Now sends real email via Resend with PDF attachment when `customerEmail` provided
+
+### 4. Payment Receipt Email
+- `app/api/admin/invoices/[id]/payment/route.ts` — sends receipt email to customer when invoice fully paid
+- Includes invoice #, payment date, method, amount, zero balance confirmation
+
+### 5. Admin Job Completion Notifications
+- `app/api/job-orders/[id]/status/route.ts` — fire-and-forget: when job → 'completed', creates `schedule_notifications` for all admin/super_admin/ops_manager users
+- Type: 'job_completed', prompts admin to invoice
+
+### 6. Liability Release Email Fix
+- Was hardcoded to `noreply@pontifexindustries.com`
+- Now uses `RESEND_FROM_EMAIL` env var (consistent with all other routes)
+
+### 7. Active Jobs Auto-Refresh
+- `app/dashboard/admin/active-jobs/page.tsx` — auto-refreshes every 30s silently
+- 'Live' green pulse badge + last-refreshed timestamp in header
+- Toggle button to pause auto-refresh
+
+### 8. Husky Pre-commit Fix
+- Removed deprecated `#!/usr/bin/env sh` and `. husky.sh` lines (was printing DEPRECATED warning on every commit)
+
+---
+
+## SPRINT STATUS (Target: April 2, 2026)
+
+### Week 1 — Core Features COMPLETE
+- [x] Dispatch ticket PDF generation
+- [x] Customer signature capture in job completion flow (mandatory — enforced March 24)
+- [x] Photo upload during job execution
+- [x] PDF invoice generation
+- [x] QuickBooks CSV export from billing page (added March 24)
+
+### Week 2 — Polish & Launch (In Progress)
+- [x] Mobile responsive audit (critical fixes done)
+- [x] Loading states & error handling audit
+- [x] Global error handling + crash prevention
+- [x] System health monitoring dashboard
+- [x] SaaS multi-tenant foundation
+- [x] Backup system (auto daily + manual snapshots)
+- [x] Full API security audit — all routes use requireAuth/requireAdmin (March 24)
+- [x] SSR prerender fix — all 69 client pages have `force-dynamic` (March 24)
+- [x] Invoice email send via Resend (March 24)
+- [x] Invoice payment recording (March 24)
+- [ ] **Apply pending migrations** (requires Supabase dashboard SQL Editor — see below)
+- [ ] E2E workflow testing (schedule → dispatch → execute → complete → invoice)
+- [ ] Remove `NEXT_PUBLIC_BYPASS_LOCATION_CHECK=true` from production env
 - [ ] Production deployment prep (env vars, custom domain, SSL)
 - [ ] Final build verification & merge to main
 
-### Polish Items
-- [x] Customer signature capture in job completion flow (DONE — portal + inline signature)
-- [ ] Photo upload during job execution
-- [ ] PDF invoice generation
-- [ ] QuickBooks CSV export from billing page
-- [ ] Dispatch ticket PDF generation (component + API route exist, needs finishing)
+### Bonus Features Built (Ahead of Schedule)
+- [x] AI Auto-Scheduling Engine (one-click operator assignment)
+- [x] AI Smart Fill (voice/text NLP for schedule form)
+- [x] Customer CRM system with autocomplete
+- [x] Drag-and-drop schedule board with operator view
+- [x] White-label branding system
+- [x] Global notification system + network monitoring
+- [x] System health dashboard + error tracking
+- [x] Multi-tenant SaaS foundation
+- [x] Manual + automatic backup system
+- [x] Rate limiting for SMS/email endpoints (middleware)
 
 ---
 
-## ARCHITECTURE NOTES
+## WHAT TO DO NEXT
 
-### All New Tables (Sessions 4-5)
-| Table | Purpose |
-|-------|---------|
-| `facilities` | Jobsite compliance, badging rules |
-| `operator_facility_badges` | Per-operator per-facility badge tracking |
-| `schedule_form_submissions` | Approval workflow audit trail |
-| `operator_time_off` | PTO/unpaid/sick/worked_last_night tracking |
-| `signature_requests` | Token-based signature requests for customer portal |
-| `customer_surveys` | Post-completion customer feedback |
-| `form_templates` | Custom form builder templates |
-| `job_form_assignments` | Links forms to jobs with completion tracking |
+### Immediate Priority
+1. **Apply pending migrations** — Run SQL in Supabase Dashboard SQL Editor in order:
+   - `supabase/migrations/20260320_add_error_logs_tenants_backups.sql`
+   - `supabase/migrations/20260324_timecard_job_linkage_and_pnl.sql`
+   - `supabase/migrations/20260324_notification_types_and_invoice_reminder.sql`
+   - `supabase/migrations/20260325_job_on_hold_and_documents.sql` ← NEW (on_hold status + job_documents table)
+2. E2E workflow testing — test the full pipeline end-to-end, especially:
+   - clock in/out
+   - schedule form → schedule board → dispatch → operator receives job → in_route → work → day complete (done for today / put on hold / complete)
+   - Resume on-hold job from my-jobs page
+   - Upload document to a job
+3. Remove `NEXT_PUBLIC_BYPASS_LOCATION_CHECK=true` from `.env.local` before production
+4. Production deployment: configure Vercel env vars from `.env.example`, custom domain, SSL
+
+### Production Env Checklist (all in .env.example)
+- `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` + `SUPABASE_SERVICE_ROLE_KEY`
+- `RESEND_API_KEY` + `RESEND_FROM_EMAIL`
+- `NEXT_PUBLIC_APP_URL` → set to real domain (not localhost)
+- `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_PHONE_NUMBER` (or install twilio package)
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+- **DO NOT** set `NEXT_PUBLIC_BYPASS_LOCATION_CHECK` in production
+
+### Nice-to-Have (If Time Allows)
+- AR aging warnings on dispatch screen
+- Stripe payment links on invoices
+- Schedule board performance optimization for large datasets
+- Notification system polish (SMS/email for job assignments)
+
+### Deprioritized by User
+- ~~Diamond blade intelligence~~
+- ~~Equipment management enhancements~~
+- ~~Certified payroll~~
+- ~~Estimate-to-job pipeline~~
+
+---
+
+## UNAPPLIED MIGRATIONS
+1. `20260320_add_error_logs_tenants_backups.sql` — error_logs, tenants, tenant_users, backup_logs tables
+2. `20260324_timecard_job_linkage_and_pnl.sql` — job_order_id on timecards, labor_cost trigger, job_pnl_summary view
+3. `20260324_notification_types_and_invoice_reminder.sql` — expands notification type CHECK, adds UPDATE RLS policy, adds last_reminder_sent_at on invoices
+
+**All migrations safe to run in order.** Apply in Supabase Dashboard → SQL Editor.
+
+---
+
+## KEY PATTERNS & CONVENTIONS
+
+### Authentication
+- **Token retrieval**: Always `supabase.auth.getSession()` — NEVER localStorage for tokens
+- **API auth**: `requireAdmin()` / `requireSuperAdmin()` / `requireAuth()` from `lib/api-auth.ts`
+- **Client guard**: `getCurrentUser()` from `lib/auth.ts` (synchronous, reads localStorage)
+- **Schedule board access**: `requireScheduleBoardAccess()` — admin, super_admin, salesman, ops_manager, supervisor
+- `canEdit` on schedule board = `role === 'super_admin'` only
+
+### UI/Styling
+- Purple/dark theme with Tailwind CSS
+- lucide-react icons throughout
+- Input fields: always `text-gray-900 bg-white` (black text on white background)
+- Mobile-first responsive design
+- Rounded corners: `rounded-xl` or `rounded-2xl`
+- Cards: `bg-white rounded-2xl border border-gray-200 p-5`
+
+### Data
+- **Branding**: Use `useBranding()` hook for dynamic company name/colors
+- **Notifications**: Use `useNotifications()` hook for toast messages
+- **API calls**: Use `useApi()` hook for auto-error-handled fetch, or manual fetch with `supabase.auth.getSession()` for token
+- **PDFs**: Server-side only with @react-pdf/renderer, NO React hooks in PDF components
+- **Photos**: PhotoUploader component → Supabase Storage `job-photos` bucket
+- **Signatures**: Upload to Storage as PNG, fallback to base64 in DB
+- **Fire-and-forget logging**: `Promise.resolve(supabaseAdmin.from(...).insert(...)).then(...).catch(() => {})`
+
+### API Response Format
+```
+Success: { success: true, data: {...} }
+Error: { error: 'message' } with HTTP status 4xx/5xx
+```
+
+### Job Numbers
+- Schedule Form: `JOB-{year}-{6 digits}`
+- Quick Add: `QA-{year}-{6 digits}`
+
+### Roles (priority order)
+super_admin > operations_manager > admin > salesman > shop_manager > inventory_manager > operator > apprentice
+
+---
+
+## FILE STRUCTURE REFERENCE
+
+### Root Layout Provider Stack
+```
+ThemeProvider > BrandingProvider > NotificationProvider > ErrorBoundary > NetworkMonitor > GoogleMapsProvider > App
+```
+
+### Key Contexts
+- `contexts/ThemeContext.tsx` — dark/light mode
+- `contexts/NotificationContext.tsx` — global toast notifications
+- `lib/branding-context.tsx` — tenant branding (company name, colors, logos)
+
+### Key Hooks
+- `hooks/useApi.ts` — authenticated fetch with auto error handling
+- `hooks/useAuth.ts` — auth state management
+- `hooks/useVoiceInput.ts` — Web Speech API voice input
+- `hooks/useWorkflow.ts` — operator job workflow state
+
+### Key Libraries
+- `lib/api-auth.ts` — API route auth guards (requireAdmin, requireSuperAdmin, etc.)
+- `lib/auth.ts` — Client-side auth helpers (getCurrentUser, isAdmin, etc.)
+- `lib/supabase.ts` — Public Supabase client (client-side, respects RLS)
+- `lib/supabase-admin.ts` — Admin Supabase client (server-side, bypasses RLS)
+- `lib/rbac.ts` — ADMIN_CARDS array, ROLE_PERMISSION_PRESETS, role definitions
+- `lib/audit.ts` — Audit logging helper
+
+### Admin Pages (27 total)
+```
+/dashboard/admin/
+  access-requests, active-jobs, all-equipment, analytics, billing,
+  completed-job-tickets, completed-jobs, create-estimate, create-job,
+  customers, debug, equipment-performance, equipment-units, jobs,
+  maintenance-schedules, operator-profiles, operators, ops-hub,
+  schedule-board, schedule-form, settings, system-health,
+  team-management, tenant-management, timecards, upcoming-projects
+```
+
+### API Routes (38 categories)
+```
+/api/
+  access-requests, admin/*, auth, card-permissions, contractors,
+  demo-request, equipment, equipment-units, equipment-usage, geocode,
+  google-maps, health, helper-work-log, inventory, job-hazard-analysis,
+  job-orders, liability-release, log-error, maps, migrations, my-profile,
+  onboarding, operator, operator-ratings, send-email, send-sms,
+  service-completion-agreement, setup, shop, silica-plan, sms, standby,
+  time-clock, timecard, users, work-items, work-order-agreement, workflow
+```
+
+### Admin API Sub-routes
+```
+/api/admin/
+  backups, billing, branding, change-requests, completed-jobs,
+  contractors, customers, job-notes, job-orders/[id], operators,
+  schedule-board (+ assign, auto-schedule, capacity, dispatch,
+    missing-info, notify, operators, quick-add, reorder, settings,
+    skill-match), schedule-form/ai-parse, settings/branding,
+  suggestions, system-health, team, tenants/[id], timecards, users
+```
+
+### Database (73 migration files)
+- Project ref: `klatddoyncxidgqtcjnu`
+- Key views: `schedule_board_view`, `active_job_orders`, `recent_completed_jobs`, `operator_performance_summary`
+- All tables have RLS enabled
+- New tables use JWT metadata for RLS: `auth.jwt() -> 'user_metadata' ->> 'role'`

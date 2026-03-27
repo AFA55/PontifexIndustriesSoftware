@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle, PauseCircle, PlayCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DayNavigator from './_components/DayNavigator';
 import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
@@ -29,6 +29,7 @@ export default function MyJobsPage() {
   const [userRole, setUserRole] = useState<string>('operator');
   const [userId, setUserId] = useState<string>('');
   const [hasLongDurationJob, setHasLongDurationJob] = useState(false);
+  const [continuingProjects, setContinuingProjects] = useState<any[]>([]);
   const [activeShopTicket, setActiveShopTicket] = useState<any>(null);
   const [completingShop, setCompletingShop] = useState(false);
   const [shopDescription, setShopDescription] = useState('');
@@ -104,6 +105,45 @@ export default function MyJobsPage() {
     }
   }, []);
 
+  // Fetch on_hold and in_progress jobs from past dates (continuing projects)
+  const fetchContinuingProjects = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const today = toDateString(new Date());
+
+      // Fetch on_hold jobs assigned to this user (any date)
+      const [onHoldRes, inProgressRes] = await Promise.all([
+        fetch(`/api/job-orders?status=on_hold&include_helper_jobs=true&includeCompleted=false`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        }),
+        fetch(`/api/job-orders?status=in_progress&include_helper_jobs=true&includeCompleted=false`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        }),
+      ]);
+
+      const onHoldData = onHoldRes.ok ? (await onHoldRes.json()).data || [] : [];
+      const inProgressData = inProgressRes.ok ? (await inProgressRes.json()).data || [] : [];
+
+      // Combine, filter to past dates only (don't double-show today's jobs)
+      const uid = session.user.id;
+      const all = [...onHoldData, ...inProgressData].filter((j: any) => {
+        const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid;
+        const isPastDate = j.scheduled_date && j.scheduled_date < today;
+        return isAssigned && isPastDate;
+      });
+
+      // Deduplicate by id
+      const seen = new Set<string>();
+      const unique = all.filter((j: any) => { if (seen.has(j.id)) return false; seen.add(j.id); return true; });
+
+      setContinuingProjects(unique);
+    } catch {
+      // silent
+    }
+  }, []);
+
   // Fetch active shop ticket for today (helpers only)
   const fetchShopTicket = useCallback(async () => {
     if (!isHelper) return;
@@ -158,7 +198,8 @@ export default function MyJobsPage() {
 
   useEffect(() => {
     checkLongDurationJobs();
-  }, [checkLongDurationJobs]);
+    fetchContinuingProjects();
+  }, [checkLongDurationJobs, fetchContinuingProjects]);
 
   useEffect(() => {
     fetchShopTicket();
@@ -211,6 +252,49 @@ export default function MyJobsPage() {
       <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
         {/* Notification Banner */}
         <NotificationBanner />
+
+        {/* Continuing Projects (on_hold / in_progress from past dates) */}
+        {continuingProjects.length > 0 && (
+          <div className="mb-5 bg-purple-50 border-2 border-purple-200 rounded-2xl overflow-hidden shadow-md">
+            <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-700 to-violet-700">
+              <PauseCircle className="w-5 h-5 text-white" />
+              <h3 className="text-sm font-bold text-white">
+                Continuing Projects ({continuingProjects.length})
+              </h3>
+            </div>
+            <div className="divide-y divide-purple-100">
+              {continuingProjects.map((job: any) => (
+                <div key={job.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${job.status === 'on_hold' ? 'bg-purple-500' : 'bg-orange-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{job.customer_name}</p>
+                    <p className="text-xs text-slate-500 truncate">{job.job_number} &bull; {job.address || job.location || 'No address'}</p>
+                    {job.status === 'on_hold' && job.pause_reason && (
+                      <p className="text-xs text-purple-600 mt-0.5 truncate">Hold: {job.pause_reason}</p>
+                    )}
+                    {job.status === 'on_hold' && job.return_date && (
+                      <p className="text-xs text-purple-500">Return: {job.return_date}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                      job.status === 'on_hold' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      {job.status === 'on_hold' ? 'On Hold' : 'In Progress'}
+                    </span>
+                    <a
+                      href={`/dashboard/my-jobs/${job.id}`}
+                      className="text-xs text-purple-600 font-semibold flex items-center gap-0.5 hover:text-purple-800"
+                    >
+                      <PlayCircle className="w-3 h-3" />
+                      Resume
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Day Navigator */}
         <div className="mb-5">

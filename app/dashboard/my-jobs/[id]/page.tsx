@@ -7,7 +7,8 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
-  ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer
+  ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer,
+  Paperclip, Upload, Trash2, PauseCircle, X, Image, File
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
@@ -39,6 +40,7 @@ function getStatusStyle(status: string) {
     case 'assigned': return 'bg-blue-100 text-blue-700 border-blue-200';
     case 'in_route': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
     case 'in_progress': return 'bg-orange-100 text-orange-700 border-orange-200';
+    case 'on_hold': return 'bg-purple-100 text-purple-700 border-purple-200';
     case 'completed': return 'bg-green-100 text-green-700 border-green-200';
     default: return 'bg-gray-100 text-gray-700 border-gray-200';
   }
@@ -59,6 +61,13 @@ export default function JobDetailPage() {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [workDetailsOpen, setWorkDetailsOpen] = useState(true);
   const [equipmentOpen, setEquipmentOpen] = useState(true);
+
+  // Documents state
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docCategory, setDocCategory] = useState('other');
+  const [docNotes, setDocNotes] = useState('');
 
   const isHelper = userRole === 'apprentice';
 
@@ -101,9 +110,26 @@ export default function JobDetailPage() {
     }
   }, [jobId, router]);
 
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/job-orders/${jobId}/documents`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setDocuments(json.data || []);
+      }
+    } catch {
+      // silent
+    }
+  }, [jobId]);
+
   useEffect(() => {
     fetchJob();
-  }, [fetchJob]);
+    fetchDocuments();
+  }, [fetchJob, fetchDocuments]);
 
   const toggleEquipment = (item: string) => {
     setCheckedItems(prev => ({ ...prev, [item]: !prev[item] }));
@@ -140,6 +166,7 @@ export default function JobDetailPage() {
       ? checkAllConfirmed(unifiedItems, checkedItems)
       : mandatoryComplete);
   const isCompleted = job?.status === 'completed';
+  const isOnHold = job?.status === 'on_hold';
   const isInProgress = job ? ['in_route', 'in_progress'].includes(job.status) : false;
   const jobIsHelper = job?.isHelper || isHelper;
 
@@ -190,6 +217,89 @@ export default function JobDetailPage() {
   const handleViewCompleted = () => {
     if (!job) return;
     router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
+  };
+
+  const handleResumeJob = async () => {
+    if (!job) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      await fetch(`/api/job-orders/${job.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+
+      router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
+    } catch (err) {
+      console.error('Error resuming job:', err);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !job) return;
+    setUploadingDoc(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Upload to Supabase Storage
+      const ext = file.name.split('.').pop();
+      const path = `${jobId}/documents/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('job-photos')
+        .upload(path, file, { contentType: file.type });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from('job-photos').getPublicUrl(path);
+      const fileUrl = urlData?.publicUrl;
+
+      // Save document record
+      const res = await fetch(`/api/job-orders/${jobId}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          file_name: file.name,
+          file_url: fileUrl,
+          file_size: file.size,
+          file_type: file.type,
+          category: docCategory,
+          notes: docNotes.trim() || null,
+          uploaded_by_name: session.user.user_metadata?.full_name || '',
+        }),
+      });
+
+      if (res.ok) {
+        setDocNotes('');
+        fetchDocuments();
+      }
+    } catch (err) {
+      console.error('Error uploading document:', err);
+    } finally {
+      setUploadingDoc(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteDocument = async (docId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`/api/job-orders/${jobId}/documents/${docId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      setDocuments(prev => prev.filter(d => d.id !== docId));
+    } catch (err) {
+      console.error('Error deleting document:', err);
+    }
   };
 
   if (loading) {
@@ -317,6 +427,24 @@ export default function JobDetailPage() {
             <span className="text-xs px-2.5 py-1 bg-orange-500 text-white rounded-full font-bold">HIGH</span>
           )}
         </div>
+
+        {/* On-Hold Banner */}
+        {isOnHold && (
+          <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <PauseCircle className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-purple-800">Job On Hold</p>
+                {job.pause_reason && (
+                  <p className="text-xs text-purple-600 mt-0.5">{job.pause_reason}</p>
+                )}
+                {job.return_date && (
+                  <p className="text-xs text-purple-500 mt-0.5">Expected return: {job.return_date}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Crew Info */}
         <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-4">
@@ -463,8 +591,120 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {/* Documents Section */}
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+          <button
+            onClick={() => { setDocsOpen(!docsOpen); }}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Paperclip className="w-4 h-4 text-indigo-600" />
+              <span className="text-sm font-bold text-gray-800">Documents & Photos</span>
+              {documents.length > 0 && (
+                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-semibold">
+                  {documents.length}
+                </span>
+              )}
+            </div>
+            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${docsOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {docsOpen && (
+            <div className="px-4 pb-4 space-y-3">
+              {/* Upload controls */}
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <select
+                    value={docCategory}
+                    onChange={e => setDocCategory(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="site_photo">Site Photo</option>
+                    <option value="before_after">Before / After</option>
+                    <option value="permit">Permit</option>
+                    <option value="customer_doc">Customer Document</option>
+                    <option value="scope">Scope of Work</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={docNotes}
+                  onChange={e => setDocNotes(e.target.value)}
+                  placeholder="Notes (optional)"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+                <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-semibold cursor-pointer hover:bg-indigo-100 transition-all ${uploadingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {uploadingDoc ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+                  ) : (
+                    <><Upload className="w-4 h-4" /> Tap to upload file or photo</>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    disabled={uploadingDoc}
+                  />
+                </label>
+              </div>
+
+              {/* Document list */}
+              {documents.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-3">No documents yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {documents.map(doc => {
+                    const isImage = doc.file_type?.startsWith('image/');
+                    const categoryLabels: Record<string, string> = {
+                      site_photo: 'Site Photo', before_after: 'Before/After',
+                      permit: 'Permit', customer_doc: 'Customer Doc',
+                      scope: 'Scope', other: 'Other',
+                    };
+                    return (
+                      <div key={doc.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="p-1.5 bg-white rounded-lg border border-slate-200 flex-shrink-0">
+                          {isImage ? <Image className="w-4 h-4 text-indigo-500" /> : <File className="w-4 h-4 text-slate-400" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <a
+                            href={doc.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-semibold text-indigo-700 hover:underline truncate block"
+                          >
+                            {doc.file_name}
+                          </a>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                              {categoryLabels[doc.category] || doc.category}
+                            </span>
+                            {doc.notes && (
+                              <span className="text-xs text-slate-500 truncate max-w-[150px]">{doc.notes}</span>
+                            )}
+                          </div>
+                          {doc.uploaded_by_name && (
+                            <p className="text-[10px] text-slate-400 mt-0.5">by {doc.uploaded_by_name}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteDocument(doc.id)}
+                          className="p-1.5 text-slate-300 hover:text-red-500 transition-colors flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Action Buttons */}
-        {!isCompleted && !jobIsHelper && (
+        {!isCompleted && !isOnHold && !jobIsHelper && (
           <div className="pt-2">
             {isInProgress ? (
               <button
@@ -493,6 +733,19 @@ export default function JobDetailPage() {
                 )}
               </button>
             )}
+          </div>
+        )}
+
+        {/* Resume On-Hold Job */}
+        {isOnHold && !jobIsHelper && (
+          <div className="pt-2">
+            <button
+              onClick={handleResumeJob}
+              className="w-full py-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2"
+            >
+              <PlayCircle className="w-5 h-5" />
+              Resume This Job
+            </button>
           </div>
         )}
 

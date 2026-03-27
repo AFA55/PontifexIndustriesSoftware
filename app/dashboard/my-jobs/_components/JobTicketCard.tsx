@@ -50,6 +50,10 @@ export interface JobTicketData {
   special_equipment_notes?: string | null;
   site_contact_phone?: string | null;
   additional_info?: string | null;
+  // On-hold fields
+  pause_reason?: string | null;
+  return_date?: string | null;
+  paused_at?: string | null;
   // isHelper indicates the current user is the helper, not the operator
   isHelper?: boolean;
 }
