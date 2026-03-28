@@ -5,13 +5,31 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
+import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
     // Get user from Supabase session (server-side)
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();
@@ -34,12 +52,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // If a jobId is provided, verify it belongs to the user's tenant
+    const tenantId = await getTenantId(user.id);
+    if (jobId && tenantId) {
+      const { data: jobTenantCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!jobTenantCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
+    }
+
     // Find the user's active timecard — gracefully handle missing table
     let activeTimecard: any = null;
     const { data: timecardData, error: timecardError } = await supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('user_id', auth.userId)
+      .eq('user_id', user.id)
       .is('clock_out_time', null)
       .order('clock_in_time', { ascending: false })
       .limit(1)
@@ -65,7 +97,7 @@ export async function POST(request: NextRequest) {
     const { data: statusData, error: statusError } = await supabaseAdmin
       .from('operator_status_history')
       .insert([{
-        user_id: auth.userId,
+        user_id: user.id,
         timecard_id: activeTimecard?.id || null,
         status: status,
         timestamp: new Date().toISOString(),
@@ -136,15 +168,33 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session (server-side)
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Get latest status — gracefully handle missing table
     let latestStatus = null;
     const { data: statusData, error: statusError } = await supabaseAdmin
       .from('operator_status_history')
       .select('*')
-      .eq('user_id', auth.userId)
+      .eq('user_id', user.id)
       .order('timestamp', { ascending: false })
       .limit(1)
       .maybeSingle();

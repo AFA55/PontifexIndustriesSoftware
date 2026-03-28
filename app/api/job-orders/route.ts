@@ -5,13 +5,30 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
-    // SECURITY: Require authenticated user
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session (server-side)
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -20,17 +37,24 @@ export async function GET(request: NextRequest) {
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
     const scheduledDate = searchParams.get('scheduled_date');
 
-    // Use role from auth result
-    const profile = { role: auth.role };
-    const isAdmin = auth.role === 'admin';
+    // Check if user is admin
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const isAdmin = profile?.role === 'admin';
+    const tenantId = await getTenantId(user.id);
 
     // If ID is provided, fetch that specific job
     if (id) {
-      const { data: specificJob, error: jobError } = await supabaseAdmin
+      let specificJobQuery = supabaseAdmin
         .from('active_job_orders')
         .select('*')
-        .eq('id', id)
-        .single();
+        .eq('id', id);
+      if (tenantId) specificJobQuery = specificJobQuery.eq('tenant_id', tenantId);
+      const { data: specificJob, error: jobError } = await specificJobQuery.single();
 
       if (jobError) {
         console.error('Error fetching specific job:', jobError);
@@ -48,7 +72,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Check if user has access to this job
-      if (!isAdmin && specificJob.assigned_to !== auth.userId) {
+      if (!isAdmin && specificJob.assigned_to !== user.id) {
         return NextResponse.json(
           { error: 'Unauthorized to view this job' },
           { status: 403 }
@@ -63,7 +87,7 @@ export async function GET(request: NextRequest) {
       const { data: currentUserProfile } = await supabaseAdmin
         .from('profiles')
         .select('full_name, phone_number, email')
-        .eq('id', auth.userId)
+        .eq('id', user.id)
         .single();
 
       operatorProfile = currentUserProfile;
@@ -91,98 +115,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Additional query params for schedule view
-    const dateFrom = searchParams.get('date_from');
-    const dateTo = searchParams.get('date_to');
-    const includeHelperJobs = searchParams.get('include_helper_jobs') === 'true';
-    const dispatchedOnly = searchParams.get('dispatched_only') === 'true';
-
-    const isAdminRole = ['admin', 'super_admin', 'operations_manager', 'salesman', 'supervisor'].includes(profile?.role || '');
-    const isFieldWorker = ['operator', 'apprentice'].includes(profile?.role || '');
-
-    // For operators/helpers: use OR filter (assigned_to OR helper_assigned_to)
-    if (!isAdminRole && (includeHelperJobs || isFieldWorker)) {
-      // Need two separate queries and merge results
-      let operatorQuery = supabaseAdmin.from('active_job_orders').select('*').eq('assigned_to', auth.userId);
-      let helperQuery = supabaseAdmin.from('active_job_orders').select('*').eq('helper_assigned_to', auth.userId);
-
-      // Apply shared filters
-      // For date filtering, include multi-day jobs where the date falls within scheduled_date..end_date
-      if (scheduledDate) {
-        // Jobs that either:
-        // 1. Start on this date (exact match) OR
-        // 2. Are multi-day and this date falls within their range (scheduled_date <= date AND end_date >= date)
-        operatorQuery = operatorQuery.or(`scheduled_date.eq.${scheduledDate},and(scheduled_date.lte.${scheduledDate},end_date.gte.${scheduledDate})`);
-        helperQuery = helperQuery.or(`scheduled_date.eq.${scheduledDate},and(scheduled_date.lte.${scheduledDate},end_date.gte.${scheduledDate})`);
-      }
-      if (dateFrom) {
-        operatorQuery = operatorQuery.gte('scheduled_date', dateFrom);
-        helperQuery = helperQuery.gte('scheduled_date', dateFrom);
-      }
-      if (dateTo) {
-        operatorQuery = operatorQuery.lte('scheduled_date', dateTo);
-        helperQuery = helperQuery.lte('scheduled_date', dateTo);
-      }
-      if (status) {
-        operatorQuery = operatorQuery.eq('status', status);
-        helperQuery = helperQuery.eq('status', status);
-      }
-      if (!includeCompleted) {
-        operatorQuery = operatorQuery.neq('status', 'completed');
-        helperQuery = helperQuery.neq('status', 'completed');
-      }
-      if (dispatchedOnly) {
-        operatorQuery = operatorQuery.not('dispatched_at', 'is', null);
-        helperQuery = helperQuery.not('dispatched_at', 'is', null);
-      }
-
-      operatorQuery = operatorQuery.order('scheduled_date', { ascending: true });
-      helperQuery = helperQuery.order('scheduled_date', { ascending: true });
-
-      const [opResult, helperResult] = await Promise.all([operatorQuery, helperQuery]);
-
-      if (opResult.error) {
-        console.error('Error fetching operator jobs:', opResult.error);
-        return NextResponse.json({ error: 'Failed to fetch job orders' }, { status: 500 });
-      }
-
-      // Merge and deduplicate by id
-      const allJobs = [...(opResult.data || [])];
-      const seenIds = new Set(allJobs.map((j: any) => j.id));
-      for (const job of (helperResult.data || [])) {
-        if (!seenIds.has(job.id)) {
-          allJobs.push(job);
-          seenIds.add(job.id);
-        }
-      }
-
-      // Strip sensitive fields for field workers
-      const sanitized = isFieldWorker
-        ? allJobs.map((j: any) => { const { difficulty_rating, estimated_cost, ...rest } = j; return rest; })
-        : allJobs;
-
-      return NextResponse.json({ success: true, data: sanitized, user_role: profile?.role }, { status: 200 });
-    }
-
-    // Standard admin/single-role query
+    // Build query from active_job_orders view
     let query = supabaseAdmin
       .from('active_job_orders')
       .select('*');
 
-    // If not admin, only show jobs assigned to this user
-    if (!isAdminRole) {
-      query = query.eq('assigned_to', auth.userId);
+    // Scope to tenant
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
     }
 
-    // Filter by scheduled_date — also include multi-day jobs spanning this date
+    // If not admin, only show jobs assigned to this user
+    if (!isAdmin) {
+      query = query.eq('assigned_to', user.id);
+    }
+
+    // Filter by scheduled_date if provided
     if (scheduledDate) {
-      query = query.or(`scheduled_date.eq.${scheduledDate},and(scheduled_date.lte.${scheduledDate},end_date.gte.${scheduledDate})`);
-    }
-    if (dateFrom) {
-      query = query.gte('scheduled_date', dateFrom);
-    }
-    if (dateTo) {
-      query = query.lte('scheduled_date', dateTo);
+      query = query.eq('scheduled_date', scheduledDate);
     }
 
     query = query.order('scheduled_date', { ascending: true });
@@ -197,10 +147,6 @@ export async function GET(request: NextRequest) {
       query = query.neq('status', 'completed');
     }
 
-    if (dispatchedOnly) {
-      query = query.not('dispatched_at', 'is', null);
-    }
-
     const { data: jobOrders, error: fetchError } = await query;
 
     if (fetchError) {
@@ -211,16 +157,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Strip sensitive fields for field workers
-    const sanitized = isFieldWorker
-      ? (jobOrders || []).map((j: any) => { const { difficulty_rating, estimated_cost, ...rest } = j; return rest; })
-      : (jobOrders || []);
+    console.log('Returning job orders with shop_arrival_time:',
+      (jobOrders || []).map((j: any) => ({
+        id: j.id,
+        job_number: j.job_number,
+        shop_arrival_time: j.shop_arrival_time,
+        arrival_time: j.arrival_time
+      }))
+    );
 
     return NextResponse.json(
       {
         success: true,
-        data: sanitized,
-        user_role: profile?.role,
+        data: jobOrders || [],
       },
       { status: 200 }
     );

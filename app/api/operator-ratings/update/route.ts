@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
-    // SECURITY: Require authenticated user
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    // Verify authentication via Bearer token
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const body = await request.json();
     const {
@@ -18,6 +27,20 @@ export async function POST(request: NextRequest) {
 
     if (!operatorId) {
       return NextResponse.json({ error: 'Operator ID is required' }, { status: 400 });
+    }
+
+    // Verify operator belongs to the same tenant
+    const tenantId = await getTenantId(user.id);
+    if (tenantId) {
+      const { data: operatorProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('id', operatorId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!operatorProfile) {
+        return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
+      }
     }
 
     // Validate ratings are between 1-10

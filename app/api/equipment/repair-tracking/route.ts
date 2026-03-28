@@ -1,21 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth, requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * GET /api/equipment/repair-tracking
  * Get repair tracking records (admin sees all, operators see for their equipment)
  */
-export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized) return auth.response;
-
+export async function GET(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const equipmentId = searchParams.get('equipmentId');
     const damageReportId = searchParams.get('damageReportId');
     const status = searchParams.get('status');
 
+    const tenantId = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_repair_tracking')
       .select(`
@@ -34,6 +45,10 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (equipmentId) {
       query = query.eq('equipment_id', equipmentId);
@@ -65,11 +80,32 @@ export async function GET(request: NextRequest) {
  * POST /api/equipment/repair-tracking
  * Create a new repair tracking record (admin only)
  */
-export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
-  if (!auth.authorized) return auth.response;
-
+export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       equipmentId,
@@ -93,7 +129,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const repairData = {
+    const tenantIdPost = await getTenantId(user.id);
+    const repairData: any = {
       equipment_id: equipmentId,
       damage_report_id: damageReportId,
       repair_title: repairTitle,
@@ -106,9 +143,10 @@ export async function POST(request: NextRequest) {
       vendor_name: vendorName,
       vendor_contact: vendorContact,
       vendor_invoice_number: vendorInvoiceNumber,
-      created_by: auth.userId,
+      created_by: user.id,
       status: 'pending'
     };
+    if (tenantIdPost) repairData.tenant_id = tenantIdPost;
 
     const { data: repair, error } = await supabaseAdmin
       .from('equipment_repair_tracking')
@@ -140,17 +178,31 @@ export async function POST(request: NextRequest) {
  * PATCH /api/equipment/repair-tracking
  * Update repair tracking (admin only)
  */
-export async function PATCH(request: NextRequest) {
-  const auth = await requireAdmin(request);
-  if (!auth.authorized) return auth.response;
-
+export async function PATCH(request: Request) {
   try {
-    // Get admin profile for full name
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('full_name')
-      .eq('id', auth.userId)
+      .select('role, full_name')
+      .eq('id', user.id)
       .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
 
     const body = await request.json();
     const {
@@ -201,8 +253,8 @@ export async function PATCH(request: NextRequest) {
     if (warrantyExpirationDate) updateData.warranty_expiration_date = warrantyExpirationDate;
     if (qualityCheckPassed !== undefined) {
       updateData.quality_check_passed = qualityCheckPassed;
-      updateData.quality_check_by = auth.userId;
-      updateData.quality_check_by_name = profile?.full_name || auth.userEmail;
+      updateData.quality_check_by = user.id;
+      updateData.quality_check_by_name = profile?.full_name || user.email;
       updateData.quality_check_date = new Date().toISOString();
       if (qualityCheckNotes) updateData.quality_check_notes = qualityCheckNotes;
     }

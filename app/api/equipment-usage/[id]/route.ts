@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PATCH(
   request: NextRequest,
@@ -16,15 +16,34 @@ export async function PATCH(
   try {
     const { id } = await params;
 
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    // Check if user owns this equipment usage entry or is admin
-    const { data: existingEntry } = await supabaseAdmin
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Check if user owns this equipment usage entry or is admin (scoped to tenant)
+    const tenantId = await getTenantId(user.id);
+    let entryQuery = supabaseAdmin
       .from('equipment_usage')
       .select('operator_id')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) entryQuery = entryQuery.eq('tenant_id', tenantId);
+    const { data: existingEntry } = await entryQuery.single();
 
     if (!existingEntry) {
       return NextResponse.json(
@@ -33,7 +52,13 @@ export async function PATCH(
       );
     }
 
-    if (existingEntry.operator_id !== auth.userId && auth.role !== 'admin') {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (existingEntry.operator_id !== user.id && profile?.role !== 'admin') {
       return NextResponse.json(
         { error: 'You can only update your own equipment usage entries' },
         { status: 403 }
@@ -117,15 +142,34 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    // Check if user owns this equipment usage entry or is admin
-    const { data: existingEntry } = await supabaseAdmin
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Check if user owns this equipment usage entry or is admin (scoped to tenant)
+    const tenantIdDel = await getTenantId(user.id);
+    let delEntryQuery = supabaseAdmin
       .from('equipment_usage')
       .select('operator_id')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantIdDel) delEntryQuery = delEntryQuery.eq('tenant_id', tenantIdDel);
+    const { data: existingEntry } = await delEntryQuery.single();
 
     if (!existingEntry) {
       return NextResponse.json(
@@ -134,18 +178,26 @@ export async function DELETE(
       );
     }
 
-    if (existingEntry.operator_id !== auth.userId && auth.role !== 'admin') {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (existingEntry.operator_id !== user.id && profile?.role !== 'admin') {
       return NextResponse.json(
         { error: 'You can only delete your own equipment usage entries' },
         { status: 403 }
       );
     }
 
-    // Delete equipment usage entry
-    const { error: deleteError } = await supabaseAdmin
+    // Delete equipment usage entry (scoped to tenant)
+    let deleteQuery = supabaseAdmin
       .from('equipment_usage')
       .delete()
       .eq('id', id);
+    if (tenantIdDel) deleteQuery = deleteQuery.eq('tenant_id', tenantIdDel);
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       console.error('Error deleting equipment usage:', deleteError);

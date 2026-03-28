@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
+import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PUT(
   request: NextRequest,
@@ -15,19 +16,38 @@ export async function PUT(
     // Await params in Next.js 15+
     const { id: jobId } = await params;
 
-    // SECURITY: Require authenticated user
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session (server-side)
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();
 
-    // Check if job exists and user has permission
-    const { data: existingJob, error: checkError } = await supabaseAdmin
+    // Check if job exists and user has permission (scoped to tenant)
+    const tenantId = await getTenantId(user.id);
+    let jobCheckQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobCheckQuery = jobCheckQuery.eq('tenant_id', tenantId);
+    const { data: existingJob, error: checkError } = await jobCheckQuery.single();
 
     if (checkError || !existingJob) {
       return NextResponse.json(
@@ -37,7 +57,7 @@ export async function PUT(
     }
 
     // Check permissions: operator can only submit data for their own jobs
-    if (existingJob.assigned_to !== auth.userId) {
+    if (existingJob.assigned_to !== user.id) {
       return NextResponse.json(
         { error: 'You can only submit data for jobs assigned to you' },
         { status: 403 }
@@ -114,7 +134,7 @@ export async function PUT(
     const { error: statusHistoryError } = await supabaseAdmin
       .from('operator_status_history')
       .insert({
-        user_id: auth.userId,
+        user_id: user.id,
         status: 'job_completed',
         latitude: body.latitude,
         longitude: body.longitude,

@@ -1,20 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth, requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * GET /api/equipment/maintenance-schedule
  * Get maintenance schedules (admin sees all, operators see for their equipment)
  */
-export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized) return auth.response;
-
+export async function GET(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const equipmentId = searchParams.get('equipmentId');
     const activeOnly = searchParams.get('activeOnly') === 'true';
 
+    const tenantId = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_maintenance_schedules')
       .select(`
@@ -29,6 +40,10 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (equipmentId) {
       query = query.eq('equipment_id', equipmentId);
@@ -56,11 +71,32 @@ export async function GET(request: NextRequest) {
  * POST /api/equipment/maintenance-schedule
  * Create a new maintenance schedule (admin only)
  */
-export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
-  if (!auth.authorized) return auth.response;
-
+export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       equipmentId,
@@ -84,7 +120,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const scheduleData = {
+    const tenantIdPost = await getTenantId(user.id);
+    const scheduleData: any = {
       equipment_id: equipmentId,
       maintenance_type: maintenanceType,
       description,
@@ -97,9 +134,10 @@ export async function POST(request: NextRequest) {
       last_maintenance_date: lastMaintenanceDate || new Date().toISOString(),
       last_maintenance_hours: lastMaintenanceHours || 0,
       last_maintenance_feet: lastMaintenanceFeet || 0,
-      created_by: auth.userId,
+      created_by: user.id,
       is_active: true
     };
+    if (tenantIdPost) scheduleData.tenant_id = tenantIdPost;
 
     const { data: schedule, error } = await supabaseAdmin
       .from('equipment_maintenance_schedules')
@@ -123,11 +161,32 @@ export async function POST(request: NextRequest) {
  * PATCH /api/equipment/maintenance-schedule
  * Update maintenance schedule (admin only)
  */
-export async function PATCH(request: NextRequest) {
-  const auth = await requireAdmin(request);
-  if (!auth.authorized) return auth.response;
-
+export async function PATCH(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       scheduleId,
@@ -187,11 +246,32 @@ export async function PATCH(request: NextRequest) {
  * DELETE /api/equipment/maintenance-schedule
  * Delete maintenance schedule (admin only)
  */
-export async function DELETE(request: NextRequest) {
-  const auth = await requireAdmin(request);
-  if (!auth.authorized) return auth.response;
-
+export async function DELETE(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const scheduleId = searchParams.get('scheduleId');
 

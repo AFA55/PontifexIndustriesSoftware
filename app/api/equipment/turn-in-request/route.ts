@@ -1,20 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth, requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * GET /api/equipment/turn-in-request
  * Get turn-in requests (operator sees theirs, admin sees all)
  */
-export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized) return auth.response;
-
+export async function GET(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status'); // 'pending', 'approved', 'in_service', 'completed', 'rejected'
     const equipmentId = searchParams.get('equipmentId');
 
+    const tenantId = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_turn_in_requests')
       .select(`
@@ -33,6 +44,10 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (status) {
       query = query.eq('status', status);
@@ -60,16 +75,26 @@ export async function GET(request: NextRequest) {
  * POST /api/equipment/turn-in-request
  * Create a new turn-in request
  */
-export async function POST(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized) return auth.response;
-
+export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Get user profile for full name
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('full_name')
-      .eq('id', auth.userId)
+      .eq('id', user.id)
       .single();
 
     const body = await request.json();
@@ -82,16 +107,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const requestData = {
+    const tenantIdPost = await getTenantId(user.id);
+    const requestData: any = {
       equipment_id: equipmentId,
-      requested_by: auth.userId,
-      requested_by_name: profile?.full_name || auth.userEmail,
+      requested_by: user.id,
+      requested_by_name: profile?.full_name || user.email,
       reason,
       description,
       urgency: urgency || 'normal',
       photo_urls: photoUrls || [],
       status: 'pending'
     };
+    if (tenantIdPost) requestData.tenant_id = tenantIdPost;
 
     const { data: turnInRequest, error } = await supabaseAdmin
       .from('equipment_turn_in_requests')
@@ -108,7 +135,7 @@ export async function POST(request: NextRequest) {
     if (reason === 'scheduled_maintenance') {
       await supabaseAdmin.from('equipment_maintenance_alerts').insert({
         equipment_id: equipmentId,
-        operator_id: auth.userId,
+        operator_id: user.id,
         alert_type: 'turn_in_requested',
         severity: urgency === 'critical' ? 'critical' : 'warning',
         title: 'Equipment Turn-In Requested',
@@ -127,17 +154,31 @@ export async function POST(request: NextRequest) {
  * PATCH /api/equipment/turn-in-request
  * Update turn-in request (admin approval/rejection, service tracking)
  */
-export async function PATCH(request: NextRequest) {
-  const auth = await requireAdmin(request);
-  if (!auth.authorized) return auth.response;
-
+export async function PATCH(request: Request) {
   try {
-    // Get admin profile for full name
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('full_name')
-      .eq('id', auth.userId)
+      .select('role, full_name')
+      .eq('id', user.id)
       .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
 
     const body = await request.json();
     const {
@@ -155,8 +196,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updateData: any = {
-      reviewed_by: auth.userId,
-      reviewed_by_name: profile?.full_name || auth.userEmail,
+      reviewed_by: user.id,
+      reviewed_by_name: profile?.full_name || user.email,
       reviewed_at: new Date().toISOString()
     };
 

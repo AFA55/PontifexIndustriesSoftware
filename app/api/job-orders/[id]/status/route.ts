@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
+import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -15,16 +16,33 @@ async function updateJobStatus(
     // Await params in Next.js 15+
     const { id: jobId } = await params;
 
-    // SECURITY: Require authenticated user
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session (server-side)
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();
     const { status, latitude, longitude, accuracy, departure_time, ...additionalFields } = body;
 
     // Validate status
-    const validStatuses = ['scheduled', 'assigned', 'in_route', 'in_progress', 'on_hold', 'completed', 'cancelled'];
+    const validStatuses = ['scheduled', 'assigned', 'in_route', 'in_progress', 'completed', 'cancelled'];
     if (!status || !validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
@@ -32,12 +50,16 @@ async function updateJobStatus(
       );
     }
 
-    // Check if job exists and user has permission
-    const { data: existingJob, error: checkError } = await supabaseAdmin
+    // Get tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Check if job exists and user has permission (scoped to tenant)
+    let jobCheckQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobCheckQuery = jobCheckQuery.eq('tenant_id', tenantId);
+    const { data: existingJob, error: checkError } = await jobCheckQuery.single();
 
     if (checkError || !existingJob) {
       return NextResponse.json(
@@ -46,9 +68,15 @@ async function updateJobStatus(
       );
     }
 
-    // Check permissions: operator can only update their own jobs, admin roles can update any
-    const adminRoles = ['admin', 'super_admin', 'operations_manager'];
-    if (!adminRoles.includes(auth.role || '') && existingJob.assigned_to !== auth.userId) {
+    // Get user's role
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    // Check permissions: operator can only update their own jobs, admin can update any
+    if (profile?.role !== 'admin' && existingJob.assigned_to !== user.id) {
       return NextResponse.json(
         { error: 'You can only update jobs assigned to you' },
         { status: 403 }
@@ -85,11 +113,6 @@ async function updateJobStatus(
       updateData.work_end_longitude = longitude;
     }
 
-    if (status === 'on_hold') {
-      updateData.paused_at = now;
-      updateData.paused_by = auth.userId;
-    }
-
     // Allow additional known fields to be updated (whitelisted for safety)
     const allowedExtraFields = [
       // Liability release fields
@@ -111,12 +134,6 @@ async function updateJobStatus(
       'job_difficulty_rating', 'job_access_rating',
       'job_difficulty_notes', 'job_access_notes',
       'feedback_submitted_at',
-      // Equipment confirmation tracking (per-operator)
-      'equipment_confirmed_by',
-      // Job survey (smart post-work survey)
-      'job_survey',
-      // On-hold fields
-      'pause_reason', 'return_date', 'paused_at', 'paused_by',
     ];
 
     for (const field of allowedExtraFields) {
@@ -165,34 +182,9 @@ async function updateJobStatus(
       updatedJob = fullUpdateResult;
     }
 
-    // Fire-and-forget: notify admins when job is completed
-    if (status === 'completed') {
-      Promise.resolve((async () => {
-        try {
-          // Find all admin/super_admin/operations_manager profiles
-          const { data: adminProfiles } = await supabaseAdmin
-            .from('profiles')
-            .select('id, full_name')
-            .in('role', ['admin', 'super_admin', 'operations_manager']);
-
-          if (adminProfiles && adminProfiles.length > 0) {
-            const notifications = adminProfiles.map(admin => ({
-              recipient_id: admin.id,
-              recipient_name: admin.full_name,
-              job_order_id: jobId,
-              type: 'job_completed',
-              title: `Job Completed: ${existingJob.job_number || jobId.slice(0, 8)}`,
-              message: `${existingJob.customer_name || 'Job'} — ${existingJob.address || existingJob.location || 'Location N/A'} is ready to invoice.`,
-            }));
-            await supabaseAdmin.from('schedule_notifications').insert(notifications);
-          }
-        } catch { /* never block */ }
-      })()).catch(() => {});
-    }
-
     // Also update operator_status_history for tracking
     const historyData: any = {
-      operator_id: auth.userId,
+      operator_id: user.id,
       job_order_id: jobId,
       status: status,
     };
@@ -235,7 +227,7 @@ async function updateJobStatus(
   }
 }
 
-// Export POST, PUT, and PATCH handlers (day-complete page uses PATCH)
+// Export both POST and PUT handlers
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -244,13 +236,6 @@ export async function POST(
 }
 
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  return updateJobStatus(request, params);
-}
-
-export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {

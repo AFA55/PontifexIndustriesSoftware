@@ -7,12 +7,29 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();
@@ -45,12 +62,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create equipment usage entry
-    const { data: equipmentUsage, error: insertError } = await supabaseAdmin
-      .from('equipment_usage')
-      .insert({
+    // Create equipment usage entry (with tenant scope)
+    const tenantId = await getTenantId(user.id);
+    const insertData: any = {
         job_order_id,
-        operator_id: auth.userId,
+        operator_id: user.id,
         equipment_type,
         equipment_id,
         linear_feet_cut: linear_feet_cut || 0,
@@ -66,7 +82,12 @@ export async function POST(request: NextRequest) {
         location_changes: location_changes || 0,
         setup_time_minutes: setup_time_minutes || 0,
         notes
-      })
+    };
+    if (tenantId) insertData.tenant_id = tenantId;
+
+    const { data: equipmentUsage, error: insertError } = await supabaseAdmin
+      .from('equipment_usage')
+      .insert(insertData)
       .select()
       .single();
 
@@ -122,8 +143,32 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Get user's role
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
 
     // Parse query parameters
     const { searchParams } = new URL(request.url);
@@ -132,7 +177,8 @@ export async function GET(request: NextRequest) {
     const equipmentType = searchParams.get('equipment_type');
     const limit = parseInt(searchParams.get('limit') || '100');
 
-    // Build query
+    // Build query with tenant scope
+    const tenantIdGet = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_usage')
       .select(`
@@ -150,6 +196,10 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(limit);
 
+    if (tenantIdGet) {
+      query = query.eq('tenant_id', tenantIdGet);
+    }
+
     // Apply filters
     if (jobOrderId) {
       query = query.eq('job_order_id', jobOrderId);
@@ -157,9 +207,9 @@ export async function GET(request: NextRequest) {
 
     if (operatorId) {
       query = query.eq('operator_id', operatorId);
-    } else if (auth.role !== 'admin') {
+    } else if (profile?.role !== 'admin') {
       // Non-admins can only see their own data
-      query = query.eq('operator_id', auth.userId);
+      query = query.eq('operator_id', user.id);
     }
 
     if (equipmentType) {

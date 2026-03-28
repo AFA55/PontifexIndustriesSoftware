@@ -5,12 +5,30 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();
@@ -63,7 +81,8 @@ export async function POST(request: NextRequest) {
       publicUrl = urlResult.data.publicUrl;
     }
 
-    // Save silica plan record to database
+    // Save silica plan record to database (with tenant scope)
+    const tenantId = await getTenantId(user.id);
     const silicaPlanRecord: any = {
       job_order_id: jobId,
       employee_name: formData.employeeName,
@@ -77,7 +96,7 @@ export async function POST(request: NextRequest) {
       safety_concerns: formData.otherSafetyConcerns || '',
       signature: formData.signature,
       signature_date: formData.signatureDate,
-      created_by: auth.userId,
+      created_by: user.id,
     };
 
     // Add PDF URL if upload succeeded, otherwise store base64 as fallback
@@ -87,6 +106,7 @@ export async function POST(request: NextRequest) {
       // Store PDF as base64 in database as fallback
       silicaPlanRecord.pdf_base64 = pdfBase64;
     }
+    if (tenantId) silicaPlanRecord.tenant_id = tenantId;
 
     // Try to save silica plan record — table may not exist yet
     let silicaPlanId = null;
@@ -133,7 +153,7 @@ export async function POST(request: NextRequest) {
           file_path: filePath,
           file_url: publicUrl,
           file_size_bytes: pdfBuffer.length,
-          generated_by: auth.userId,
+          generated_by: user.id,
           metadata: {
             employee_name: formData.employeeName,
             work_types: formData.workType,

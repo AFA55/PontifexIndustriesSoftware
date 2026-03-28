@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function DELETE(
   request: NextRequest,
@@ -15,15 +15,51 @@ export async function DELETE(
     // Await params (Next.js 15 requirement)
     const { id: jobId } = await params;
 
-    // SECURITY: Require admin access
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    // Delete the job order
-    const { error: deleteError } = await supabaseAdmin
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Check if user is admin
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden. Admin access required.' },
+        { status: 403 }
+      );
+    }
+
+    // Scope delete to tenant
+    const tenantId = await getTenantId(user.id);
+    let deleteQuery = supabaseAdmin
       .from('job_orders')
       .delete()
       .eq('id', jobId);
+    if (tenantId) deleteQuery = deleteQuery.eq('tenant_id', tenantId);
+
+    // Delete the job order
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       console.error('Error deleting job order:', deleteError);

@@ -5,13 +5,31 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 import jsPDF from 'jspdf';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();
@@ -206,24 +224,28 @@ export async function POST(request: NextRequest) {
 
     const publicUrl = urlData.publicUrl;
 
-    // Track PDF in pdf_documents table
-    const { error: pdfDocError } = await supabaseAdmin
-      .from('pdf_documents')
-      .insert({
+    // Track PDF in pdf_documents table (with tenant scope)
+    const tenantId = await getTenantId(user.id);
+    const pdfDocData: any = {
         job_id: jobId,
         document_type: 'job_hazard_analysis',
         document_name: fileName,
         file_path: filePath,
         file_url: publicUrl,
         file_size_bytes: pdfBuffer.length,
-        generated_by: auth.userId,
+        generated_by: user.id,
         metadata: {
           crew_leader: formData.crewLeader,
           crew_size: formData.crewMembers.filter((m: string) => m).length,
           tasks_analyzed: formData.tasks.length,
           date_performed: formData.datePerformed
         }
-      });
+    };
+    if (tenantId) pdfDocData.tenant_id = tenantId;
+
+    const { error: pdfDocError } = await supabaseAdmin
+      .from('pdf_documents')
+      .insert(pdfDocData);
 
     if (pdfDocError) {
       console.error('⚠️ Failed to track PDF in pdf_documents table:', pdfDocError);

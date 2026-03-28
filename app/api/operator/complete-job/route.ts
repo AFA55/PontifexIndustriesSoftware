@@ -6,12 +6,29 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
+import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     const body = await request.json();
     const { jobId, hoursWorked, customerRating } = body;
@@ -21,6 +38,20 @@ export async function POST(request: NextRequest) {
         { error: 'jobId is required' },
         { status: 400 }
       );
+    }
+
+    // Verify job belongs to user's tenant
+    const tenantId = await getTenantId(user.id);
+    if (tenantId) {
+      const { data: jobTenantCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!jobTenantCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
     }
 
     // Get all work items for this job to calculate total production
@@ -106,7 +137,7 @@ export async function POST(request: NextRequest) {
     const { data: existingRecord, error: existingRecordError } = await supabaseAdmin
       .from('operator_job_history')
       .select('id')
-      .eq('operator_id', auth.userId)
+      .eq('operator_id', user.id)
       .eq('job_id', jobId)
       .maybeSingle();
 
@@ -143,7 +174,7 @@ export async function POST(request: NextRequest) {
       const { error: insertError } = await supabaseAdmin
         .from('operator_job_history')
         .insert({
-          operator_id: auth.userId,
+          operator_id: user.id,
           job_id: jobId,
           work_type: primaryWorkType,
           linear_feet_cut: totalLinearFeet,
@@ -167,7 +198,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Operator performance recorded for job ${jobId}:`, {
-      operator: auth.userId,
+      operator: user.id,
       linearFeet: totalLinearFeet,
       hours: calculatedHours,
       productivity: productivityRate.toFixed(2),

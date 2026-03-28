@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
+import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -14,9 +15,25 @@ export async function POST(
   try {
     const { id: jobId } = await params;
 
-    // SECURITY: Require authenticated user
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from authorization token
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();
@@ -30,12 +47,14 @@ export async function POST(
       longitude
     } = body;
 
-    // Get job order
-    const { data: job, error: jobError } = await supabaseAdmin
+    // Get job order (scoped to tenant)
+    const tenantId = await getTenantId(user.id);
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json(
@@ -45,7 +64,7 @@ export async function POST(
     }
 
     // Verify user is assigned to this job
-    if (job.assigned_to !== auth.userId) {
+    if (job.assigned_to !== user.id) {
       return NextResponse.json(
         { error: 'You are not assigned to this job' },
         { status: 403 }
@@ -61,41 +80,29 @@ export async function POST(
     const startTime = workStarted || routeStarted;
     const hoursWorked = startTime ? (new Date().getTime() - startTime.getTime()) / (1000 * 60 * 60) : 0;
 
-    // Calculate the day number for this log
-    const { data: existingLogs } = await supabaseAdmin
-      .from('daily_job_logs')
-      .select('id')
-      .eq('job_order_id', jobId)
-      .neq('log_date', today);
-    const dayNumber = (existingLogs?.length || 0) + 1;
-
-    // Upsert daily log entry — handles duplicate submissions on same day gracefully
-    // Uses the UNIQUE constraint on (job_order_id, log_date)
+    // Create daily log entry — gracefully handle missing table
     let dailyLog = null;
-    const logPayload = {
-      job_order_id: jobId,
-      operator_id: auth.userId,
-      log_date: today,
-      day_number: dayNumber,
-      route_started_at: job.route_started_at,
-      work_started_at: job.work_started_at,
-      day_completed_at: now,
-      work_performed: workPerformed || [],
-      notes: notes || null,
-      hours_worked: Number(hoursWorked.toFixed(2)),
-      daily_signer_name: signerName || null,
-      daily_signature_data: signatureData || null,
-      route_start_latitude: job.route_start_latitude,
-      route_start_longitude: job.route_start_longitude,
-      work_start_latitude: job.work_start_latitude,
-      work_start_longitude: job.work_start_longitude,
-      day_end_latitude: latitude,
-      day_end_longitude: longitude
-    };
-
     const { data: logData, error: logError } = await supabaseAdmin
       .from('daily_job_logs')
-      .upsert(logPayload, { onConflict: 'job_order_id,log_date' })
+      .insert({
+        job_order_id: jobId,
+        operator_id: user.id,
+        log_date: today,
+        route_started_at: job.route_started_at,
+        work_started_at: job.work_started_at,
+        day_completed_at: now,
+        work_performed: workPerformed || [],
+        notes: notes || null,
+        hours_worked: Number(hoursWorked.toFixed(2)),
+        daily_signer_name: signerName || null,
+        daily_signature_data: signatureData || null,
+        route_start_latitude: job.route_start_latitude,
+        route_start_longitude: job.route_start_longitude,
+        work_start_latitude: job.work_start_latitude,
+        work_start_longitude: job.work_start_longitude,
+        day_end_latitude: latitude,
+        day_end_longitude: longitude
+      })
       .select()
       .single();
 
@@ -147,7 +154,7 @@ export async function POST(
           customer_signature_received: false
         })
         .eq('job_order_id', jobId)
-        .eq('operator_id', auth.userId);
+        .eq('operator_id', user.id);
 
       if (workflowError && !(isTableNotFoundError(workflowError))) {
         console.error('Error resetting workflow for next day:', workflowError);
@@ -186,9 +193,38 @@ export async function GET(
   try {
     const { id: jobId } = await params;
 
-    // SECURITY: Require authenticated user
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Verify job belongs to user's tenant
+    const tenantIdGet = await getTenantId(user.id);
+    if (tenantIdGet) {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantIdGet)
+        .maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
+    }
 
     // Get all daily logs for this job — gracefully handle missing table
     const { data: logs, error: logsError } = await supabaseAdmin

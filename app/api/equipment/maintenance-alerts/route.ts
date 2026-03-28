@@ -1,20 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * GET /api/equipment/maintenance-alerts
  * Get maintenance alerts for current user (operator sees theirs, admin sees all)
  */
-export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized) return auth.response;
-
+export async function GET(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status'); // 'unread', 'unresolved', 'all'
     const equipmentId = searchParams.get('equipmentId');
 
+    const tenantId = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_maintenance_alerts')
       .select(`
@@ -33,6 +44,10 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // Apply filters
     if (status === 'unread') {
@@ -63,11 +78,21 @@ export async function GET(request: NextRequest) {
  * PATCH /api/equipment/maintenance-alerts
  * Update alert status (mark as read, acknowledge, resolve)
  */
-export async function PATCH(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized) return auth.response;
-
+export async function PATCH(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { alertId, action } = body; // action: 'mark_read', 'acknowledge', 'resolve'
 
@@ -91,12 +116,13 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
+    const tenantIdPatch = await getTenantId(user.id);
+    let updateQuery = supabaseAdmin
       .from('equipment_maintenance_alerts')
       .update(updateData)
-      .eq('id', alertId)
-      .select()
-      .single();
+      .eq('id', alertId);
+    if (tenantIdPatch) updateQuery = updateQuery.eq('tenant_id', tenantIdPatch);
+    const { data, error } = await updateQuery.select().single();
 
     if (error) {
       console.error('Error updating alert:', error);

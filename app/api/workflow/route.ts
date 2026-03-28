@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
+import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // Workflow step definitions
 const WORKFLOW_STEPS = [
@@ -21,8 +22,19 @@ const WORKFLOW_STEPS = [
 // GET: Retrieve workflow progress
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
 
@@ -30,12 +42,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Job ID required' }, { status: 400 });
     }
 
+    // Verify job belongs to user's tenant
+    const tenantId = await getTenantId(user.id);
+    if (tenantId) {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
+    }
+
     // Get workflow progress
     const { data: workflow, error } = await supabaseAdmin
       .from('workflow_steps')
       .select('*')
       .eq('job_order_id', jobId)
-      .eq('operator_id', auth.userId)
+      .eq('operator_id', user.id)
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
@@ -50,7 +76,7 @@ export async function GET(request: NextRequest) {
         .from('workflow_steps')
         .insert({
           job_order_id: jobId,
-          operator_id: auth.userId,
+          operator_id: user.id,
           current_step: 'equipment_checklist',
           equipment_checklist_completed: false,
           sms_sent: false,
@@ -82,14 +108,38 @@ export async function GET(request: NextRequest) {
 // POST: Update workflow progress
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const body = await request.json();
     const { jobId, currentStep, completedStep } = body;
 
     if (!jobId) {
       return NextResponse.json({ error: 'Job ID required' }, { status: 400 });
+    }
+
+    // Verify job belongs to user's tenant
+    const tenantIdPost = await getTenantId(user.id);
+    if (tenantIdPost) {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantIdPost)
+        .maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
     }
 
     // Build update data
@@ -139,7 +189,7 @@ export async function POST(request: NextRequest) {
       .from('workflow_steps')
       .upsert({
         job_order_id: jobId,
-        operator_id: auth.userId,
+        operator_id: user.id,
         ...updateData,
       }, {
         onConflict: 'job_order_id,operator_id'
