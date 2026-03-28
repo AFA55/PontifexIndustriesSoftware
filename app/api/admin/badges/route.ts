@@ -6,11 +6,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+
+    const tenantId = await getTenantId(auth.userId);
 
     const { searchParams } = new URL(request.url);
     const facilityId = searchParams.get('facility_id');
@@ -24,6 +27,7 @@ export async function GET(request: NextRequest) {
       .order('facility_name')
       .order('operator_name');
 
+    if (tenantId) query = query.eq('tenant_id', tenantId);
     if (facilityId) query = query.eq('facility_id', facilityId);
     if (operatorId) query = query.eq('operator_id', operatorId);
     if (status) query = query.eq('status', status);
@@ -98,6 +102,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This operator already has an active badge at this facility' }, { status: 409 });
     }
 
+    const tenantId = await getTenantId(auth.userId);
+
     const { data, error } = await supabaseAdmin
       .from('operator_facility_badges')
       .insert({
@@ -109,6 +115,7 @@ export async function POST(request: NextRequest) {
         status: 'active',
         notes: notes?.trim() || null,
         created_by: auth.userId,
+        tenant_id: tenantId || null,
       })
       .select()
       .single();

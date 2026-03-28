@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSuperAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 import { logAuditEvent } from '@/lib/audit';
 import { logApiError } from '@/lib/error-logger';
 
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
     const auth = await requireSuperAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const body = await request.json();
     const { jobOrderId, operatorId, helperId } = body;
 
@@ -42,10 +44,12 @@ export async function POST(request: NextRequest) {
       updateData.assigned_at = null;
     }
 
-    const { data: updated, error } = await supabaseAdmin
+    let assignQuery = supabaseAdmin
       .from('job_orders')
       .update(updateData)
-      .eq('id', jobOrderId)
+      .eq('id', jobOrderId);
+    if (tenantId) { assignQuery = assignQuery.eq('tenant_id', tenantId); }
+    const { data: updated, error } = await assignQuery
       .select('id, job_number, customer_name, assigned_to, helper_assigned_to, status')
       .single();
 

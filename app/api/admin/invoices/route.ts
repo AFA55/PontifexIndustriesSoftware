@@ -7,11 +7,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+
+    const tenantId = await getTenantId(auth.userId);
 
     // Auto-mark overdue: flip any sent invoices past due_date to 'overdue' (fire-and-forget)
     const today = new Date().toISOString().split('T')[0];
@@ -33,6 +36,10 @@ export async function GET(request: NextRequest) {
       .select('*, invoice_line_items(count)')
       .order('created_at', { ascending: false })
       .limit(limit);
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
@@ -238,6 +245,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const tenantIdForInsert = await getTenantId(auth.userId);
+
     // Create the invoice
     const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from('invoices')
@@ -258,6 +267,7 @@ export async function POST(request: NextRequest) {
         po_number: job.po_number || null,
         notes: `Job: ${job.job_number}\nLocation: ${job.location || job.address || 'N/A'}`,
         created_by: auth.userId,
+        tenant_id: tenantIdForInsert || null,
       })
       .select()
       .single();

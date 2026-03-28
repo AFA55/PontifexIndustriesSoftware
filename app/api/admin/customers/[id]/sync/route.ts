@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -16,14 +17,16 @@ export async function POST(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
 
     // Fetch customer
-    const { data: customer, error: customerError } = await supabaseAdmin
+    let customerQuery = supabaseAdmin
       .from('customers')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) { customerQuery = customerQuery.eq('tenant_id', tenantId); }
+    const { data: customer, error: customerError } = await customerQuery.single();
 
     if (customerError || !customer) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });

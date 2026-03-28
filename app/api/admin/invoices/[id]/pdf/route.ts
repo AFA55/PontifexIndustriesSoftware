@@ -7,6 +7,7 @@ import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 import { renderToBuffer } from '@react-pdf/renderer';
 import InvoicePDF from '@/components/pdf/InvoicePDF';
 import type { InvoicePDFData } from '@/components/pdf/InvoicePDF';
@@ -19,14 +20,16 @@ export async function GET(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
 
     // Fetch invoice
-    const { data: invoice, error } = await supabaseAdmin
+    let invoiceQuery = supabaseAdmin
       .from('invoices')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) { invoiceQuery = invoiceQuery.eq('tenant_id', tenantId); }
+    const { data: invoice, error } = await invoiceQuery.single();
 
     if (error || !invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -56,12 +59,12 @@ export async function GET(
     // Fetch branding
     let branding: Record<string, any> = {};
     try {
-      const { data: brandingRow } = await supabaseAdmin
+      let brandingQuery = supabaseAdmin
         .from('tenant_branding')
         .select('company_name, company_address, support_phone, support_email, pdf_footer_text, pdf_show_logo, primary_color, logo_url')
-        .eq('is_active', true)
-        .limit(1)
-        .single();
+        .eq('is_active', true);
+      if (tenantId) { brandingQuery = brandingQuery.eq('tenant_id', tenantId); }
+      const { data: brandingRow } = await brandingQuery.limit(1).single();
 
       if (brandingRow) {
         branding = {

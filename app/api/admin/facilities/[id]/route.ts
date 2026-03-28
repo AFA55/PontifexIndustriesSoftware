@@ -7,19 +7,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
 
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('facilities')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) { query = query.eq('tenant_id', tenantId); }
+    const { data, error } = await query.single();
 
     if (error || !data) {
       return NextResponse.json({ error: 'Facility not found' }, { status: 404 });
@@ -37,6 +40,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
     const body = await request.json();
 
@@ -52,12 +56,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from('facilities')
       .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+    if (tenantId) { updateQuery = updateQuery.eq('tenant_id', tenantId); }
+    const { data, error } = await updateQuery.select().single();
 
     if (error) {
       console.error('Error updating facility:', error);
@@ -76,15 +80,16 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
 
     // Soft delete — set is_active to false
-    const { data, error } = await supabaseAdmin
+    let deleteQuery = supabaseAdmin
       .from('facilities')
       .update({ is_active: false })
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+    if (tenantId) { deleteQuery = deleteQuery.eq('tenant_id', tenantId); }
+    const { data, error } = await deleteQuery.select().single();
 
     if (error) {
       console.error('Error deactivating facility:', error);

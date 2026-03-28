@@ -7,11 +7,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+
+    const tenantId = await getTenantId(auth.userId);
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
@@ -25,6 +28,10 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .order('name', { ascending: true })
       .range(offset, offset + limit - 1);
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (search.trim()) {
       query = query.ilike('name', `%${search.trim()}%`);
@@ -79,6 +86,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Company name is required' }, { status: 400 });
     }
 
+    const tenantId = await getTenantId(auth.userId);
+
     const insertData: Record<string, any> = {
       name: body.company_name.trim(),
       display_name: body.company_name.trim(),
@@ -101,6 +110,7 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== undefined ? body.is_active : true,
       active: body.is_active !== undefined ? body.is_active : true,
       created_by: auth.userId,
+      tenant_id: tenantId || null,
     };
 
     const { data: customer, error } = await supabaseAdmin

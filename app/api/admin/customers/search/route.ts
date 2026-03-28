@@ -8,11 +8,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+
+    const tenantId = await getTenantId(auth.userId);
 
     const { searchParams } = new URL(request.url);
     const q = searchParams.get('q') || '';
@@ -21,12 +24,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    const { data: customers, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('customers')
       .select('id, name, primary_contact_name, primary_contact_phone, address')
       .ilike('name', `%${q.trim()}%`)
       .order('name', { ascending: true })
       .limit(10);
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { data: customers, error } = await query;
 
     if (error) {
       console.error('Error searching customers:', error);

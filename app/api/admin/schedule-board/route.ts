@@ -8,11 +8,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
+
+    const tenantId = await getTenantId(auth.userId);
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date'); // YYYY-MM-DD
@@ -25,6 +28,10 @@ export async function GET(request: NextRequest) {
       .select('*')
       .neq('status', 'pending_approval')
       .order('arrival_time', { ascending: true, nullsFirst: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (date) {
       query = query.eq('scheduled_date', date);
@@ -43,23 +50,27 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Fetch ALL pending_approval jobs (not date-filtered — global queue)
-    const { data: pendingJobs, error: pendingError } = await supabaseAdmin
+    let pendingQuery = supabaseAdmin
       .from('schedule_board_view')
       .select('*')
       .eq('status', 'pending_approval')
       .order('created_at', { ascending: false });
+    if (tenantId) { pendingQuery = pendingQuery.eq('tenant_id', tenantId); }
+    const { data: pendingJobs, error: pendingError } = await pendingQuery;
 
     if (pendingError) {
       console.error('Error fetching pending jobs:', pendingError);
     }
 
     // 3. Fetch ALL will-call jobs (also global — not date-filtered)
-    const { data: willCallJobs, error: wcError } = await supabaseAdmin
+    let wcQuery = supabaseAdmin
       .from('schedule_board_view')
       .select('*')
       .eq('is_will_call', true)
       .neq('status', 'pending_approval')
       .order('created_at', { ascending: false });
+    if (tenantId) { wcQuery = wcQuery.eq('tenant_id', tenantId); }
+    const { data: willCallJobs, error: wcError } = await wcQuery;
 
     if (wcError) {
       console.error('Error fetching will-call jobs:', wcError);

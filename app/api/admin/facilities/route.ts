@@ -6,11 +6,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+
+    const tenantId = await getTenantId(auth.userId);
 
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get('active_only') !== 'false'; // default true
@@ -19,6 +22,10 @@ export async function GET(request: NextRequest) {
       .from('facilities')
       .select('*')
       .order('name');
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (activeOnly) {
       query = query.eq('is_active', true);
@@ -50,6 +57,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Facility name is required' }, { status: 400 });
     }
 
+    const tenantId = await getTenantId(auth.userId);
+
     const { data, error } = await supabaseAdmin
       .from('facilities')
       .insert({
@@ -64,6 +73,7 @@ export async function POST(request: NextRequest) {
         compliance_documents: compliance_documents || null,
         notes: notes?.trim() || null,
         created_by: auth.userId,
+        tenant_id: tenantId || null,
       })
       .select()
       .single();

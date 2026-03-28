@@ -7,18 +7,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
+
     // Fetch operators (role = 'operator')
-    const { data: operators, error: opError } = await supabaseAdmin
+    let opQuery = supabaseAdmin
       .from('profiles')
       .select('id, full_name, role')
       .eq('role', 'operator')
       .order('full_name');
+    if (tenantId) { opQuery = opQuery.eq('tenant_id', tenantId); }
+    const { data: operators, error: opError } = await opQuery;
 
     if (opError) {
       console.error('Error fetching operators:', opError);
@@ -29,11 +34,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch helpers (role = 'apprentice')
-    const { data: helpers, error: helpError } = await supabaseAdmin
+    let helpQuery = supabaseAdmin
       .from('profiles')
       .select('id, full_name, role')
       .eq('role', 'apprentice')
       .order('full_name');
+    if (tenantId) { helpQuery = helpQuery.eq('tenant_id', tenantId); }
+    const { data: helpers, error: helpError } = await helpQuery;
 
     if (helpError) {
       console.error('Error fetching helpers:', helpError);
