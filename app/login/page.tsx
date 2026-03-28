@@ -1,13 +1,13 @@
 'use client';
 
-import React, { Suspense, useState, useEffect, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { Eye, EyeOff, Mail, Lock, Building2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const schema = z.object({
@@ -18,90 +18,17 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-interface TenantInfo {
-  id: string;
-  company_code: string;
-  name: string;
-}
-
-interface TenantBrandingData {
-  company_name?: string;
-  company_short_name?: string;
-  tagline?: string;
-  logo_url?: string | null;
-  primary_color?: string;
-  login_bg_gradient_from?: string;
-  login_bg_gradient_to?: string;
-  login_welcome_text?: string;
-  login_subtitle?: string | null;
-  show_demo_accounts?: boolean;
-}
-
 export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-      </div>
-    }>
-      <LoginContent />
-    </Suspense>
-  );
-}
-
-function LoginContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tenant, setTenant] = useState<TenantInfo | null>(null);
-  const [tenantBranding, setTenantBranding] = useState<TenantBrandingData | null>(null);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const companyCode = searchParams.get('company');
-
-  const { register, handleSubmit } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
-  // Load tenant info and branding from localStorage
-  useEffect(() => {
-    if (!companyCode) return;
-
-    try {
-      const storedTenant = localStorage.getItem('current-tenant');
-      if (storedTenant) {
-        const parsed = JSON.parse(storedTenant);
-        if (parsed?.company_code === companyCode) {
-          setTenant(parsed);
-          // Load branding
-          const storedBranding = localStorage.getItem(`branding-${parsed.id}`);
-          if (storedBranding) {
-            const brandingData = JSON.parse(storedBranding);
-            setTenantBranding(brandingData.data || brandingData);
-          }
-        }
-      }
-    } catch {
-      // ignore parse errors
-    }
-  }, [companyCode]);
-
-  // Derived display values
-  const displayName = useMemo(() => {
-    if (tenantBranding?.company_name) return tenantBranding.company_name;
-    if (tenant?.name) return tenant.name;
-    return 'Operations Platform';
-  }, [tenantBranding, tenant]);
-
-  const displayTagline = useMemo(() => {
-    if (tenantBranding?.tagline) return tenantBranding.tagline;
-    return 'Management System';
-  }, [tenantBranding]);
-
-  const showDemoAccounts = tenantBranding?.show_demo_accounts !== false;
-
   const onSubmit = async (data: FormData) => {
-    console.log('Starting login process...');
+    console.log('🚀 Starting login process...');
     setLoading(true);
     setError(null);
 
@@ -121,13 +48,14 @@ function LoginContent() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        console.log('Login failed:', result.error);
+        console.log('❌ Login failed:', result.error);
         setError(result.error || 'Login failed');
         setLoading(false);
         return;
       }
 
-      console.log('Login successful!');
+      console.log('✅ Login successful!');
+      console.log('👤 User:', result.user);
 
       // Set the session in the client
       if (result.session) {
@@ -137,32 +65,39 @@ function LoginContent() {
         });
       }
 
-      // Store user data in localStorage for dashboard access
-      const userData: Record<string, unknown> = {
+      // Store user data in localStorage for dashboard access (always use API response)
+      const userData = {
         id: result.user.id,
         name: result.user.full_name,
         email: result.user.email,
         role: result.user.role,
+        tenant_id: result.user.tenant_id || null,
       };
-
-      // Attach tenant info if available
-      if (tenant?.id) {
-        userData.tenant_id = tenant.id;
-      }
-
       localStorage.setItem('supabase-user', JSON.stringify(userData));
+
+      // Store tenant info from API response (works regardless of navigation path)
+      if (result.tenant) {
+        localStorage.setItem('current-tenant', JSON.stringify(result.tenant));
+      } else if (result.user.tenant_id) {
+        // If API returned tenant_id but no tenant object, store minimal tenant data
+        localStorage.setItem('current-tenant', JSON.stringify({ id: result.user.tenant_id }));
+      }
+      console.log('💾 User and tenant stored in localStorage');
 
       // Redirect based on user role
       if (result.user.role === 'admin') {
+        console.log('🔑 Admin user, redirecting to admin dashboard...');
         router.push('/dashboard/admin');
       } else if (result.user.role === 'operator' || result.user.role === 'apprentice') {
+        console.log('👤 Operator/Apprentice user, redirecting to operator dashboard...');
         router.push('/dashboard');
       } else {
         setError('Invalid user role');
         setLoading(false);
       }
-    } catch (err: unknown) {
-      console.error('Unexpected login error:', err);
+      // Keep loading state true during navigation - it will unmount anyway
+    } catch (err: any) {
+      console.error('💥 Unexpected login error:', err);
       setError('An unexpected error occurred');
       setLoading(false);
     }
@@ -189,11 +124,7 @@ function LoginContent() {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
           >
-            {tenantBranding?.logo_url ? (
-              <img src={tenantBranding.logo_url} alt={displayName} className="h-12 w-auto" />
-            ) : (
-              <Logo />
-            )}
+            <Logo />
           </motion.div>
           <motion.h1
             initial={{ opacity: 0 }}
@@ -201,9 +132,9 @@ function LoginContent() {
             transition={{ delay: 0.3 }}
             className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-red-700 bg-clip-text text-transparent mt-6 mb-2 tracking-tight"
           >
-            {displayName}
+            Pontifex Industries
           </motion.h1>
-          <p className="text-gray-600 text-sm font-medium">{displayTagline}</p>
+          <p className="text-gray-600 text-sm font-medium">Concrete Cutting Management System</p>
         </div>
 
         {/* Login Form */}
@@ -298,60 +229,47 @@ function LoginContent() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
-            className="text-center space-y-2"
+            className="text-center"
           >
-            <Link href="/request-access" className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors block">
+            <Link href="/request-access" className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors">
               Need access? Request Login
             </Link>
-            {companyCode ? (
-              <Link href="/company" className="text-gray-500 hover:text-gray-700 text-xs font-medium transition-colors flex items-center justify-center gap-1">
-                <Building2 size={12} />
-                Not your company? Switch
-              </Link>
-            ) : (
-              <Link href="/company" className="text-gray-500 hover:text-gray-700 text-xs font-medium transition-colors flex items-center justify-center gap-1">
-                <Building2 size={12} />
-                Enter company code
-              </Link>
-            )}
           </motion.div>
         </form>
 
         {/* Demo Credentials - Modern Cards */}
-        {showDemoAccounts && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
-            className="mt-8 space-y-3"
-          >
-            <h3 className="text-gray-700 font-bold text-sm mb-4 text-center">Quick Access Demo Accounts</h3>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="mt-8 space-y-3"
+        >
+          <h3 className="text-gray-700 font-bold text-sm mb-4 text-center">Quick Access Demo Accounts</h3>
 
-            {/* Operator Account */}
-            <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 hover:border-blue-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <h4 className="text-blue-800 font-bold text-xs tracking-wider">OPERATOR DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-blue-700 font-bold">Email:</span> demo@pontifex.com</div>
-                <div><span className="text-blue-700 font-bold">Password:</span> Demo1234!</div>
-              </div>
+          {/* Operator Account */}
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 hover:border-blue-300 transition-all hover:shadow-md cursor-default">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              <h4 className="text-blue-800 font-bold text-xs tracking-wider">OPERATOR DASHBOARD</h4>
             </div>
+            <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+              <div><span className="text-blue-700 font-bold">Email:</span> demo@pontifex.com</div>
+              <div><span className="text-blue-700 font-bold">Password:</span> Demo1234!</div>
+            </div>
+          </div>
 
-            {/* Admin Account */}
-            <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200 hover:border-orange-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                <h4 className="text-red-800 font-bold text-xs tracking-wider">ADMIN DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-red-700 font-bold">Email:</span> admin@pontifex.com</div>
-                <div><span className="text-red-700 font-bold">Password:</span> Admin1234!</div>
-              </div>
+          {/* Admin Account */}
+          <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200 hover:border-orange-300 transition-all hover:shadow-md cursor-default">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <h4 className="text-red-800 font-bold text-xs tracking-wider">ADMIN DASHBOARD</h4>
             </div>
-          </motion.div>
-        )}
+            <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+              <div><span className="text-red-700 font-bold">Email:</span> admin@pontifex.com</div>
+              <div><span className="text-red-700 font-bold">Password:</span> Admin1234!</div>
+            </div>
+          </div>
+        </motion.div>
       </motion.div>
     </div>
   );
