@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PUT(
   request: NextRequest,
@@ -16,14 +16,31 @@ export async function PUT(
     const { id: timecardId } = await params;
 
     // Get user from Supabase session (server-side)
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Get user's role from profiles
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
-      .eq('id', auth.userId)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -33,9 +50,8 @@ export async function PUT(
       );
     }
 
-    // Check if user is admin, super_admin, or operations_manager
-    const adminRoles = ['admin', 'super_admin', 'operations_manager'];
-    if (!adminRoles.includes(profile.role)) {
+    // Check if user is admin
+    if (profile.role !== 'admin') {
       return NextResponse.json(
         { error: 'Only administrators can update timecards' },
         { status: 403 }
@@ -46,12 +62,18 @@ export async function PUT(
     const body = await request.json();
     const { clock_in_time, clock_out_time, notes } = body;
 
-    // Check if timecard exists
-    const { data: existingTimecard, error: checkError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Check if timecard exists (scoped to tenant)
+    let checkQuery = supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('id', timecardId)
-      .single();
+      .eq('id', timecardId);
+    if (tenantId) {
+      checkQuery = checkQuery.eq('tenant_id', tenantId);
+    }
+    const { data: existingTimecard, error: checkError } = await checkQuery.single();
 
     if (checkError || !existingTimecard) {
       return NextResponse.json(
@@ -80,10 +102,14 @@ export async function PUT(
     if (notes !== undefined) updateData.notes = notes;
     if (total_hours !== null) updateData.total_hours = total_hours;
 
-    const { data: updatedTimecard, error: updateError } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from('timecards')
       .update(updateData)
-      .eq('id', timecardId)
+      .eq('id', timecardId);
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId);
+    }
+    const { data: updatedTimecard, error: updateError } = await updateQuery
       .select()
       .single();
 

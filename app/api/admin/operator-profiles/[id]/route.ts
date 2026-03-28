@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
@@ -18,14 +18,31 @@ export async function GET(
     const { id } = await params;
 
     // Get user from Supabase session (server-side)
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Get user's role from profiles
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
-      .eq('id', auth.userId)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -43,12 +60,18 @@ export async function GET(
       );
     }
 
-    // Get operator profile
-    const { data: operator, error: operatorError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Get operator profile (scoped to tenant)
+    let operatorQuery = supabaseAdmin
       .from('profiles')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) {
+      operatorQuery = operatorQuery.eq('tenant_id', tenantId);
+    }
+    const { data: operator, error: operatorError } = await operatorQuery.single();
 
     if (operatorError || !operator) {
       return NextResponse.json(
@@ -96,8 +119,48 @@ export async function PATCH(
   try {
     const { id } = await params;
 
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session (server-side)
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Get user's role from profiles
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { error: 'Failed to verify user role' },
+        { status: 403 }
+      );
+    }
+
+    // Check if user is admin
+    if (profile.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Only administrators can update operator profiles' },
+        { status: 403 }
+      );
+    }
 
     // Parse request body
     const updates = await request.json();
@@ -130,11 +193,18 @@ export async function PATCH(
 
     sanitizedUpdates.updated_at = new Date().toISOString();
 
-    // Update operator profile
-    const { data: updatedOperator, error: updateError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Update operator profile (scoped to tenant)
+    let updateQuery = supabaseAdmin
       .from('profiles')
       .update(sanitizedUpdates)
-      .eq('id', id)
+      .eq('id', id);
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId);
+    }
+    const { data: updatedOperator, error: updateError } = await updateQuery
       .select()
       .single();
 

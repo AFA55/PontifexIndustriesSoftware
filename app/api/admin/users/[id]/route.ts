@@ -1,102 +1,123 @@
 /**
  * API Route: PATCH /api/admin/users/[id]
- * Update a user's profile (role, active status).
- * SECURITY: Only super_admin/operations_manager can update users.
- *           Only super_admin can grant super_admin role.
+ * Update a user (admin only)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireOpsManager } from '@/lib/api-auth';
-import { ROLES_WITH_LABELS } from '@/lib/rbac';
-
-const VALID_ROLES = ROLES_WITH_LABELS.map(r => r.value);
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireOpsManager(request);
-    if (!auth.authorized) return auth.response;
-
     const { id } = await params;
-    const body = await request.json();
-    const updates: Record<string, any> = {};
 
-    // Optional: role update
-    if (body.role !== undefined) {
-      if (!VALID_ROLES.includes(body.role)) {
-        return NextResponse.json(
-          { error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` },
-          { status: 400 }
-        );
-      }
-      // Guard: only super_admin can grant super_admin
-      if (body.role === 'super_admin' && auth.role !== 'super_admin') {
-        return NextResponse.json(
-          { error: 'Only a Super Admin can grant the Super Admin role.' },
-          { status: 403 }
-        );
-      }
-      updates.role = body.role;
+    // Get user from Supabase session (server-side)
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
     }
 
-    // Optional: active status update
-    if (body.active !== undefined) {
-      if (typeof body.active !== 'boolean') {
-        return NextResponse.json(
-          { error: 'active must be a boolean' },
-          { status: 400 }
-        );
-      }
-      updates.active = body.active;
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
     }
 
-    if (Object.keys(updates).length === 0) {
+    // Get user's role from profiles
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { error: 'Failed to verify user role' },
+        { status: 403 }
+      );
+    }
+
+    // Check if user is admin
+    if (profile.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Only administrators can update users' },
+        { status: 403 }
+      );
+    }
+
+    // Parse request body
+    const updates = await request.json();
+    console.log(`Updating user ${id} with:`, updates);
+
+    // Validate and sanitize updates
+    const allowedFields = ['active', 'role'];
+    const sanitizedUpdates: any = {};
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        sanitizedUpdates[field] = updates[field];
+      }
+    }
+
+    if (Object.keys(sanitizedUpdates).length === 0) {
       return NextResponse.json(
         { error: 'No valid fields to update' },
         { status: 400 }
       );
     }
 
-    // Verify user exists
-    const { data: profile, error: fetchError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, full_name')
-      .eq('id', id)
-      .single();
+    sanitizedUpdates.updated_at = new Date().toISOString();
 
-    if (fetchError || !profile) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Update user (scoped to tenant)
+    let updateQuery = supabaseAdmin
+      .from('profiles')
+      .update(sanitizedUpdates)
+      .eq('id', id);
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId);
     }
-
-    // Apply update
-    const { data: updatedUser, error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update(updates)
-      .eq('id', id)
+    const { data: updatedUser, error: updateError } = await updateQuery
       .select()
       .single();
 
+    console.log('Update result:', { updatedUser, updateError });
+
     if (updateError) {
-      console.error('[admin/users PATCH] Update error:', updateError);
+      console.error('Error updating user:', updateError);
       return NextResponse.json(
-        { error: `Failed to update user: ${updateError.message}` },
+        { error: 'Failed to update user' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: `User ${profile.full_name} has been updated.`,
-      data: updatedUser,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'User updated successfully',
+        data: updatedUser,
+      },
+      { status: 200 }
+    );
   } catch (error: any) {
-    console.error('[admin/users PATCH] Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Unexpected error in update user route:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

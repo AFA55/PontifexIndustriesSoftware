@@ -1,27 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
     // Get user from authorization header
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Verify admin
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role')
-      .eq('id', auth.userId)
+      .eq('id', user.id)
       .single();
 
     if (profile?.role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    // Get all job orders
-    const { data: jobs, error: jobsError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Get all job orders (scoped to tenant)
+    let jobsQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
       .order('scheduled_date', { ascending: false });
+    if (tenantId) {
+      jobsQuery = jobsQuery.eq('tenant_id', tenantId);
+    }
+    const { data: jobs, error: jobsError } = await jobsQuery;
 
     if (jobsError) {
       return NextResponse.json({ error: jobsError.message }, { status: 500 });

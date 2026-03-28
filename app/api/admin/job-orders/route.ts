@@ -5,20 +5,37 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // GET: Fetch all job orders (admin only)
 export async function GET(request: NextRequest) {
   try {
     // Get user from Supabase session (server-side)
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Get user's role from profiles
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
-      .eq('id', auth.userId)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -29,12 +46,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin
-    if (!['admin', 'super_admin'].includes(profile.role)) {
+    if (profile.role !== 'admin') {
       return NextResponse.json(
         { error: 'Only administrators can view all job orders' },
         { status: 403 }
       );
     }
+
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
@@ -48,6 +68,11 @@ export async function GET(request: NextRequest) {
       .from('job_orders')
       .select('*')
       .order('created_at', { ascending: false });
+
+    // Scope to tenant
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // Apply filters
     if (status) {
@@ -113,8 +138,51 @@ export async function GET(request: NextRequest) {
 // POST: Create new job order (admin only)
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session (server-side)
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Get user's role from profiles
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { error: 'Failed to verify user role' },
+        { status: 403 }
+      );
+    }
+
+    // Check if user is admin
+    if (profile.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Only administrators can create job orders' },
+        { status: 403 }
+      );
+    }
+
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
 
     // Parse request body
     const body = await request.json();
@@ -153,7 +221,8 @@ export async function POST(request: NextRequest) {
       job_site_number: body.job_site_number,
       po_number: body.po_number,
       customer_job_number: body.customer_job_number,
-      created_by: auth.userId,
+      created_by: user.id,
+      tenant_id: tenantId || null,
     };
 
     // Set assigned_at if assigning to operator

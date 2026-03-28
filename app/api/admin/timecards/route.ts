@@ -5,19 +5,36 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     // Get user from Supabase session (server-side)
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Get user's role from profiles
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
-      .eq('id', auth.userId)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -27,14 +44,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is admin, super_admin, or operations_manager
-    const adminRoles = ['admin', 'super_admin', 'operations_manager'];
-    if (!adminRoles.includes(profile.role)) {
+    // Check if user is admin
+    if (profile.role !== 'admin') {
       return NextResponse.json(
         { error: 'Only administrators can view timecards' },
         { status: 403 }
       );
     }
+
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -49,6 +68,11 @@ export async function GET(request: NextRequest) {
       .from('timecards_with_users')
       .select('*')
       .order('clock_in_time', { ascending: false });
+
+    // Scope to tenant
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // Apply filters
     if (userId) {

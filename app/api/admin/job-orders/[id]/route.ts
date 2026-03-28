@@ -8,7 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
+import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PATCH(
   request: NextRequest,
@@ -19,14 +20,31 @@ export async function PATCH(
     const { id } = await params;
 
     // Get user from Supabase session (server-side)
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Get user's role and name from profiles
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role, full_name, email')
-      .eq('id', auth.userId)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -36,24 +54,30 @@ export async function PATCH(
       );
     }
 
-    // Check if user is admin or super_admin
-    if (!['admin', 'super_admin'].includes(profile.role)) {
+    // Check if user is admin
+    if (profile.role !== 'admin') {
       return NextResponse.json(
         { error: 'Only administrators can update job orders' },
         { status: 403 }
       );
     }
 
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
     // Parse request body
     const updates = await request.json();
     console.log(`Updating job order ${id} with:`, updates);
 
     // Get the current job order before updating (for audit trail)
-    const { data: oldJobOrder, error: fetchError } = await supabaseAdmin
+    let fetchQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) {
+      fetchQuery = fetchQuery.eq('tenant_id', tenantId);
+    }
+    const { data: oldJobOrder, error: fetchError } = await fetchQuery.single();
 
     if (fetchError || !oldJobOrder) {
       return NextResponse.json(
@@ -70,9 +94,8 @@ export async function PATCH(
     const allowedFields = [
       'arrival_time', 'shop_arrival_time', 'location', 'address',
       'customer_name', 'foreman_name', 'foreman_phone', 'equipment_needed',
-      'description', 'assigned_to', 'helper_assigned_to', 'scheduled_date', 'end_date',
-      'estimated_hours', 'estimated_cost', 'operator_name', 'status', 'priority',
-      'is_will_call', 'difficulty_rating',
+      'description', 'assigned_to', 'scheduled_date', 'end_date',
+      'estimated_hours', 'operator_name', 'status', 'priority',
     ];
 
     allowedFields.forEach(field => {
@@ -81,11 +104,15 @@ export async function PATCH(
       }
     });
 
-    // Update job order
-    const { data: jobOrder, error: updateError } = await supabaseAdmin
+    // Update job order (scoped to tenant)
+    let updateQuery = supabaseAdmin
       .from('job_orders')
       .update(updateFields)
-      .eq('id', id)
+      .eq('id', id);
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId);
+    }
+    const { data: jobOrder, error: updateError } = await updateQuery
       .select()
       .single();
 
@@ -135,8 +162,8 @@ export async function PATCH(
           .insert({
             job_order_id: id,
             job_number: jobOrder.job_number,
-            changed_by: auth.userId,
-            changed_by_name: profile.full_name || auth.userEmail,
+            changed_by: user.id,
+            changed_by_name: profile.full_name || user.email,
             changed_by_role: profile.role,
             change_type: 'updated',
             changes: changes,
@@ -152,31 +179,6 @@ export async function PATCH(
           }
         } else {
           console.log('Audit trail logged:', Object.keys(changes));
-        }
-
-        // Auto-create a change_log note in job_notes for the schedule board
-        const changeDescriptions = Object.entries(changes).map(([field, { old: oldVal, new: newVal }]) => {
-          const label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-          return `${label}: "${oldVal || '(empty)'}" → "${newVal || '(empty)'}"`;
-        });
-
-        const { error: noteError } = await supabaseAdmin
-          .from('job_notes')
-          .insert({
-            job_order_id: id,
-            author_id: auth.userId,
-            author_name: profile.full_name || auth.userEmail || 'System',
-            content: changeDescriptions.join('\n'),
-            note_type: 'change_log',
-            metadata: { changes },
-          });
-
-        if (noteError) {
-          if (isTableNotFoundError(noteError)) {
-            console.log('Change log note skipped: job_notes table not available yet');
-          } else {
-            console.error('Error creating change_log note:', noteError);
-          }
         }
       }
     }
@@ -214,22 +216,61 @@ export async function DELETE(
     // Await params as required by Next.js 15+
     const { id } = await params;
 
-    const auth = await requireAdmin(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session (server-side)
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    // Get admin profile for audit trail
-    const { data: profile } = await supabaseAdmin
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Get user's role and name from profiles
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role, full_name, email')
-      .eq('id', auth.userId)
+      .eq('id', user.id)
       .single();
 
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { error: 'Failed to verify user role' },
+        { status: 403 }
+      );
+    }
+
+    // Check if user is admin
+    if (profile.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Only administrators can delete job orders' },
+        { status: 403 }
+      );
+    }
+
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
     // Get the job order before deleting (for audit trail)
-    const { data: jobOrder, error: fetchError } = await supabaseAdmin
+    let delFetchQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) {
+      delFetchQuery = delFetchQuery.eq('tenant_id', tenantId);
+    }
+    const { data: jobOrder, error: fetchError } = await delFetchQuery.single();
 
     if (fetchError || !jobOrder) {
       return NextResponse.json(
@@ -244,9 +285,9 @@ export async function DELETE(
       .insert({
         job_order_id: id,
         job_number: jobOrder.job_number,
-        changed_by: auth.userId,
-        changed_by_name: profile?.full_name || auth.userEmail,
-        changed_by_role: profile?.role,
+        changed_by: user.id,
+        changed_by_name: profile.full_name || user.email,
+        changed_by_role: profile.role,
         change_type: 'deleted',
         changes: { deleted: { old: jobOrder, new: null } },
         snapshot: jobOrder,
@@ -256,11 +297,15 @@ export async function DELETE(
       console.error('Error logging deletion audit trail:', deleteHistoryError);
     }
 
-    // Delete the job order
-    const { error: deleteError } = await supabaseAdmin
+    // Delete the job order (scoped to tenant)
+    let deleteQuery = supabaseAdmin
       .from('job_orders')
       .delete()
       .eq('id', id);
+    if (tenantId) {
+      deleteQuery = deleteQuery.eq('tenant_id', tenantId);
+    }
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       console.error('Error deleting job order:', deleteError);
@@ -270,7 +315,7 @@ export async function DELETE(
       );
     }
 
-    console.log(`Job order ${id} deleted by ${profile?.full_name || auth.userEmail}`);
+    console.log(`Job order ${id} deleted by ${profile.full_name}`);
 
     return NextResponse.json(
       {
