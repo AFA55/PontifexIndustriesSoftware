@@ -9,6 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { logAuditEvent } from '@/lib/audit';
 import { logApiError } from '@/lib/error-logger';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // GET: List all operator/helper profiles (simple fields)
 export async function GET(request: NextRequest) {
@@ -16,11 +17,19 @@ export async function GET(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
-    const { data: profiles, error } = await supabaseAdmin
+    const tenantId = await getTenantId(auth.userId);
+
+    let query = supabaseAdmin
       .from('profiles')
       .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, role, active, profile_picture_url, created_at')
       .in('role', ['operator', 'apprentice'])
       .order('full_name');
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { data: profiles, error } = await query;
 
     if (error) {
       console.error('Error fetching profiles:', error);
@@ -73,6 +82,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create user account' }, { status: 500 });
     }
 
+    const tenantId = await getTenantId(auth.userId);
+
     // Create profile
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
@@ -83,6 +94,7 @@ export async function POST(request: NextRequest) {
         role,
         active: true,
         date_of_birth: dateOfBirth || null,
+        tenant_id: tenantId || null,
       })
       .select()
       .single();

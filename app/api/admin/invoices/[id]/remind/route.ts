@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -18,13 +19,15 @@ export async function POST(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
 
-    const { data: invoice, error: invoiceError } = await supabaseAdmin
+    let invoiceQuery = supabaseAdmin
       .from('invoices')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) { invoiceQuery = invoiceQuery.eq('tenant_id', tenantId); }
+    const { data: invoice, error: invoiceError } = await invoiceQuery.single();
 
     if (invoiceError || !invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });

@@ -7,12 +7,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSuperAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireSuperAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const body = await request.json();
     const { jobId, type, title, message } = body;
 
@@ -21,11 +23,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch the job to get submitter info
-    const { data: job } = await supabaseAdmin
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('id, customer_name, salesman_name, created_by')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) { jobQuery = jobQuery.eq('tenant_id', tenantId); }
+    const { data: job } = await jobQuery.single();
 
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });

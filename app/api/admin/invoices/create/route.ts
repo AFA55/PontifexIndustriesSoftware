@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest) {
     const randomNum = Math.floor(100000 + Math.random() * 900000);
     const invoiceNumber = `INV-${year}-${randomNum}`;
 
+    const tenantId = await getTenantId(auth.userId);
+
     // Create the invoice
     const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from('invoices')
@@ -62,6 +65,7 @@ export async function POST(request: NextRequest) {
         po_number: po_number || null,
         notes: notes || null,
         created_by: auth.userId,
+        tenant_id: tenantId || null,
       })
       .select()
       .single();

@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, requireSuperAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
@@ -17,14 +18,16 @@ export async function GET(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
 
     // Fetch customer
-    const { data: customer, error: customerError } = await supabaseAdmin
+    let customerQuery = supabaseAdmin
       .from('customers')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) { customerQuery = customerQuery.eq('tenant_id', tenantId); }
+    const { data: customer, error: customerError } = await customerQuery.single();
 
     if (customerError || !customer) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
@@ -119,12 +122,14 @@ export async function PATCH(
       }
     }
 
-    const { data: customer, error } = await supabaseAdmin
+    const tenantId = await getTenantId(auth.userId);
+
+    let updateQuery = supabaseAdmin
       .from('customers')
       .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+    if (tenantId) { updateQuery = updateQuery.eq('tenant_id', tenantId); }
+    const { data: customer, error } = await updateQuery.select().single();
 
     if (error) {
       console.error('Error updating customer:', error);
@@ -146,6 +151,7 @@ export async function DELETE(
     const auth = await requireSuperAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
 
     // Unlink job_orders first
@@ -154,10 +160,12 @@ export async function DELETE(
       .update({ customer_id: null })
       .eq('customer_id', id);
 
-    const { error } = await supabaseAdmin
+    let deleteQuery = supabaseAdmin
       .from('customers')
       .delete()
       .eq('id', id);
+    if (tenantId) { deleteQuery = deleteQuery.eq('tenant_id', tenantId); }
+    const { error } = await deleteQuery;
 
     if (error) {
       console.error('Error deleting customer:', error);

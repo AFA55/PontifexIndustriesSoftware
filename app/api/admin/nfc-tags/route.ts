@@ -6,11 +6,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+
+    const tenantId = await getTenantId(auth.userId);
 
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get('active') === 'true';
@@ -21,6 +24,7 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('created_at', { ascending: false });
 
+    if (tenantId) query = query.eq('tenant_id', tenantId);
     if (activeOnly) query = query.eq('is_active', true);
     if (tagType) query = query.eq('tag_type', tagType);
 
@@ -74,6 +78,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const tenantId = await getTenantId(auth.userId);
+
     const { data, error } = await supabaseAdmin
       .from('nfc_tags')
       .insert({
@@ -83,6 +89,7 @@ export async function POST(request: NextRequest) {
         truck_number: truck_number || null,
         jobsite_address: jobsite_address || null,
         registered_by: auth.userId,
+        tenant_id: tenantId || null,
       })
       .select()
       .single();
@@ -122,12 +129,14 @@ export async function PATCH(request: NextRequest) {
     if (typeof truck_number === 'string') updates.truck_number = truck_number;
     if (typeof jobsite_address === 'string') updates.jobsite_address = jobsite_address;
 
-    const { data, error } = await supabaseAdmin
+    const tenantId = await getTenantId(auth.userId);
+
+    let updateQuery = supabaseAdmin
       .from('nfc_tags')
       .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+    if (tenantId) { updateQuery = updateQuery.eq('tenant_id', tenantId); }
+    const { data, error } = await updateQuery.select().single();
 
     if (error) {
       console.error('Error updating NFC tag:', error);

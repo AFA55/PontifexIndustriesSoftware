@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireOpsManager } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 import { ALL_CARD_KEYS, type PermissionLevel } from '@/lib/rbac';
 
 const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'full'];
@@ -17,6 +18,8 @@ export async function GET(request: NextRequest) {
     const auth = await requireOpsManager(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('user_id');
 
@@ -25,6 +28,14 @@ export async function GET(request: NextRequest) {
         { error: 'Missing required query parameter: user_id' },
         { status: 400 }
       );
+    }
+
+    // Verify the target user belongs to the same tenant
+    if (tenantId) {
+      const { data: targetProfile } = await supabaseAdmin.from('profiles').select('id').eq('id', userId).eq('tenant_id', tenantId).single();
+      if (!targetProfile) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
     }
 
     const { data: rows, error } = await supabaseAdmin
@@ -63,6 +74,7 @@ export async function POST(request: NextRequest) {
     const auth = await requireOpsManager(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const body = await request.json();
 
     if (!body.user_id || !body.permissions || typeof body.permissions !== 'object') {
@@ -90,12 +102,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Verify the user exists
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // Verify the user exists and belongs to the same tenant
+    let profileQuery = supabaseAdmin
       .from('profiles')
       .select('id')
-      .eq('id', user_id)
-      .single();
+      .eq('id', user_id);
+    if (tenantId) { profileQuery = profileQuery.eq('tenant_id', tenantId); }
+    const { data: profile, error: profileError } = await profileQuery.single();
 
     if (profileError || !profile) {
       return NextResponse.json(

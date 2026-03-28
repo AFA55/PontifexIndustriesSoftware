@@ -8,12 +8,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const date = request.nextUrl.searchParams.get('date');
     const startDate = request.nextUrl.searchParams.get('startDate');
     const endDate = request.nextUrl.searchParams.get('endDate');
@@ -22,6 +24,10 @@ export async function GET(request: NextRequest) {
       .from('operator_time_off')
       .select('id, operator_id, date, type, notes, approved_by, created_at, profiles:operator_id(full_name)')
       .order('date', { ascending: true });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (date) {
       query = query.eq('date', date);
@@ -62,6 +68,7 @@ export async function POST(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const body = await request.json();
     const { operator_id, date, type, notes } = body;
 
@@ -83,6 +90,7 @@ export async function POST(request: NextRequest) {
         notes: notes || null,
         approved_by: auth.userId,
         created_by: auth.userId,
+        tenant_id: tenantId || null,
       })
       .select('id, operator_id, date, type, notes, created_at')
       .single();
@@ -108,15 +116,18 @@ export async function DELETE(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const id = request.nextUrl.searchParams.get('id');
     if (!id) {
       return NextResponse.json({ error: 'Missing required query param: id' }, { status: 400 });
     }
 
-    const { error } = await supabaseAdmin
+    let deleteQuery = supabaseAdmin
       .from('operator_time_off')
       .delete()
       .eq('id', id);
+    if (tenantId) { deleteQuery = deleteQuery.eq('tenant_id', tenantId); }
+    const { error } = await deleteQuery;
 
     if (error) {
       console.error('Error deleting time-off:', error);

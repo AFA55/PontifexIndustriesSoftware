@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
     if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
       return NextResponse.json({ error: 'Only administrators can create schedule forms' }, { status: 403 });
     }
+
+    const tenantId = await getTenantId(auth.userId);
 
     const body = await request.json();
 
@@ -108,6 +111,9 @@ export async function POST(request: NextRequest) {
 
       // ── Step 8: Jobsite Conditions ──────────────────────────
       jobsite_conditions: body.jobsite_conditions || {},
+
+      // ── Tenant ────────────────────────────────────────────
+      tenant_id: tenantId || null,
     };
 
     // Insert job order

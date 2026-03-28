@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 const EXCLUDED_FIELDS = new Set([
   'id',
@@ -45,6 +46,7 @@ export async function POST(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const body = await request.json();
     const { scheduled_date, end_date, notes } = body;
 
@@ -56,11 +58,12 @@ export async function POST(
     }
 
     // Fetch the original job order
-    const { data: original, error: fetchError } = await supabaseAdmin
+    let origQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) { origQuery = origQuery.eq('tenant_id', tenantId); }
+    const { data: original, error: fetchError } = await origQuery.single();
 
     if (fetchError || !original) {
       return NextResponse.json(

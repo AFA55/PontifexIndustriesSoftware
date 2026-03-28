@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSuperAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -23,15 +24,17 @@ export async function POST(
     const auth = await requireSuperAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const body = await request.json();
     const { scheduled_date, is_will_call } = body;
 
     // Fetch the job order
-    const { data: jobOrder, error: fetchError } = await supabaseAdmin
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('*, profiles:created_by(id, full_name, email)')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) { jobQuery = jobQuery.eq('tenant_id', tenantId); }
+    const { data: jobOrder, error: fetchError } = await jobQuery.single();
 
     if (fetchError || !jobOrder) {
       return NextResponse.json({ error: 'Job order not found' }, { status: 404 });

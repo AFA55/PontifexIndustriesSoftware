@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
@@ -16,13 +17,15 @@ export async function GET(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
 
-    const { data: invoice, error } = await supabaseAdmin
+    let invoiceQuery = supabaseAdmin
       .from('invoices')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) { invoiceQuery = invoiceQuery.eq('tenant_id', tenantId); }
+    const { data: invoice, error } = await invoiceQuery.single();
 
     if (error || !invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -64,6 +67,7 @@ export async function PATCH(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
     const body = await request.json();
 
@@ -91,12 +95,12 @@ export async function PATCH(
 
     updates.updated_at = new Date().toISOString();
 
-    const { data: invoice, error } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from('invoices')
       .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+    if (tenantId) { updateQuery = updateQuery.eq('tenant_id', tenantId); }
+    const { data: invoice, error } = await updateQuery.select().single();
 
     if (error) {
       console.error('Error updating invoice:', error);

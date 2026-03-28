@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +17,14 @@ export async function GET(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
+
+    // Verify customer belongs to tenant
+    if (tenantId) {
+      const { data: customer } = await supabaseAdmin.from('customers').select('id').eq('id', id).eq('tenant_id', tenantId).single();
+      if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+    }
 
     const { data: contacts, error } = await supabaseAdmin
       .from('customer_contacts')
@@ -45,11 +53,18 @@ export async function POST(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
     const { id } = await params;
     const body = await request.json();
 
     if (!body.name?.trim()) {
       return NextResponse.json({ error: 'Contact name is required' }, { status: 400 });
+    }
+
+    // Verify customer belongs to tenant
+    if (tenantId) {
+      const { data: customer } = await supabaseAdmin.from('customers').select('id').eq('id', id).eq('tenant_id', tenantId).single();
+      if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
     const insertData = {
