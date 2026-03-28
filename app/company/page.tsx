@@ -86,7 +86,7 @@ export default function CompanyCodePage() {
           <div className="flex items-center justify-center gap-2 mb-3">
             <Shield className="w-5 h-5 text-purple-400" />
             <span className="text-purple-300/80 text-sm font-medium tracking-widest uppercase">
-              Pontifex Platform
+              Operations Platform
             </span>
           </div>
         </motion.div>
@@ -190,9 +190,9 @@ export default function CompanyCodePage() {
           className="text-center mt-6 text-slate-500 text-xs"
         >
           Don&apos;t have a company code?{' '}
-          <a href="mailto:sales@pontifex.com" className="text-purple-400 hover:text-purple-300 transition-colors">
-            Contact sales
-          </a>
+          <span className="text-purple-400">
+            Contact your administrator
+          </span>
         </motion.p>
       </motion.div>
     </div>
