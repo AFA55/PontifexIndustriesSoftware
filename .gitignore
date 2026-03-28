@@ -6,4 +6,4 @@ node_modules/
 .env.production
 .env.development
 *.log
-.DS_Store
+.DS_Store.claude/worktrees/
