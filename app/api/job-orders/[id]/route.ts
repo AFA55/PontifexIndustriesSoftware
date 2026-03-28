@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function DELETE(
   request: NextRequest,
@@ -49,11 +50,16 @@ export async function DELETE(
       );
     }
 
-    // Delete the job order
-    const { error: deleteError } = await supabaseAdmin
+    // Scope delete to tenant
+    const tenantId = await getTenantId(user.id);
+    let deleteQuery = supabaseAdmin
       .from('job_orders')
       .delete()
       .eq('id', jobId);
+    if (tenantId) deleteQuery = deleteQuery.eq('tenant_id', tenantId);
+
+    // Delete the job order
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       console.error('Error deleting job order:', deleteError);

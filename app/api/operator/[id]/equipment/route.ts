@@ -1,15 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getTenantId } from '@/lib/get-tenant-id'
 
 export async function GET(
   request: Request,
@@ -32,8 +23,9 @@ export async function GET(
       )
     }
 
-    // Fetch equipment assigned to operator
-    const { data: equipment, error: equipmentError } = await supabaseAdmin
+    // Scope equipment to operator's tenant
+    const tenantId = await getTenantId(operatorId)
+    let equipmentQuery = supabaseAdmin
       .from('equipment')
       .select(`
         id,
@@ -52,6 +44,10 @@ export async function GET(
       `)
       .eq('assigned_to_operator', operatorId)
       .order('assigned_date', { ascending: false })
+    if (tenantId) equipmentQuery = equipmentQuery.eq('tenant_id', tenantId)
+
+    // Fetch equipment assigned to operator
+    const { data: equipment, error: equipmentError } = await equipmentQuery
 
     if (equipmentError) {
       console.error('Error fetching equipment:', equipmentError)

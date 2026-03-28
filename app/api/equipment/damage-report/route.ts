@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * GET /api/equipment/damage-report
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const equipmentId = searchParams.get('equipmentId');
     const status = searchParams.get('status'); // 'reported', 'under_review', 'approved_for_repair', etc.
 
+    const tenantId = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_damage_reports')
       .select(`
@@ -47,6 +49,10 @@ export async function GET(request: Request) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (equipmentId) {
       query = query.eq('equipment_id', equipmentId);
@@ -125,7 +131,8 @@ export async function POST(request: Request) {
       p_equipment_id: equipmentId
     });
 
-    const reportData = {
+    const tenantIdPost = await getTenantId(user.id);
+    const reportData: any = {
       equipment_id: equipmentId,
       reported_by: user.id,
       reported_by_name: profile?.full_name || user.email,
@@ -146,6 +153,7 @@ export async function POST(request: Request) {
       last_job_id: lastUser?.[0]?.job_title || null,
       status: 'reported'
     };
+    if (tenantIdPost) reportData.tenant_id = tenantIdPost;
 
     const { data: report, error } = await supabaseAdmin
       .from('equipment_damage_reports')

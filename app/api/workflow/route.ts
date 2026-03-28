@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // Workflow step definitions
 const WORKFLOW_STEPS = [
@@ -39,6 +40,20 @@ export async function GET(request: NextRequest) {
 
     if (!jobId) {
       return NextResponse.json({ error: 'Job ID required' }, { status: 400 });
+    }
+
+    // Verify job belongs to user's tenant
+    const tenantId = await getTenantId(user.id);
+    if (tenantId) {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
     }
 
     // Get workflow progress
@@ -111,6 +126,20 @@ export async function POST(request: NextRequest) {
 
     if (!jobId) {
       return NextResponse.json({ error: 'Job ID required' }, { status: 400 });
+    }
+
+    // Verify job belongs to user's tenant
+    const tenantIdPost = await getTenantId(user.id);
+    if (tenantIdPost) {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantIdPost)
+        .maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
     }
 
     // Build update data

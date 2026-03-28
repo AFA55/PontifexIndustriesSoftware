@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 import jsPDF from 'jspdf';
 
 export async function POST(request: NextRequest) {
@@ -223,10 +224,9 @@ export async function POST(request: NextRequest) {
 
     const publicUrl = urlData.publicUrl;
 
-    // Track PDF in pdf_documents table
-    const { error: pdfDocError } = await supabaseAdmin
-      .from('pdf_documents')
-      .insert({
+    // Track PDF in pdf_documents table (with tenant scope)
+    const tenantId = await getTenantId(user.id);
+    const pdfDocData: any = {
         job_id: jobId,
         document_type: 'job_hazard_analysis',
         document_name: fileName,
@@ -240,7 +240,12 @@ export async function POST(request: NextRequest) {
           tasks_analyzed: formData.tasks.length,
           date_performed: formData.datePerformed
         }
-      });
+    };
+    if (tenantId) pdfDocData.tenant_id = tenantId;
+
+    const { error: pdfDocError } = await supabaseAdmin
+      .from('pdf_documents')
+      .insert(pdfDocData);
 
     if (pdfDocError) {
       console.error('⚠️ Failed to track PDF in pdf_documents table:', pdfDocError);

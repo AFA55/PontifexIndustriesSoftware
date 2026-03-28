@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // GET current clock status
 export async function GET(request: NextRequest) {
@@ -100,15 +101,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Create new clock-in record
-      const { data: newClock, error } = await supabaseAdmin
-        .from('time_clock')
-        .insert({
+      // Create new clock-in record (with tenant scope)
+      const tenantId = await getTenantId(user.id);
+      const clockInData: any = {
           user_id: user.id,
           clock_in_time: new Date().toISOString(),
           clock_in_location: location || null,
           notes: notes || null
-        })
+      };
+      if (tenantId) clockInData.tenant_id = tenantId;
+
+      const { data: newClock, error } = await supabaseAdmin
+        .from('time_clock')
+        .insert(clockInData)
         .select()
         .single();
 

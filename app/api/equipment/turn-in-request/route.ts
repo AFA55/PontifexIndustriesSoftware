@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * GET /api/equipment/turn-in-request
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const status = searchParams.get('status'); // 'pending', 'approved', 'in_service', 'completed', 'rejected'
     const equipmentId = searchParams.get('equipmentId');
 
+    const tenantId = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_turn_in_requests')
       .select(`
@@ -42,6 +44,10 @@ export async function GET(request: Request) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (status) {
       query = query.eq('status', status);
@@ -101,7 +107,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const requestData = {
+    const tenantIdPost = await getTenantId(user.id);
+    const requestData: any = {
       equipment_id: equipmentId,
       requested_by: user.id,
       requested_by_name: profile?.full_name || user.email,
@@ -111,6 +118,7 @@ export async function POST(request: Request) {
       photo_urls: photoUrls || [],
       status: 'pending'
     };
+    if (tenantIdPost) requestData.tenant_id = tenantIdPost;
 
     const { data: turnInRequest, error } = await supabaseAdmin
       .from('equipment_turn_in_requests')

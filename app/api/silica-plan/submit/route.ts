@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,9 +42,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Save to database (you may need to create this table first)
-    const { data: savedPlan, error: dbError } = await supabaseAdmin
-      .from('silica_exposure_plans')
-      .insert([{
+    const tenantId = await getTenantId(user.id);
+    const planData: any = {
         job_id: jobId,
         user_id: user.id,
         employee_name: formData.employeeName,
@@ -59,7 +59,12 @@ export async function POST(request: NextRequest) {
         signature_date: formData.signatureDate,
         pdf_data: pdfBase64,
         submitted_at: new Date().toISOString(),
-      }])
+    };
+    if (tenantId) planData.tenant_id = tenantId;
+
+    const { data: savedPlan, error: dbError } = await supabaseAdmin
+      .from('silica_exposure_plans')
+      .insert([planData])
       .select()
       .single();
 

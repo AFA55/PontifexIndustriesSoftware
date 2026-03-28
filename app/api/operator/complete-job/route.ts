@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,6 +38,20 @@ export async function POST(request: NextRequest) {
         { error: 'jobId is required' },
         { status: 400 }
       );
+    }
+
+    // Verify job belongs to user's tenant
+    const tenantId = await getTenantId(user.id);
+    if (tenantId) {
+      const { data: jobTenantCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!jobTenantCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
     }
 
     // Get all work items for this job to calculate total production

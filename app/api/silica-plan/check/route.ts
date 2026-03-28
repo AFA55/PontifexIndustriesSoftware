@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,6 +27,20 @@ export async function GET(request: NextRequest) {
 
     if (!jobId) {
       return NextResponse.json({ error: 'Job ID required' }, { status: 400 });
+    }
+
+    // Verify job belongs to user's tenant
+    const tenantId = await getTenantId(user.id);
+    if (tenantId) {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ success: true, exists: false }, { status: 200 });
+      }
     }
 
     // Check if silica plan exists — table may not exist yet

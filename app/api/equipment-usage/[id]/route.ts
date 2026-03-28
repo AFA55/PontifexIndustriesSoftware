@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PATCH(
   request: NextRequest,
@@ -35,12 +36,14 @@ export async function PATCH(
       );
     }
 
-    // Check if user owns this equipment usage entry or is admin
-    const { data: existingEntry } = await supabaseAdmin
+    // Check if user owns this equipment usage entry or is admin (scoped to tenant)
+    const tenantId = await getTenantId(user.id);
+    let entryQuery = supabaseAdmin
       .from('equipment_usage')
       .select('operator_id')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) entryQuery = entryQuery.eq('tenant_id', tenantId);
+    const { data: existingEntry } = await entryQuery.single();
 
     if (!existingEntry) {
       return NextResponse.json(
@@ -159,12 +162,14 @@ export async function DELETE(
       );
     }
 
-    // Check if user owns this equipment usage entry or is admin
-    const { data: existingEntry } = await supabaseAdmin
+    // Check if user owns this equipment usage entry or is admin (scoped to tenant)
+    const tenantIdDel = await getTenantId(user.id);
+    let delEntryQuery = supabaseAdmin
       .from('equipment_usage')
       .select('operator_id')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantIdDel) delEntryQuery = delEntryQuery.eq('tenant_id', tenantIdDel);
+    const { data: existingEntry } = await delEntryQuery.single();
 
     if (!existingEntry) {
       return NextResponse.json(
@@ -186,11 +191,13 @@ export async function DELETE(
       );
     }
 
-    // Delete equipment usage entry
-    const { error: deleteError } = await supabaseAdmin
+    // Delete equipment usage entry (scoped to tenant)
+    let deleteQuery = supabaseAdmin
       .from('equipment_usage')
       .delete()
       .eq('id', id);
+    if (tenantIdDel) deleteQuery = deleteQuery.eq('tenant_id', tenantIdDel);
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       console.error('Error deleting equipment usage:', deleteError);

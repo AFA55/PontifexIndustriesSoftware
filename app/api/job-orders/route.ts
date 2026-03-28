@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,14 +45,16 @@ export async function GET(request: NextRequest) {
       .single();
 
     const isAdmin = profile?.role === 'admin';
+    const tenantId = await getTenantId(user.id);
 
     // If ID is provided, fetch that specific job
     if (id) {
-      const { data: specificJob, error: jobError } = await supabaseAdmin
+      let specificJobQuery = supabaseAdmin
         .from('active_job_orders')
         .select('*')
-        .eq('id', id)
-        .single();
+        .eq('id', id);
+      if (tenantId) specificJobQuery = specificJobQuery.eq('tenant_id', tenantId);
+      const { data: specificJob, error: jobError } = await specificJobQuery.single();
 
       if (jobError) {
         console.error('Error fetching specific job:', jobError);
@@ -116,6 +119,11 @@ export async function GET(request: NextRequest) {
     let query = supabaseAdmin
       .from('active_job_orders')
       .select('*');
+
+    // Scope to tenant
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // If not admin, only show jobs assigned to this user
     if (!isAdmin) {

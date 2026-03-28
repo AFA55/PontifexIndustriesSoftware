@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
@@ -44,14 +45,16 @@ export async function GET(
       .single();
 
     const isAdmin = profile?.role === 'admin';
+    const tenantId = await getTenantId(user.id);
 
     // Verify user has access to this job
     if (!isAdmin) {
-      const { data: job } = await supabaseAdmin
+      let jobAccessQuery = supabaseAdmin
         .from('job_orders')
         .select('assigned_to')
-        .eq('id', id)
-        .single();
+        .eq('id', id);
+      if (tenantId) jobAccessQuery = jobAccessQuery.eq('tenant_id', tenantId);
+      const { data: job } = await jobAccessQuery.single();
 
       if (!job || job.assigned_to !== user.id) {
         return NextResponse.json(

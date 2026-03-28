@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +27,20 @@ export async function POST(request: NextRequest) {
 
     if (!operatorId) {
       return NextResponse.json({ error: 'Operator ID is required' }, { status: 400 });
+    }
+
+    // Verify operator belongs to the same tenant
+    const tenantId = await getTenantId(user.id);
+    if (tenantId) {
+      const { data: operatorProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('id', operatorId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!operatorProfile) {
+        return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
+      }
     }
 
     // Validate ratings are between 1-10

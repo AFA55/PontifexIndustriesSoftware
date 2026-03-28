@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,10 +62,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create equipment usage entry
-    const { data: equipmentUsage, error: insertError } = await supabaseAdmin
-      .from('equipment_usage')
-      .insert({
+    // Create equipment usage entry (with tenant scope)
+    const tenantId = await getTenantId(user.id);
+    const insertData: any = {
         job_order_id,
         operator_id: user.id,
         equipment_type,
@@ -82,7 +82,12 @@ export async function POST(request: NextRequest) {
         location_changes: location_changes || 0,
         setup_time_minutes: setup_time_minutes || 0,
         notes
-      })
+    };
+    if (tenantId) insertData.tenant_id = tenantId;
+
+    const { data: equipmentUsage, error: insertError } = await supabaseAdmin
+      .from('equipment_usage')
+      .insert(insertData)
       .select()
       .single();
 
@@ -172,7 +177,8 @@ export async function GET(request: NextRequest) {
     const equipmentType = searchParams.get('equipment_type');
     const limit = parseInt(searchParams.get('limit') || '100');
 
-    // Build query
+    // Build query with tenant scope
+    const tenantIdGet = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_usage')
       .select(`
@@ -189,6 +195,10 @@ export async function GET(request: NextRequest) {
       `)
       .order('created_at', { ascending: false })
       .limit(limit);
+
+    if (tenantIdGet) {
+      query = query.eq('tenant_id', tenantIdGet);
+    }
 
     // Apply filters
     if (jobOrderId) {

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -49,12 +50,16 @@ async function updateJobStatus(
       );
     }
 
-    // Check if job exists and user has permission
-    const { data: existingJob, error: checkError } = await supabaseAdmin
+    // Get tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Check if job exists and user has permission (scoped to tenant)
+    let jobCheckQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobCheckQuery = jobCheckQuery.eq('tenant_id', tenantId);
+    const { data: existingJob, error: checkError } = await jobCheckQuery.single();
 
     if (checkError || !existingJob) {
       return NextResponse.json(

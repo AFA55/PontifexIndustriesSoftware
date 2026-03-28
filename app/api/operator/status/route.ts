@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,6 +50,20 @@ export async function POST(request: NextRequest) {
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
         { status: 400 }
       );
+    }
+
+    // If a jobId is provided, verify it belongs to the user's tenant
+    const tenantId = await getTenantId(user.id);
+    if (jobId && tenantId) {
+      const { data: jobTenantCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!jobTenantCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
     }
 
     // Find the user's active timecard — gracefully handle missing table

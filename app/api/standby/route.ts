@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { STANDBY_POLICY_VERSION, STANDBY_HOURLY_RATE, calculateStandbyCharge } from '@/lib/legal/standby-policy';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * POST /api/standby - Start a standby log
@@ -38,17 +39,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create standby log - jobId is already a UUID
-    const { data: standbyLog, error: insertError } = await supabaseAdmin
-      .from('standby_logs')
-      .insert({
+    // Create standby log - jobId is already a UUID (with tenant scope)
+    const tenantId = await getTenantId(user.id);
+    const standbyData: any = {
         job_order_id: jobId,
         operator_id: user.id,
         started_at: startedAt || new Date().toISOString(),
         ended_at: null,
         reason: reason,
         status: 'active'
-      })
+    };
+    if (tenantId) standbyData.tenant_id = tenantId;
+
+    const { data: standbyLog, error: insertError } = await supabaseAdmin
+      .from('standby_logs')
+      .insert(standbyData)
       .select()
       .single();
 
@@ -213,10 +218,15 @@ export async function GET(request: NextRequest) {
     const jobId = searchParams.get('jobId');
     const operatorId = searchParams.get('operatorId');
 
+    const tenantIdGet = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('standby_logs')
       .select('*')
       .order('started_at', { ascending: false });
+
+    if (tenantIdGet) {
+      query = query.eq('tenant_id', tenantIdGet);
+    }
 
     if (jobId) {
       query = query.eq('job_order_id', jobId);

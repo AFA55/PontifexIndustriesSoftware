@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * GET /api/equipment/repair-tracking
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
     const damageReportId = searchParams.get('damageReportId');
     const status = searchParams.get('status');
 
+    const tenantId = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_repair_tracking')
       .select(`
@@ -43,6 +45,10 @@ export async function GET(request: Request) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (equipmentId) {
       query = query.eq('equipment_id', equipmentId);
@@ -123,7 +129,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const repairData = {
+    const tenantIdPost = await getTenantId(user.id);
+    const repairData: any = {
       equipment_id: equipmentId,
       damage_report_id: damageReportId,
       repair_title: repairTitle,
@@ -139,6 +146,7 @@ export async function POST(request: Request) {
       created_by: user.id,
       status: 'pending'
     };
+    if (tenantIdPost) repairData.tenant_id = tenantIdPost;
 
     const { data: repair, error } = await supabaseAdmin
       .from('equipment_repair_tracking')

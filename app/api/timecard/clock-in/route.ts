@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS } from '@/lib/geolocation';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,9 +97,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new timecard entry
+    // Create new timecard entry with tenant scope
     const now = new Date();
     const todayDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const tenantId = await getTenantId(user.id);
 
     const { data: timecard, error: insertError } = await supabaseAdmin
       .from('timecards')
@@ -111,6 +113,7 @@ export async function POST(request: NextRequest) {
           clock_in_accuracy: accuracy || null,
           date: todayDate,
           is_approved: false,
+          tenant_id: tenantId || null,
         },
       ])
       .select()

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -46,12 +47,14 @@ export async function POST(
       longitude
     } = body;
 
-    // Get job order
-    const { data: job, error: jobError } = await supabaseAdmin
+    // Get job order (scoped to tenant)
+    const tenantId = await getTenantId(user.id);
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json(
@@ -207,6 +210,20 @@ export async function GET(
         { error: 'Unauthorized' },
         { status: 401 }
       );
+    }
+
+    // Verify job belongs to user's tenant
+    const tenantIdGet = await getTenantId(user.id);
+    if (tenantIdGet) {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantIdGet)
+        .maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
     }
 
     // Get all daily logs for this job — gracefully handle missing table

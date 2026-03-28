@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * GET /api/equipment/maintenance-alerts
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const status = searchParams.get('status'); // 'unread', 'unresolved', 'all'
     const equipmentId = searchParams.get('equipmentId');
 
+    const tenantId = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_maintenance_alerts')
       .select(`
@@ -42,6 +44,10 @@ export async function GET(request: Request) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // Apply filters
     if (status === 'unread') {
@@ -110,12 +116,13 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
+    const tenantIdPatch = await getTenantId(user.id);
+    let updateQuery = supabaseAdmin
       .from('equipment_maintenance_alerts')
       .update(updateData)
-      .eq('id', alertId)
-      .select()
-      .single();
+      .eq('id', alertId);
+    if (tenantIdPatch) updateQuery = updateQuery.eq('tenant_id', tenantIdPatch);
+    const { data, error } = await updateQuery.select().single();
 
     if (error) {
       console.error('Error updating alert:', error);

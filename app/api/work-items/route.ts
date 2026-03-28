@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,10 +44,9 @@ export async function POST(request: NextRequest) {
       notes
     } = body;
 
-    // Insert work item
-    const { data: workItem, error: insertError } = await supabaseAdmin
-      .from('work_items')
-      .insert({
+    // Insert work item (with tenant scope)
+    const tenantId = await getTenantId(user.id);
+    const insertData: any = {
         job_order_id,
         work_type,
         core_size,
@@ -59,7 +59,12 @@ export async function POST(request: NextRequest) {
         quantity,
         notes,
         created_by: user.id
-      })
+    };
+    if (tenantId) insertData.tenant_id = tenantId;
+
+    const { data: workItem, error: insertError } = await supabaseAdmin
+      .from('work_items')
+      .insert(insertData)
       .select()
       .single();
 
@@ -136,12 +141,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch work items for this job
-    const { data: workItems, error: fetchError } = await supabaseAdmin
+    // Fetch work items for this job (scoped to tenant)
+    const tenantIdGet = await getTenantId(user.id);
+    let workItemsQuery = supabaseAdmin
       .from('work_items')
       .select('*')
       .eq('job_order_id', jobOrderId)
       .order('created_at', { ascending: false });
+    if (tenantIdGet) workItemsQuery = workItemsQuery.eq('tenant_id', tenantIdGet);
+    const { data: workItems, error: fetchError } = await workItemsQuery;
 
     if (fetchError) {
       // If work_items table doesn't exist yet, return empty array

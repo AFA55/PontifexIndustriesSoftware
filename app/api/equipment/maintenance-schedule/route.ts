@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * GET /api/equipment/maintenance-schedule
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const equipmentId = searchParams.get('equipmentId');
     const activeOnly = searchParams.get('activeOnly') === 'true';
 
+    const tenantId = await getTenantId(user.id);
     let query = supabaseAdmin
       .from('equipment_maintenance_schedules')
       .select(`
@@ -38,6 +40,10 @@ export async function GET(request: Request) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     if (equipmentId) {
       query = query.eq('equipment_id', equipmentId);
@@ -114,7 +120,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const scheduleData = {
+    const tenantIdPost = await getTenantId(user.id);
+    const scheduleData: any = {
       equipment_id: equipmentId,
       maintenance_type: maintenanceType,
       description,
@@ -130,6 +137,7 @@ export async function POST(request: Request) {
       created_by: user.id,
       is_active: true
     };
+    if (tenantIdPost) scheduleData.tenant_id = tenantIdPost;
 
     const { data: schedule, error } = await supabaseAdmin
       .from('equipment_maintenance_schedules')
