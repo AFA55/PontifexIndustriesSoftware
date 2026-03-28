@@ -1,5 +1,5 @@
 /**
- * Pontifex Industries - Database Helper Functions
+ * Operations Platform - Database Helper Functions
  * Complete CRUD operations for all tables
  */
 

@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     const emailSent = await sendEmail({
       to: email,
-      subject: 'Access Request Received - Pontifex Industries',
+      subject: `Access Request Received - ${process.env.COMPANY_NAME || 'Your Company'}`,
       html: confirmationEmailHtml,
     });
 

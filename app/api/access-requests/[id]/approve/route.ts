@@ -177,7 +177,7 @@ export async function POST(
 
     const emailSent = await sendEmail({
       to: accessRequest.email,
-      subject: 'Access Approved - Pontifex Industries',
+      subject: `Access Approved - ${process.env.COMPANY_NAME || 'Your Company'}`,
       html: approvalEmailHtml,
     });
 

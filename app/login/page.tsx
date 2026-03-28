@@ -122,7 +122,7 @@ export default function LoginPage() {
             transition={{ delay: 0.3 }}
             className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-red-700 bg-clip-text text-transparent mt-6 mb-2 tracking-tight"
           >
-            Pontifex Industries
+            Operations Platform
           </motion.h1>
           <p className="text-gray-600 text-sm font-medium">Concrete Cutting Management System</p>
         </div>

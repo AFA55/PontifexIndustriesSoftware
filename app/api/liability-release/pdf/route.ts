@@ -10,7 +10,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { LiabilityReleasePDF } from '@/components/pdf/LiabilityReleasePDF';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
 
 export async function POST(request: NextRequest) {
   try {
@@ -128,17 +128,17 @@ export async function POST(request: NextRequest) {
 
     try {
       const emailResult = await resend.emails.send({
-        from: 'Pontifex Industries <noreply@pontifexindustries.com>',
+        from: process.env.RESEND_FROM_EMAIL || `${process.env.COMPANY_NAME || 'Your Company'} <noreply@resend.dev>`,
         to: customerEmail,
         subject: `Liability Release - Job #${jobNumber || jobId}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #EA580C;">Pontifex Industries</h1>
+            <h1 style="color: #EA580C;">${process.env.COMPANY_NAME || 'Your Company'}</h1>
             <h2 style="color: #334155;">Liability Release & Indemnification</h2>
 
             <p>Dear ${customerName},</p>
 
-            <p>Thank you for working with Pontifex Industries. This email confirms that the Liability Release & Indemnification agreement has been signed for:</p>
+            <p>Thank you for working with us. This email confirms that the Liability Release & Indemnification agreement has been signed for:</p>
 
             <div style="background: #F1F5F9; padding: 16px; border-radius: 8px; margin: 20px 0;">
               <p style="margin: 4px 0;"><strong>Job Number:</strong> ${jobNumber || jobId}</p>
@@ -153,10 +153,10 @@ export async function POST(request: NextRequest) {
 
             <div style="margin: 20px 0;">
               <p style="margin: 4px 0;"><strong>Phone:</strong> (833) 695-4288</p>
-              <p style="margin: 4px 0;"><strong>Email:</strong> support@pontifexindustries.com</p>
+              <p style="margin: 4px 0;"><strong>Email:</strong> ${process.env.SUPPORT_EMAIL || 'support@yourcompany.com'}</p>
             </div>
 
-            <p>Thank you for choosing Pontifex Industries.</p>
+            <p>Thank you for choosing us.</p>
 
             <p style="margin-top: 30px; color: #64748B; font-size: 14px;">
               This is an automated message. Please do not reply to this email.

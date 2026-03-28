@@ -15,6 +15,9 @@ interface EmailOptions {
 // Use a dummy key if not set to prevent build errors (checked before use)
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
 
+// Company name for email templates — configurable via env var
+const COMPANY_NAME = process.env.COMPANY_NAME || 'Your Company';
+
 export async function sendEmail({ to, subject, html }: EmailOptions): Promise<boolean> {
   try {
     console.log(`📧 Sending email to: ${to}`);
@@ -30,7 +33,7 @@ export async function sendEmail({ to, subject, html }: EmailOptions): Promise<bo
 
     // Send email using Resend
     const { data, error } = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'Pontifex Industries <onboarding@resend.dev>',
+      from: process.env.RESEND_FROM_EMAIL || `${COMPANY_NAME} <onboarding@resend.dev>`,
       to: [to],
       subject: subject,
       html: html,
@@ -64,7 +67,7 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
   <meta name="supported-color-schemes" content="light dark">
-  <title>Access Approved - Pontifex Industries</title>
+  <title>Access Approved - ${COMPANY_NAME}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
   <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
@@ -77,10 +80,10 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
           <tr>
             <td style="background: linear-gradient(135deg, #2563eb 0%, #dc2626 100%); padding: 48px 40px; text-align: center;">
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                Pontifex Industries
+                ${COMPANY_NAME}
               </h1>
               <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
-                Concrete Cutting Management System
+                Operations Management System
               </p>
             </td>
           </tr>
@@ -153,8 +156,8 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
           <tr>
             <td style="background-color: #f8fafc; padding: 32px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
               <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #475569;">Pontifex Industries</strong><br>
-                Concrete Cutting Management System
+                <strong style="color: #475569;">${COMPANY_NAME}</strong><br>
+                Operations Management System
               </p>
               <p style="margin: 0; color: #94a3b8; font-size: 12px;">
                 This is an automated message. Please do not reply.
@@ -182,7 +185,7 @@ export function generateAccessRequestReceivedEmail(fullName: string, email: stri
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
   <meta name="supported-color-schemes" content="light dark">
-  <title>Access Request Received - Pontifex Industries</title>
+  <title>Access Request Received - ${COMPANY_NAME}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
   <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
@@ -195,10 +198,10 @@ export function generateAccessRequestReceivedEmail(fullName: string, email: stri
           <tr>
             <td style="background: linear-gradient(135deg, #2563eb 0%, #dc2626 100%); padding: 48px 40px; text-align: center;">
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                Pontifex Industries
+                ${COMPANY_NAME}
               </h1>
               <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
-                Concrete Cutting Management System
+                Operations Management System
               </p>
             </td>
           </tr>
@@ -218,7 +221,7 @@ export function generateAccessRequestReceivedEmail(fullName: string, email: stri
 
               <!-- Main Message -->
               <p style="margin: 0 0 32px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Thank you for requesting access to the Pontifex Industries platform. We've received your request and our team will review it shortly.
+                Thank you for requesting access to the ${COMPANY_NAME} platform. We've received your request and our team will review it shortly.
               </p>
 
               <!-- Request Details -->
@@ -268,8 +271,8 @@ export function generateAccessRequestReceivedEmail(fullName: string, email: stri
           <tr>
             <td style="background-color: #f8fafc; padding: 32px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
               <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #475569;">Pontifex Industries</strong><br>
-                Concrete Cutting Management System
+                <strong style="color: #475569;">${COMPANY_NAME}</strong><br>
+                Operations Management System
               </p>
               <p style="margin: 0; color: #94a3b8; font-size: 12px;">
                 This is an automated message. Please do not reply.
@@ -297,7 +300,7 @@ export function generatePasswordResetEmail(fullName: string, resetLink: string):
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
   <meta name="supported-color-schemes" content="light dark">
-  <title>Password Reset - Pontifex Industries</title>
+  <title>Password Reset - ${COMPANY_NAME}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
   <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
@@ -310,10 +313,10 @@ export function generatePasswordResetEmail(fullName: string, resetLink: string):
           <tr>
             <td style="background: linear-gradient(135deg, #2563eb 0%, #dc2626 100%); padding: 48px 40px; text-align: center;">
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                Pontifex Industries
+                ${COMPANY_NAME}
               </h1>
               <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
-                Concrete Cutting Management System
+                Operations Management System
               </p>
             </td>
           </tr>
@@ -380,8 +383,8 @@ export function generatePasswordResetEmail(fullName: string, resetLink: string):
           <tr>
             <td style="background-color: #f8fafc; padding: 32px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
               <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #475569;">Pontifex Industries</strong><br>
-                Concrete Cutting Management System
+                <strong style="color: #475569;">${COMPANY_NAME}</strong><br>
+                Operations Management System
               </p>
               <p style="margin: 0; color: #94a3b8; font-size: 12px;">
                 This is an automated message. Please do not reply.

@@ -166,11 +166,11 @@ export default function StartRoutePage() {
       const name = session.user.user_metadata?.full_name
         || session.user.user_metadata?.name
         || (() => { try { const u = JSON.parse(localStorage.getItem('pontifex-user') || '{}'); return u.full_name; } catch { return null; } })()
-        || 'Pontifex Team';
+        || 'Operations Team';
       setOperatorName(name);
     } catch (error) {
       console.error('Error fetching operator name:', error);
-      setOperatorName('Pontifex Team');
+      setOperatorName('Operations Team');
     }
   };
 

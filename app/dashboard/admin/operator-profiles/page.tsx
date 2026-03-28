@@ -659,7 +659,7 @@ export default function OperatorProfilesPage() {
                             email: e.target.value
                           })}
                           className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold text-gray-900 bg-white"
-                          placeholder="operator@pontifexindustries.com"
+                          placeholder="operator@company.com"
                         />
                       </div>
                     </div>

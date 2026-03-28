@@ -8,8 +8,8 @@ import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
 import OnboardingTour from '@/components/OnboardingTour';
 
-// Pontifex Industries Logo Component
-function PontifexLogo({ className = "h-8" }: { className?: string }) {
+// Company Logo Component
+function CompanyLogo({ className = "h-8" }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -32,13 +32,13 @@ function PontifexLogo({ className = "h-8" }: { className?: string }) {
         />
       </g>
 
-      {/* PONTIFEX Text */}
+      {/* Company Text */}
       <g fill="currentColor">
         <text x="65" y="25" className="text-lg font-bold" style={{fontSize: '18px', fontFamily: 'Inter, sans-serif'}}>
-          PONTIFEX
+          OPERATIONS
         </text>
         <text x="65" y="45" className="text-sm" style={{fontSize: '12px', fontFamily: 'Inter, sans-serif', opacity: '0.8'}}>
-          INDUSTRIES
+          PLATFORM
         </text>
       </g>
 
@@ -591,7 +591,7 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold">Welcome to Pontifex!</h2>
+                  <h2 className="text-3xl font-bold">Welcome!</h2>
                   <p className="text-blue-100 mt-1">Demo Operator Dashboard Tour</p>
                 </div>
               </div>
@@ -609,7 +609,7 @@ export default function Dashboard() {
                   <div className="flex-1">
                     <h3 className="font-bold text-blue-900 text-lg mb-2">This is a Demo Account</h3>
                     <p className="text-blue-800 text-sm leading-relaxed">
-                      You're exploring a limited demonstration of the Pontifex operator platform.
+                      You're exploring a limited demonstration of the operator platform.
                       Some features are restricted to showcase the full platform capabilities.
                     </p>
                   </div>
@@ -713,9 +713,9 @@ export default function Dashboard() {
       <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            {/* Pontifex Logo with Animation */}
+            {/* Company Logo with Animation */}
             <div className="transform hover:scale-105 transition-transform duration-200">
-              <PontifexLogo className="h-10 text-white" />
+              <CompanyLogo className="h-10 text-white" />
             </div>
 
             {/* Modern Profile Section */}

@@ -142,11 +142,11 @@ export default function ConfirmRoutePage() {
       const name = session.user.user_metadata?.full_name
         || session.user.user_metadata?.name
         || (() => { try { const u = JSON.parse(localStorage.getItem('pontifex-user') || '{}'); return u.full_name; } catch { return null; } })()
-        || 'Pontifex Team';
+        || 'Operations Team';
       setOperatorName(name);
     } catch (error) {
       console.error('Error fetching operator name:', error);
-      setOperatorName('Pontifex Team');
+      setOperatorName('Operations Team');
     }
   };
 
@@ -217,7 +217,7 @@ export default function ConfirmRoutePage() {
       // Send SMS only if time difference is 15 minutes or less
       if (shouldSendSMS && job?.foreman_phone && operatorName) {
         const contactName = job.foreman_name || 'there';
-        const smsMessage = `Hey ${contactName}, this is ${operatorName} from Pontifex Industries. We are en route to your location for ${job.title}. We'll contact you when we arrive.`;
+        const smsMessage = `Hey ${contactName}, this is ${operatorName} from our team. We are en route to your location for ${job.title}. We'll contact you when we arrive.`;
 
         await fetch('/api/send-sms', {
           method: 'POST',

@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
     yPos += 10;
 
     pdf.setFontSize(12);
-    pdf.text('Pontifex Industries', 105, yPos, { align: 'center' });
+    const companyName = process.env.COMPANY_NAME || 'Your Company';
+    pdf.text(companyName, 105, yPos, { align: 'center' });
     yPos += 15;
 
     // Job Information

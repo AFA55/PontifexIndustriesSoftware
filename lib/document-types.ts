@@ -1,5 +1,5 @@
 /**
- * Document Types and Templates for Pontifex Industries
+ * Document Types and Templates for Operations Platform
  * Comprehensive list of required documents for concrete cutting and construction jobs
  */
 

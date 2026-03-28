@@ -5,9 +5,9 @@
 
 // Shop location configuration
 export const SHOP_LOCATION = {
-  latitude: 33.97121,  // Pontifex Industries Shop location
-  longitude: -84.18066, // Pontifex Industries Shop location
-  name: 'Pontifex Industries Shop',
+  latitude: 33.97121,  // Company shop location
+  longitude: -84.18066, // Company shop location
+  name: 'Company Shop',
 };
 
 // Allowed radius in meters (100m = ~328 feet)

@@ -13,7 +13,7 @@ interface OnboardingStep {
 const OPERATOR_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: 'Welcome to Pontifex Industries! 👋',
+    title: 'Welcome to the Platform! 👋',
     description: 'Your complete job management platform. Let us show you how to navigate your workday with ease.',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
