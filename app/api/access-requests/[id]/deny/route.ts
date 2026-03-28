@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -15,6 +16,7 @@ export async function POST(
     // Security: only admins can deny access requests
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { id } = await params;
     const body = await request.json();
@@ -35,12 +37,10 @@ export async function POST(
       );
     }
 
-    // Fetch the access request
-    const { data: accessRequest, error: fetchError } = await supabaseAdmin
-      .from('access_requests')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // Fetch the access request (tenant-scoped)
+    let denyQuery = supabaseAdmin.from('access_requests').select('*').eq('id', id);
+    if (tenantId) denyQuery = denyQuery.eq('tenant_id', tenantId);
+    const { data: accessRequest, error: fetchError } = await denyQuery.single();
 
     if (fetchError || !accessRequest) {
       return NextResponse.json(

@@ -5,12 +5,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
     // SECURITY: Require authenticated user
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     // Parse request body
     const body = await request.json();

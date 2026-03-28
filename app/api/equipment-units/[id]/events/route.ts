@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // Event types operators are allowed to create
 const OPERATOR_ALLOWED_EVENTS = [
@@ -24,6 +25,7 @@ export async function GET(
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { id } = await params;
     const { searchParams } = new URL(request.url);
@@ -34,12 +36,10 @@ export async function GET(
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    // Verify unit exists
-    const { data: unit, error: unitError } = await supabaseAdmin
-      .from('equipment_units')
-      .select('id')
-      .eq('id', id)
-      .single();
+    // Verify unit exists (tenant-scoped)
+    let unitQuery = supabaseAdmin.from('equipment_units').select('id').eq('id', id);
+    if (tenantId) unitQuery = unitQuery.eq('tenant_id', tenantId);
+    const { data: unit, error: unitError } = await unitQuery.single();
 
     if (unitError || !unit) {
       return NextResponse.json(
@@ -137,6 +137,7 @@ export async function POST(
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+    const tenantIdPost = await getTenantId(auth.userId);
 
     const { id } = await params;
 
@@ -191,12 +192,10 @@ export async function POST(
       );
     }
 
-    // Verify unit exists
-    const { data: unit, error: unitError } = await supabaseAdmin
-      .from('equipment_units')
-      .select('id, lifecycle_status')
-      .eq('id', id)
-      .single();
+    // Verify unit exists (tenant-scoped)
+    let postUnitQuery = supabaseAdmin.from('equipment_units').select('id, lifecycle_status').eq('id', id);
+    if (tenantIdPost) postUnitQuery = postUnitQuery.eq('tenant_id', tenantIdPost);
+    const { data: unit, error: unitError } = await postUnitQuery.single();
 
     if (unitError || !unit) {
       return NextResponse.json(

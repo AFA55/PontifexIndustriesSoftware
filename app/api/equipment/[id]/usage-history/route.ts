@@ -1,15 +1,21 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+    const tenantId = await getTenantId(auth.userId)
+
     const { id: equipmentId } = await params
 
-    // Fetch usage history for this equipment
-    const { data: usageHistory, error } = await supabaseAdmin
+    // Fetch usage history for this equipment (tenant-scoped)
+    let usageQuery = supabaseAdmin
       .from('blade_usage_history')
       .select(`
         *,
@@ -22,6 +28,8 @@ export async function GET(
       `)
       .eq('equipment_id', equipmentId)
       .order('usage_date', { ascending: false })
+    if (tenantId) usageQuery = usageQuery.eq('tenant_id', tenantId)
+    const { data: usageHistory, error } = await usageQuery
 
     if (error) {
       console.error('Error fetching usage history:', error)

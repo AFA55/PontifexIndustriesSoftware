@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -14,6 +15,7 @@ export async function POST(
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { id } = await params;
     const body = await request.json();
@@ -34,12 +36,10 @@ export async function POST(
       );
     }
 
-    // Verify the target unit exists
-    const { data: unit, error: unitError } = await supabaseAdmin
-      .from('equipment_units')
-      .select('id, name, nfc_tag_id')
-      .eq('id', id)
-      .single();
+    // Verify the target unit exists (tenant-scoped)
+    let unitQuery = supabaseAdmin.from('equipment_units').select('id, name, nfc_tag_id').eq('id', id);
+    if (tenantId) unitQuery = unitQuery.eq('tenant_id', tenantId);
+    const { data: unit, error: unitError } = await unitQuery.single();
 
     if (unitError || !unit) {
       return NextResponse.json(

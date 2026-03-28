@@ -11,7 +11,7 @@ import bcrypt from 'bcryptjs';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, email, phoneNumber, password, dateOfBirth, position } = body;
+    const { fullName, email, phoneNumber, password, dateOfBirth, position, tenant_id } = body;
 
     // Validation
     if (!fullName || !email || !phoneNumber || !password || !dateOfBirth) {
@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
           date_of_birth: dateOfBirth,
           position: position || 'Not specified',
           status: 'pending',
+          tenant_id: tenant_id || null,
         },
       ])
       .select()

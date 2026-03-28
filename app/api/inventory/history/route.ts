@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin(request)
   if (!auth.authorized) return auth.response
+  const tenantId = await getTenantId(auth.userId)
 
   try {
     const { searchParams } = new URL(request.url)
@@ -34,6 +36,7 @@ export async function GET(request: NextRequest) {
       `)
       .order('transaction_date', { ascending: false })
 
+    if (tenantId) query = query.eq('tenant_id', tenantId)
     if (transactionType && transactionType !== 'all') {
       query = query.eq('transaction_type', transactionType)
     }

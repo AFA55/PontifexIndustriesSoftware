@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
 
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) {
       return auth.response;
     }
+    const tenantId = await getTenantId(auth.userId);
 
     const body = await request.json();
     const { to, subject, html, pdfUrl, pdfName } = body;
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[send-email] User ${auth.userId} sending email to: ${to}`);
+    console.log(`[send-email] User ${auth.userId} (tenant: ${tenantId || 'none'}) sending email to: ${to}`);
 
     // Check if Resend API key is configured
     if (!process.env.RESEND_API_KEY) {

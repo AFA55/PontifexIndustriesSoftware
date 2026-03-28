@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+    const tenantId = await getTenantId(auth.userId)
+
     const { searchParams } = new URL(request.url)
     const uniqueId = searchParams.get('uniqueId')
 
@@ -10,12 +16,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unique ID is required' }, { status: 400 })
     }
 
-    // Query equipment by unique identification code
-    const { data: equipment, error } = await supabaseAdmin
-      .from('equipment')
-      .select('*')
-      .eq('unique_identification_code', uniqueId)
-      .single()
+    // Query equipment by unique identification code (tenant-scoped)
+    let equipQuery = supabaseAdmin.from('equipment').select('*').eq('unique_identification_code', uniqueId)
+    if (tenantId) equipQuery = equipQuery.eq('tenant_id', tenantId)
+    const { data: equipment, error } = await equipQuery.single()
 
     if (error || !equipment) {
       return NextResponse.json({ error: 'Equipment not found' }, { status: 404 })

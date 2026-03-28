@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -15,6 +16,7 @@ export async function POST(
     // Security: only admins can delete access requests
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { id: requestId } = await params;
 
@@ -27,12 +29,10 @@ export async function POST(
 
     console.log(`🗑️ Deleting access request: ${requestId}`);
 
-    // First, get the access request to find the associated email
-    const { data: accessRequest, error: fetchError } = await supabaseAdmin
-      .from('access_requests')
-      .select('email, status')
-      .eq('id', requestId)
-      .single();
+    // First, get the access request to find the associated email (tenant-scoped)
+    let delFetch = supabaseAdmin.from('access_requests').select('email, status').eq('id', requestId);
+    if (tenantId) delFetch = delFetch.eq('tenant_id', tenantId);
+    const { data: accessRequest, error: fetchError } = await delFetch.single();
 
     if (fetchError) {
       console.error('❌ Error fetching access request:', fetchError);

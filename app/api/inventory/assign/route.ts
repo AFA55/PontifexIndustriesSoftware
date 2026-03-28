@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin(request)
   if (!auth.authorized) return auth.response
+  const tenantId = await getTenantId(auth.userId)
 
   try {
     const { inventory_id, operator_id, serial_number, notes } = await request.json()
@@ -16,12 +18,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if serial number already exists
-    const { data: existingEquipment } = await supabaseAdmin
-      .from('equipment')
-      .select('id, serial_number, name')
-      .eq('serial_number', serial_number)
-      .single()
+    // Check if serial number already exists (tenant-scoped)
+    let serialCheck = supabaseAdmin.from('equipment').select('id, serial_number, name').eq('serial_number', serial_number)
+    if (tenantId) serialCheck = serialCheck.eq('tenant_id', tenantId)
+    const { data: existingEquipment } = await serialCheck.single()
 
     if (existingEquipment) {
       return NextResponse.json(

@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin(request)
   if (!auth.authorized) return auth.response
+  const tenantId = await getTenantId(auth.userId)
 
   try {
-    const { data: inventory, error } = await supabaseAdmin
-      .from('inventory')
-      .select('*')
-      .order('created_at', { ascending: false })
+    let invQuery = supabaseAdmin.from('inventory').select('*').order('created_at', { ascending: false })
+    if (tenantId) invQuery = invQuery.eq('tenant_id', tenantId)
+    const { data: inventory, error } = await invQuery
 
     if (error) {
       console.error('Error fetching inventory:', error)
@@ -27,13 +28,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin(request)
   if (!auth.authorized) return auth.response
+  const tenantId = await getTenantId(auth.userId)
 
   try {
     const inventoryData = await request.json()
 
     const { data: newInventory, error } = await supabaseAdmin
       .from('inventory')
-      .insert(inventoryData)
+      .insert({ ...inventoryData, tenant_id: tenantId || null })
       .select()
       .single()
 

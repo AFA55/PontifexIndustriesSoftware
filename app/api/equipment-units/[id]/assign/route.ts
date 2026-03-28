@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -15,17 +16,16 @@ export async function POST(
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { id } = await params;
     const body = await request.json();
     const { operator_id } = body;
 
-    // Fetch current unit
-    const { data: unit, error: fetchError } = await supabaseAdmin
-      .from('equipment_units')
-      .select('id, name, pontifex_id, current_operator_id, lifecycle_status')
-      .eq('id', id)
-      .single();
+    // Fetch current unit (tenant-scoped)
+    let unitQuery = supabaseAdmin.from('equipment_units').select('id, name, pontifex_id, current_operator_id, lifecycle_status').eq('id', id);
+    if (tenantId) unitQuery = unitQuery.eq('tenant_id', tenantId);
+    const { data: unit, error: fetchError } = await unitQuery.single();
 
     if (fetchError || !unit) {
       return NextResponse.json(

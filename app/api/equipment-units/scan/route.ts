@@ -7,11 +7,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { searchParams } = new URL(request.url);
     const nfcTagId = searchParams.get('nfc_tag_id');
@@ -30,20 +32,16 @@ export async function GET(request: NextRequest) {
 
     if (nfcTagId) {
       // Direct NFC tag lookup
-      const result = await supabaseAdmin
-        .from('equipment_units')
-        .select('*')
-        .eq('nfc_tag_id', nfcTagId)
-        .maybeSingle();
+      let q = supabaseAdmin.from('equipment_units').select('*').eq('nfc_tag_id', nfcTagId);
+      if (tenantId) q = q.eq('tenant_id', tenantId);
+      const result = await q.maybeSingle();
       unit = result.data;
       unitError = result.error;
     } else if (pontifexId) {
       // Direct pontifex_id lookup
-      const result = await supabaseAdmin
-        .from('equipment_units')
-        .select('*')
-        .eq('pontifex_id', pontifexId)
-        .maybeSingle();
+      let q = supabaseAdmin.from('equipment_units').select('*').eq('pontifex_id', pontifexId);
+      if (tenantId) q = q.eq('tenant_id', tenantId);
+      const result = await q.maybeSingle();
       unit = result.data;
       unitError = result.error;
     } else if (genericQuery) {
@@ -52,33 +50,27 @@ export async function GET(request: NextRequest) {
 
       // 1. Try pontifex_id (starts with PX-)
       if (lookupValue.startsWith('PX-')) {
-        const result = await supabaseAdmin
-          .from('equipment_units')
-          .select('*')
-          .eq('pontifex_id', lookupValue)
-          .maybeSingle();
+        let q = supabaseAdmin.from('equipment_units').select('*').eq('pontifex_id', lookupValue);
+        if (tenantId) q = q.eq('tenant_id', tenantId);
+        const result = await q.maybeSingle();
         unit = result.data;
         unitError = result.error;
       }
 
       // 2. If not found, try nfc_tag_id
       if (!unit && !unitError) {
-        const result = await supabaseAdmin
-          .from('equipment_units')
-          .select('*')
-          .eq('nfc_tag_id', lookupValue)
-          .maybeSingle();
+        let q = supabaseAdmin.from('equipment_units').select('*').eq('nfc_tag_id', lookupValue);
+        if (tenantId) q = q.eq('tenant_id', tenantId);
+        const result = await q.maybeSingle();
         unit = result.data;
         unitError = result.error;
       }
 
       // 3. If still not found, try manufacturer_serial
       if (!unit && !unitError) {
-        const result = await supabaseAdmin
-          .from('equipment_units')
-          .select('*')
-          .eq('manufacturer_serial', lookupValue)
-          .maybeSingle();
+        let q = supabaseAdmin.from('equipment_units').select('*').eq('manufacturer_serial', lookupValue);
+        if (tenantId) q = q.eq('tenant_id', tenantId);
+        const result = await q.maybeSingle();
         unit = result.data;
         unitError = result.error;
       }

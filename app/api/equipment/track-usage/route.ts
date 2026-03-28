@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+    const tenantId = await getTenantId(auth.userId)
+
     const { job_order_id, work_items } = await request.json()
 
     if (!job_order_id || !work_items || !Array.isArray(work_items)) {
@@ -27,7 +33,7 @@ export async function POST(request: Request) {
             else if (sawType.includes('chop saw')) equipmentType = 'chop_saw'
 
             // Find assigned blades for this operator and equipment type
-            const { data: assignedBlades } = await supabaseAdmin
+            let bladeQuery = supabaseAdmin
               .from('blade_assignments')
               .select(`
                 equipment_id,
@@ -41,6 +47,8 @@ export async function POST(request: Request) {
                 )
               `)
               .eq('status', 'active')
+            if (tenantId) bladeQuery = bladeQuery.eq('tenant_id', tenantId)
+            const { data: assignedBlades } = await bladeQuery
 
             // Filter for matching equipment type
             const matchingBlades = assignedBlades?.filter(
@@ -60,7 +68,8 @@ export async function POST(request: Request) {
                 linear_feet_cut: cut.linearFeet,
                 equipment_type_used: equipmentType,
                 blade_size: equipment?.size,
-                notes: `${item.name} - Cut depth: ${cut.cutDepth}"${cut.cutSteel ? ' (Cut steel)' : ''}`
+                notes: `${item.name} - Cut depth: ${cut.cutDepth}"${cut.cutSteel ? ' (Cut steel)' : ''}`,
+                tenant_id: tenantId || null,
               })
             }
 

@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    // Note: Using supabaseAdmin for server-side operations
-    // Authentication should be handled by middleware or client-side
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+    const tenantId = await getTenantId(auth.userId)
 
     const { equipment } = await request.json()
 
@@ -31,7 +34,8 @@ export async function POST(request: Request) {
       status: 'available',
       is_checked_out: false,
       total_usage_linear_feet: 0,
-      quantity_in_stock: 1
+      quantity_in_stock: 1,
+      tenant_id: tenantId || null,
     }))
 
     // Insert equipment into database

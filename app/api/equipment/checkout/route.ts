@@ -1,20 +1,24 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+    const tenantId = await getTenantId(auth.userId)
+
     const { equipment_id, operator_id, assignment_date, notes } = await request.json()
 
     if (!equipment_id || !operator_id) {
       return NextResponse.json({ error: 'Equipment ID and Operator ID are required' }, { status: 400 })
     }
 
-    // Check if equipment is already checked out
-    const { data: existingEquipment } = await supabaseAdmin
-      .from('equipment')
-      .select('is_checked_out, name')
-      .eq('id', equipment_id)
-      .single()
+    // Check if equipment is already checked out (tenant-scoped)
+    let eqCheck = supabaseAdmin.from('equipment').select('is_checked_out, name').eq('id', equipment_id)
+    if (tenantId) eqCheck = eqCheck.eq('tenant_id', tenantId)
+    const { data: existingEquipment } = await eqCheck.single()
 
     if (existingEquipment?.is_checked_out) {
       return NextResponse.json({ error: 'Equipment is already checked out' }, { status: 400 })
@@ -28,7 +32,8 @@ export async function POST(request: Request) {
         operator_id,
         assigned_date: assignment_date || new Date().toISOString(),
         checkout_notes: notes || null,
-        status: 'active'
+        status: 'active',
+        tenant_id: tenantId || null,
       })
       .select()
       .single()
@@ -57,7 +62,8 @@ export async function POST(request: Request) {
       .insert({
         equipment_id,
         scan_action: 'assign_equipment',
-        notes: `Assigned to operator ${operator_id}`
+        notes: `Assigned to operator ${operator_id}`,
+        tenant_id: tenantId || null,
       })
 
     return NextResponse.json({

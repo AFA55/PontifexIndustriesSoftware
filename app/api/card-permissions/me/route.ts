@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 import type { PermissionLevel } from '@/lib/rbac';
 
 // GET: Current user's card permissions as a map
@@ -14,7 +15,9 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
+    // Query is already user-scoped (eq user_id), tenant_id available for future use
     const { data: rows, error } = await supabaseAdmin
       .from('user_card_permissions')
       .select('card_key, permission_level')
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       role: auth.role,
+      tenantId: tenantId || null,
       permissions: permMap,
     });
   } catch (error: any) {

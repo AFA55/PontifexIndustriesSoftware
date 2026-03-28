@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // GET: Fetch a single unit with recent events and maintenance count
 export async function GET(
@@ -15,15 +16,14 @@ export async function GET(
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { id } = await params;
 
-    // Fetch the unit
-    const { data: unit, error: unitError } = await supabaseAdmin
-      .from('equipment_units')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // Fetch the unit (tenant-scoped)
+    let unitQuery = supabaseAdmin.from('equipment_units').select('*').eq('id', id);
+    if (tenantId) unitQuery = unitQuery.eq('tenant_id', tenantId);
+    const { data: unit, error: unitError } = await unitQuery.single();
 
     if (unitError || !unit) {
       return NextResponse.json(
@@ -77,16 +77,15 @@ export async function PATCH(
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { id } = await params;
     const body = await request.json();
 
-    // Fetch the current unit to detect changes
-    const { data: currentUnit, error: fetchError } = await supabaseAdmin
-      .from('equipment_units')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // Fetch the current unit to detect changes (tenant-scoped)
+    let fetchQuery = supabaseAdmin.from('equipment_units').select('*').eq('id', id);
+    if (tenantId) fetchQuery = fetchQuery.eq('tenant_id', tenantId);
+    const { data: currentUnit, error: fetchError } = await fetchQuery.single();
 
     if (fetchError || !currentUnit) {
       return NextResponse.json(
@@ -213,15 +212,14 @@ export async function DELETE(
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { id } = await params;
 
-    // Verify unit exists
-    const { data: unit, error: fetchError } = await supabaseAdmin
-      .from('equipment_units')
-      .select('id, name, lifecycle_status')
-      .eq('id', id)
-      .single();
+    // Verify unit exists (tenant-scoped)
+    let delQuery = supabaseAdmin.from('equipment_units').select('id, name, lifecycle_status').eq('id', id);
+    if (tenantId) delQuery = delQuery.eq('tenant_id', tenantId);
+    const { data: unit, error: fetchError } = await delQuery.single();
 
     if (fetchError || !unit) {
       return NextResponse.json(

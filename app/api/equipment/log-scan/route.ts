@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAuth } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuth(request)
+    if (!auth.authorized) return auth.response
+    const tenantId = await getTenantId(auth.userId)
+
     const { equipment_id, scan_action, notes } = await request.json()
 
     if (!equipment_id) {
@@ -15,7 +21,8 @@ export async function POST(request: Request) {
       .insert({
         equipment_id,
         scan_action: scan_action || 'view_equipment',
-        notes: notes || null
+        notes: notes || null,
+        tenant_id: tenantId || null,
       })
       .select()
       .single()

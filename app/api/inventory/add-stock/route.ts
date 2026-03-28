@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin(request)
   if (!auth.authorized) return auth.response
+  const tenantId = await getTenantId(auth.userId)
 
   try {
     const { inventory_id, quantity, notes } = await request.json()
@@ -20,11 +22,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Quantity must be at least 1' }, { status: 400 })
     }
 
-    const { data: inventoryItem, error: fetchError } = await supabaseAdmin
-      .from('inventory')
-      .select('quantity_in_stock')
-      .eq('id', inventory_id)
-      .single()
+    let stockQuery = supabaseAdmin.from('inventory').select('quantity_in_stock').eq('id', inventory_id)
+    if (tenantId) stockQuery = stockQuery.eq('tenant_id', tenantId)
+    const { data: inventoryItem, error: fetchError } = await stockQuery.single()
 
     if (fetchError || !inventoryItem) {
       return NextResponse.json({ error: 'Inventory item not found' }, { status: 404 })
