@@ -12,6 +12,7 @@ interface AuthSuccess {
   userId: string;
   userEmail: string;
   role: string;
+  tenantId: string;
 }
 
 interface AuthFailure {
@@ -53,11 +54,11 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('role')
+    .select('role, tenant_id')
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || profile.role !== 'admin') {
+  if (profileError || !profile || !['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(profile.role)) {
     return {
       authorized: false,
       response: NextResponse.json(
@@ -72,7 +73,50 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
     userId: user.id,
     userEmail: user.email || '',
     role: profile.role,
+    tenantId: profile.tenant_id || '',
   };
+}
+
+/**
+ * Require the request to have a valid Bearer token belonging to a super_admin user.
+ * Returns 401 if no/invalid token, 403 if not super_admin.
+ */
+export async function requireSuperAdmin(request: NextRequest): Promise<AuthResult> {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth;
+
+  if (auth.role !== 'super_admin') {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Super admin access required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return auth;
+}
+
+/**
+ * Require the request to have a valid Bearer token belonging to an admin, super_admin, or salesman.
+ * Used for Schedule Board access where all three roles can view.
+ */
+export async function requireScheduleBoardAccess(request: NextRequest): Promise<AuthResult> {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth;
+
+  if (!['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor'].includes(auth.role)) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Schedule board access required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return auth;
 }
 
 /**
@@ -121,6 +165,22 @@ export function isTableNotFoundError(error: any): boolean {
   );
 }
 
+/**
+ * Require a valid Bearer token belonging to a shop user.
+ * Stub -- accepts any authenticated user for now.
+ */
+export async function requireShopUser(request: NextRequest): Promise<AuthResult> {
+  return requireAuth(request);
+}
+
+/**
+ * Require a valid Bearer token belonging to a shop manager (admin).
+ * Stub -- delegates to requireAdmin for now.
+ */
+export async function requireShopManager(request: NextRequest): Promise<AuthResult> {
+  return requireAdmin(request);
+}
+
 export async function requireAuth(request: NextRequest): Promise<AuthResult> {
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace('Bearer ', '');
@@ -147,16 +207,48 @@ export async function requireAuth(request: NextRequest): Promise<AuthResult> {
     };
   }
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('role')
+    .select('role, tenant_id')
     .eq('id', user.id)
     .single();
+
+  if (profileError || !profile || !profile.role) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. User profile not found or incomplete.' },
+        { status: 403 }
+      ),
+    };
+  }
 
   return {
     authorized: true,
     userId: user.id,
     userEmail: user.email || '',
-    role: profile?.role || 'operator',
+    role: profile.role,
+    tenantId: profile.tenant_id || '',
   };
+}
+
+/**
+ * Require the request to have a valid Bearer token belonging to a super_admin or operations_manager.
+ * Used for the Operations Hub diagnostics dashboard.
+ */
+export async function requireOpsManager(request: NextRequest): Promise<AuthResult> {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth;
+
+  if (!['super_admin', 'operations_manager'].includes(auth.role)) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Operations manager or super admin access required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return auth;
 }
