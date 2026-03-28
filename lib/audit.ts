@@ -19,7 +19,7 @@ interface AuditEventParams {
 }
 
 /**
- * Log an audit event. Non-blocking — errors are silently caught.
+ * Log an audit event. Non-blocking -- errors are silently caught.
  */
 export function logAuditEvent(params: AuditEventParams): void {
   const {

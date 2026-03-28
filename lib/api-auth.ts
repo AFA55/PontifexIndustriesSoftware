@@ -12,6 +12,7 @@ interface AuthSuccess {
   userId: string;
   userEmail: string;
   role: string;
+  tenantId: string;
 }
 
 interface AuthFailure {
@@ -53,7 +54,7 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('role')
+    .select('role, tenant_id')
     .eq('id', user.id)
     .single();
 
@@ -72,6 +73,7 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
     userId: user.id,
     userEmail: user.email || '',
     role: profile.role,
+    tenantId: profile.tenant_id || '',
   };
 }
 
@@ -165,7 +167,7 @@ export function isTableNotFoundError(error: any): boolean {
 
 /**
  * Require a valid Bearer token belonging to a shop user.
- * Stub — accepts any authenticated user for now.
+ * Stub -- accepts any authenticated user for now.
  */
 export async function requireShopUser(request: NextRequest): Promise<AuthResult> {
   return requireAuth(request);
@@ -173,7 +175,7 @@ export async function requireShopUser(request: NextRequest): Promise<AuthResult>
 
 /**
  * Require a valid Bearer token belonging to a shop manager (admin).
- * Stub — delegates to requireAdmin for now.
+ * Stub -- delegates to requireAdmin for now.
  */
 export async function requireShopManager(request: NextRequest): Promise<AuthResult> {
   return requireAdmin(request);
@@ -207,7 +209,7 @@ export async function requireAuth(request: NextRequest): Promise<AuthResult> {
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('role')
+    .select('role, tenant_id')
     .eq('id', user.id)
     .single();
 
@@ -226,6 +228,7 @@ export async function requireAuth(request: NextRequest): Promise<AuthResult> {
     userId: user.id,
     userEmail: user.email || '',
     role: profile.role,
+    tenantId: profile.tenant_id || '',
   };
 }
 

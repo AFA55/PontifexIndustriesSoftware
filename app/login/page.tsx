@@ -30,7 +30,7 @@ export default function LoginPage() {
   });
 
   const onSubmit = async (data: FormData) => {
-    console.log('🚀 Starting login process...');
+    console.log('Starting login process...');
     setLoading(true);
     setError(null);
 
@@ -50,14 +50,14 @@ export default function LoginPage() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        console.log('❌ Login failed:', result.error);
+        console.log('Login failed:', result.error);
         setError(result.error || 'Login failed');
         setLoading(false);
         return;
       }
 
-      console.log('✅ Login successful!');
-      console.log('👤 User:', result.user);
+      console.log('Login successful!');
+      console.log('User:', result.user);
 
       // Set the session in the client
       if (result.session) {
@@ -73,15 +73,21 @@ export default function LoginPage() {
         name: result.user.full_name,
         email: result.user.email,
         role: result.user.role,
+        tenant_id: result.user.tenant_id,
       }));
-      console.log('💾 User stored in localStorage');
+      console.log('User stored in localStorage');
+
+      // Store tenant info separately for branding
+      if (result.tenant) {
+        localStorage.setItem('current-tenant', JSON.stringify(result.tenant));
+      }
 
       // Redirect based on user role
       if (['admin', 'super_admin', 'salesman', 'operations_manager'].includes(result.user.role)) {
-        console.log(`🔑 ${result.user.role} user, redirecting to admin dashboard...`);
+        console.log(`${result.user.role} user, redirecting to admin dashboard...`);
         router.push('/dashboard/admin');
       } else if (result.user.role === 'operator' || result.user.role === 'apprentice') {
-        console.log('👤 Operator/Apprentice user, redirecting to operator dashboard...');
+        console.log('Operator/Apprentice user, redirecting to operator dashboard...');
         router.push('/dashboard');
       } else {
         setError('Invalid user role');
@@ -89,7 +95,7 @@ export default function LoginPage() {
       }
       // Keep loading state true during navigation - it will unmount anyway
     } catch (err: any) {
-      console.error('💥 Unexpected login error:', err);
+      console.error('Unexpected login error:', err);
       if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
         setError('Cannot connect to server. Please check your connection or try again.');
       } else {

@@ -19,17 +19,24 @@ const ALLOWED_FIELDS = [
 
 /**
  * GET /api/admin/branding
- * Public — no auth required (used by login page before user is authenticated)
+ * Public -- no auth required (used by login page before user is authenticated)
  * Fetches the active tenant branding row.
+ * Supports optional ?tenant_id= query param for tenant-specific branding.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabaseAdmin
+    const tenantId = request.nextUrl.searchParams.get('tenant_id');
+
+    let query = supabaseAdmin
       .from('tenant_branding')
       .select('*')
-      .eq('is_active', true)
-      .limit(1)
-      .single();
+      .eq('is_active', true);
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query.limit(1).single();
 
     if (error || !data) {
       // Return defaults if no branding row exists
@@ -60,7 +67,7 @@ export async function GET() {
 
 /**
  * PATCH /api/admin/branding
- * Super admin only — update the active branding row.
+ * Super admin only -- update the active branding row.
  */
 export async function PATCH(request: NextRequest) {
   const auth = await requireSuperAdmin(request);
@@ -87,13 +94,17 @@ export async function PATCH(request: NextRequest) {
     updates.updated_at = new Date().toISOString();
     updates.updated_by = auth.userId;
 
-    // Find the active row
-    const { data: existing } = await supabaseAdmin
+    // Find the active row (scoped to tenant if available)
+    let findQuery = supabaseAdmin
       .from('tenant_branding')
       .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single();
+      .eq('is_active', true);
+
+    if (auth.tenantId) {
+      findQuery = findQuery.eq('tenant_id', auth.tenantId);
+    }
+
+    const { data: existing } = await findQuery.limit(1).single();
 
     if (!existing) {
       return NextResponse.json(

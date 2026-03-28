@@ -80,7 +80,6 @@ const DEFAULT_BRANDING: TenantBranding = {
   show_customer_crm: true,
 };
 
-const CACHE_KEY = 'pontifex-branding';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface CachedBranding {
@@ -100,13 +99,24 @@ const BrandingContext = createContext<BrandingContextType>({
   refreshBranding: async () => {},
 });
 
+function getCacheKey(): string {
+  try {
+    const tenantStr = localStorage.getItem('current-tenant');
+    const tenantId = tenantStr ? JSON.parse(tenantStr)?.id : 'default';
+    return `branding-${tenantId}`;
+  } catch {
+    return 'branding-default';
+  }
+}
+
 function getCachedBranding(): TenantBranding | null {
   try {
-    const cached = localStorage.getItem(CACHE_KEY);
+    const cacheKey = getCacheKey();
+    const cached = localStorage.getItem(cacheKey);
     if (!cached) return null;
     const parsed: CachedBranding = JSON.parse(cached);
     if (Date.now() - parsed.timestamp > CACHE_TTL) {
-      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(cacheKey);
       return null;
     }
     return parsed.data;
@@ -117,8 +127,9 @@ function getCachedBranding(): TenantBranding | null {
 
 function setCachedBranding(data: TenantBranding) {
   try {
+    const cacheKey = getCacheKey();
     const cached: CachedBranding = { data, timestamp: Date.now() };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cached));
+    localStorage.setItem(cacheKey, JSON.stringify(cached));
   } catch {
     // localStorage may be unavailable
   }
@@ -140,7 +151,15 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const res = await fetch('/api/admin/branding', { cache: 'no-store' });
+      // Try to get tenant-specific branding
+      const tenantStr = typeof window !== 'undefined' ? localStorage.getItem('current-tenant') : null;
+      const tenantId = tenantStr ? JSON.parse(tenantStr)?.id : null;
+
+      const url = tenantId
+        ? `/api/admin/branding?tenant_id=${tenantId}`
+        : '/api/admin/branding';
+
+      const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
@@ -150,7 +169,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch {
-      // Use defaults on error — already set
+      // Use defaults on error -- already set
     } finally {
       setLoading(false);
     }
@@ -159,7 +178,8 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const refreshBranding = useCallback(async () => {
     setLoading(true);
     try {
-      localStorage.removeItem(CACHE_KEY);
+      const cacheKey = getCacheKey();
+      localStorage.removeItem(cacheKey);
     } catch {
       // ignore
     }

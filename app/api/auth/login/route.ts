@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     // Step 2: Get profile using ADMIN client (bypasses RLS)
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, email, full_name, role, active')
+      .select('id, email, full_name, role, active, tenant_id')
       .eq('id', authData.user.id)
       .single();
 
@@ -101,6 +101,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Step 3: Get tenant details for branding (if user has a tenant)
+    let tenant = null;
+    if (profile.tenant_id) {
+      const { data: tenantData } = await supabaseAdmin
+        .from('tenants')
+        .select('id, name, slug, company_code')
+        .eq('id', profile.tenant_id)
+        .single();
+      tenant = tenantData;
+    }
+
     // Log successful login
     logLoginAttempt({ email, success: true, userId: profile.id, request });
     logAuditEvent({
@@ -112,7 +123,7 @@ export async function POST(request: NextRequest) {
       request,
     });
 
-    // Return success with session and profile
+    // Return success with session, profile, and tenant
     return NextResponse.json(
       {
         success: true,
@@ -121,7 +132,9 @@ export async function POST(request: NextRequest) {
           email: profile.email,
           full_name: profile.full_name,
           role: profile.role,
+          tenant_id: profile.tenant_id,
         },
+        tenant,
         session: authData.session,
       },
       { status: 200 }
