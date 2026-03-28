@@ -65,14 +65,24 @@ export default function LoginPage() {
         });
       }
 
-      // Store user data in localStorage for dashboard access
-      localStorage.setItem('supabase-user', JSON.stringify({
+      // Store user data in localStorage for dashboard access (always use API response)
+      const userData = {
         id: result.user.id,
         name: result.user.full_name,
         email: result.user.email,
         role: result.user.role,
-      }));
-      console.log('💾 User stored in localStorage');
+        tenant_id: result.user.tenant_id || null,
+      };
+      localStorage.setItem('supabase-user', JSON.stringify(userData));
+
+      // Store tenant info from API response (works regardless of navigation path)
+      if (result.tenant) {
+        localStorage.setItem('current-tenant', JSON.stringify(result.tenant));
+      } else if (result.user.tenant_id) {
+        // If API returned tenant_id but no tenant object, store minimal tenant data
+        localStorage.setItem('current-tenant', JSON.stringify({ id: result.user.tenant_id }));
+      }
+      console.log('💾 User and tenant stored in localStorage');
 
       // Redirect based on user role
       if (result.user.role === 'admin') {
