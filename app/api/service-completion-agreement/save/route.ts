@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(filePath);
 
     // Track in pdf_documents table (with tenant scope)
-    const tenantId = await getTenantId(user.id);
+    const tenantId = await getTenantId(auth.userId);
     const pdfDocData: any = {
         job_id: jobId,
         document_type: 'service_completion_agreement',

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create standby log - jobId is already a UUID (with tenant scope)
-    const tenantId = await getTenantId(user.id);
+    const tenantId = await getTenantId(auth.userId);
     const standbyData: any = {
         job_order_id: jobId,
         operator_id: auth.userId,
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
     const jobId = searchParams.get('jobId');
     const operatorId = searchParams.get('operatorId');
 
-    const tenantIdGet = await getTenantId(user.id);
+    const tenantIdGet = await getTenantId(auth.userId);
     let query = supabaseAdmin
       .from('standby_logs')
       .select('*')
