@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -57,12 +58,18 @@ export async function POST(
       );
     }
 
-    // Check if timecard exists
-    const { data: existingTimecard, error: checkError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Check if timecard exists (scoped to tenant)
+    let checkQuery = supabaseAdmin
       .from('timecards')
       .select('id, is_approved')
-      .eq('id', timecardId)
-      .single();
+      .eq('id', timecardId);
+    if (tenantId) {
+      checkQuery = checkQuery.eq('tenant_id', tenantId);
+    }
+    const { data: existingTimecard, error: checkError } = await checkQuery.single();
 
     if (checkError || !existingTimecard) {
       return NextResponse.json(
@@ -78,15 +85,19 @@ export async function POST(
       );
     }
 
-    // Update timecard to approved
-    const { data: updatedTimecard, error: updateError } = await supabaseAdmin
+    // Update timecard to approved (scoped to tenant)
+    let approveQuery = supabaseAdmin
       .from('timecards')
       .update({
         is_approved: true,
         approved_by: user.id,
         approved_at: new Date().toISOString(),
       })
-      .eq('id', timecardId)
+      .eq('id', timecardId);
+    if (tenantId) {
+      approveQuery = approveQuery.eq('tenant_id', tenantId);
+    }
+    const { data: updatedTimecard, error: updateError } = await approveQuery
       .select()
       .single();
 

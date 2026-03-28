@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,6 +38,20 @@ export async function GET(request: NextRequest) {
 
     if (!jobId) {
       return NextResponse.json({ error: 'Job ID required' }, { status: 400 });
+    }
+
+    // Resolve tenant scope — verify the job belongs to this tenant
+    const tenantId = await getTenantId(user.id);
+    if (tenantId) {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .single();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
     }
 
     // Fetch all workflow records for this job with operator info

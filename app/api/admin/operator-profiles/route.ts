@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,13 +55,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
     // Get all operators with their profile data
-    const { data: operators, error: operatorsError } = await supabaseAdmin
+    let operatorsQuery = supabaseAdmin
       .from('profiles')
       .select('*')
       .in('role', ['operator', 'apprentice'])
       .eq('active', true)
       .order('full_name');
+    if (tenantId) {
+      operatorsQuery = operatorsQuery.eq('tenant_id', tenantId);
+    }
+    const { data: operators, error: operatorsError } = await operatorsQuery;
 
     if (operatorsError) {
       console.error('Error fetching operators:', operatorsError);

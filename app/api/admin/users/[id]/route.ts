@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PATCH(
   request: NextRequest,
@@ -79,11 +80,18 @@ export async function PATCH(
 
     sanitizedUpdates.updated_at = new Date().toISOString();
 
-    // Update user
-    const { data: updatedUser, error: updateError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Update user (scoped to tenant)
+    let updateQuery = supabaseAdmin
       .from('profiles')
       .update(sanitizedUpdates)
-      .eq('id', id)
+      .eq('id', id);
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId);
+    }
+    const { data: updatedUser, error: updateError } = await updateQuery
       .select()
       .single();
 

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,6 +53,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
     // Get role filter from query params
     const { searchParams } = new URL(request.url);
     const roleFilter = searchParams.get('role');
@@ -62,6 +66,11 @@ export async function GET(request: NextRequest) {
       .select('id, full_name, role, email, active')
       .eq('active', true)
       .order('full_name');
+
+    // Scope to tenant
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // Apply role filter if provided
     if (roleFilter) {

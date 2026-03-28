@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
@@ -59,12 +60,18 @@ export async function GET(
       );
     }
 
-    // Get operator profile
-    const { data: operator, error: operatorError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Get operator profile (scoped to tenant)
+    let operatorQuery = supabaseAdmin
       .from('profiles')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) {
+      operatorQuery = operatorQuery.eq('tenant_id', tenantId);
+    }
+    const { data: operator, error: operatorError } = await operatorQuery.single();
 
     if (operatorError || !operator) {
       return NextResponse.json(
@@ -186,11 +193,18 @@ export async function PATCH(
 
     sanitizedUpdates.updated_at = new Date().toISOString();
 
-    // Update operator profile
-    const { data: updatedOperator, error: updateError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Update operator profile (scoped to tenant)
+    let updateQuery = supabaseAdmin
       .from('profiles')
       .update(sanitizedUpdates)
-      .eq('id', id)
+      .eq('id', id);
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId);
+    }
+    const { data: updatedOperator, error: updateError } = await updateQuery
       .select()
       .single();
 

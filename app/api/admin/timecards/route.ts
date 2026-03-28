@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +52,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
@@ -64,6 +68,11 @@ export async function GET(request: NextRequest) {
       .from('timecards_with_users')
       .select('*')
       .order('clock_in_time', { ascending: false });
+
+    // Scope to tenant
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // Apply filters
     if (userId) {

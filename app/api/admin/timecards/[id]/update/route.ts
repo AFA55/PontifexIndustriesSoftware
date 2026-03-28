@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PUT(
   request: NextRequest,
@@ -61,12 +62,18 @@ export async function PUT(
     const body = await request.json();
     const { clock_in_time, clock_out_time, notes } = body;
 
-    // Check if timecard exists
-    const { data: existingTimecard, error: checkError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Check if timecard exists (scoped to tenant)
+    let checkQuery = supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('id', timecardId)
-      .single();
+      .eq('id', timecardId);
+    if (tenantId) {
+      checkQuery = checkQuery.eq('tenant_id', tenantId);
+    }
+    const { data: existingTimecard, error: checkError } = await checkQuery.single();
 
     if (checkError || !existingTimecard) {
       return NextResponse.json(
@@ -95,10 +102,14 @@ export async function PUT(
     if (notes !== undefined) updateData.notes = notes;
     if (total_hours !== null) updateData.total_hours = total_hours;
 
-    const { data: updatedTimecard, error: updateError } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from('timecards')
       .update(updateData)
-      .eq('id', timecardId)
+      .eq('id', timecardId);
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId);
+    }
+    const { data: updatedTimecard, error: updateError } = await updateQuery
       .select()
       .single();
 

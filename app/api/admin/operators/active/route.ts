@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,12 +52,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
     // Get all active operators — try the view first, fall back to empty
     let activeOperators: any[] = [];
-    const { data: viewData, error: fetchError } = await supabaseAdmin
+    let statusQuery = supabaseAdmin
       .from('current_operator_status')
       .select('*')
       .order('timestamp', { ascending: false });
+    if (tenantId) {
+      statusQuery = statusQuery.eq('tenant_id', tenantId);
+    }
+    const { data: viewData, error: fetchError } = await statusQuery;
 
     if (!fetchError && viewData) {
       activeOperators = viewData;

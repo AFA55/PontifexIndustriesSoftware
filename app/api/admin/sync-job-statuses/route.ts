@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,11 +28,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    // Get all job orders
-    const { data: jobs, error: jobsError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Get all job orders (scoped to tenant)
+    let jobsQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
       .order('scheduled_date', { ascending: false });
+    if (tenantId) {
+      jobsQuery = jobsQuery.eq('tenant_id', tenantId);
+    }
+    const { data: jobs, error: jobsError } = await jobsQuery;
 
     if (jobsError) {
       return NextResponse.json({ error: jobsError.message }, { status: 500 });
