@@ -1,8 +1,8 @@
 export const BRAND = {
-  companyName: 'Pontifex Industries',
+  companyName: 'Pontifex Platform',
   tagline: 'Custom Software & Automation for Construction',
   shortName: 'Pontifex',
-  logoInitials: 'PI',
+  logoInitials: 'PP',
   ctaPrimary: 'Schedule a Demo',
   ctaSecondary: 'See How It Works',
   ctaPrimaryHref: '#demo',

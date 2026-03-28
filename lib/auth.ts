@@ -102,13 +102,19 @@ export const logout = async (): Promise<void> => {
   try {
     const { supabase } = await import('@/lib/supabase');
     await supabase.auth.signOut();
-  } catch (e) {
-    console.log('Supabase signOut skipped:', e);
+  } catch {
+    // Supabase signOut may fail if no session exists
   }
 
   localStorage.removeItem('pontifex-user');
   localStorage.removeItem('supabase-user');
-  console.log('🚪 User logged out');
+  localStorage.removeItem('platform-user');
+  localStorage.removeItem('current-tenant');
+  // Clear all branding caches
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('branding-')) localStorage.removeItem(key);
+  });
+  console.log('User logged out');
 };
 
 export const isAuthenticated = (): boolean => {
