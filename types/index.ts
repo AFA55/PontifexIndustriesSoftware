@@ -1,5 +1,5 @@
 /**
- * Pontifex Platform - Shared Type Definitions
+ * Operations Platform - Shared Type Definitions
  *
  * SINGLE SOURCE OF TRUTH for all data types.
  * Every page, component, hook, and service imports from here.

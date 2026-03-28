@@ -43,10 +43,10 @@ function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: 
       </g>
       <g fill="currentColor">
         <text x="65" y="25" className="text-lg font-bold" style={{fontSize: '18px', fontFamily: 'Inter, sans-serif'}}>
-          {(companyName || 'PONTIFEX').toUpperCase().split(' ')[0]}
+          {(companyName || 'OPERATIONS').toUpperCase().split(' ')[0]}
         </text>
         <text x="65" y="45" className="text-sm" style={{fontSize: '12px', fontFamily: 'Inter, sans-serif', opacity: '0.8'}}>
-          {(companyName || 'PONTIFEX INDUSTRIES').toUpperCase().split(' ').slice(1).join(' ') || 'INDUSTRIES'}
+          {(companyName || 'OPERATIONS PLATFORM').toUpperCase().split(' ').slice(1).join(' ') || 'PLATFORM'}
         </text>
       </g>
       <defs>

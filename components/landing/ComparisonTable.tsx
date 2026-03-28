@@ -67,7 +67,7 @@ export default function ComparisonTable() {
             </span>
           </h2>
           <p className="text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto">
-            See how Pontifex replaces your entire manual process
+            See how our platform replaces your entire manual process
           </p>
         </motion.div>
 
@@ -92,7 +92,7 @@ export default function ComparisonTable() {
               <div className="text-center">
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 rounded-full border border-green-400/30">
                   <Check className="text-green-400" size={18} />
-                  <span className="text-green-300 font-bold">Pontifex Platform</span>
+                  <span className="text-green-300 font-bold">Our Platform</span>
                 </div>
               </div>
             </div>
@@ -155,7 +155,7 @@ export default function ComparisonTable() {
               <div className="p-4 bg-green-500/10 rounded-xl border border-green-400/20">
                 <div className="flex items-center gap-2 mb-2">
                   <Check className="text-green-400" size={18} />
-                  <span className="text-green-300 font-semibold text-sm">Pontifex Platform</span>
+                  <span className="text-green-300 font-semibold text-sm">Our Platform</span>
                 </div>
                 <p className="text-gray-200 text-sm font-medium">{comparison.platform}</p>
               </div>

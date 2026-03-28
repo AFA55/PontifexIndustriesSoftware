@@ -12,11 +12,13 @@ import { getTenantId } from '@/lib/get-tenant-id';
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
 
 // Allowed domains for PDF URL fetching (SSRF protection)
+// Dynamically include the app domain from env vars
+const appDomain = process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL).hostname : '';
 const ALLOWED_PDF_DOMAINS = [
-  'pontifexindustries.com',
-  'www.pontifexindustries.com',
-  'pontifex-industries-software-z8py.vercel.app',
+  ...(appDomain ? [appDomain] : []),
   'localhost',
+  // Add Supabase storage domain
+  'klatddoyncxidgqtcjnu.supabase.co',
 ];
 
 function isAllowedPdfUrl(url: string): boolean {
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare email options
     const emailOptions: any = {
-      from: process.env.RESEND_FROM_EMAIL || 'Pontifex Industries <onboarding@resend.dev>',
+      from: process.env.RESEND_FROM_EMAIL || `${process.env.COMPANY_NAME || 'Your Company'} <onboarding@resend.dev>`,
       to: [to],
       subject: subject,
       html: html,

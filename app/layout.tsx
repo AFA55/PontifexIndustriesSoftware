@@ -4,8 +4,8 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 
 export const metadata: Metadata = {
-  title: 'Operations Management Platform',
-  description: 'Professional concrete cutting operations management software',
+  title: 'Operations Platform - Construction Management Software',
+  description: 'Complete job workflow, real-time profitability tracking, and OSHA compliance for concrete cutting contractors. GPS time tracking, digital signatures, and automated documentation.',
   keywords: [
     'concrete cutting software',
     'construction management software',
@@ -21,27 +21,27 @@ export const metadata: Metadata = {
   authors: [{ name: 'Operations Platform' }],
   creator: 'Operations Platform',
   publisher: 'Operations Platform',
-  metadataBase: new URL('https://pontifex.com'), // Update with your actual domain
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://pontifex.com', // Update with your actual domain
-    title: 'Operations Management Platform',
-    description: 'Professional concrete cutting operations management software',
-    siteName: 'Operations Management Platform',
+    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    title: 'Operations Platform - Construction Management Software',
+    description: 'Run your concrete cutting business like a Fortune 500 company. Track jobs, profitability, and OSHA compliance in real-time.',
+    siteName: 'Operations Platform',
     images: [
       {
-        url: '/og-image.jpg', // You'll need to create this
+        url: '/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'Operations Management Platform',
+        alt: 'Operations Platform - Construction Management',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Operations Management Platform',
-    description: 'Professional concrete cutting operations management software',
+    title: 'Operations Platform - Construction Management Software',
+    description: 'Complete job workflow, real-time profitability, and OSHA compliance for concrete contractors.',
     images: ['/og-image.jpg'], // You'll need to create this
   },
   robots: {

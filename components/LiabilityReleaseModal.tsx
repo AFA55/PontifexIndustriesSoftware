@@ -262,7 +262,7 @@ export default function LiabilityReleaseModal({
                     className="mt-1 w-5 h-5 text-red-600 rounded focus:ring-red-500"
                   />
                   <span className="text-sm text-gray-900">
-                    <strong>I have read and accept</strong> all terms and conditions stated above, including the liability release and indemnification provisions. I understand that I am signing this agreement on behalf of Pontifex Industries before beginning work.
+                    <strong>I have read and accept</strong> all terms and conditions stated above, including the liability release and indemnification provisions. I understand that I am signing this agreement on behalf of the Company before beginning work.
                   </span>
                 </label>
               </div>
