@@ -4,7 +4,6 @@ export interface User {
   name: string;
   email: string;
   role: string;
-  tenant_id?: string;
 }
 
 // Demo credentials
@@ -32,9 +31,9 @@ const DEMO_CREDENTIALS = [
 ];
 
 export const checkCredentials = async (email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> => {
-  console.log('Checking credentials...');
-  console.log('Email entered:', email);
-  console.log('Password entered:', password.replace(/./g, '*')); // Mask password
+  console.log('🔐 Checking credentials...');
+  console.log('📧 Email entered:', email);
+  console.log('🔑 Password entered:', password.replace(/./g, '*')); // Mask password
 
   // Simulate async operation
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -45,12 +44,12 @@ export const checkCredentials = async (email: string, password: string): Promise
   );
 
   if (matchingCredential) {
-    console.log('Credentials match!', matchingCredential.user.role);
+    console.log('✅ Credentials match!', matchingCredential.user.role);
 
     // Store user in localStorage
     if (typeof window !== 'undefined') {
-      localStorage.setItem('platform-user', JSON.stringify(matchingCredential.user));
-      console.log('User stored in localStorage');
+      localStorage.setItem('pontifex-user', JSON.stringify(matchingCredential.user));
+      console.log('💾 User stored in localStorage');
     }
 
     return {
@@ -58,7 +57,7 @@ export const checkCredentials = async (email: string, password: string): Promise
       user: matchingCredential.user
     };
   } else {
-    console.log('Credentials do not match any account');
+    console.log('❌ Credentials do not match any account');
 
     return {
       success: false,
@@ -75,30 +74,21 @@ export const getCurrentUser = (): User | null => {
     const supabaseUserStr = localStorage.getItem('supabase-user');
     if (supabaseUserStr && supabaseUserStr.trim()) {
       const user = JSON.parse(supabaseUserStr);
-      console.log('Current user from Supabase session:', user);
+      console.log('👤 Current user from Supabase session:', user);
       return user;
     }
 
-    // Fallback to platform-user localStorage (white-label neutral key)
-    const platformUserStr = localStorage.getItem('platform-user');
-    if (platformUserStr && platformUserStr.trim()) {
-      const user = JSON.parse(platformUserStr);
-      console.log('Current user from localStorage:', user);
-      return user;
-    }
-
-    // Legacy fallback for backwards compatibility
-    const legacyUserStr = localStorage.getItem('pontifex-user');
-    if (legacyUserStr && legacyUserStr.trim()) {
-      const user = JSON.parse(legacyUserStr);
-      console.log('Current user from legacy localStorage:', user);
+    // Fallback to old localStorage system for backwards compatibility
+    const userStr = localStorage.getItem('pontifex-user');
+    if (userStr && userStr.trim()) {
+      const user = JSON.parse(userStr);
+      console.log('👤 Current user from localStorage:', user);
       return user;
     }
   } catch (error) {
     console.error('Error getting user from localStorage:', error);
     // Clear corrupted data
     localStorage.removeItem('pontifex-user');
-    localStorage.removeItem('platform-user');
     localStorage.removeItem('supabase-user');
   }
 
@@ -112,14 +102,18 @@ export const logout = async (): Promise<void> => {
   try {
     const { supabase } = await import('@/lib/supabase');
     await supabase.auth.signOut();
-  } catch (e) {
-    console.log('Supabase signOut skipped:', e);
+  } catch {
+    // Supabase signOut may fail if no session exists
   }
 
   localStorage.removeItem('pontifex-user');
-  localStorage.removeItem('platform-user');
   localStorage.removeItem('supabase-user');
+  localStorage.removeItem('platform-user');
   localStorage.removeItem('current-tenant');
+  // Clear all branding caches
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('branding-')) localStorage.removeItem(key);
+  });
   console.log('User logged out');
 };
 
@@ -129,27 +123,7 @@ export const isAuthenticated = (): boolean => {
 
 export const isAdmin = (): boolean => {
   const user = getCurrentUser();
-  return ['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(user?.role || '');
-};
-
-export const isOpsManager = (): boolean => {
-  const user = getCurrentUser();
-  return user?.role === 'operations_manager';
-};
-
-export const isSuperAdmin = (): boolean => {
-  const user = getCurrentUser();
-  return user?.role === 'super_admin';
-};
-
-export const isSupervisor = (): boolean => {
-  const user = getCurrentUser();
-  return user?.role === 'supervisor';
-};
-
-export const isSalesman = (): boolean => {
-  const user = getCurrentUser();
-  return user?.role === 'salesman';
+  return user?.role === 'admin';
 };
 
 export const isOperator = (): boolean => {
@@ -160,14 +134,4 @@ export const isOperator = (): boolean => {
 export const hasRole = (role: string): boolean => {
   const user = getCurrentUser();
   return user?.role === role;
-};
-
-export const isShopUser = (): boolean => {
-  const user = getCurrentUser();
-  return user?.role === 'shop_manager' || user?.role === 'admin' || user?.role === 'operator';
-};
-
-export const isShopManager = (): boolean => {
-  const user = getCurrentUser();
-  return user?.role === 'shop_manager' || user?.role === 'admin';
 };

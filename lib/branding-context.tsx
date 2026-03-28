@@ -43,9 +43,9 @@ export interface TenantBranding {
 
 const DEFAULT_BRANDING: TenantBranding = {
   id: '',
-  company_name: 'Pontifex Industries',
-  company_short_name: 'Pontifex',
-  tagline: 'Concrete Cutting Management Software',
+  company_name: 'Concrete Cutting Platform',
+  company_short_name: 'Platform',
+  tagline: 'Professional Operations Management',
   logo_url: null,
   logo_dark_url: null,
   favicon_url: null,
@@ -80,6 +80,7 @@ const DEFAULT_BRANDING: TenantBranding = {
   show_customer_crm: true,
 };
 
+const CACHE_KEY = 'pontifex-branding';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface CachedBranding {
@@ -91,27 +92,19 @@ interface BrandingContextType {
   branding: TenantBranding;
   loading: boolean;
   refreshBranding: () => Promise<void>;
+  loadTenantBranding: (tenantId: string) => void;
 }
 
 const BrandingContext = createContext<BrandingContextType>({
   branding: DEFAULT_BRANDING,
   loading: true,
   refreshBranding: async () => {},
+  loadTenantBranding: () => {},
 });
 
-function getCacheKey(): string {
+function getCachedBranding(key?: string): TenantBranding | null {
   try {
-    const tenantStr = localStorage.getItem('current-tenant');
-    const tenantId = tenantStr ? JSON.parse(tenantStr)?.id : 'default';
-    return `branding-${tenantId}`;
-  } catch {
-    return 'branding-default';
-  }
-}
-
-function getCachedBranding(): TenantBranding | null {
-  try {
-    const cacheKey = getCacheKey();
+    const cacheKey = key || CACHE_KEY;
     const cached = localStorage.getItem(cacheKey);
     if (!cached) return null;
     const parsed: CachedBranding = JSON.parse(cached);
@@ -125,9 +118,9 @@ function getCachedBranding(): TenantBranding | null {
   }
 }
 
-function setCachedBranding(data: TenantBranding) {
+function setCachedBranding(data: TenantBranding, key?: string) {
   try {
-    const cacheKey = getCacheKey();
+    const cacheKey = key || CACHE_KEY;
     const cached: CachedBranding = { data, timestamp: Date.now() };
     localStorage.setItem(cacheKey, JSON.stringify(cached));
   } catch {
@@ -151,15 +144,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Try to get tenant-specific branding
-      const tenantStr = typeof window !== 'undefined' ? localStorage.getItem('current-tenant') : null;
-      const tenantId = tenantStr ? JSON.parse(tenantStr)?.id : null;
-
-      const url = tenantId
-        ? `/api/admin/branding?tenant_id=${tenantId}`
-        : '/api/admin/branding';
-
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetch('/api/admin/branding', { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
@@ -169,7 +154,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch {
-      // Use defaults on error -- already set
+      // Use defaults on error — already set
     } finally {
       setLoading(false);
     }
@@ -178,15 +163,44 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const refreshBranding = useCallback(async () => {
     setLoading(true);
     try {
-      const cacheKey = getCacheKey();
-      localStorage.removeItem(cacheKey);
+      localStorage.removeItem(CACHE_KEY);
     } catch {
       // ignore
     }
     await fetchBranding(true);
   }, [fetchBranding]);
 
+  // Load branding for a specific tenant from localStorage cache
+  const loadTenantBranding = useCallback((tenantId: string) => {
+    const cached = getCachedBranding(`branding-${tenantId}`);
+    if (cached) {
+      const merged = { ...DEFAULT_BRANDING, ...cached };
+      setBranding(merged);
+      setCachedBranding(merged); // Also set as main cache
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
+    // On mount, check if there's a current tenant stored and try to load its branding
+    try {
+      const tenantStr = localStorage.getItem('current-tenant');
+      if (tenantStr) {
+        const tenant = JSON.parse(tenantStr);
+        if (tenant?.id) {
+          const cached = getCachedBranding(`branding-${tenant.id}`);
+          if (cached) {
+            const merged = { ...DEFAULT_BRANDING, ...cached };
+            setBranding(merged);
+            setCachedBranding(merged);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
     fetchBranding();
   }, [fetchBranding]);
 
@@ -198,7 +212,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   }, [branding.company_name, branding.tagline, loading]);
 
   return (
-    <BrandingContext.Provider value={{ branding, loading, refreshBranding }}>
+    <BrandingContext.Provider value={{ branding, loading, refreshBranding, loadTenantBranding }}>
       {children}
     </BrandingContext.Provider>
   );

@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { Suspense, useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Building2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useBranding } from '@/lib/branding-context';
 
 const schema = z.object({
   email: z.string().email(),
@@ -19,15 +18,87 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+interface TenantInfo {
+  id: string;
+  company_code: string;
+  name: string;
+}
+
+interface TenantBrandingData {
+  company_name?: string;
+  company_short_name?: string;
+  tagline?: string;
+  logo_url?: string | null;
+  primary_color?: string;
+  login_bg_gradient_from?: string;
+  login_bg_gradient_to?: string;
+  login_welcome_text?: string;
+  login_subtitle?: string | null;
+  show_demo_accounts?: boolean;
+}
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tenant, setTenant] = useState<TenantInfo | null>(null);
+  const [tenantBranding, setTenantBranding] = useState<TenantBrandingData | null>(null);
   const router = useRouter();
-  const { branding } = useBranding();
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const searchParams = useSearchParams();
+  const companyCode = searchParams.get('company');
+
+  const { register, handleSubmit } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
+
+  // Load tenant info and branding from localStorage
+  useEffect(() => {
+    if (!companyCode) return;
+
+    try {
+      const storedTenant = localStorage.getItem('current-tenant');
+      if (storedTenant) {
+        const parsed = JSON.parse(storedTenant);
+        if (parsed?.company_code === companyCode) {
+          setTenant(parsed);
+          // Load branding
+          const storedBranding = localStorage.getItem(`branding-${parsed.id}`);
+          if (storedBranding) {
+            const brandingData = JSON.parse(storedBranding);
+            setTenantBranding(brandingData.data || brandingData);
+          }
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [companyCode]);
+
+  // Derived display values
+  const displayName = useMemo(() => {
+    if (tenantBranding?.company_name) return tenantBranding.company_name;
+    if (tenant?.name) return tenant.name;
+    return 'Operations Platform';
+  }, [tenantBranding, tenant]);
+
+  const displayTagline = useMemo(() => {
+    if (tenantBranding?.tagline) return tenantBranding.tagline;
+    return 'Management System';
+  }, [tenantBranding]);
+
+  const showDemoAccounts = tenantBranding?.show_demo_accounts !== false;
 
   const onSubmit = async (data: FormData) => {
     console.log('Starting login process...');
@@ -57,7 +128,6 @@ export default function LoginPage() {
       }
 
       console.log('Login successful!');
-      console.log('User:', result.user);
 
       // Set the session in the client
       if (result.session) {
@@ -68,50 +138,38 @@ export default function LoginPage() {
       }
 
       // Store user data in localStorage for dashboard access
-      localStorage.setItem('supabase-user', JSON.stringify({
+      const userData: Record<string, unknown> = {
         id: result.user.id,
         name: result.user.full_name,
         email: result.user.email,
         role: result.user.role,
-        tenant_id: result.user.tenant_id,
-      }));
-      console.log('User stored in localStorage');
+      };
 
-      // Store tenant info separately for branding
-      if (result.tenant) {
-        localStorage.setItem('current-tenant', JSON.stringify(result.tenant));
+      // Attach tenant info if available
+      if (tenant?.id) {
+        userData.tenant_id = tenant.id;
       }
 
+      localStorage.setItem('supabase-user', JSON.stringify(userData));
+
       // Redirect based on user role
-      if (['admin', 'super_admin', 'salesman', 'operations_manager'].includes(result.user.role)) {
-        console.log(`${result.user.role} user, redirecting to admin dashboard...`);
+      if (result.user.role === 'admin') {
         router.push('/dashboard/admin');
       } else if (result.user.role === 'operator' || result.user.role === 'apprentice') {
-        console.log('Operator/Apprentice user, redirecting to operator dashboard...');
         router.push('/dashboard');
       } else {
         setError('Invalid user role');
         setLoading(false);
       }
-      // Keep loading state true during navigation - it will unmount anyway
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Unexpected login error:', err);
-      if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
-        setError('Cannot connect to server. Please check your connection or try again.');
-      } else {
-        setError('An unexpected error occurred');
-      }
+      setError('An unexpected error occurred');
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center relative overflow-hidden"
-      style={{
-        background: `linear-gradient(to bottom right, ${branding.login_bg_gradient_from || '#0f172a'}, ${branding.login_bg_gradient_to || '#1e1b4b'})`,
-      }}
-    >
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
@@ -131,8 +189,8 @@ export default function LoginPage() {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
           >
-            {branding.logo_url ? (
-              <img src={branding.logo_url} alt={branding.company_name} className="h-12 w-auto object-contain" />
+            {tenantBranding?.logo_url ? (
+              <img src={tenantBranding.logo_url} alt={displayName} className="h-12 w-auto" />
             ) : (
               <Logo />
             )}
@@ -143,9 +201,9 @@ export default function LoginPage() {
             transition={{ delay: 0.3 }}
             className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-red-700 bg-clip-text text-transparent mt-6 mb-2 tracking-tight"
           >
-            {branding.login_welcome_text || 'Welcome Back'}
+            {displayName}
           </motion.h1>
-          <p className="text-gray-600 text-sm font-medium">{branding.tagline || 'Concrete Cutting Management System'}</p>
+          <p className="text-gray-600 text-sm font-medium">{displayTagline}</p>
         </div>
 
         {/* Login Form */}
@@ -222,10 +280,7 @@ export default function LoginPage() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.7 }}
             type="submit"
-            className="w-full py-4 rounded-xl text-white font-bold shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500/30 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            style={{
-              background: `linear-gradient(to right, ${branding.primary_color || '#2563eb'}, ${branding.secondary_color || '#dc2626'})`,
-            }}
+            className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white font-bold shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500/30 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             disabled={loading}
           >
             {loading ? (
@@ -243,16 +298,27 @@ export default function LoginPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
-            className="text-center"
+            className="text-center space-y-2"
           >
-            <Link href="/request-access" className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors">
+            <Link href="/request-access" className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors block">
               Need access? Request Login
             </Link>
+            {companyCode ? (
+              <Link href="/company" className="text-gray-500 hover:text-gray-700 text-xs font-medium transition-colors flex items-center justify-center gap-1">
+                <Building2 size={12} />
+                Not your company? Switch
+              </Link>
+            ) : (
+              <Link href="/company" className="text-gray-500 hover:text-gray-700 text-xs font-medium transition-colors flex items-center justify-center gap-1">
+                <Building2 size={12} />
+                Enter company code
+              </Link>
+            )}
           </motion.div>
         </form>
 
-        {/* Demo Credentials - Modern Cards (conditionally shown) */}
-        {branding.show_demo_accounts && (
+        {/* Demo Credentials - Modern Cards */}
+        {showDemoAccounts && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -270,18 +336,6 @@ export default function LoginPage() {
               <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
                 <div><span className="text-blue-700 font-bold">Email:</span> demo@pontifex.com</div>
                 <div><span className="text-blue-700 font-bold">Password:</span> Demo1234!</div>
-              </div>
-            </div>
-
-            {/* Team Member Account */}
-            <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 hover:border-green-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <h4 className="text-green-800 font-bold text-xs tracking-wider">TEAM MEMBER DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-green-700 font-bold">Email:</span> team@pontifex.com</div>
-                <div><span className="text-green-700 font-bold">Password:</span> Team1234!</div>
               </div>
             </div>
 

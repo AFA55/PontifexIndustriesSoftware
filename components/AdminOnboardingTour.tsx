@@ -16,7 +16,7 @@ interface OnboardingStep {
 const ADMIN_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: 'Welcome to Pontifex Industries',
+    title: 'Welcome to Your Operations Hub',
     description: 'Your complete operations management platform for concrete cutting and coring services.',
     icon: (
       <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
