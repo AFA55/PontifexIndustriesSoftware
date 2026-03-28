@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 import crypto from 'crypto';
 
 export async function GET(
@@ -17,6 +18,20 @@ export async function GET(
     const { id } = await params;
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+
+    // Tenant filtering
+    const tenantId = await getTenantId(auth.userId);
+
+    // Verify job belongs to tenant
+    let jobCheck = supabaseAdmin
+      .from('job_orders')
+      .select('id')
+      .eq('id', id);
+    if (tenantId) jobCheck = jobCheck.eq('tenant_id', tenantId);
+    const { data: jobExists } = await jobCheck.single();
+    if (!jobExists) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
 
     // Get all signature requests for this job
     const { data, error } = await supabaseAdmin
@@ -46,6 +61,9 @@ export async function POST(
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
+    // Tenant filtering
+    const postTenantId = await getTenantId(auth.userId);
+
     const body = await request.json();
     const { contact_name, contact_phone, contact_email, request_type, form_template_id } = body;
 
@@ -53,12 +71,13 @@ export async function POST(
       return NextResponse.json({ error: 'Valid request_type is required (utility_waiver, completion, custom)' }, { status: 400 });
     }
 
-    // Verify job exists
-    const { data: job, error: jobError } = await supabaseAdmin
+    // Verify job exists (with tenant filter)
+    let postJobQuery = supabaseAdmin
       .from('job_orders')
       .select('id, job_number, customer_name')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (postTenantId) postJobQuery = postJobQuery.eq('tenant_id', postTenantId);
+    const { data: job, error: jobError } = await postJobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job order not found' }, { status: 404 });

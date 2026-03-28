@@ -13,11 +13,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
     const body = await request.json();
     const {
       job_order_id,
@@ -34,13 +36,14 @@ export async function POST(request: NextRequest) {
     // ── SHOP TICKET ──
     if (is_shop_ticket) {
       // Check for existing shop ticket today
-      const { data: existingShop } = await supabaseAdmin
+      let shopQuery = supabaseAdmin
         .from('helper_work_logs')
         .select('id, started_at')
         .eq('helper_id', auth.userId)
         .eq('log_date', today)
-        .eq('is_shop_ticket', true)
-        .maybeSingle();
+        .eq('is_shop_ticket', true);
+      if (tenantId) shopQuery = shopQuery.eq('tenant_id', tenantId);
+      const { data: existingShop } = await shopQuery.maybeSingle();
 
       if (existingShop) {
         // Update existing shop ticket
@@ -77,6 +80,7 @@ export async function POST(request: NextRequest) {
           is_shop_ticket: true,
           work_description: work_description || '',
           started_at: start_now ? now : null,
+          ...(tenantId ? { tenant_id: tenantId } : {}),
         };
 
         const { data: newShop, error: insertError } = await supabaseAdmin
@@ -107,11 +111,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify user is a helper/apprentice on this job
-    const { data: job } = await supabaseAdmin
+    let verifyJobQuery = supabaseAdmin
       .from('job_orders')
       .select('helper_assigned_to, assigned_to')
-      .eq('id', job_order_id)
-      .single();
+      .eq('id', job_order_id);
+    if (tenantId) verifyJobQuery = verifyJobQuery.eq('tenant_id', tenantId);
+    const { data: job } = await verifyJobQuery.single();
 
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
@@ -122,13 +127,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for existing log
-    const { data: existing } = await supabaseAdmin
+    let existingQuery = supabaseAdmin
       .from('helper_work_logs')
       .select('id, started_at, completed_at')
       .eq('job_order_id', job_order_id)
       .eq('helper_id', auth.userId)
-      .eq('log_date', today)
-      .maybeSingle();
+      .eq('log_date', today);
+    if (tenantId) existingQuery = existingQuery.eq('tenant_id', tenantId);
+    const { data: existing } = await existingQuery.maybeSingle();
 
     if (existing) {
       const updateData: Record<string, unknown> = {};
@@ -170,6 +176,7 @@ export async function POST(request: NextRequest) {
         work_description: work_description || '',
         is_shop_ticket: false,
         started_at: start_now ? now : null,
+        ...(tenantId ? { tenant_id: tenantId } : {}),
       };
 
       if (complete) {
@@ -239,6 +246,7 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
 
     const { searchParams } = new URL(request.url);
     const jobOrderId = searchParams.get('job_order_id');
@@ -247,12 +255,14 @@ export async function GET(request: NextRequest) {
 
     // Fetch all logs for today (for time summary)
     if (allToday) {
-      const { data: logs, error } = await supabaseAdmin
+      let allQuery = supabaseAdmin
         .from('helper_work_logs')
         .select('*')
         .eq('helper_id', auth.userId)
         .eq('log_date', logDate)
         .order('started_at', { ascending: true });
+      if (tenantId) allQuery = allQuery.eq('tenant_id', tenantId);
+      const { data: logs, error } = await allQuery;
 
       if (error) {
         console.error('Error fetching helper work logs:', error);
@@ -271,13 +281,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'job_order_id or all_today=true is required' }, { status: 400 });
     }
 
-    const { data: log, error } = await supabaseAdmin
+    let logQuery = supabaseAdmin
       .from('helper_work_logs')
       .select('*')
       .eq('job_order_id', jobOrderId)
       .eq('helper_id', auth.userId)
-      .eq('log_date', logDate)
-      .maybeSingle();
+      .eq('log_date', logDate);
+    if (tenantId) logQuery = logQuery.eq('tenant_id', tenantId);
+    const { data: log, error } = await logQuery.maybeSingle();
 
     if (error) {
       console.error('Error fetching helper work log:', error);
