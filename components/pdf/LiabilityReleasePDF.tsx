@@ -135,9 +135,9 @@ export const LiabilityReleasePDF: React.FC<LiabilityReleasePDFProps> = ({
   signedAt,
   branding,
 }) => {
-  const companyName = branding?.company_name || 'Pontifex Industries';
+  const companyName = branding?.company_name || 'Patriot Concrete Cutting';
   const supportPhone = branding?.support_phone || '(833) 695-4288';
-  const supportEmail = branding?.support_email || 'support@pontifexindustries.com';
+  const supportEmail = branding?.support_email || 'support@patriotconcretecutting.com';
   const formattedDate = new Date(signedAt).toLocaleString('en-US', {
     year: 'numeric',
     month: 'long',

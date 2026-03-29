@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     // Try to send notification email via Resend
     const resendKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL || `${process.env.COMPANY_NAME || 'Your Company'} <noreply@resend.dev>`;
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@admin.patriotconcretecutting.com>';
 
     if (resendKey) {
       try {
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
           },
           body: JSON.stringify({
             from: fromEmail,
-            to: [process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@yourcompany.com'],
+            to: ['patriotconcretecutting@gmail.com'],
             subject: `New Demo Request: ${safeName} - ${safeCompany}`,
             html: `
               <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
                   <tr><td style="padding: 8px 0; color: #666;">Company Size</td><td style="padding: 8px 0;">${safeCompanySize}</td></tr>
                 </table>
                 ${safeMessage ? `<div style="margin-top: 16px; padding: 16px; background: #f3f4f6; border-radius: 8px;"><strong>Message:</strong><br/>${safeMessage}</div>` : ''}
-                <p style="color: #999; font-size: 12px; margin-top: 24px;">Sent from the platform landing page</p>
+                <p style="color: #999; font-size: 12px; margin-top: 24px;">Sent from the Patriot Concrete Cutting landing page</p>
               </div>
             `,
           }),

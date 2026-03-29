@@ -6,20 +6,36 @@
 import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { LiabilityReleasePDF } from '@/components/pdf/LiabilityReleasePDF';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
+const getResend = () => new Resend(process.env.RESEND_API_KEY || '');
 
 export async function POST(request: NextRequest) {
   try {
     console.log('[LIABILITY PDF] Starting PDF generation...');
 
-    // SECURITY: Require authenticated user
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    // Get user from Supabase session
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();
@@ -53,7 +69,7 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('email, full_name')
-      .eq('id', auth.userId)
+      .eq('id', user.id)
       .single();
 
     const isDemoOperator = profile?.email === 'demo@pontifex.com' ||
@@ -135,11 +151,11 @@ export async function POST(request: NextRequest) {
     console.log('[LIABILITY PDF] Sending email to:', customerEmail);
 
     try {
-      const emailCompanyName = (pdfBranding.company_name as string) || 'Pontifex Industries';
+      const emailCompanyName = (pdfBranding.company_name as string) || 'Patriot Concrete Cutting';
       const emailPhone = (pdfBranding.support_phone as string) || '(833) 695-4288';
-      const emailSupportAddr = (pdfBranding.support_email as string) || 'support@pontifexindustries.com';
-      const emailResult = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || `${emailCompanyName} <noreply@resend.dev>`,
+      const emailSupportAddr = (pdfBranding.support_email as string) || 'support@patriotconcretecutting.com';
+      const emailResult = await getResend().emails.send({
+        from: `${emailCompanyName} <noreply@patriotconcretecutting.com>`,
         to: customerEmail,
         subject: `Liability Release - Job #${jobNumber || jobId}`,
         html: `

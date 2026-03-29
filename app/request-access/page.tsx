@@ -18,7 +18,9 @@ export default function RequestAccessPage() {
     confirmPassword: '',
     birthMonth: '',
     birthDay: '',
-    birthYear: ''
+    birthYear: '',
+    acceptedPrivacy: false,
+    acceptedTerms: false,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,6 +37,13 @@ export default function RequestAccessPage() {
 
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
+    // Validate privacy and terms acceptance
+    if (!formData.acceptedPrivacy || !formData.acceptedTerms) {
+      setError('You must accept the Privacy Policy and Terms of Service');
       setLoading(false);
       return;
     }
@@ -129,7 +138,7 @@ export default function RequestAccessPage() {
             <span className="text-4xl">📝</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Request Access</h1>
-          <p className="text-gray-600">Submit your information to request access to the platform</p>
+          <p className="text-gray-600">Submit your information to request access to Patriot Concrete Cutting platform</p>
         </div>
 
         {/* Error Message */}
@@ -282,10 +291,38 @@ export default function RequestAccessPage() {
             <p className="text-xs text-gray-500 mt-1">You must be at least 18 years old</p>
           </div>
 
+          {/* Legal Agreements */}
+          <div className="space-y-3 bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.acceptedPrivacy}
+                onChange={(e) => setFormData({ ...formData, acceptedPrivacy: e.target.checked })}
+                className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">
+                I have read and agree to the{' '}
+                <a href="/privacy" target="_blank" className="text-blue-600 underline hover:text-blue-800">Privacy Policy</a>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.acceptedTerms}
+                onChange={(e) => setFormData({ ...formData, acceptedTerms: e.target.checked })}
+                className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">
+                I have read and agree to the{' '}
+                <a href="/terms" target="_blank" className="text-blue-600 underline hover:text-blue-800">Terms of Service</a>
+              </span>
+            </label>
+          </div>
+
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !formData.acceptedPrivacy || !formData.acceptedTerms}
             className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (

@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,9 +7,10 @@ import { getCurrentUser, logout, type User } from '@/lib/auth';
 import {
   ArrowLeft, Clock, Calendar, CheckCircle, AlertTriangle,
   ChevronLeft, ChevronRight, Moon, Factory, Briefcase, TrendingUp,
-  MapPin, Smartphone, Wifi
+  LogOut, Loader2, FileText
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import NfcClockInButton from '@/components/NfcClockInButton';
 
 interface TimecardEntry {
   id: string;
@@ -24,10 +23,6 @@ interface TimecardEntry {
   is_night_shift: boolean;
   hour_type: string;
   notes: string | null;
-  job_order_id: string | null;
-  job_number: string | null;
-  job_customer_name: string | null;
-  clock_in_method: string | null;
 }
 
 interface WeekData {
@@ -63,6 +58,12 @@ export default function TimecardPage() {
   const [timecards, setTimecards] = useState<TimecardEntry[]>([]);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const [weekData, setWeekData] = useState<WeekData | null>(null);
+  const [activeTimecard, setActiveTimecard] = useState<any>(null);
+  const [clockLoading, setClockLoading] = useState(true);
+  const [clockingAction, setClockingAction] = useState(false);
+  const [clockMethod, setClockMethod] = useState<'nfc' | 'gps' | 'remote'>('nfc');
+  const [nfcScanning, setNfcScanning] = useState(false);
+  const [liveHours, setLiveHours] = useState('0.0');
   const router = useRouter();
   const isRedirecting = useRef(false);
 
@@ -71,7 +72,7 @@ export default function TimecardPage() {
     isRedirecting.current = true;
     console.warn('Session expired, redirecting to login...');
     localStorage.removeItem('supabase-user');
-    localStorage.removeItem('pontifex-user');
+    localStorage.removeItem('patriot-user');
     window.location.href = '/login';
   }, []);
 
@@ -85,6 +86,143 @@ export default function TimecardPage() {
     }
     setUser(currentUser);
   }, [router]);
+
+  // Fetch active timecard on mount
+  const fetchActiveTimecard = useCallback(async () => {
+    if (isRedirecting.current) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/timecard/current', {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setActiveTimecard(json.data || null);
+      }
+    } catch (err) {
+      console.error('Error fetching active timecard:', err);
+    }
+    setClockLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (user) fetchActiveTimecard();
+  }, [user, fetchActiveTimecard]);
+
+  // Live hours counter (updates every 30 seconds when clocked in)
+  useEffect(() => {
+    if (!activeTimecard?.clockInTime) return;
+    const update = () => {
+      const start = new Date(activeTimecard.clockInTime).getTime();
+      const hrs = ((Date.now() - start) / 3600000).toFixed(1);
+      setLiveHours(hrs);
+    };
+    update();
+    const interval = setInterval(update, 30000);
+    return () => clearInterval(interval);
+  }, [activeTimecard]);
+
+  const handleClockIn = useCallback(async (nfcTagUid?: string) => {
+    setClockingAction(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Get GPS position
+      let latitude: number | undefined, longitude: number | undefined, accuracy: number | undefined;
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+        });
+        latitude = pos.coords.latitude;
+        longitude = pos.coords.longitude;
+        accuracy = pos.coords.accuracy;
+      } catch { /* GPS optional for NFC */ }
+
+      const body: Record<string, unknown> = {
+        clock_in_method: nfcTagUid ? 'nfc' : clockMethod,
+        latitude, longitude, accuracy,
+      };
+      if (nfcTagUid) {
+        body.nfc_tag_uid = nfcTagUid;
+      }
+
+      const res = await fetch('/api/timecard/clock-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        await fetchActiveTimecard();
+        // fetchTimecards will be called via the user effect when weekData updates
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Clock-in failed');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Clock-in failed');
+    }
+    setClockingAction(false);
+    setNfcScanning(false);
+  }, [clockMethod, fetchActiveTimecard]);
+
+  const handleClockOut = useCallback(async () => {
+    setClockingAction(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      let latitude: number | undefined, longitude: number | undefined, accuracy: number | undefined;
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+        });
+        latitude = pos.coords.latitude;
+        longitude = pos.coords.longitude;
+        accuracy = pos.coords.accuracy;
+      } catch { /* GPS optional */ }
+
+      const res = await fetch('/api/timecard/clock-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ latitude, longitude, accuracy }),
+      });
+
+      if (res.ok) {
+        setActiveTimecard(null);
+        // Refresh weekly data
+        fetchTimecards();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Clock-out failed');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Clock-out failed');
+    }
+    setClockingAction(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleNfcScan = useCallback(async (tagUid: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const verifyRes = await fetch('/api/timecard/verify-nfc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ tag_uid: tagUid }),
+    });
+
+    if (verifyRes.ok) {
+      await handleClockIn(tagUid);
+    } else {
+      const err = await verifyRes.json();
+      alert(err.error || 'NFC tag not recognized');
+      setNfcScanning(false);
+    }
+  }, [handleClockIn]);
 
   const fetchTimecards = useCallback(async () => {
     if (isRedirecting.current) return;
@@ -216,7 +354,7 @@ export default function TimecardPage() {
     <div className="min-h-screen bg-[#f8fafc]">
       {/* ── Header ─────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
-        <div className="max-w-[1024px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-[1024px] mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/dashboard"
@@ -246,19 +384,94 @@ export default function TimecardPage() {
         </div>
       </header>
 
-      <div className="max-w-[1024px] mx-auto px-4 sm:px-6 py-6 pb-28 sm:pb-6">
+      <div className="max-w-[1024px] mx-auto px-6 py-6">
+        {/* ── Clock-In/Out Section ─────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-6">
+          {clockLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            </div>
+          ) : activeTimecard ? (
+            /* CLOCKED IN STATE */
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-sm font-semibold">Clocked In</span>
+                <span className="text-xs text-emerald-600">
+                  since {new Date(activeTimecard.clockInTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-4xl font-bold text-gray-900">{liveHours}</p>
+                <p className="text-sm text-gray-500">hours today</p>
+              </div>
+
+              <button
+                onClick={handleClockOut}
+                disabled={clockingAction}
+                className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {clockingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />}
+                Clock Out
+              </button>
+            </div>
+          ) : (
+            /* NOT CLOCKED IN STATE */
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-full">
+                <div className="w-2 h-2 rounded-full bg-gray-400" />
+                <span className="text-sm font-semibold">Not Clocked In</span>
+              </div>
+
+              {/* Method selector */}
+              <div className="flex justify-center gap-2">
+                {(['nfc', 'gps', 'remote'] as const).map(method => (
+                  <button key={method} onClick={() => setClockMethod(method)}
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                      clockMethod === method ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}>
+                    {method === 'nfc' ? 'NFC Badge' : method === 'gps' ? 'GPS' : 'Remote'}
+                  </button>
+                ))}
+              </div>
+
+              {clockMethod === 'nfc' && !nfcScanning ? (
+                <button onClick={() => setNfcScanning(true)} disabled={clockingAction}
+                  className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
+                  Scan NFC to Clock In
+                </button>
+              ) : clockMethod === 'nfc' && nfcScanning ? (
+                <NfcClockInButton
+                  scanning={nfcScanning}
+                  onScanResult={handleNfcScan}
+                  onError={(err) => { alert(err); setNfcScanning(false); }}
+                  onStartScan={() => setNfcScanning(true)}
+                  onStopScan={() => setNfcScanning(false)}
+                />
+              ) : (
+                <button onClick={() => handleClockIn()} disabled={clockingAction}
+                  className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
+                  {clockingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : <Clock className="w-5 h-5" />}
+                  Clock In ({clockMethod === 'gps' ? 'GPS' : 'Remote'})
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* ── Week Navigation ───────────────────────────── */}
-        <div className="mb-5 flex items-center justify-between gap-2">
+        <div className="mb-5 flex items-center justify-between">
           <button
             onClick={() => setCurrentWeekOffset(currentWeekOffset - 1)}
-            className="flex items-center gap-1.5 px-4 py-3 sm:px-3.5 sm:py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-lg transition-all text-sm font-medium border border-slate-200 shadow-sm hover:shadow min-h-[44px]"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-lg transition-all text-sm font-medium border border-slate-200 shadow-sm hover:shadow"
           >
             <ChevronLeft size={16} />
             <span className="hidden sm:inline">Prev</span>
           </button>
 
-          <div className="text-center flex-1">
-            <p className="text-sm sm:text-base font-bold text-slate-900">{formatWeekRange()}</p>
+          <div className="text-center">
+            <p className="text-base font-bold text-slate-900">{formatWeekRange()}</p>
             <p className="text-xs text-slate-400 mt-0.5">
               {isCurrentWeek() ? 'Current Week' : `${Math.abs(currentWeekOffset)} ${Math.abs(currentWeekOffset) === 1 ? 'week' : 'weeks'} ago`}
             </p>
@@ -267,7 +480,7 @@ export default function TimecardPage() {
           <button
             onClick={() => setCurrentWeekOffset(currentWeekOffset + 1)}
             disabled={isCurrentWeek()}
-            className={`flex items-center gap-1.5 px-4 py-3 sm:px-3.5 sm:py-2 rounded-lg transition-all text-sm font-medium border shadow-sm min-h-[44px] ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all text-sm font-medium border shadow-sm ${
               isCurrentWeek()
                 ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
                 : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:shadow'
@@ -278,10 +491,24 @@ export default function TimecardPage() {
           </button>
         </div>
 
+        {/* ── Download PDF ──────────────────────────────── */}
+        <div className="mb-5 flex justify-end">
+          <button
+            onClick={() => {
+              const mondayStr = monday.toISOString().split('T')[0];
+              window.open(`/api/timecard/pdf?weekStart=${mondayStr}`, '_blank');
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-blue-700 rounded-lg transition-all text-sm font-medium border border-blue-200 shadow-sm hover:shadow"
+          >
+            <FileText size={16} />
+            Download My Timecard
+          </button>
+        </div>
+
         {/* ── Stats Row ─────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
+        <div className="grid grid-cols-3 gap-4 mb-5">
           {/* Total Hours - hero card */}
-          <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
+          <div className="col-span-3 sm:col-span-1 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={15} className="text-blue-200" />
@@ -336,7 +563,7 @@ export default function TimecardPage() {
         </div>
 
         {/* ── Category Breakdown ─────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-5">
+        <div className="grid grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
           {[
             { label: 'Regular', value: (weekData?.regularHours || 0).toFixed(1), icon: <CheckCircle size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
             { label: 'Weekly OT', value: (weekData?.weeklyOvertimeHours || 0).toFixed(1), icon: <TrendingUp size={14} />, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
@@ -400,16 +627,15 @@ export default function TimecardPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[480px]">
+              <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-100">
-                    <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                    <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">In</th>
-                    <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Out</th>
-                    <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hrs</th>
-                    <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Category</th>
-                    <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">Project</th>
-                    <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clock In</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clock Out</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hours</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Category</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -423,15 +649,15 @@ export default function TimecardPage() {
                           isMandatoryOT ? 'border-l-[3px] border-l-red-400' : 'border-l-[3px] border-l-transparent'
                         }`}
                       >
-                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
-                          <span className="text-xs sm:text-sm font-medium text-slate-700">{formatDate(entry.date)}</span>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm font-medium text-slate-700">{formatDate(entry.date)}</span>
                         </td>
-                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
-                          <span className="text-xs sm:text-sm font-medium text-slate-700 tabular-nums">{formatTime(entry.clock_in_time)}</span>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm font-medium text-slate-700 tabular-nums">{formatTime(entry.clock_in_time)}</span>
                         </td>
-                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {entry.clock_out_time ? (
-                            <span className="text-xs sm:text-sm font-medium text-slate-700 tabular-nums">{formatTime(entry.clock_out_time)}</span>
+                            <span className="text-sm font-medium text-slate-700 tabular-nums">{formatTime(entry.clock_out_time)}</span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
                               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
@@ -439,16 +665,16 @@ export default function TimecardPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {entry.total_hours !== null ? (
-                            <span className="text-xs sm:text-sm font-bold tabular-nums text-slate-800">
+                            <span className="text-sm font-bold tabular-nums text-slate-800">
                               {entry.total_hours.toFixed(2)}
                             </span>
                           ) : (
                             <span className="text-sm text-slate-300">&mdash;</span>
                           )}
                         </td>
-                        <td className="px-3 sm:px-4 py-3 hidden sm:table-cell">
+                        <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
                             {badges.length > 0 ? badges.map((badge, bidx) => (
                               <span key={bidx} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${badge.color}`}>
@@ -459,38 +685,16 @@ export default function TimecardPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-3 sm:px-4 py-3 hidden md:table-cell">
-                          {entry.job_number ? (
-                            <div className="space-y-0.5">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600">
-                                <MapPin size={9} />
-                                {entry.job_number}
-                              </span>
-                              {entry.job_customer_name && (
-                                <p className="text-[9px] text-slate-400 truncate max-w-[100px]">{entry.job_customer_name}</p>
-                              )}
-                            </div>
-                          ) : entry.is_shop_hours ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600">
-                              <Factory size={9} />
-                              Shop
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-300">--</span>
-                          )}
-                        </td>
-                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {entry.is_approved ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
                               <CheckCircle size={10} />
-                              <span className="hidden sm:inline">Approved</span>
-                              <span className="sm:hidden">✓</span>
+                              Approved
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
                               <Clock size={10} />
-                              <span className="hidden sm:inline">Pending</span>
-                              <span className="sm:hidden">…</span>
+                              Pending
                             </span>
                           )}
                         </td>

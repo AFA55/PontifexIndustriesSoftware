@@ -54,7 +54,9 @@ export async function POST(request: NextRequest) {
         core_quantity,
         linear_feet_cut,
         cut_depth_inches,
-        accessibility_rating,
+        accessibility_rating: typeof accessibility_rating === 'string'
+          ? ({ easy: 1, moderate: 2, medium: 3, difficult: 4, hard: 5 } as Record<string, number>)[accessibility_rating] || null
+          : accessibility_rating ? Number(accessibility_rating) : null,
         accessibility_description,
         quantity,
         notes,
@@ -89,7 +91,9 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin
         .from('job_orders')
         .update({
-          work_area_accessibility_rating: accessibility_rating,
+          work_area_accessibility_rating: typeof accessibility_rating === 'string'
+            ? ({ easy: 1, moderate: 2, medium: 3, difficult: 4, hard: 5 } as Record<string, number>)[accessibility_rating] || null
+            : accessibility_rating ? Number(accessibility_rating) : null,
           work_area_accessibility_notes: accessibility_description,
           work_area_accessibility_submitted_at: new Date().toISOString(),
           work_area_accessibility_submitted_by: user.id

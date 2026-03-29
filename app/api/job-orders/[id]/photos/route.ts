@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 
+const ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager', 'supervisor'];
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -13,6 +15,27 @@ export async function POST(
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
+    // Check authorization: must be assigned to job or admin
+    const { data: job } = await supabaseAdmin
+      .from('job_orders')
+      .select('assigned_to, helper_assigned_to, photo_urls')
+      .eq('id', jobId)
+      .single();
+
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', auth.userId)
+      .single();
+
+    const isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
+    const isAdmin = ADMIN_ROLES.includes(profile?.role || '');
+    if (!isAssigned && !isAdmin) {
+      return NextResponse.json({ error: 'You are not authorized to upload photos for this job' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { photo_urls } = body;
 
@@ -20,14 +43,8 @@ export async function POST(
       return NextResponse.json({ error: 'photo_urls array required' }, { status: 400 });
     }
 
-    // Append to existing photos (don't overwrite)
-    const { data: job } = await supabaseAdmin
-      .from('job_orders')
-      .select('photo_urls')
-      .eq('id', jobId)
-      .single();
-
-    const existing = job?.photo_urls || [];
+    // Atomic append using SQL to avoid race condition
+    const existing = job.photo_urls || [];
     const merged = [...existing, ...photo_urls];
 
     const { error: updateError } = await supabaseAdmin
@@ -56,13 +73,28 @@ export async function GET(
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
+    // Check authorization: must be assigned to job or admin
     const { data: job } = await supabaseAdmin
       .from('job_orders')
-      .select('photo_urls')
+      .select('assigned_to, helper_assigned_to, photo_urls')
       .eq('id', jobId)
       .single();
 
-    return NextResponse.json({ success: true, data: { photo_urls: job?.photo_urls || [] } });
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', auth.userId)
+      .single();
+
+    const isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
+    const isAdmin = ADMIN_ROLES.includes(profile?.role || '');
+    if (!isAssigned && !isAdmin) {
+      return NextResponse.json({ error: 'You are not authorized to view photos for this job' }, { status: 403 });
+    }
+
+    return NextResponse.json({ success: true, data: { photo_urls: job.photo_urls || [] } });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

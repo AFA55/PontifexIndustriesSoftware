@@ -5,14 +5,23 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getTenantId } from '@/lib/get-tenant-id';
 import jsPDF from 'jspdf';
-import { requireAuth } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    if (!auth.authorized) return auth.response;
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       jobId,
@@ -40,8 +49,7 @@ export async function POST(request: NextRequest) {
 
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    const companyName = process.env.COMPANY_NAME || 'Your Company';
-    pdf.text(companyName, pageWidth / 2, yPos, { align: 'center' });
+    pdf.text('Patriot Concrete Cutting (formerly B&D Concrete Cutting)', pageWidth / 2, yPos, { align: 'center' });
     yPos += 15;
 
     // Job Information
@@ -162,7 +170,7 @@ export async function POST(request: NextRequest) {
     yPos += 10;
 
     pdf.setFont('helvetica', 'normal');
-    const ackText = `I acknowledge that ${companyName} has ${signatureData.workSatisfactory ? 'satisfactorily completed' : 'completed'} the contracted services at the above location as described.`;
+    const ackText = `I acknowledge that Patriot Concrete Cutting (formerly B&D Concrete Cutting) has ${signatureData.workSatisfactory ? 'satisfactorily completed' : 'completed'} the contracted services at the above location as described.`;
     const ackLines = pdf.splitTextToSize(ackText, contentWidth);
     pdf.text(ackLines, margin, yPos);
     yPos += (ackLines.length * 7) + 10;
@@ -201,7 +209,7 @@ export async function POST(request: NextRequest) {
     const footerY = pdf.internal.pageSize.getHeight() - 20;
     pdf.setFontSize(8);
     pdf.setTextColor(128, 128, 128);
-    pdf.text('Generated with Operations Platform', pageWidth / 2, footerY, { align: 'center' });
+    pdf.text('Generated with Claude Code - Patriot Platform', pageWidth / 2, footerY, { align: 'center' });
 
     // Convert PDF to buffer
     const pdfBuffer = Buffer.from(pdf.output('arraybuffer'));
@@ -228,16 +236,17 @@ export async function POST(request: NextRequest) {
       .from('JobDocuments')
       .getPublicUrl(filePath);
 
-    // Track in pdf_documents table (with tenant scope)
-    const tenantId = await getTenantId(auth.userId);
-    const pdfDocData: any = {
+    // Track in pdf_documents table
+    const { error: pdfDocError } = await supabaseAdmin
+      .from('pdf_documents')
+      .insert({
         job_id: jobId,
         document_type: 'service_completion_agreement',
         document_name: fileName,
         file_path: filePath,
         file_url: publicUrl,
         file_size_bytes: pdfBuffer.length,
-        generated_by: auth.userId,
+        generated_by: user.id,
         metadata: {
           customer_name: signatureData.customerName,
           customer_title: signatureData.customerTitle,
@@ -248,12 +257,7 @@ export async function POST(request: NextRequest) {
           overall_rating: signatureData.overallRating,
           signed_at: new Date().toISOString()
         }
-    };
-    if (tenantId) pdfDocData.tenant_id = tenantId;
-
-    const { error: pdfDocError } = await supabaseAdmin
-      .from('pdf_documents')
-      .insert(pdfDocData);
+      });
 
     if (pdfDocError) {
       console.error('PDF doc tracking error:', pdfDocError);
@@ -280,14 +284,14 @@ export async function POST(request: NextRequest) {
               html: `
                 <h2>Service Completion Agreement</h2>
                 <p>Dear ${job.customer},</p>
-                <p>Thank you for choosing ${companyName}!</p>
+                <p>Thank you for choosing Patriot Concrete Cutting (formerly B&D Concrete Cutting)!</p>
                 <p>Your signed Service Completion Agreement is attached to this email for your records.</p>
                 <p><strong>Job ID:</strong> ${jobId}</p>
                 <p><strong>Signed by:</strong> ${signatureData.customerName}</p>
                 <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
                 <p>You can also view the document here: <a href="${publicUrl}">View PDF</a></p>
                 <p>If you have any questions, please don't hesitate to contact us.</p>
-                <p>Best regards,<br>${companyName} Team</p>
+                <p>Best regards,<br>Patriot Concrete Cutting Team</p>
               `,
               pdfUrl: publicUrl,
               pdfName: fileName

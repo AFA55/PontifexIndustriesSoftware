@@ -2,10 +2,14 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
+import { BrandingProvider } from '@/lib/branding-context';
+import { NotificationProvider } from '@/contexts/NotificationContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import NetworkMonitor from '@/components/NetworkMonitor';
 
 export const metadata: Metadata = {
-  title: 'Operations Platform - Construction Management Software',
-  description: 'Complete job workflow, real-time profitability tracking, and OSHA compliance for concrete cutting contractors. GPS time tracking, digital signatures, and automated documentation.',
+  title: 'Patriot Concrete Cutting - Concrete Cutting Management Software',
+  description: 'Complete job workflow, real-time profitability tracking, and OSHA compliance for concrete cutting contractors. GPS time tracking, digital signatures, and automated documentation. Setup in 5 minutes.',
   keywords: [
     'concrete cutting software',
     'construction management software',
@@ -18,29 +22,29 @@ export const metadata: Metadata = {
     'silica exposure tracking',
     'job management system',
   ],
-  authors: [{ name: 'Operations Platform' }],
-  creator: 'Operations Platform',
-  publisher: 'Operations Platform',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  authors: [{ name: 'Patriot Concrete Cutting' }],
+  creator: 'Patriot Concrete Cutting',
+  publisher: 'Patriot Concrete Cutting',
+  metadataBase: new URL('https://patriotconcretecutting.com'), // Update with your actual domain
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-    title: 'Operations Platform - Construction Management Software',
+    url: 'https://patriotconcretecutting.com', // Update with your actual domain
+    title: 'Patriot Concrete Cutting - Concrete Cutting Management Software',
     description: 'Run your concrete cutting business like a Fortune 500 company. Track jobs, profitability, and OSHA compliance in real-time.',
-    siteName: 'Operations Platform',
+    siteName: 'Patriot Concrete Cutting',
     images: [
       {
-        url: '/og-image.jpg',
+        url: '/og-image.jpg', // You'll need to create this
         width: 1200,
         height: 630,
-        alt: 'Operations Platform - Construction Management',
+        alt: 'Patriot Concrete Cutting - Concrete Management Platform',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Operations Platform - Construction Management Software',
+    title: 'Patriot Concrete Cutting - Concrete Cutting Management Software',
     description: 'Complete job workflow, real-time profitability, and OSHA compliance for concrete contractors.',
     images: ['/og-image.jpg'], // You'll need to create this
   },
@@ -69,7 +73,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head />
       <body className="transition-colors duration-200">
         <ThemeProvider>
-          <GoogleMapsProvider>{children}</GoogleMapsProvider>
+          <BrandingProvider>
+            <NotificationProvider>
+              <ErrorBoundary>
+                <NetworkMonitor />
+                <GoogleMapsProvider>{children}</GoogleMapsProvider>
+              </ErrorBoundary>
+            </NotificationProvider>
+          </BrandingProvider>
         </ThemeProvider>
       </body>
     </html>

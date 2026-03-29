@@ -90,6 +90,7 @@ export default function PermissionEditorModal({
 
   // Count permission summary
   const fullCount = Object.values(permissions).filter(v => v === 'full').length;
+  const submitCount = Object.values(permissions).filter(v => v === 'submit').length;
   const viewCount = Object.values(permissions).filter(v => v === 'view').length;
   const noneCount = Object.values(permissions).filter(v => v === 'none').length;
 
@@ -204,9 +205,12 @@ export default function PermissionEditorModal({
                 <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">
                   Card Permissions
                 </label>
-                <div className="flex gap-3 text-xs">
+                <div className="flex gap-2 text-xs">
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full font-semibold">
                     {fullCount} Full
+                  </span>
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold">
+                    {submitCount} Submit
                   </span>
                   <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-semibold">
                     {viewCount} View
@@ -220,10 +224,11 @@ export default function PermissionEditorModal({
               {/* Column headers */}
               <div className="grid grid-cols-[1fr,auto] gap-2 mb-2 px-3">
                 <div></div>
-                <div className="grid grid-cols-3 gap-1 text-center">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase w-16">None</span>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase w-16">View</span>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase w-16">Full</span>
+                <div className="grid grid-cols-4 gap-1 text-center">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase w-14">None</span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase w-14">View</span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase w-14">Submit</span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase w-14">Full</span>
                 </div>
               </div>
 
@@ -237,6 +242,8 @@ export default function PermissionEditorModal({
                       className={`grid grid-cols-[1fr,auto] gap-2 items-center p-3 rounded-xl border transition-all ${
                         level === 'full'
                           ? 'border-green-200 bg-green-50/50'
+                          : level === 'submit'
+                          ? 'border-blue-200 bg-blue-50/30'
                           : level === 'view'
                           ? 'border-yellow-200 bg-yellow-50/30'
                           : 'border-gray-100 bg-gray-50/30'
@@ -251,22 +258,24 @@ export default function PermissionEditorModal({
                       </div>
 
                       {/* Radio buttons */}
-                      <div className="grid grid-cols-3 gap-1">
-                        {(['none', 'view', 'full'] as PermissionLevel[]).map(opt => (
+                      <div className="grid grid-cols-4 gap-1">
+                        {(['none', 'view', 'submit', 'full'] as PermissionLevel[]).map(opt => (
                           <button
                             key={opt}
                             onClick={() => handlePermissionChange(card.key, opt)}
-                            className={`w-16 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            className={`w-14 py-1.5 rounded-lg text-xs font-bold transition-all ${
                               level === opt
                                 ? opt === 'full'
                                   ? 'bg-green-500 text-white shadow-sm'
+                                  : opt === 'submit'
+                                  ? 'bg-blue-500 text-white shadow-sm'
                                   : opt === 'view'
                                   ? 'bg-yellow-500 text-white shadow-sm'
                                   : 'bg-gray-400 text-white shadow-sm'
                                 : 'bg-white border border-gray-200 text-gray-400 hover:border-gray-300'
                             }`}
                           >
-                            {opt === 'none' ? 'None' : opt === 'view' ? 'View' : 'Full'}
+                            {opt === 'none' ? 'None' : opt === 'view' ? 'View' : opt === 'submit' ? 'Submit' : 'Full'}
                           </button>
                         ))}
                       </div>

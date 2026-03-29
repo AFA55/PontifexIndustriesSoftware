@@ -110,7 +110,7 @@ export default function SystemHealthPage() {
     // Auth guard
     const u = getCurrentUser();
     if (!u || u.role !== 'super_admin') {
-      router.push('/dashboard');
+      router.push('/dashboard/admin');
       return;
     }
     fetchHealth();
@@ -175,7 +175,7 @@ export default function SystemHealthPage() {
           <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-gray-900 mb-2">Access Denied</h2>
           <p className="text-sm text-gray-500 mb-4">{error}</p>
-          <button onClick={() => router.push('/dashboard')} className="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700">
+          <button onClick={() => router.push('/dashboard/admin')} className="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700">
             Back to Dashboard
           </button>
         </div>
@@ -192,7 +192,7 @@ export default function SystemHealthPage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={() => router.push('/dashboard')} className="p-2 hover:bg-gray-100 rounded-xl">
+              <button onClick={() => router.push('/dashboard/admin')} className="p-2 hover:bg-gray-100 rounded-xl">
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
               </button>
               <div className="flex items-center gap-3">

@@ -55,8 +55,9 @@ export interface PendingJob {
   scope_details: Record<string, Record<string, string>> | null;
   additional_info: string | null;
   special_equipment: string[] | null;
-  last_submitted_at?: string | null;
-  rejection_reason?: string | null;
+  missing_info_flagged?: boolean;
+  missing_info_items?: string[];
+  missing_info_note?: string | null;
 }
 
 interface PendingQueueSidebarProps {
@@ -65,7 +66,6 @@ interface PendingQueueSidebarProps {
   pendingJobs: PendingJob[];
   onApprove: (job: PendingJob) => void;
   onMissingInfo: (job: PendingJob) => void;
-  onReject?: (job: PendingJob) => void;
 }
 
 export default function PendingQueueSidebar({
@@ -74,7 +74,6 @@ export default function PendingQueueSidebar({
   pendingJobs,
   onApprove,
   onMissingInfo,
-  onReject,
 }: PendingQueueSidebarProps) {
   if (!open) return null;
 
@@ -118,9 +117,21 @@ export default function PendingQueueSidebar({
             pendingJobs.map((job) => (
               <div
                 key={job.id}
-                className="bg-white rounded-xl border-2 border-orange-200 hover:border-orange-300 shadow-sm hover:shadow-md transition-all"
+                className={`bg-white rounded-xl border-2 shadow-sm hover:shadow-md transition-all ${
+                  job.missing_info_flagged
+                    ? 'border-red-300 hover:border-red-400'
+                    : 'border-orange-200 hover:border-orange-300'
+                }`}
               >
                 <div className="p-4">
+                  {/* Missing Info Banner */}
+                  {job.missing_info_flagged && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-lg mb-2 text-xs text-red-700 font-semibold">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Missing Info — awaiting update from {job.submitted_by}</span>
+                    </div>
+                  )}
+
                   {/* Customer + Job type + Quoted */}
                   <div className="flex items-start justify-between mb-2">
                     <div>
@@ -202,18 +213,7 @@ export default function PendingQueueSidebar({
                     </div>
                   )}
 
-                  {/* Resubmitted badge */}
-                  {job.last_submitted_at && (
-                    <div className="mb-2 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                      <span className="text-xs font-semibold text-blue-700">Resubmitted</span>
-                      <span className="text-xs text-blue-500">
-                        {new Date(job.last_submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Action buttons — Approve, Reject, or Missing Info */}
+                  {/* Action buttons — Approve or Missing Info */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => onApprove(job)}
@@ -221,20 +221,16 @@ export default function PendingQueueSidebar({
                     >
                       ✓ Approve
                     </button>
-                    {onReject && (
-                      <button
-                        onClick={() => onReject(job)}
-                        className="flex-1 px-3 py-2.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-lg text-xs font-bold transition-all hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Reject
-                      </button>
-                    )}
                     <button
                       onClick={() => onMissingInfo(job)}
-                      className="px-3 py-2.5 bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white rounded-lg text-xs font-bold transition-all hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5"
+                      className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-bold transition-all hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5 ${
+                        job.missing_info_flagged
+                          ? 'bg-red-100 text-red-700 border border-red-300 hover:bg-red-200'
+                          : 'bg-gradient-to-r from-orange-400 to-red-400 hover:from-orange-500 hover:to-red-500 text-white'
+                      }`}
                     >
                       <AlertCircle className="w-3.5 h-3.5" />
+                      {job.missing_info_flagged ? 'Flagged' : 'Missing Info'}
                     </button>
                   </div>
                 </div>

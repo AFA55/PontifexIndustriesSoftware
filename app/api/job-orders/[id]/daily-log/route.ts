@@ -121,6 +121,33 @@ export async function POST(
       dailyLog = logData;
     }
 
+    // Persist work items to work_items table for billing
+    if (workPerformed && Array.isArray(workPerformed) && workPerformed.length > 0) {
+      const workItemRows = workPerformed.map((item: any) => ({
+        job_order_id: jobId,
+        operator_id: user.id,
+        day_number: dailyLog?.day_number ?? 1,
+        work_type: item.work_type || item.type || 'General',
+        quantity: Number(item.quantity) || 1,
+        core_quantity: item.core_quantity ? Number(item.core_quantity) : null,
+        core_size: item.core_size || null,
+        core_depth_inches: item.core_depth_inches ? Number(item.core_depth_inches) : null,
+        linear_feet_cut: item.linear_feet_cut ? Number(item.linear_feet_cut) : null,
+        cut_depth_inches: item.cut_depth_inches ? Number(item.cut_depth_inches) : null,
+        accessibility_rating: typeof item.accessibility_rating === 'string'
+          ? ({ easy: 1, moderate: 2, medium: 3, difficult: 4, hard: 5 } as Record<string, number>)[item.accessibility_rating] || null
+          : item.accessibility_rating ? Number(item.accessibility_rating) : null,
+        notes: item.notes || null,
+      }));
+
+      // Fire-and-forget — don't block the response on this
+      Promise.resolve(
+        supabaseAdmin.from('work_items').insert(workItemRows)
+      ).then(({ error: wiError }) => {
+        if (wiError) console.error('Error saving work items to DB:', wiError);
+      }).catch(() => {});
+    }
+
     if (continueNextDay) {
       // Mark as multi-day job and reset timestamps for next day
       const { error: updateError } = await supabaseAdmin

@@ -135,10 +135,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate invoice number: INV-{year}-{6 digits}
+    // Generate unique invoice number: INV-{year}-{6 digits} with collision retry
     const year = new Date().getFullYear();
-    const randomNum = Math.floor(100000 + Math.random() * 900000);
-    const invoiceNumber = `INV-${year}-${randomNum}`;
+    let invoiceNumber = '';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const randomNum = Math.floor(100000 + Math.random() * 900000);
+      const candidate = `INV-${year}-${randomNum}`;
+      const { data: existing } = await supabaseAdmin
+        .from('invoices')
+        .select('id')
+        .eq('invoice_number', candidate)
+        .limit(1)
+        .maybeSingle();
+      if (!existing) {
+        invoiceNumber = candidate;
+        break;
+      }
+    }
+    if (!invoiceNumber) {
+      // Fallback: use timestamp-based number
+      invoiceNumber = `INV-${year}-${Date.now().toString().slice(-6)}`;
+    }
 
     // Calculate due date (Net 30 by default)
     const invoiceDate = new Date();
@@ -172,6 +189,22 @@ export async function POST(request: NextRequest) {
       laborHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
     }
 
+    // Default rates by work type (admin can adjust on the invoice)
+    const DEFAULT_RATES: Record<string, { rate: number; unit: string }> = {
+      'Core Drilling': { rate: 150, unit: 'cores' },
+      'Wall Sawing': { rate: 12, unit: 'LF' },
+      'Flat Sawing': { rate: 8, unit: 'LF' },
+      'Wire Sawing': { rate: 25, unit: 'LF' },
+      'Hand Sawing': { rate: 10, unit: 'LF' },
+      'Ring Sawing': { rate: 10, unit: 'LF' },
+      'Chain Sawing': { rate: 15, unit: 'LF' },
+      'GPR Scanning': { rate: 250, unit: 'each' },
+      'Demolition': { rate: 175, unit: 'hours' },
+      'Removal': { rate: 150, unit: 'hours' },
+      'Hauling': { rate: 125, unit: 'hours' },
+    };
+    const DEFAULT_LABOR_RATE = 125; // $/hr
+
     // Build line items from work items
     const lineItems: any[] = [];
     let lineNumber = 1;
@@ -182,12 +215,11 @@ export async function POST(request: NextRequest) {
       const amount = Number(job.estimated_cost);
       lineItems.push({
         line_number: lineNumber++,
-        description: `${job.title} — ${job.job_type || 'Concrete Cutting Services'}`,
+        description: `${job.title || job.job_number} — ${job.job_type || 'Concrete Cutting Services'}`,
         billing_type: 'flat_rate',
         quantity: 1,
         unit: 'job',
         unit_rate: amount,
-        amount: amount,
         job_order_id: jobOrderId,
         taxable: true,
       });
@@ -196,20 +228,22 @@ export async function POST(request: NextRequest) {
       // Build from work items with default rates
       if (workItems && workItems.length > 0) {
         for (const item of workItems) {
-          let desc = item.work_type;
+          let desc = item.work_type || 'Concrete Cutting';
           let qty = Number(item.quantity) || 1;
           let unit = 'each';
-          let rate = 0;
+          let rate = DEFAULT_RATES[item.work_type]?.rate || 0;
 
-          // Set rates based on work type
+          // Set quantities and units based on work type specifics
           if (item.core_quantity) {
             desc += ` (${item.core_size || ''} x ${item.core_depth_inches || ''}in)`;
-            qty = item.core_quantity;
+            qty = Number(item.core_quantity);
             unit = 'cores';
+            rate = DEFAULT_RATES['Core Drilling']?.rate || 150;
           } else if (item.linear_feet_cut) {
             desc += ` (${item.cut_depth_inches || ''}in deep)`;
             qty = Number(item.linear_feet_cut);
             unit = 'LF';
+            if (!rate) rate = 10; // Default LF rate if type not found
           }
 
           const amount = qty * rate;
@@ -220,7 +254,6 @@ export async function POST(request: NextRequest) {
             quantity: qty,
             unit: unit,
             unit_rate: rate,
-            amount: amount,
             job_order_id: jobOrderId,
             operator_id: item.operator_id,
             taxable: true,
@@ -231,14 +264,29 @@ export async function POST(request: NextRequest) {
 
       // Add labor hours line item
       if (laborHours > 0) {
+        const laborAmount = Number(laborHours.toFixed(2)) * DEFAULT_LABOR_RATE;
         lineItems.push({
           line_number: lineNumber++,
           description: `Labor — ${laborHours.toFixed(1)} hours on-site`,
           billing_type: 'labor',
           quantity: Number(laborHours.toFixed(2)),
           unit: 'hours',
-          unit_rate: 0, // Rate to be set by admin
-          amount: 0,
+          unit_rate: DEFAULT_LABOR_RATE,
+          job_order_id: jobOrderId,
+          taxable: true,
+        });
+        subtotal += laborAmount;
+      }
+
+      // If no work items and no labor, add a generic line item from job type
+      if (lineItems.length === 0) {
+        lineItems.push({
+          line_number: lineNumber++,
+          description: `${job.job_type || 'Concrete Cutting Services'} — ${job.job_number}`,
+          billing_type: 'flat_rate',
+          quantity: 1,
+          unit: 'job',
+          unit_rate: 0,
           job_order_id: jobOrderId,
           taxable: true,
         });
@@ -261,7 +309,7 @@ export async function POST(request: NextRequest) {
         tax_rate: 0,
         tax_amount: 0,
         total_amount: subtotal,
-        balance_due: subtotal,
+        amount_paid: 0,
         status: 'draft',
         payment_terms: 30,
         po_number: job.po_number || null,

@@ -1,7 +1,7 @@
 /**
  * API Route: GET/POST /api/admin/card-permissions
  * Admin-only CRUD for dashboard card permissions per user.
- * Uses 3-level permission_level: 'none' | 'view' | 'full'
+ * Uses 4-level permission_level: 'none' | 'view' | 'submit' | 'full'
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,7 +10,7 @@ import { requireOpsManager } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { ALL_CARD_KEYS, type PermissionLevel } from '@/lib/rbac';
 
-const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'full'];
+const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'submit', 'full'];
 
 // GET: Get card permissions for a specific user (returns Record<string, PermissionLevel>)
 export async function GET(request: NextRequest) {

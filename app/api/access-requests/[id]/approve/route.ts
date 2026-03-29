@@ -10,12 +10,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmail, generateApprovalEmail } from '@/lib/email';
 import { requireOpsManager } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
 import { ROLES_WITH_LABELS, ALL_CARD_KEYS, type PermissionLevel } from '@/lib/rbac';
 import crypto from 'crypto';
 
 const VALID_ROLES = ROLES_WITH_LABELS.map(r => r.value);
-const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'full'];
+const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'submit', 'full'];
 
 export async function POST(
   request: NextRequest,
@@ -25,7 +24,6 @@ export async function POST(
     // Security: only super_admin/operations_manager can approve access requests
     const auth = await requireOpsManager(request);
     if (!auth.authorized) return auth.response;
-    const tenantId = await getTenantId(auth.userId);
 
     const { id } = await params;
     const body = await request.json();
@@ -72,10 +70,12 @@ export async function POST(
       }
     }
 
-    // Fetch the access request (tenant-scoped)
-    let arQuery = supabaseAdmin.from('access_requests').select('*').eq('id', id);
-    if (tenantId) arQuery = arQuery.eq('tenant_id', tenantId);
-    const { data: accessRequest, error: fetchError } = await arQuery.single();
+    // Fetch the access request
+    const { data: accessRequest, error: fetchError } = await supabaseAdmin
+      .from('access_requests')
+      .select('*')
+      .eq('id', id)
+      .single();
 
     if (fetchError || !accessRequest) {
       return NextResponse.json(
@@ -145,7 +145,6 @@ export async function POST(
           role: role,
           phone_number: accessRequest.phone_number || existingProfile.phone_number,
           active: true,
-          tenant_id: tenantId || existingProfile.tenant_id || null,
         })
         .eq('id', userId);
 
@@ -168,7 +167,6 @@ export async function POST(
             phone: '',
             phone_number: accessRequest.phone_number || '',
             active: true,
-            tenant_id: tenantId || null,
           },
         ]);
 
@@ -231,7 +229,7 @@ export async function POST(
 
     const emailSent = await sendEmail({
       to: accessRequest.email,
-      subject: `Access Approved - ${process.env.COMPANY_NAME || 'Your Company'}`,
+      subject: 'Access Approved - Patriot Concrete Cutting',
       html: approvalEmailHtml,
     });
 

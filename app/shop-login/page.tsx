@@ -87,7 +87,7 @@ export default function ShopLoginPage() {
               <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-1">Pontifex Industries</h1>
+          <h1 className="text-3xl font-bold text-white mb-1">Patriot Concrete Cutting</h1>
           <p className="text-orange-300 font-semibold text-lg">Shop Operations Portal</p>
           <p className="text-gray-400 text-sm mt-1">Maintenance & Equipment Management</p>
         </div>
@@ -153,7 +153,7 @@ export default function ShopLoginPage() {
 
         {/* Footer */}
         <p className="text-center text-gray-500 text-xs mt-6">
-          © {new Date().getFullYear()} Pontifex Industries. All rights reserved.
+          © {new Date().getFullYear()} Patriot Concrete Cutting. All rights reserved.
         </p>
       </div>
     </div>
