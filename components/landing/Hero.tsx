@@ -123,11 +123,11 @@ export default function Hero() {
               </a>
 
               <a
-                href={BRAND.ctaSecondaryHref}
+                href="/request-demo"
                 className="group px-8 py-4 rounded-xl bg-white/10 backdrop-blur-md hover:bg-white/[0.15] text-white font-semibold border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.03] flex items-center justify-center gap-2"
               >
+                Request a Demo
                 <ChevronDown size={18} />
-                {BRAND.ctaSecondary}
               </a>
             </motion.div>
 

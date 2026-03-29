@@ -59,13 +59,13 @@ export default function Footer() {
               Get Started
             </h3>
             <p className="text-zinc-500 text-sm mb-5 leading-relaxed">
-              Have a company code? Enter the platform now with your team&apos;s branded experience.
+              See how the platform can streamline your concrete cutting operations.
             </p>
             <a
-              href="/company"
+              href="/request-demo"
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg text-sm font-semibold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all hover:scale-105"
             >
-              Enter Company Code
+              Request a Demo
               <ArrowRight className="w-4 h-4" />
             </a>
           </div>
