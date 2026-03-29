@@ -161,7 +161,6 @@ export default function JSAFormPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('JSA Form Submitted:', formData);
     alert('Job Safety Analysis form submitted successfully!');
   };
 

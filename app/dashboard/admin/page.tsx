@@ -109,22 +109,18 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    console.log('🔍 Checking admin access...');
     const currentUser = getCurrentUser();
 
     if (!currentUser) {
-      console.log('❌ No authenticated user found, redirecting to login...');
       router.push('/login');
       return;
     }
 
     if (!ADMIN_DASHBOARD_ROLES.includes(currentUser.role)) {
-      console.log('🚫 User does not have admin dashboard access, redirecting to operator dashboard...');
       router.push('/dashboard');
       return;
     }
 
-    console.log('✅ Admin access granted');
     setUser(currentUser);
 
     // Fetch card permissions for this user
@@ -252,7 +248,6 @@ export default function AdminDashboard() {
   }
 
   const handleLogout = () => {
-    console.log('🚪 Admin logging out...');
     logout();
     router.push('/login');
   };

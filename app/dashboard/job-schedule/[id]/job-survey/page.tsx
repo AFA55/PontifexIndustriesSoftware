@@ -174,7 +174,7 @@ export default function JobSurveyPage() {
           body: JSON.stringify({ status: 'completed' }),
         });
       } catch (completeErr) {
-        console.log('Job completion status update error:', completeErr);
+        // silent
       }
 
       // Navigate to my-jobs

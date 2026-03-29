@@ -130,7 +130,7 @@ export default function CompletedJobDetailsPage() {
             setOperatorName(profile.full_name);
           }
         } catch (err) {
-          console.log('Could not load operator name');
+          // silent
         }
       }
 

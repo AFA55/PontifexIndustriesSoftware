@@ -6,10 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
 import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
 
 export async function POST(
   request: NextRequest,
@@ -48,15 +45,12 @@ export async function POST(
       );
     }
 
-    const tenantId = await getTenantId(auth.userId);
-
     // Fetch current invoice
-    let invoiceQuery = supabaseAdmin
+    const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from('invoices')
       .select('id, balance_due, total_amount, status, customer_name, customer_email, invoice_number')
-      .eq('id', id);
-    if (tenantId) { invoiceQuery = invoiceQuery.eq('tenant_id', tenantId); }
-    const { data: invoice, error: invoiceError } = await invoiceQuery.single();
+      .eq('id', id)
+      .single();
 
     if (invoiceError || !invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -125,6 +119,7 @@ export async function POST(
       const fromAddress = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@resend.dev>';
       const fmt$ = (n: number) =>
         new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+      const resend = new Resend(process.env.RESEND_API_KEY);
       Promise.resolve(
         resend.emails.send({
           from: fromAddress,

@@ -62,7 +62,6 @@ export default function CompletedJobTicketsPage() {
 
   const loadCompletedJobs = async () => {
     try {
-      console.log('Loading completed job tickets...');
       const { data, error } = await supabase
         .from('job_orders')
         .select('*')
@@ -75,7 +74,6 @@ export default function CompletedJobTicketsPage() {
         throw error;
       }
 
-      console.log('Loaded completed jobs:', data?.length || 0);
       setJobs(data || []);
     } catch (error: any) {
       // Only log if there's an actual error message
