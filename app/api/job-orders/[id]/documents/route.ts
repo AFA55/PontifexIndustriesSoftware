@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 const VALID_CATEGORIES = ['site_photo', 'permit', 'customer_doc', 'before_after', 'scope', 'other'];
 
@@ -20,12 +21,16 @@ export async function GET(
 
     const { id: jobId } = await params;
 
+    // Tenant filtering
+    const tenantId = await getTenantId(auth.userId);
+
     // Verify job exists and user has access
-    const { data: job, error: jobError } = await supabaseAdmin
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('id, assigned_to, helper_assigned_to')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
@@ -66,12 +71,16 @@ export async function POST(
 
     const { id: jobId } = await params;
 
+    // Tenant filtering
+    const tenantId = await getTenantId(auth.userId);
+
     // Verify job exists and user has access
-    const { data: job, error: jobError } = await supabaseAdmin
+    let postJobQuery = supabaseAdmin
       .from('job_orders')
       .select('id, assigned_to, helper_assigned_to')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) postJobQuery = postJobQuery.eq('tenant_id', tenantId);
+    const { data: job, error: jobError } = await postJobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });

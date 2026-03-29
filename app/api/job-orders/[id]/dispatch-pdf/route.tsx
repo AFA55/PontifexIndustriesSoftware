@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 import { renderToBuffer } from '@react-pdf/renderer';
 import React from 'react';
 import DispatchTicketPDF from '@/components/pdf/DispatchTicketPDF';
@@ -26,12 +27,16 @@ export async function GET(
       return NextResponse.json({ error: 'Not authorized to print dispatch tickets' }, { status: 403 });
     }
 
+    // Tenant filtering
+    const tenantId = await getTenantId(auth.userId);
+
     // Fetch full job data
-    const { data: job, error: jobError } = await supabaseAdmin
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
