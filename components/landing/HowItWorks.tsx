@@ -3,70 +3,40 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import {
-  UserPlus,
-  Settings,
-  Rocket,
+  Database,
+  Shield,
+  Layers,
+  Building2,
   ArrowRight,
-  Zap,
-  Smartphone,
-  ShieldCheck,
-  HeadphonesIcon,
+  Lock,
+  Server,
+  Globe,
 } from 'lucide-react';
 
-const steps = [
-  {
-    number: '01',
-    icon: UserPlus,
-    title: 'Sign Up',
-    description:
-      'Request a demo or try instant access. No credit card required.',
-    gradient: 'from-blue-500 to-cyan-500',
-    iconBg: 'from-blue-500/20 to-cyan-500/20',
-    iconColor: 'text-blue-400',
-    glowColor: 'bg-blue-500/20',
-  },
-  {
-    number: '02',
-    icon: Settings,
-    title: 'Configure',
-    description:
-      'Set up your business in 5 minutes. Add team, equipment, job types.',
-    gradient: 'from-purple-500 to-pink-500',
-    iconBg: 'from-purple-500/20 to-pink-500/20',
-    iconColor: 'text-purple-400',
-    glowColor: 'bg-purple-500/20',
-  },
-  {
-    number: '03',
-    icon: Rocket,
-    title: 'Go Live',
-    description:
-      'Start tracking jobs and profitability immediately.',
-    gradient: 'from-green-500 to-emerald-500',
-    iconBg: 'from-green-500/20 to-emerald-500/20',
-    iconColor: 'text-green-400',
-    glowColor: 'bg-green-500/20',
-  },
+const techStack = [
+  { label: 'Next.js 15', desc: 'App Router + React 19', color: 'text-white' },
+  { label: 'TypeScript', desc: 'Full type safety', color: 'text-blue-400' },
+  { label: 'Supabase', desc: 'PostgreSQL + Auth + Realtime', color: 'text-emerald-400' },
+  { label: 'Tailwind CSS', desc: 'Dark theme design system', color: 'text-cyan-400' },
 ];
 
-const bottomFeatures = [
-  { icon: Zap, label: 'Lightning Fast Setup', gradient: 'from-yellow-400 to-orange-400' },
-  { icon: Smartphone, label: 'Works on Any Device', gradient: 'from-blue-400 to-cyan-400' },
-  { icon: ShieldCheck, label: 'Bank-Level Security', gradient: 'from-green-400 to-emerald-400' },
-  { icon: HeadphonesIcon, label: 'Expert Support', gradient: 'from-purple-400 to-pink-400' },
+const securityFeatures = [
+  { icon: Lock, label: 'Tenant data isolation on every API route (85+)' },
+  { icon: Shield, label: '8-level RBAC with card-level permissions' },
+  { icon: Database, label: 'Row-Level Security at the database layer' },
+  { icon: Server, label: 'JWT metadata auth with tenant context' },
 ];
 
 export default function HowItWorks() {
   return (
     <section
-      id="how-it-works"
+      id="architecture"
       className="py-24 bg-[#0a0a0f] relative overflow-hidden"
     >
-      {/* Background blur decorations */}
+      {/* Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[120px]" />
         <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-purple-600/5 rounded-full blur-[100px]" />
-        <div className="absolute top-2/3 left-1/2 w-[300px] h-[300px] bg-cyan-600/5 rounded-full blur-[80px]" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -79,148 +49,131 @@ export default function HowItWorks() {
           className="text-center mb-20"
         >
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-            Get Started in{' '}
+            Platform{' '}
             <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-              Three Simple Steps
+              Architecture
             </span>
           </h2>
           <p className="text-lg sm:text-xl text-zinc-400 max-w-3xl mx-auto">
-            From signup to tracking your first job in minutes, not days
+            Enterprise-grade multi-tenant SaaS built for security and scale
           </p>
         </motion.div>
 
-        {/* Steps Container */}
-        <div className="relative">
-          {/* Connecting Line (Desktop) */}
-          <div className="hidden md:block absolute top-1/2 left-[10%] right-[10%] h-0.5 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-green-500/30 -translate-y-1/2 z-0" />
-
-          {/* Steps Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12 relative z-10">
-            {steps.map((step, index) => {
-              const Icon = step.icon;
-
-              return (
-                <motion.div
-                  key={step.number}
-                  initial={{ opacity: 0, y: 40 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-50px' }}
-                  transition={{ delay: index * 0.2, duration: 0.6 }}
-                  className="relative"
-                >
-                  {/* Card */}
-                  <motion.div
-                    whileHover={{ scale: 1.03, y: -4 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    className="bg-zinc-900/50 border border-white/10 backdrop-blur-sm rounded-2xl p-8 relative group"
-                  >
-                    {/* Hover glow effect */}
-                    <div
-                      className={`absolute inset-0 ${step.glowColor} rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10`}
-                    />
-
-                    {/* Step Number Badge */}
-                    <motion.div
-                      initial={{ scale: 0, rotate: -180 }}
-                      whileInView={{ scale: 1, rotate: 0 }}
-                      viewport={{ once: true }}
-                      transition={{
-                        delay: index * 0.2 + 0.3,
-                        type: 'spring',
-                        stiffness: 200,
-                        damping: 15,
-                      }}
-                      className={`absolute -top-6 -right-6 w-16 h-16 rounded-2xl bg-gradient-to-br ${step.gradient} flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-black/30`}
-                    >
-                      {step.number}
-                    </motion.div>
-
-                    {/* Icon Container */}
-                    <motion.div
-                      whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                      transition={{ duration: 0.5 }}
-                      className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.iconBg} flex items-center justify-center mb-6 border border-white/5`}
-                    >
-                      <Icon
-                        className={step.iconColor}
-                        size={40}
-                        strokeWidth={1.5}
-                      />
-                    </motion.div>
-
-                    {/* Content */}
-                    <h3 className="text-2xl font-bold text-white mb-3">
-                      {step.title}
-                    </h3>
-                    <p className="text-zinc-400 leading-relaxed">
-                      {step.description}
-                    </p>
-                  </motion.div>
-
-                  {/* Desktop: Animated Arrow between cards */}
-                  {index < steps.length - 1 && (
-                    <div className="hidden md:flex absolute top-1/2 -right-6 -translate-y-1/2 translate-x-full z-20 items-center justify-center">
-                      <motion.div
-                        animate={{ x: [0, 8, 0] }}
-                        transition={{
-                          duration: 1.5,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                        }}
-                      >
-                        <ArrowRight className="text-zinc-600" size={24} />
-                      </motion.div>
-                    </div>
-                  )}
-
-                  {/* Mobile: Vertical dots between cards */}
-                  {index < steps.length - 1 && (
-                    <div className="md:hidden flex justify-center my-6">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-zinc-700 rounded-full" />
-                        <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full" />
-                        <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full" />
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Bottom Feature Highlights */}
+        {/* Multi-Tenant Flow Diagram */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="mt-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          className="mb-20"
         >
-          {bottomFeatures.map((feature, index) => {
-            const FeatureIcon = feature.icon;
-            return (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1, duration: 0.4 }}
-                whileHover={{ scale: 1.02 }}
-                className="flex items-center gap-3 p-4 bg-zinc-900/50 rounded-xl border border-white/10 backdrop-blur-sm"
-              >
-                <div
-                  className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.gradient} flex items-center justify-center flex-shrink-0`}
+          <h3 className="text-xl font-bold text-white mb-8 text-center">Multi-Tenant Login Flow</h3>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+            {[
+              { icon: Globe, label: '/company', desc: 'Enter company code', color: 'from-blue-500 to-cyan-500' },
+              { icon: Building2, label: 'Lookup Tenant', desc: 'Fetch branding & config', color: 'from-purple-500 to-pink-500' },
+              { icon: Lock, label: '/login', desc: 'Branded login page', color: 'from-violet-500 to-indigo-500' },
+              { icon: Layers, label: 'Dashboard', desc: 'Tenant-scoped data', color: 'from-emerald-500 to-teal-500' },
+            ].map((step, i) => (
+              <React.Fragment key={step.label}>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="bg-zinc-900/80 border border-white/10 rounded-xl p-5 text-center min-w-[160px] backdrop-blur-sm"
                 >
-                  <FeatureIcon className="text-white" size={20} />
-                </div>
-                <span className="text-zinc-300 font-medium text-sm">
-                  {feature.label}
-                </span>
-              </motion.div>
-            );
-          })}
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center mx-auto mb-3`}>
+                    <step.icon className="text-white" size={24} />
+                  </div>
+                  <div className="text-white font-bold text-sm mb-1">{step.label}</div>
+                  <div className="text-zinc-500 text-xs">{step.desc}</div>
+                </motion.div>
+                {i < 3 && (
+                  <ArrowRight className="text-zinc-600 hidden md:block flex-shrink-0" size={20} />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
         </motion.div>
+
+        <div className="grid lg:grid-cols-2 gap-12">
+          {/* Tech Stack */}
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h3 className="text-xl font-bold text-white mb-6">Tech Stack</h3>
+            <div className="space-y-4">
+              {techStack.map((tech) => (
+                <div key={tech.label} className="bg-zinc-900/50 border border-white/10 rounded-xl p-4 flex items-center gap-4">
+                  <div className={`${tech.color} font-bold text-lg min-w-[120px]`}>{tech.label}</div>
+                  <div className="text-zinc-400 text-sm">{tech.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-4 mt-8">
+              {[
+                { value: '85+', label: 'API Routes' },
+                { value: '71', label: 'DB Tables' },
+                { value: '58+', label: 'Migrations' },
+              ].map((stat) => (
+                <div key={stat.label} className="text-center bg-zinc-900/30 border border-white/[0.06] rounded-xl p-4">
+                  <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">{stat.value}</div>
+                  <div className="text-zinc-500 text-xs mt-1">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Security */}
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h3 className="text-xl font-bold text-white mb-6">Security & Isolation</h3>
+            <div className="space-y-4">
+              {securityFeatures.map((feat) => (
+                <div key={feat.label} className="bg-zinc-900/50 border border-white/10 rounded-xl p-4 flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <feat.icon className="text-emerald-400" size={20} />
+                  </div>
+                  <div className="text-zinc-300 text-sm leading-relaxed">{feat.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Data Isolation Diagram */}
+            <div className="mt-8 bg-zinc-900/50 border border-white/10 rounded-xl p-6">
+              <h4 className="text-white font-semibold text-sm mb-4">Tenant Data Isolation</h4>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <div className="flex-1 h-8 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center px-3">
+                    <span className="text-blue-300 text-xs font-mono">Patriot Concrete (PATRIOT)</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-purple-500" />
+                  <div className="flex-1 h-8 bg-purple-500/10 border border-purple-500/20 rounded-lg flex items-center px-3">
+                    <span className="text-purple-300 text-xs font-mono">Company B (COMPANYB)</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <div className="flex-1 h-8 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center px-3">
+                    <span className="text-emerald-300 text-xs font-mono">Company C (COMPANYC)</span>
+                  </div>
+                </div>
+                <div className="text-center text-zinc-500 text-xs mt-2">
+                  Each tenant&apos;s data is completely isolated via tenant_id on all 71 tables
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </div>
     </section>
   );

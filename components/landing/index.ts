@@ -1,9 +1,6 @@
 export { default as Navigation } from './Navigation';
 export { default as Hero } from './Hero';
-export { default as StatsBar } from './StatsBar';
-export { default as ProblemSolution } from './ProblemSolution';
 export { default as FeatureShowcase } from './FeatureShowcase';
+export { default as ComparisonTable } from './ComparisonTable';
 export { default as HowItWorks } from './HowItWorks';
-export { default as ROISection } from './ROISection';
-export { default as ScheduleDemoForm } from './ScheduleDemoForm';
 export { default as Footer } from './Footer';
