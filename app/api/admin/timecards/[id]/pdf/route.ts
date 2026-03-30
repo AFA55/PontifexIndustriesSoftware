@@ -1,5 +1,5 @@
 /**
- * API Route: GET /api/admin/timecards/[userId]/pdf
+ * API Route: GET /api/admin/timecards/[id]/pdf
  * Generate a weekly timecard PDF for a specific employee.
  * Requires admin role.
  *
@@ -24,13 +24,13 @@ import type { TimecardEntry } from '@/lib/timecard-utils';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
-    const { userId } = await params;
+    const { id } = await params;
 
     // Parse week start, default to current Monday
     const searchParams = request.nextUrl.searchParams;
@@ -46,7 +46,7 @@ export async function GET(
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('full_name, email, role')
-      .eq('id', userId)
+      .eq('id', id)
       .single();
 
     if (profileError || !profile) {
@@ -60,7 +60,7 @@ export async function GET(
     const { data: timecards, error: tcError } = await supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', id)
       .gte('date', weekStart)
       .lte('date', weekEnd)
       .order('date')
@@ -152,7 +152,7 @@ export async function GET(
       operatorName: profile.full_name || profile.email,
       operatorEmail: profile.email || '',
       operatorRole: profile.role || 'operator',
-      employeeId: userId.substring(0, 8).toUpperCase(),
+      employeeId: id.substring(0, 8).toUpperCase(),
       weekStart,
       weekEnd,
       entries,
