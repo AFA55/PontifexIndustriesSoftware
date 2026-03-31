@@ -559,8 +559,26 @@ function OperatorTimecardDetailPageInner() {
             </button>
 
             <button
-              onClick={() => {
-                window.open(`/api/admin/timecards/export?weekStart=${weekStart}&userId=${operatorId}&format=pdf`, '_blank');
+              onClick={async () => {
+                const token = await getSessionToken();
+                if (!token) return;
+                try {
+                  const res = await fetch(`/api/admin/timecards/export?weekStart=${weekStart}&userId=${operatorId}&format=pdf`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                  });
+                  if (!res.ok) { console.error('PDF export failed'); return; }
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `timecard_${operatorId}_${weekStart}.pdf`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                } catch (error) {
+                  console.error('Error exporting PDF:', error);
+                }
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg transition-all text-xs font-bold border border-white/5"
             >

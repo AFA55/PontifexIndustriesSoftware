@@ -108,14 +108,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/** Escape HTML special characters to prevent XSS in email templates */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function generateNotificationEmail(name: string, title: string, message: string, actionUrl: string): string {
+  const safeName = escapeHtml(name);
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+  const safeActionUrl = encodeURI(actionUrl);
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - Patriot Concrete Cutting</title>
+  <title>${safeTitle} - Patriot Concrete Cutting</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc;">
   <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
@@ -129,14 +143,14 @@ function generateNotificationEmail(name: string, title: string, message: string,
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi <strong>${name}</strong>,</p>
-              <h2 style="margin: 0 0 16px; color: #0f172a; font-size: 22px; font-weight: 700;">${title}</h2>
-              <p style="margin: 0 0 32px; color: #475569; font-size: 16px; line-height: 1.6;">${message}</p>
-              ${actionUrl ? `
+              <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi <strong>${safeName}</strong>,</p>
+              <h2 style="margin: 0 0 16px; color: #0f172a; font-size: 22px; font-weight: 700;">${safeTitle}</h2>
+              <p style="margin: 0 0 32px; color: #475569; font-size: 16px; line-height: 1.6;">${safeMessage}</p>
+              ${safeActionUrl ? `
               <table role="presentation" style="width: 100%; margin: 0 0 32px;">
                 <tr>
                   <td style="text-align: center;">
-                    <a href="${actionUrl}" style="display: inline-block; padding: 14px 40px; background-color: #7c3aed; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Take Action</a>
+                    <a href="${safeActionUrl}" style="display: inline-block; padding: 14px 40px; background-color: #7c3aed; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Take Action</a>
                   </td>
                 </tr>
               </table>` : ''}

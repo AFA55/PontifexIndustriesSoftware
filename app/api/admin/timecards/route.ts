@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const pending = searchParams.get('pending');
     const status = searchParams.get('status'); // 'active' | 'completed'
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '100') || 100, 500);
 
     // Use the view that joins with profiles for user details
     let query = supabaseAdmin

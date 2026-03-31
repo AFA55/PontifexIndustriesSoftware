@@ -23,9 +23,9 @@ import {
 import type { TimecardEntry } from '@/lib/timecard-utils';
 
 // ── CSV Export ─────────────────────────────────────────────
-async function generateCSV(weekStart: string, weekEnd: string) {
+async function generateCSV(weekStart: string, weekEnd: string, tenantId?: string) {
   // Fetch all timecards for the week with user info
-  const { data: timecards, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('timecards_with_users')
     .select('*')
     .gte('date', weekStart)
@@ -33,6 +33,12 @@ async function generateCSV(weekStart: string, weekEnd: string) {
     .order('full_name')
     .order('date')
     .order('clock_in_time');
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+
+  const { data: timecards, error } = await query;
 
   if (error) {
     throw new Error(`Failed to fetch timecards: ${error.message}`);
@@ -104,7 +110,7 @@ async function generateCSV(weekStart: string, weekEnd: string) {
 }
 
 // ── PDF Export (multi-page, one page per operator) ────────
-async function generateBatchPDF(weekStart: string, weekEnd: string, userId?: string) {
+async function generateBatchPDF(weekStart: string, weekEnd: string, userId?: string, tenantId?: string) {
   const weekDates = getWeekDates(weekStart);
 
   // Get all distinct operators who have timecards this week
@@ -119,6 +125,10 @@ async function generateBatchPDF(weekStart: string, weekEnd: string, userId?: str
 
   if (userId) {
     tcQuery = tcQuery.eq('user_id', userId);
+  }
+
+  if (tenantId) {
+    tcQuery = tcQuery.eq('tenant_id', tenantId);
   }
 
   const { data: allTimecards, error: tcError } = await tcQuery;
@@ -484,8 +494,10 @@ export async function GET(request: NextRequest) {
     endDate.setDate(endDate.getDate() + 6);
     const weekEnd = endDate.toISOString().split('T')[0];
 
+    const tenantId = auth.tenantId || undefined;
+
     if (format === 'csv') {
-      const csvContent = await generateCSV(weekStart, weekEnd);
+      const csvContent = await generateCSV(weekStart, weekEnd, tenantId);
       const filename = `timecards_${weekStart}_to_${weekEnd}.csv`;
 
       return new NextResponse(csvContent, {
@@ -498,7 +510,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Default: PDF
-    const pdfBytes = await generateBatchPDF(weekStart, weekEnd, userId);
+    const pdfBytes = await generateBatchPDF(weekStart, weekEnd, userId, tenantId);
     const filename = `timecards_batch_${weekStart}_to_${weekEnd}.pdf`;
 
     return new NextResponse(pdfBytes, {

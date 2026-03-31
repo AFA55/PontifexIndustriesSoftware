@@ -237,18 +237,50 @@ export default function AdminTimecardsPage() {
   const handleExportPDF = async () => {
     setExportingPDF(true);
     try {
-      window.open(`/api/admin/timecards/export?weekStart=${mondayStr}&format=pdf`, '_blank');
+      const token = await getSessionToken();
+      if (!token) return;
+      const res = await fetch(`/api/admin/timecards/export?weekStart=${mondayStr}&format=pdf`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) { console.error('PDF export failed'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `timecards_${mondayStr}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
     } finally {
-      setTimeout(() => setExportingPDF(false), 2000);
+      setExportingPDF(false);
     }
   };
 
   const handleExportCSV = async () => {
     setExportingCSV(true);
     try {
-      window.open(`/api/admin/timecards/export?weekStart=${mondayStr}&format=csv`, '_blank');
+      const token = await getSessionToken();
+      if (!token) return;
+      const res = await fetch(`/api/admin/timecards/export?weekStart=${mondayStr}&format=csv`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) { console.error('CSV export failed'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `timecards_${mondayStr}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
     } finally {
-      setTimeout(() => setExportingCSV(false), 2000);
+      setExportingCSV(false);
     }
   };
 
