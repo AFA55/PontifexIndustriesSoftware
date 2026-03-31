@@ -36,12 +36,25 @@ export default function DayCompletePage() {
   const [completionPhotos, setCompletionPhotos] = useState<string[]>([]);
   const [esignConsented, setEsignConsented] = useState(false);
 
+  // ─── Smart last-day detection ────────────────────────────────────────────
+  const [isLastScheduledDay, setIsLastScheduledDay] = useState<boolean | null>(null);
+
+  // ─── Scope progress summary for the completion modal ─────────────────────
+  const [progressSummary, setProgressSummary] = useState<{ overall_pct: number; total_completed: number; total_target: number } | null>(null);
+
+  // ─── Completion request modal state ──────────────────────────────────────
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completionNotes, setCompletionNotes] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
   // Signature canvas
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
     fetchJob();
+    fetchScheduleInfo();
+    fetchScopeProgress();
   }, []);
 
   const fetchJob = async () => {
@@ -69,6 +82,79 @@ export default function DayCompletePage() {
       console.error('Error fetching job:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchScheduleInfo = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/jobs/${jobId}/schedule-info`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const today = new Date().toISOString().split('T')[0];
+        const endDate = json.data?.scheduled_end_date;
+        const scheduledDate = json.data?.scheduled_date;
+        // It's the last day if end_date === today, or (no end_date and scheduled_date === today)
+        const isLast = endDate ? endDate === today : scheduledDate === today;
+        setIsLastScheduledDay(isLast);
+      } else {
+        // If we can't determine, don't restrict the UI — show both options
+        setIsLastScheduledDay(null);
+      }
+    } catch {
+      setIsLastScheduledDay(null);
+    }
+  };
+
+  const fetchScopeProgress = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/admin/jobs/${jobId}/scope`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data?.scope_items?.length > 0) {
+          setProgressSummary({
+            overall_pct: json.data.overall_pct,
+            total_completed: json.data.total_completed,
+            total_target: json.data.total_target,
+          });
+        }
+      }
+    } catch { /* non-critical */ }
+  };
+
+  const handleSubmitCompletion = async () => {
+    setSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/jobs/${jobId}/completion-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ operator_notes: completionNotes || null }),
+      });
+      if (res.ok) {
+        setShowCompletionModal(false);
+        setSubmitted(true);
+        localStorage.removeItem(`work-performed-${jobId}`);
+      } else {
+        const data = await res.json();
+        showNotif(data.error || 'Failed to submit completion request', 'error');
+      }
+    } catch (err) {
+      console.error('Error submitting completion request:', err);
+      showNotif('Failed to submit. Please try again.', 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -310,6 +396,29 @@ export default function DayCompletePage() {
     );
   }
 
+  // ─── Submitted success screen ────────────────────────────────────────────
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl border border-green-100 p-8 max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-8 h-8 text-green-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Submitted!</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            Your supervisor has been notified and will review shortly.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard/my-jobs')}
+            className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl font-semibold"
+          >
+            Back to My Jobs
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
@@ -387,32 +496,36 @@ export default function DayCompletePage() {
         {!showSignature ? (
           <div className="space-y-4">
             <h2 className="text-center text-lg font-semibold text-slate-800">
-              Are you done with this job?
+              {isLastScheduledDay === true
+                ? 'This is the final scheduled day'
+                : 'Are you done with this job?'}
             </h2>
 
-            {/* Done for Today */}
-            <button
-              onClick={handleDoneForToday}
-              disabled={submitting}
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white/20 rounded-xl">
-                  <Sun className="w-7 h-7" />
+            {/* Done for Today — hidden on last scheduled day */}
+            {isLastScheduledDay !== true && (
+              <button
+                onClick={handleDoneForToday}
+                disabled={submitting}
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <Sun className="w-7 h-7" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="text-lg font-bold">Done for Today</p>
+                    <p className="text-sm text-amber-100">
+                      Job continues tomorrow. Progress saved.
+                    </p>
+                  </div>
+                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
                 </div>
-                <div className="text-left flex-1">
-                  <p className="text-lg font-bold">Done for Today</p>
-                  <p className="text-sm text-amber-100">
-                    Job continues tomorrow. Progress saved.
-                  </p>
-                </div>
-                {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
-              </div>
-            </button>
+              </button>
+            )}
 
-            {/* Job Fully Complete */}
+            {/* Complete Job — opens confirmation modal */}
             <button
-              onClick={() => setShowSignature(true)}
+              onClick={() => setShowCompletionModal(true)}
               disabled={submitting}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
             >
@@ -421,12 +534,20 @@ export default function DayCompletePage() {
                   <Trophy className="w-7 h-7" />
                 </div>
                 <div className="text-left flex-1">
-                  <p className="text-lg font-bold">Job Fully Complete</p>
+                  <p className="text-lg font-bold">Complete Job</p>
                   <p className="text-sm text-emerald-100">
-                    All work finished. Get customer signature.
+                    Submit to supervisor for final approval.
                   </p>
                 </div>
               </div>
+            </button>
+
+            {/* Legacy: still allow customer signature for same-day completions */}
+            <button
+              onClick={() => setShowSignature(true)}
+              className="w-full text-slate-500 text-xs text-center py-2 hover:text-slate-700"
+            >
+              Add customer signature first
             </button>
           </div>
         ) : (
@@ -533,11 +654,65 @@ export default function DayCompletePage() {
             <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-amber-700">
               <strong>Done for Today</strong> saves your progress and resets the job for tomorrow.
-              <strong> Job Fully Complete</strong> marks the job as finished and sends it to billing.
+              <strong> Complete Job</strong> submits to your supervisor for approval.
             </p>
           </div>
         </div>
       </div>
+
+      {/* ─── Completion Confirmation Modal ──────────────────────────────── */}
+      {showCompletionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Submit for Completion</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              This will send the job to your supervisor for final approval.
+            </p>
+
+            {/* Progress summary if available */}
+            {progressSummary && progressSummary.total_target > 0 && (
+              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-1">Progress Summary</p>
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+                  <div
+                    className="bg-blue-500 h-2 rounded-full"
+                    style={{ width: `${Math.min(100, progressSummary.overall_pct)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500">
+                  {progressSummary.overall_pct.toFixed(0)}% of scope complete
+                  ({progressSummary.total_completed} / {progressSummary.total_target} units)
+                </p>
+              </div>
+            )}
+
+            <textarea
+              placeholder="Any final notes for the supervisor? (optional)"
+              className="w-full border border-gray-300 rounded-lg p-3 text-sm mb-4 h-24 focus:outline-none focus:border-emerald-500 text-gray-900 resize-none"
+              value={completionNotes}
+              onChange={(e) => setCompletionNotes(e.target.value)}
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleSubmitCompletion}
+                disabled={submitting}
+                className="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                {submitting ? 'Submitting…' : 'Submit for Approval'}
+              </button>
+              <button
+                onClick={() => setShowCompletionModal(false)}
+                disabled={submitting}
+                className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

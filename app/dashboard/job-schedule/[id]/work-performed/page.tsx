@@ -215,6 +215,26 @@ export default function WorkPerformed() {
   const [jobPhotos, setJobPhotos] = useState<string[]>([]);
   const [voiceNotes, setVoiceNotes] = useState<string>('');
 
+  // ─── Scope Progress State ─────────────────────────────────────────────────
+  interface ScopeItem {
+    id: string;
+    work_type: string;
+    description: string;
+    unit: string;
+    target_quantity: number;
+    completed_quantity: number;
+    pct_complete: number;
+  }
+  interface ScopeData {
+    scope_items: ScopeItem[];
+    overall_pct: number;
+    total_target: number;
+    total_completed: number;
+  }
+  const [scopeData, setScopeData] = useState<ScopeData | null>(null);
+  const [progressInputs, setProgressInputs] = useState<Record<string, number>>({});
+  const [scopeLoading, setScopeLoading] = useState(false);
+
   // Fetch job type and day number for smart recommendations + correct work item tracking
   useEffect(() => {
     const fetchJobInfo = async () => {
@@ -239,6 +259,61 @@ export default function WorkPerformed() {
     };
     fetchJobInfo();
   }, [params.id]);
+
+  // Fetch scope items for this job (fire on mount)
+  useEffect(() => {
+    const fetchScope = async () => {
+      setScopeLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`/api/admin/jobs/${params.id}/scope`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data?.scope_items?.length > 0) {
+            setScopeData(json.data);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching scope:', err);
+      } finally {
+        setScopeLoading(false);
+      }
+    };
+    fetchScope();
+  }, [params.id]);
+
+  // Submit scope progress entries in parallel with the main work-items save
+  const submitProgressInputs = async (session: { access_token: string }) => {
+    const today = new Date().toISOString().split('T')[0];
+    const entries = Object.entries(progressInputs).filter(([, qty]) => qty > 0);
+    if (entries.length === 0) return;
+    await Promise.all(
+      entries.map(([scope_item_id, quantity_completed]) =>
+        fetch(`/api/jobs/${params.id}/progress`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ scope_item_id, quantity_completed, date: today }),
+        }).catch(() => {}) // fire-and-forget, don't block main save
+      )
+    );
+    // Refresh scope data after submitting
+    try {
+      const res = await fetch(`/api/admin/jobs/${params.id}/scope`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) setScopeData(json.data);
+      }
+    } catch { /* non-critical */ }
+  };
+
   const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
   const [totalStandbyMinutes, setTotalStandbyMinutes] = useState(0);
 
@@ -1167,6 +1242,9 @@ export default function WorkPerformed() {
           console.error('Failed to save work items to DB, falling back to localStorage');
         }
 
+        // Submit scope progress inputs (fire-and-forget — don't block main save)
+        submitProgressInputs(session).catch(() => {});
+
         // Track blade usage for sawing work (fire and forget)
         fetch('/api/equipment/track-usage', {
           method: 'POST',
@@ -1279,6 +1357,74 @@ export default function WorkPerformed() {
       <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
         {/* Quick Access Buttons */}
         <QuickAccessButtons jobId={params.id as string} />
+
+        {/* ─── Scope Progress Section ─────────────────────────────────── */}
+        {scopeData && scopeData.scope_items.length > 0 && (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-blue-200/60 p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-800">Today&apos;s Progress</h3>
+              {/* Overall progress bar */}
+              <span className="text-xs font-semibold text-blue-600">
+                {scopeData.overall_pct.toFixed(0)}% overall
+              </span>
+            </div>
+
+            {/* Overall progress bar */}
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+              <div
+                className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, scopeData.overall_pct)}%` }}
+              />
+            </div>
+
+            <p className="text-xs text-gray-500 mb-3">
+              How much did you complete today for each item?
+            </p>
+
+            <div className="space-y-3">
+              {scopeData.scope_items.map((item) => (
+                <div key={item.id} className="border border-gray-100 rounded-xl p-3 bg-gray-50">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-gray-700 truncate flex-1 mr-2">
+                      {item.description || item.work_type}
+                    </span>
+                    <span className="text-xs text-gray-400 flex-shrink-0">
+                      {item.completed_quantity}/{item.target_quantity} {item.unit}
+                    </span>
+                  </div>
+                  {/* Per-item mini progress bar */}
+                  <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                    <div
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        item.pct_complete >= 100 ? 'bg-green-500' :
+                        item.pct_complete >= 50 ? 'bg-blue-500' : 'bg-amber-400'
+                      }`}
+                      style={{ width: `${Math.min(100, item.pct_complete)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={progressInputs[item.id] ?? ''}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setProgressInputs(prev => ({ ...prev, [item.id]: val }));
+                      }}
+                      placeholder="0"
+                      className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white font-medium text-gray-900"
+                    />
+                    <span className="text-xs text-gray-500">{item.unit} today</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {scopeLoading && (
+          <div className="text-center text-xs text-gray-400 mb-3">Loading scope items…</div>
+        )}
 
         {view === 'search' ? (
           <>

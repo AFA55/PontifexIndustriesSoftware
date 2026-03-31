@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { Clock, MapPin, Wrench, ChevronRight, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export interface JobTicketData {
   id: string;
@@ -101,6 +103,34 @@ export default function JobTicketCard({ job }: JobTicketCardProps) {
   const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
   const isCompleted = job.status === 'completed';
 
+  // Small scope progress indicator (self-fetching, non-blocking)
+  const [progressPct, setProgressPct] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchProgress = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`/api/admin/jobs/${job.id}/scope`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok && !cancelled) {
+          const json = await res.json();
+          if (json.success && json.data?.scope_items?.length > 0) {
+            setProgressPct(json.data.overall_pct ?? 0);
+          }
+        }
+      } catch { /* non-critical */ }
+    };
+    fetchProgress();
+    return () => { cancelled = true; };
+  }, [job.id]);
+
+  const progressDotColor =
+    progressPct === null ? null :
+    progressPct >= 75 ? 'bg-green-500' :
+    progressPct >= 25 ? 'bg-amber-400' : 'bg-red-400';
+
   return (
     <Link
       href={`/dashboard/my-jobs/${job.id}`}
@@ -132,6 +162,12 @@ export default function JobTicketCard({ job }: JobTicketCardProps) {
               <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getStatusStyle(job.status)}`}>
                 {job.readable_status}
               </span>
+              {progressDotColor && (
+                <span className="flex items-center gap-1" title={`Scope progress: ${progressPct?.toFixed(0)}%`}>
+                  <span className={`w-2 h-2 rounded-full inline-block ${progressDotColor}`} />
+                  <span className="text-xs text-gray-400">{progressPct?.toFixed(0)}%</span>
+                </span>
+              )}
               {isMultiDay && (
                 <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-semibold border border-purple-200">
                   Multi-Day
