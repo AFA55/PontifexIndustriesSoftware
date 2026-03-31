@@ -78,24 +78,24 @@ const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 // ── Role display ─────────────────────────────────────────────
 function getRoleBadge(role: string) {
   const map: Record<string, { label: string; color: string }> = {
-    operator: { label: 'OPR', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-    apprentice: { label: 'APR', color: 'bg-teal-500/20 text-teal-400 border-teal-500/30' },
-    admin: { label: 'ADM', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-    shop_manager: { label: 'SHOP', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-    operations_manager: { label: 'OPS', color: 'bg-rose-500/20 text-rose-400 border-rose-500/30' },
-    super_admin: { label: 'SA', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    operator: { label: 'OPR', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+    apprentice: { label: 'APR', color: 'bg-teal-100 text-teal-700 border-teal-200' },
+    admin: { label: 'ADM', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+    shop_manager: { label: 'SHOP', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+    operations_manager: { label: 'OPS', color: 'bg-rose-100 text-rose-700 border-rose-200' },
+    super_admin: { label: 'SA', color: 'bg-red-100 text-red-700 border-red-200' },
   };
-  return map[role] || { label: role.slice(0, 3).toUpperCase(), color: 'bg-slate-500/20 text-slate-400 border-slate-500/30' };
+  return map[role] || { label: role.slice(0, 3).toUpperCase(), color: 'bg-slate-100 text-slate-600 border-slate-300' };
 }
 
 // ── Day cell color ───────────────────────────────────────────
 function getDayCellClasses(info: DayInfo): string {
-  if (info.status === 'none') return 'text-slate-600';
-  if (info.status === 'active') return 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30';
-  if (info.status === 'approved') return 'bg-emerald-500/10 text-emerald-400';
-  if (info.status === 'pending') return 'bg-amber-500/10 text-amber-400';
-  if (info.status === 'mixed') return 'bg-amber-500/10 text-amber-300';
-  return 'text-slate-600';
+  if (info.status === 'none') return 'text-gray-400';
+  if (info.status === 'active') return 'bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-300';
+  if (info.status === 'approved') return 'bg-emerald-50 text-emerald-700';
+  if (info.status === 'pending') return 'bg-amber-50 text-amber-700';
+  if (info.status === 'mixed') return 'bg-amber-50 text-amber-600';
+  return 'text-gray-400';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -327,33 +327,33 @@ export default function AdminTimecardsPage() {
   // ── Loading state ──────────────────────────────────────────
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-14 h-14 mx-auto mb-4 relative">
-            <div className="absolute inset-0 rounded-full border-4 border-slate-800"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"></div>
           </div>
-          <p className="text-slate-400 text-sm font-medium">Loading payroll overview...</p>
+          <p className="text-gray-500 text-sm font-medium">Loading payroll overview...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* ── Header ─────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/5">
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/admin"
-              className="flex items-center gap-2 px-3 py-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all text-sm font-medium"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Admin</span>
             </Link>
-            <div className="h-6 w-px bg-white/10" />
-            <h1 className="text-lg font-bold text-white flex items-center gap-2.5">
+            <div className="h-6 w-px bg-gray-200" />
+            <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center shadow-sm">
                 <DollarSign size={16} className="text-white" />
               </div>
@@ -366,7 +366,7 @@ export default function AdminTimecardsPage() {
             <button
               onClick={handleExportCSV}
               disabled={exportingCSV || teamMembers.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <FileText size={14} />
               <span className="hidden sm:inline">CSV</span>
@@ -374,13 +374,13 @@ export default function AdminTimecardsPage() {
             <button
               onClick={handleExportPDF}
               disabled={exportingPDF || teamMembers.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {exportingPDF ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
               <span className="hidden sm:inline">PDF</span>
             </button>
 
-            <div className="hidden sm:flex items-center gap-2.5 pl-3 border-l border-white/10">
+            <div className="hidden sm:flex items-center gap-2.5 pl-3 border-l border-gray-200">
               <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
                 {user?.name?.charAt(0) || 'A'}
               </div>
@@ -394,15 +394,15 @@ export default function AdminTimecardsPage() {
         <div className="mb-5 flex items-center justify-between">
           <button
             onClick={() => setWeekOffset(weekOffset - 1)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg transition-all text-sm font-medium border border-white/10"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-all text-sm font-medium border border-gray-200 shadow-sm"
           >
             <ChevronLeft size={16} />
             <span className="hidden sm:inline">Prev Week</span>
           </button>
 
           <div className="text-center">
-            <p className="text-base font-bold text-white">{formatWeekRange(monday, sunday)}</p>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-base font-bold text-gray-900">{formatWeekRange(monday, sunday)}</p>
+            <p className="text-xs text-gray-500 mt-0.5">
               {weekOffset === 0 ? 'Current Week' : `${Math.abs(weekOffset)} ${Math.abs(weekOffset) === 1 ? 'week' : 'weeks'} ${weekOffset < 0 ? 'ago' : 'ahead'}`}
             </p>
           </div>
@@ -410,10 +410,10 @@ export default function AdminTimecardsPage() {
           <button
             onClick={() => setWeekOffset(weekOffset + 1)}
             disabled={weekOffset >= 0}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all text-sm font-medium border ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all text-sm font-medium border shadow-sm ${
               weekOffset >= 0
-                ? 'bg-white/[0.02] text-slate-600 border-white/5 cursor-not-allowed'
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
             }`}
           >
             <span className="hidden sm:inline">Next Week</span>
@@ -424,68 +424,68 @@ export default function AdminTimecardsPage() {
         {/* ── Summary Cards ──────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
           {/* Total Payroll Hours */}
-          <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-purple-600/20 to-purple-800/10 rounded-xl p-4 border border-purple-500/20 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full -translate-y-4 translate-x-4" />
+          <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl p-4 relative overflow-hidden shadow-lg">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full -translate-y-4 translate-x-4" />
             <div className="flex items-center gap-1.5 mb-1.5">
-              <TrendingUp size={13} className="text-purple-400" />
-              <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Total Hours</span>
+              <TrendingUp size={13} className="text-purple-200" />
+              <span className="text-[10px] font-bold text-purple-200 uppercase tracking-wider">Total Hours</span>
             </div>
             <p className="text-2xl font-bold text-white tabular-nums">{totals.totalPayrollHours.toFixed(1)}</p>
           </div>
 
           {/* Regular Hours */}
-          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5">
+          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <CheckCircle size={13} className="text-emerald-400" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Regular</span>
+              <CheckCircle size={13} className="text-emerald-600" />
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Regular</span>
             </div>
-            <p className="text-2xl font-bold text-emerald-400 tabular-nums">{totals.totalRegularHours.toFixed(1)}</p>
+            <p className="text-2xl font-bold text-emerald-600 tabular-nums">{totals.totalRegularHours.toFixed(1)}</p>
           </div>
 
           {/* Overtime Hours */}
-          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5">
+          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <AlertTriangle size={13} className="text-orange-400" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Overtime</span>
+              <AlertTriangle size={13} className="text-orange-600" />
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Overtime</span>
             </div>
-            <p className={`text-2xl font-bold tabular-nums ${totals.totalOvertimeHours > 0 ? 'text-orange-400' : 'text-slate-600'}`}>
+            <p className={`text-2xl font-bold tabular-nums ${totals.totalOvertimeHours > 0 ? 'text-orange-600' : 'text-gray-300'}`}>
               {totals.totalOvertimeHours.toFixed(1)}
             </p>
           </div>
 
           {/* Break Deducted */}
-          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5">
+          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <Coffee size={13} className="text-sky-400" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Breaks</span>
+              <Coffee size={13} className="text-sky-600" />
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Breaks</span>
             </div>
-            <p className="text-2xl font-bold text-sky-400 tabular-nums">
+            <p className="text-2xl font-bold text-sky-600 tabular-nums">
               {totals.totalBreakMinutes > 0 ? `${(totals.totalBreakMinutes / 60).toFixed(1)}` : '0.0'}
             </p>
-            <p className="text-[10px] text-slate-600 mt-0.5">{totals.totalBreakMinutes} min deducted</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{totals.totalBreakMinutes} min deducted</p>
           </div>
 
           {/* Pending Approvals */}
-          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5">
+          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <Clock size={13} className={totals.pendingApprovals > 0 ? 'text-amber-400' : 'text-emerald-400'} />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pending</span>
+              <Clock size={13} className={totals.pendingApprovals > 0 ? 'text-amber-600' : 'text-emerald-600'} />
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Pending</span>
             </div>
-            <p className={`text-2xl font-bold tabular-nums ${totals.pendingApprovals > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+            <p className={`text-2xl font-bold tabular-nums ${totals.pendingApprovals > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
               {totals.pendingApprovals}
             </p>
           </div>
 
           {/* Active Clock-ins */}
-          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5">
+          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <Zap size={13} className={totals.activeClockins > 0 ? 'text-emerald-400' : 'text-slate-600'} />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Active</span>
+              <Zap size={13} className={totals.activeClockins > 0 ? 'text-emerald-600' : 'text-gray-300'} />
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Active</span>
             </div>
-            <p className={`text-2xl font-bold tabular-nums ${totals.activeClockins > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>
+            <p className={`text-2xl font-bold tabular-nums ${totals.activeClockins > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
               {totals.activeClockins}
             </p>
-            <p className="text-[10px] text-slate-600 mt-0.5">clocked in now</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">clocked in now</p>
           </div>
         </div>
 
@@ -505,7 +505,7 @@ export default function AdminTimecardsPage() {
           <button
             onClick={handleExportPDF}
             disabled={teamMembers.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-sm font-semibold border border-white/10 transition-all disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-semibold border border-gray-200 transition-all disabled:opacity-40"
           >
             <Download size={14} />
             Export Week PDF
@@ -514,7 +514,7 @@ export default function AdminTimecardsPage() {
           <button
             onClick={handleExportCSV}
             disabled={teamMembers.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-sm font-semibold border border-white/10 transition-all disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-semibold border border-gray-200 transition-all disabled:opacity-40"
           >
             <FileText size={14} />
             Export Week CSV
@@ -522,7 +522,7 @@ export default function AdminTimecardsPage() {
 
           {statusCounts.noEntries > 0 && (
             <button
-              className="flex items-center gap-1.5 px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 rounded-lg text-sm font-semibold border border-amber-500/20 transition-all ml-auto"
+              className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-sm font-semibold border border-amber-200 transition-all ml-auto"
               title="Feature placeholder - SMS integration needed"
               onClick={() => alert(`${statusCounts.noEntries} team member(s) have no entries this week. SMS reminders require SMS integration.`)}
             >
@@ -534,7 +534,7 @@ export default function AdminTimecardsPage() {
 
         {/* ── Filters ────────────────────────────────────── */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 bg-white/[0.03] rounded-lg p-1 border border-white/5">
+          <div className="flex gap-1 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
             {([
               { key: 'all' as const, label: `All (${teamMembers.length})` },
               { key: 'pending' as const, label: `Pending (${statusCounts.pending})` },
@@ -553,7 +553,7 @@ export default function AdminTimecardsPage() {
                         : key === 'no_entries'
                           ? 'bg-red-600 text-white shadow-sm'
                           : 'bg-purple-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 {label}
@@ -562,41 +562,41 @@ export default function AdminTimecardsPage() {
           </div>
 
           <div className="relative flex-1 min-w-[160px] max-w-xs">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Search team..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white/[0.03] border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/50 transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all shadow-sm"
             />
           </div>
 
-          <div className="hidden lg:flex items-center gap-1 text-[10px] text-slate-600 ml-auto">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500/20 border border-emerald-500/40" /> Approved</span>
-            <span className="flex items-center gap-1 ml-2"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500/20 border border-amber-500/40" /> Pending</span>
-            <span className="flex items-center gap-1 ml-2"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500/30 ring-1 ring-emerald-500/50" /> Active</span>
-            <span className="flex items-center gap-1 ml-2"><span className="w-2.5 h-2.5 rounded-sm bg-slate-800" /> No Entry</span>
+          <div className="hidden lg:flex items-center gap-1 text-[10px] text-gray-500 ml-auto">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300" /> Approved</span>
+            <span className="flex items-center gap-1 ml-2"><span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300" /> Pending</span>
+            <span className="flex items-center gap-1 ml-2"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-200 ring-1 ring-emerald-400" /> Active</span>
+            <span className="flex items-center gap-1 ml-2"><span className="w-2.5 h-2.5 rounded-sm bg-gray-100 border border-gray-300" /> No Entry</span>
           </div>
         </div>
 
         {/* ── Team Table ──────────────────────────────────── */}
-        <div className="bg-white/[0.02] rounded-xl border border-white/5 overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           {loading ? (
             <div className="p-16 text-center">
               <div className="w-10 h-10 mx-auto mb-3 relative">
-                <div className="absolute inset-0 rounded-full border-[3px] border-slate-800"></div>
-                <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-purple-500 animate-spin"></div>
+                <div className="absolute inset-0 rounded-full border-[3px] border-gray-200"></div>
+                <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-blue-600 animate-spin"></div>
               </div>
-              <p className="text-slate-500 text-sm">Loading team data...</p>
+              <p className="text-gray-500 text-sm">Loading team data...</p>
             </div>
           ) : filteredMembers.length === 0 ? (
             <div className="p-16 text-center">
-              <div className="w-16 h-16 bg-white/[0.03] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Users className="text-slate-600" size={28} />
+              <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Users className="text-gray-300" size={28} />
               </div>
-              <p className="text-slate-400 font-semibold">No team members found</p>
-              <p className="text-slate-600 text-sm mt-1">
+              <p className="text-gray-600 font-semibold">No team members found</p>
+              <p className="text-gray-400 text-sm mt-1">
                 {searchQuery ? 'Try a different search' : 'No timecards for this period'}
               </p>
             </div>
@@ -604,38 +604,38 @@ export default function AdminTimecardsPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px]">
                 <thead>
-                  <tr className="border-b border-white/5">
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[220px]">
+                  <tr className="border-b border-gray-200 bg-gray-50/80">
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider w-[220px]">
                       Team Member
                     </th>
                     {DAY_NAMES.map((day, idx) => (
-                      <th key={day} className="px-2 py-3 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[72px]">
+                      <th key={day} className="px-2 py-3 text-center text-[10px] font-bold text-gray-500 uppercase tracking-wider w-[72px]">
                         <div>{day}</div>
-                        <div className="text-slate-700 font-normal mt-0.5">{formatDateForDay(monday, idx)}</div>
+                        <div className="text-gray-400 font-normal mt-0.5">{formatDateForDay(monday, idx)}</div>
                       </th>
                     ))}
-                    <th className="px-3 py-3 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[80px]">
+                    <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-500 uppercase tracking-wider w-[80px]">
                       Total
                     </th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[60px]">
+                    <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-500 uppercase tracking-wider w-[60px]">
                       OT
                     </th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[90px]">
+                    <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-500 uppercase tracking-wider w-[90px]">
                       Status
                     </th>
-                    <th className="px-3 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider w-[140px]">
+                    <th className="px-3 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-wider w-[140px]">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/[0.03]">
+                <tbody className="divide-y divide-gray-100">
                   {filteredMembers.map((member) => {
                     const roleBadge = getRoleBadge(member.role);
                     return (
                       <tr
                         key={member.userId}
                         onClick={() => navigateToOperator(member.userId)}
-                        className="group cursor-pointer hover:bg-white/[0.03] transition-colors"
+                        className="group cursor-pointer hover:bg-gray-50 transition-colors"
                       >
                         {/* Name + Avatar */}
                         <td className="px-4 py-3">
@@ -649,12 +649,12 @@ export default function AdminTimecardsPage() {
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="text-sm font-semibold text-white truncate">{member.fullName}</p>
+                                <p className="text-sm font-semibold text-gray-900 truncate">{member.fullName}</p>
                                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${roleBadge.color}`}>
                                   {roleBadge.label}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-slate-600 truncate">{member.email}</p>
+                              <p className="text-[11px] text-gray-400 truncate">{member.email}</p>
                             </div>
                           </div>
                         </td>
@@ -670,7 +670,7 @@ export default function AdminTimecardsPage() {
                                     <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                                   </span>
                                 ) : (
-                                  <span className="text-slate-700">-</span>
+                                  <span className="text-gray-300">-</span>
                                 )}
                               </div>
                             </td>
@@ -680,7 +680,7 @@ export default function AdminTimecardsPage() {
                         {/* Weekly Total */}
                         <td className="px-3 py-3 text-center">
                           <span className={`text-sm font-bold tabular-nums ${
-                            member.weeklyTotal > 0 ? 'text-white' : 'text-slate-700'
+                            member.weeklyTotal > 0 ? 'text-gray-900' : 'text-gray-300'
                           }`}>
                             {member.weeklyTotal > 0 ? member.weeklyTotal.toFixed(1) : '-'}
                           </span>
@@ -689,36 +689,36 @@ export default function AdminTimecardsPage() {
                         {/* OT */}
                         <td className="px-3 py-3 text-center">
                           {member.overtimeHours > 0 ? (
-                            <span className="text-sm font-bold text-orange-400 tabular-nums">
+                            <span className="text-sm font-bold text-orange-600 tabular-nums">
                               {member.overtimeHours.toFixed(1)}
                             </span>
                           ) : (
-                            <span className="text-sm text-slate-700">-</span>
+                            <span className="text-sm text-gray-300">-</span>
                           )}
                         </td>
 
                         {/* Status */}
                         <td className="px-3 py-3 text-center">
                           {member.status === 'clocked_in' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                               Active
                             </span>
                           )}
                           {member.status === 'has_pending' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
                               <Clock size={10} />
                               {member.pendingCount}P
                             </span>
                           )}
                           {member.status === 'all_approved' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               <CheckCircle size={10} />
                               OK
                             </span>
                           )}
                           {member.status === 'no_entries' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
                               <AlertTriangle size={10} />
                               None
                             </span>
@@ -730,7 +730,7 @@ export default function AdminTimecardsPage() {
                           <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={(e) => { e.stopPropagation(); navigateToOperator(member.userId); }}
-                              className="flex items-center gap-1 px-2 py-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-md text-[11px] font-semibold border border-white/10 transition-all"
+                              className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 rounded-md text-[11px] font-semibold border border-gray-200 transition-all"
                             >
                               <Eye size={11} />
                               Detail
@@ -738,7 +738,7 @@ export default function AdminTimecardsPage() {
                             {member.pendingCount > 0 && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleApproveUser(member.userId); }}
-                                className="flex items-center gap-1 px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-md text-[11px] font-semibold border border-emerald-500/20 transition-all"
+                                className="flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-[11px] font-semibold border border-emerald-200 transition-all"
                               >
                                 <Shield size={11} />
                                 Approve
@@ -753,9 +753,9 @@ export default function AdminTimecardsPage() {
 
                 {/* Footer totals row */}
                 <tfoot>
-                  <tr className="border-t border-white/10 bg-white/[0.02]">
+                  <tr className="border-t border-gray-200 bg-gray-50/80">
                     <td className="px-4 py-3">
-                      <span className="text-xs font-bold text-slate-400 uppercase">
+                      <span className="text-xs font-bold text-gray-500 uppercase">
                         Totals ({filteredMembers.length} members)
                       </span>
                     </td>
@@ -763,19 +763,19 @@ export default function AdminTimecardsPage() {
                       const dayTotal = filteredMembers.reduce((sum, m) => sum + (m.dailyHours[day]?.hours || 0), 0);
                       return (
                         <td key={day} className="px-2 py-3 text-center">
-                          <span className={`text-xs font-bold tabular-nums ${dayTotal > 0 ? 'text-purple-400' : 'text-slate-700'}`}>
+                          <span className={`text-xs font-bold tabular-nums ${dayTotal > 0 ? 'text-purple-600' : 'text-gray-300'}`}>
                             {dayTotal > 0 ? dayTotal.toFixed(1) : '-'}
                           </span>
                         </td>
                       );
                     })}
                     <td className="px-3 py-3 text-center">
-                      <span className="text-sm font-bold text-purple-400 tabular-nums">
+                      <span className="text-sm font-bold text-purple-600 tabular-nums">
                         {filteredMembers.reduce((s, m) => s + m.weeklyTotal, 0).toFixed(1)}
                       </span>
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <span className="text-sm font-bold text-orange-400 tabular-nums">
+                      <span className="text-sm font-bold text-orange-600 tabular-nums">
                         {filteredMembers.reduce((s, m) => s + m.overtimeHours, 0).toFixed(1)}
                       </span>
                     </td>
@@ -789,28 +789,28 @@ export default function AdminTimecardsPage() {
         </div>
 
         {/* ── Legend ──────────────────────────────────────── */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 px-2 py-3 text-[11px] text-slate-600">
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 px-2 py-3 text-[11px] text-gray-500">
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/40" />
+            <span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300" />
             <span>Approved</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500/40" />
+            <span className="w-3 h-3 rounded bg-amber-100 border border-amber-300" />
             <span>Pending Review</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-emerald-500/30 ring-1 ring-emerald-500/50" />
+            <span className="w-3 h-3 rounded bg-emerald-200 ring-1 ring-emerald-400" />
             <span>Currently Active</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-red-500/15 border border-red-500/30" />
+            <span className="w-3 h-3 rounded bg-red-100 border border-red-200" />
             <span>No Entries</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-orange-500/20 border border-orange-500/40" />
+            <span className="w-3 h-3 rounded bg-orange-100 border border-orange-300" />
             <span>Has Overtime</span>
           </div>
-          <div className="ml-auto text-slate-600">
+          <div className="ml-auto text-gray-400">
             Click any row to view detailed breakdown
           </div>
         </div>

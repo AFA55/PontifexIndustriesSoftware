@@ -316,28 +316,28 @@ export default function AdminNotificationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
-      <div className="bg-slate-900/80 border-b border-white/10 sticky top-0 z-40 backdrop-blur-xl">
+      <div className="bg-white/80 border-b border-gray-200 shadow-sm sticky top-0 z-40 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link href="/dashboard/admin" className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-                <ArrowLeft className="w-5 h-5 text-gray-400" />
+              <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                <ArrowLeft className="w-5 h-5 text-gray-500" />
               </Link>
               <div>
-                <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Bell className="w-5 h-5 text-purple-400" />
+                <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-blue-600" />
                   Notification Center
                 </h1>
-                <p className="text-xs text-gray-400">Send notifications and manage settings</p>
+                <p className="text-xs text-gray-500">Send notifications and manage settings</p>
               </div>
             </div>
 
@@ -345,7 +345,7 @@ export default function AdminNotificationsPage() {
             <button
               onClick={handleSendClockInReminder}
               disabled={sendingReminder}
-              className="flex items-center gap-2 px-4 py-2.5 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/30 text-orange-300 rounded-xl text-sm font-semibold transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 rounded-xl text-sm font-semibold transition-all"
             >
               {sendingReminder ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
               Send Clock-In Reminder
@@ -364,8 +364,8 @@ export default function AdminNotificationsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-all ${
                   activeTab === tab.id
-                    ? 'bg-white/10 text-white border-b-2 border-purple-500'
-                    : 'text-gray-400 hover:text-gray-300 hover:bg-white/5'
+                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
+                    : 'text-gray-400 hover:text-gray-300 hover:bg-gray-50'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
@@ -381,14 +381,14 @@ export default function AdminNotificationsPage() {
         {sendResult && (
           <div className={`mb-6 p-4 rounded-2xl border ${
             sendResult.type === 'success'
-              ? 'bg-green-500/10 border-green-500/30 text-green-300'
-              : 'bg-red-500/10 border-red-500/30 text-red-300'
+              ? 'bg-green-50 border-green-200 text-green-700'
+              : 'bg-red-50 border-red-200 text-red-700'
           } flex items-center justify-between`}>
             <div className="flex items-center gap-2">
               {sendResult.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
               <span className="text-sm font-semibold">{sendResult.text}</span>
             </div>
-            <button onClick={() => setSendResult(null)} className="p-1 hover:bg-white/10 rounded-lg">
+            <button onClick={() => setSendResult(null)} className="p-1 hover:bg-gray-100 rounded-lg">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -398,9 +398,9 @@ export default function AdminNotificationsPage() {
         {activeTab === 'send' && (
           <div className="space-y-6">
             {/* Recipient Selection */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-purple-400" />
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+              <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-600" />
                 Recipients
               </h3>
 
@@ -416,8 +416,8 @@ export default function AdminNotificationsPage() {
                     onClick={() => setSelectMode(opt.mode)}
                     className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                       selectMode === opt.mode
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
                     {opt.label}
@@ -434,7 +434,7 @@ export default function AdminNotificationsPage() {
                       placeholder="Search team members..."
                       value={userSearch}
                       onChange={e => setUserSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
                     />
                   </div>
                   <div className="max-h-48 overflow-y-auto space-y-1">
@@ -443,34 +443,34 @@ export default function AdminNotificationsPage() {
                         key={member.id}
                         className={`flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-colors ${
                           selectedUsers.includes(member.id)
-                            ? 'bg-purple-600/20 border border-purple-500/30'
-                            : 'hover:bg-white/5'
+                            ? 'bg-blue-50 border border-blue-200'
+                            : 'hover:bg-gray-50'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={selectedUsers.includes(member.id)}
                           onChange={() => toggleUser(member.id)}
-                          className="w-4 h-4 rounded border-gray-600 bg-transparent text-purple-600 focus:ring-purple-500"
+                          className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600 focus:ring-blue-500"
                         />
                         <div className="flex-1">
-                          <span className="text-sm font-medium text-white">{member.full_name}</span>
-                          <span className="text-xs text-gray-500 ml-2">{member.role}</span>
+                          <span className="text-sm font-medium text-gray-900">{member.full_name}</span>
+                          <span className="text-xs text-gray-400 ml-2">{member.role}</span>
                         </div>
                       </label>
                     ))}
                   </div>
                   {selectedUsers.length > 0 && (
-                    <p className="text-xs text-purple-400 mt-2">{selectedUsers.length} selected</p>
+                    <p className="text-xs text-blue-600 mt-2">{selectedUsers.length} selected</p>
                   )}
                 </>
               )}
             </div>
 
             {/* Message Composition */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-purple-400" />
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+              <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-blue-600" />
                 Message
               </h3>
 
@@ -481,7 +481,7 @@ export default function AdminNotificationsPage() {
                   <select
                     value={notifType}
                     onChange={e => setNotifType(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-purple-500/50"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
                   >
                     <option value="custom">Custom</option>
                     <option value="reminder">Reminder</option>
@@ -499,7 +499,7 @@ export default function AdminNotificationsPage() {
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     placeholder="Notification title..."
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
                   />
                 </div>
 
@@ -510,7 +510,7 @@ export default function AdminNotificationsPage() {
                     onChange={e => setMessage(e.target.value)}
                     placeholder="Write your message..."
                     rows={4}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 resize-none"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
                   />
                 </div>
 
@@ -521,7 +521,7 @@ export default function AdminNotificationsPage() {
                     value={actionUrl}
                     onChange={e => setActionUrl(e.target.value)}
                     placeholder="/dashboard/timecard"
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
                   />
                 </div>
 
@@ -532,18 +532,18 @@ export default function AdminNotificationsPage() {
                       type="checkbox"
                       checked={bypassNfc}
                       onChange={e => setBypassNfc(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-600 bg-transparent text-purple-600 focus:ring-purple-500"
+                      className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-300">Bypass NFC</span>
+                    <span className="text-sm text-gray-600">Bypass NFC</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={sendEmailToo}
                       onChange={e => setSendEmailToo(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-600 bg-transparent text-purple-600 focus:ring-purple-500"
+                      className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-300">Also send email</span>
+                    <span className="text-sm text-gray-600">Also send email</span>
                   </label>
                 </div>
               </div>
@@ -551,7 +551,7 @@ export default function AdminNotificationsPage() {
               <button
                 onClick={handleSend}
                 disabled={sending}
-                className="mt-6 w-full flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50"
+                className="mt-6 w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Send Notification
@@ -562,22 +562,22 @@ export default function AdminNotificationsPage() {
 
         {/* Settings Tab */}
         {activeTab === 'settings' && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-            <h3 className="text-sm font-bold text-white mb-6 flex items-center gap-2">
-              <Settings className="w-4 h-4 text-purple-400" />
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+            <h3 className="text-sm font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <Settings className="w-4 h-4 text-blue-600" />
               Auto-Notification Settings
             </h3>
 
             <div className="space-y-6">
               {/* Auto Clock-In Reminder */}
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
                 <div>
-                  <p className="text-sm font-semibold text-white">Auto Clock-In Reminder</p>
+                  <p className="text-sm font-semibold text-gray-900">Auto Clock-In Reminder</p>
                   <p className="text-xs text-gray-400 mt-1">Send reminder to operators who haven't clocked in</p>
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_clock_in_reminder: !s.auto_clock_in_reminder }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_clock_in_reminder ? 'text-purple-400' : 'text-gray-600'}`}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_clock_in_reminder ? 'text-blue-600' : 'text-gray-300'}`}
                 >
                   {settings.auto_clock_in_reminder
                     ? <ToggleRight className="w-8 h-8" />
@@ -593,20 +593,20 @@ export default function AdminNotificationsPage() {
                     type="time"
                     value={settings.clock_in_reminder_time}
                     onChange={e => setSettings(s => ({ ...s, clock_in_reminder_time: e.target.value }))}
-                    className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-purple-500/50"
+                    className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
                   />
                 </div>
               )}
 
               {/* Auto Overtime Alert */}
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
                 <div>
-                  <p className="text-sm font-semibold text-white">Auto Overtime Alert</p>
+                  <p className="text-sm font-semibold text-gray-900">Auto Overtime Alert</p>
                   <p className="text-xs text-gray-400 mt-1">Alert when operator approaches overtime threshold</p>
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_overtime_alert: !s.auto_overtime_alert }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_overtime_alert ? 'text-purple-400' : 'text-gray-600'}`}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_overtime_alert ? 'text-blue-600' : 'text-gray-300'}`}
                 >
                   {settings.auto_overtime_alert
                     ? <ToggleRight className="w-8 h-8" />
@@ -622,20 +622,20 @@ export default function AdminNotificationsPage() {
                     type="number"
                     value={settings.overtime_alert_threshold}
                     onChange={e => setSettings(s => ({ ...s, overtime_alert_threshold: parseFloat(e.target.value) || 40 }))}
-                    className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-purple-500/50 w-32"
+                    className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 w-32"
                   />
                 </div>
               )}
 
               {/* Auto Timecard Approval Reminder */}
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
                 <div>
-                  <p className="text-sm font-semibold text-white">Weekly Approval Reminder</p>
+                  <p className="text-sm font-semibold text-gray-900">Weekly Approval Reminder</p>
                   <p className="text-xs text-gray-400 mt-1">Send weekly reminder to approve pending timecards</p>
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_timecard_approval_reminder: !s.auto_timecard_approval_reminder }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_timecard_approval_reminder ? 'text-purple-400' : 'text-gray-600'}`}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_timecard_approval_reminder ? 'text-blue-600' : 'text-gray-300'}`}
                 >
                   {settings.auto_timecard_approval_reminder
                     ? <ToggleRight className="w-8 h-8" />
@@ -647,7 +647,7 @@ export default function AdminNotificationsPage() {
               <button
                 onClick={handleSaveSettings}
                 disabled={savingSettings}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50"
               >
                 {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {settingsSaved ? 'Saved!' : 'Save Settings'}
@@ -658,33 +658,33 @@ export default function AdminNotificationsPage() {
 
         {/* History Tab */}
         {activeTab === 'history' && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-white/10">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-purple-400" />
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-blue-600" />
                 Recently Sent Notifications
               </h3>
             </div>
 
             {historyLoading ? (
               <div className="py-10 text-center">
-                <Loader2 className="w-6 h-6 text-purple-400 animate-spin mx-auto" />
+                <Loader2 className="w-6 h-6 text-blue-600 animate-spin mx-auto" />
               </div>
             ) : sentNotifications.length === 0 ? (
               <div className="py-10 text-center text-gray-500 text-sm">
                 No sent notifications found
               </div>
             ) : (
-              <div className="divide-y divide-white/5">
+              <div className="divide-y divide-gray-100">
                 {sentNotifications.map(notif => (
-                  <div key={notif.id} className="px-6 py-4 hover:bg-white/5 transition-colors">
+                  <div key={notif.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-white">{notif.title}</p>
+                        <p className="text-sm font-semibold text-gray-900">{notif.title}</p>
                         <p className="text-xs text-gray-400 mt-0.5">
                           To: {profileMap[notif.user_id] || notif.user_id.slice(0, 8)}
                           <span className="mx-2">|</span>
-                          Type: <span className="text-purple-400">{notif.type}</span>
+                          Type: <span className="text-blue-600">{notif.type}</span>
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
