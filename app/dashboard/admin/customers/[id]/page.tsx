@@ -276,7 +276,7 @@ export default function CustomerDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
       </div>
     );
@@ -299,7 +299,7 @@ export default function CustomerDetailPage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-white">
       <div className="container mx-auto px-4 md:px-6 py-6 max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

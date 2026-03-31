@@ -31,7 +31,7 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-slate-800 rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
         className={`w-full ${gradient} px-6 py-4 text-white flex items-center justify-between`}
@@ -66,13 +66,13 @@ function TextInput({
 }) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-400 mb-1.5">{label}</label>
+      <label className="block text-xs font-bold text-gray-600 mb-1.5">{label}</label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2.5 text-gray-900 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+        className="w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
       />
     </div>
   );
@@ -90,20 +90,20 @@ function ColorInput({
 }) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-400 mb-1.5">{label}</label>
+      <label className="block text-xs font-bold text-gray-600 mb-1.5">{label}</label>
       <div className="flex items-center gap-2">
         <input
           type="color"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-10 h-10 rounded-lg border border-slate-600 cursor-pointer bg-transparent p-0.5"
+          className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer bg-transparent p-0.5"
         />
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="#000000"
-          className="flex-1 px-3 py-2.5 text-gray-900 bg-white border border-slate-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          className="flex-1 px-3 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         />
       </div>
     </div>
@@ -125,8 +125,8 @@ function Toggle({
   return (
     <div className="flex items-center justify-between gap-4 py-2">
       <div className="flex-1">
-        <span className="text-sm font-semibold text-white">{label}</span>
-        {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+        <span className="text-sm font-semibold text-gray-900">{label}</span>
+        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
       </div>
       <label className="relative inline-flex items-center cursor-pointer">
         <input
@@ -135,7 +135,7 @@ function Toggle({
           onChange={(e) => onChange(e.target.checked)}
           className="sr-only peer"
         />
-        <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600" />
+        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600" />
       </label>
     </div>
   );
@@ -210,7 +210,7 @@ function LogoUpload({
 
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-400 mb-1.5">{label}</label>
+      <label className="block text-xs font-bold text-gray-600 mb-1.5">{label}</label>
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
@@ -218,32 +218,32 @@ function LogoUpload({
         onClick={() => inputRef.current?.click()}
         className={`relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
           dragOver
-            ? 'border-purple-400 bg-purple-500/10'
-            : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
+            ? 'border-purple-400 bg-purple-50'
+            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
         }`}
       >
         {uploading ? (
           <div className="flex items-center justify-center gap-2 py-2">
-            <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
-            <span className="text-sm text-slate-300">Uploading...</span>
+            <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+            <span className="text-sm text-gray-500">Uploading...</span>
           </div>
         ) : currentUrl ? (
           <div className="flex items-center gap-3">
             <img
               src={currentUrl}
               alt={label}
-              className="w-16 h-16 object-contain rounded-lg bg-white/10 p-1"
+              className="w-16 h-16 object-contain rounded-lg bg-gray-100 p-1"
             />
             <div className="flex-1 text-left">
-              <p className="text-xs text-slate-300 truncate max-w-[200px]">{currentUrl.split('/').pop()}</p>
-              <p className="text-xs text-purple-400 mt-1">Click or drop to replace</p>
+              <p className="text-xs text-gray-600 truncate max-w-[200px]">{currentUrl.split('/').pop()}</p>
+              <p className="text-xs text-purple-600 mt-1">Click or drop to replace</p>
             </div>
           </div>
         ) : (
           <div className="py-2">
-            <Upload className="w-6 h-6 text-slate-500 mx-auto mb-1" />
-            <p className="text-xs text-slate-400">Click or drag & drop</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">PNG, JPG, SVG, ICO - Max 2MB</p>
+            <Upload className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+            <p className="text-xs text-gray-500">Click or drag & drop</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">PNG, JPG, SVG, ICO - Max 2MB</p>
           </div>
         )}
         <input
@@ -366,31 +366,31 @@ export default function BrandingSettingsPage() {
 
   if (loading || !form) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500 mx-auto mb-3" />
-          <p className="text-slate-400 font-medium">Loading branding settings...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-3" />
+          <p className="text-gray-500 font-medium">Loading branding settings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
-      <div className="backdrop-blur-xl bg-slate-900/90 border-b border-slate-700 sticky top-0 z-30 shadow-lg">
+      <div className="backdrop-blur-xl bg-white/90 border-b border-gray-200 sticky top-0 z-30 shadow-sm">
         <div className="container mx-auto px-4 md:px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link href="/dashboard/admin/settings" className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all">
-                <ChevronLeft className="w-5 h-5 text-slate-300" />
+              <Link href="/dashboard/admin/settings" className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all">
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
               </Link>
               <div>
-                <h1 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
-                  <Palette className="w-5 h-5 text-purple-400" />
+                <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Palette className="w-5 h-5 text-purple-600" />
                   Company Branding
                 </h1>
-                <p className="text-slate-400 text-xs">Customize company name, logos, colors, and feature modules</p>
+                <p className="text-gray-500 text-xs">Customize company name, logos, colors, and feature modules</p>
               </div>
             </div>
             <button
@@ -408,13 +408,13 @@ export default function BrandingSettingsPage() {
       <div className="container mx-auto px-4 md:px-6 py-6 max-w-4xl pb-32">
         {/* Toasts */}
         {saved && (
-          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-green-900/50 border border-green-700 rounded-xl text-green-300 text-sm font-semibold">
+          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-semibold">
             <CheckCircle className="w-4 h-4" />
             Branding saved successfully!
           </div>
         )}
         {error && (
-          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-900/50 border border-red-700 rounded-xl text-red-300 text-sm font-semibold">
+          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
             <AlertTriangle className="w-4 h-4" />
             {error}
             <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
@@ -483,7 +483,7 @@ export default function BrandingSettingsPage() {
             </div>
             {/* Live preview */}
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-2">Color Preview</label>
+              <label className="block text-xs font-bold text-gray-600 mb-2">Color Preview</label>
               <div className="flex rounded-xl overflow-hidden h-10 border border-slate-600">
                 <div className="flex-1" style={{ backgroundColor: form.primary_color }} title="Primary" />
                 <div className="flex-1" style={{ backgroundColor: form.primary_color_dark }} title="Primary Dark" />

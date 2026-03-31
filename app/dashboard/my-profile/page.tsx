@@ -10,6 +10,7 @@ import {
   Loader2, CheckCircle, Camera
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 
 interface MyProfile {
   id: string;
@@ -27,8 +28,8 @@ interface MyProfile {
 }
 
 async function apiFetch(url: string, opts?: RequestInit) {
-  const stored = typeof window !== 'undefined' ? localStorage.getItem('supabase-user') : null;
-  const token = stored ? JSON.parse(stored).session?.access_token : null;
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token || '';
   return fetch(url, {
     ...opts,
     headers: {
@@ -115,31 +116,31 @@ export default function MyProfilePage() {
   const roleName = profile?.role === 'apprentice' ? 'Helper' : profile?.role === 'operator' ? 'Operator' : profile?.role || '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 md:px-6 py-6 max-w-2xl">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/dashboard" className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-            <ChevronLeft className="w-5 h-5" />
+          <Link href="/dashboard" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+            <ChevronLeft className="w-5 h-5 text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <User className="w-6 h-6 text-purple-400" />
+            <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900">
+              <User className="w-6 h-6 text-purple-600" />
               My Profile
             </h1>
-            <p className="text-sm text-gray-400">View and edit your information</p>
+            <p className="text-sm text-gray-500">View and edit your information</p>
           </div>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+            <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
           </div>
         ) : profile ? (
           <div className="space-y-6">
             {/* Profile Header Card */}
-            <div className="bg-white/5 rounded-2xl border border-white/10 p-6 flex items-center gap-5">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 relative">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 flex items-center gap-5 shadow-sm">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 relative">
                 {profile.profile_picture_url ? (
                   <img src={profile.profile_picture_url} alt="" className="w-full h-full rounded-2xl object-cover" />
                 ) : (
@@ -147,122 +148,122 @@ export default function MyProfilePage() {
                     {profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                   </span>
                 )}
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center border-2 border-slate-900">
-                  <Camera className="w-3 h-3" />
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center border-2 border-white">
+                  <Camera className="w-3 h-3 text-white" />
                 </div>
               </div>
               <div>
-                <h2 className="text-xl font-bold">{profile.full_name}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{profile.full_name}</h2>
                 <span className={`inline-flex px-3 py-0.5 rounded-full text-xs font-bold mt-1 ${
-                  profile.role === 'operator' ? 'bg-purple-500/20 text-purple-300' : 'bg-cyan-500/20 text-cyan-300'
+                  profile.role === 'operator' ? 'bg-purple-100 text-purple-700' : 'bg-cyan-100 text-cyan-700'
                 }`}>
                   {roleName}
                 </span>
-                <p className="text-sm text-gray-400 mt-1">{profile.email}</p>
+                <p className="text-sm text-gray-500 mt-1">{profile.email}</p>
               </div>
             </div>
 
             {/* Editable Fields */}
-            <div className="bg-white/5 rounded-2xl border border-white/10 p-6 space-y-5">
-              <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider">Personal Info</h3>
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 shadow-sm">
+              <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Personal Info</h3>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-1">Nickname</label>
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Nickname</label>
                 <input
                   type="text"
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   placeholder="What do people call you?"
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-1">
+                <label className="block text-sm font-semibold text-gray-600 mb-1">
                   Phone Number
-                  <span className="ml-2 text-[10px] font-normal text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded-full">
-                    📱 Used for SMS job notifications
+                  <span className="ml-2 text-[10px] font-normal text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">
+                    Used for SMS job notifications
                   </span>
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="(555) 123-4567"
-                    className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                   />
                 </div>
                 {!phone && (
-                  <p className="text-xs text-amber-400 mt-1">
+                  <p className="text-xs text-amber-600 mt-1">
                     Add your phone number to receive SMS alerts when jobs are dispatched to you.
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-1">Date of Birth</label>
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Date of Birth</label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="date"
                     value={dob}
                     onChange={(e) => setDob(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-1">Profile Picture URL</label>
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Profile Picture URL</label>
                 <input
                   type="url"
                   value={profilePicUrl}
                   onChange={(e) => setProfilePicUrl(e.target.value)}
                   placeholder="https://..."
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                 />
               </div>
             </div>
 
             {/* Emergency Contact */}
-            <div className="bg-white/5 rounded-2xl border border-white/10 p-6 space-y-5">
-              <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-                <Shield className="w-4 h-4 text-red-400" />
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 shadow-sm">
+              <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider flex items-center gap-2">
+                <Shield className="w-4 h-4 text-red-500" />
                 Emergency Contact
               </h3>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-1">Contact Name</label>
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Contact Name</label>
                 <input
                   type="text"
                   value={ecName}
                   onChange={(e) => setEcName(e.target.value)}
                   placeholder="Full name"
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-1">Contact Phone</label>
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Contact Phone</label>
                 <input
                   type="tel"
                   value={ecPhone}
                   onChange={(e) => setEcPhone(e.target.value)}
                   placeholder="(555) 123-4567"
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-1">Relationship</label>
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Relationship</label>
                 <input
                   type="text"
                   value={ecRelationship}
                   onChange={(e) => setEcRelationship(e.target.value)}
                   placeholder="e.g. Spouse, Parent, Sibling"
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                 />
               </div>
             </div>
@@ -271,7 +272,7 @@ export default function MyProfilePage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {saving ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
@@ -283,9 +284,9 @@ export default function MyProfilePage() {
             </button>
           </div>
         ) : (
-          <div className="text-center py-20 text-gray-400">
-            <User className="w-12 h-12 mx-auto mb-3 text-gray-600" />
-            <p>Could not load profile</p>
+          <div className="text-center py-20">
+            <User className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-gray-500">Could not load profile</p>
           </div>
         )}
       </div>
