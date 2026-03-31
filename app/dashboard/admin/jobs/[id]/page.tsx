@@ -2,484 +2,813 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useState, useEffect, useCallback, use } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import {
   ArrowLeft,
+  Calendar,
   MapPin,
-  Clock,
   User,
   Phone,
-  Wrench,
   FileText,
-  CheckCircle,
-  Circle,
-  Navigation,
-  Camera,
-  PenTool,
-  ClipboardCheck,
-  AlertTriangle,
-  Calendar,
-  DollarSign,
-  Building
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Edit3,
+  X,
+  Loader2,
+  ChevronRight,
+  Wrench,
+  ClipboardList,
 } from 'lucide-react';
+import { getCurrentUser } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import JobScopePanel, { type ScopeItem } from '@/components/JobScopePanel';
+import JobProgressChart from '@/components/JobProgressChart';
 
-interface JobOrder {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface JobSummary {
   id: string;
   job_number: string;
-  title: string;
   customer_name: string;
+  customer_phone: string | null;
+  customer_email: string | null;
+  contact_name: string | null;
   job_type: string;
-  location: string;
-  address: string;
-  description: string;
+  location: string | null;
+  address: string | null;
+  description: string | null;
+  scope_of_work: string | null;
   status: string;
-  priority: string;
-  scheduled_date: string;
-  arrival_time: string;
-  shop_arrival_time?: string;
-  estimated_hours: number;
-  foreman_name: string;
-  foreman_phone: string;
-  salesman_name: string;
-  equipment_needed: string[];
-  assigned_operators: string[];
-  quote_amount?: number;
-  po_number?: string;
-  customer_job_number?: string;
-  created_at: string;
+  scheduled_date: string | null;
+  end_date: string | null;
+  arrival_time: string | null;
+  is_will_call: boolean;
+  po_number: string | null;
+  permit_number: string | null;
+  permit_required: boolean;
+  notes: string | null;
+  internal_notes: string | null;
+  operator_name: string | null;
+  helper_name: string | null;
+  assigned_to: string | null;
+  completion_requested_at: string | null;
+  completion_request_notes: string | null;
+  completion_approved_at: string | null;
+  completion_rejected_at: string | null;
+  completion_rejection_notes: string | null;
 }
 
-interface WorkflowStatus {
+interface ActivityEntry {
   id: string;
-  job_order_id: string;
-  operator_id: string;
-  current_step: string;
-  equipment_checklist_completed: boolean;
-  sms_sent: boolean;
-  silica_form_completed: boolean;
-  work_performed_completed: boolean;
-  pictures_submitted: boolean;
-  customer_signature_received: boolean;
-  created_at: string;
-  updated_at: string;
+  date: string | null;
+  timestamp: string | null;
+  operator_name: string;
+  work_type: string;
+  quantity: number;
+  linear_feet: number;
+  cores: number;
+  notes: string | null;
+  day_number: number | null;
+  is_scope_entry?: boolean;
 }
 
-interface OperatorProfile {
-  id: string;
-  full_name: string;
-  email: string;
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+async function getToken() {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || '';
 }
 
-interface WorkflowWithOperator extends WorkflowStatus {
-  operator?: OperatorProfile;
+async function apiFetch(url: string, opts?: RequestInit) {
+  const token = await getToken();
+  return fetch(url, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...opts?.headers,
+    },
+  });
 }
 
-export default function AdminJobDetailPage() {
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatDateTime(ts: string | null) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function formatTime(time: string | null) {
+  if (!time) return null;
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
+}
+
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
+  scheduled: { label: 'Scheduled', bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
+  assigned: { label: 'Assigned', bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+  in_route: { label: 'In Route', bg: 'bg-cyan-100', text: 'text-cyan-700', dot: 'bg-cyan-500' },
+  in_progress: { label: 'In Progress', bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500' },
+  pending_completion: { label: 'Pending Review', bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
+  completed: { label: 'Completed', bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500' },
+  cancelled: { label: 'Cancelled', bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400' },
+};
+
+const WORK_TYPE_LABELS: Record<string, string> = {
+  wall_sawing: 'Wall Sawing',
+  core_drilling: 'Core Drilling',
+  wire_sawing: 'Wire Sawing',
+  flat_sawing: 'Flat Sawing',
+  cleanup: 'Cleanup',
+  mobilization: 'Mobilization',
+  other: 'Other',
+};
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function PageSkeleton() {
+  return (
+    <div className="animate-pulse space-y-6">
+      <div className="h-8 bg-gray-200 rounded w-64" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="h-64 bg-gray-100 rounded-xl" />
+          <div className="h-48 bg-gray-100 rounded-xl" />
+        </div>
+        <div className="h-80 bg-gray-100 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Edit Schedule Modal ───────────────────────────────────────────────────────
+
+interface EditScheduleModalProps {
+  job: JobSummary;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function EditScheduleModal({ job, onClose, onSaved }: EditScheduleModalProps) {
+  const [scheduledDate, setScheduledDate] = useState(job.scheduled_date || '');
+  const [endDate, setEndDate] = useState(job.end_date || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    if (!scheduledDate) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${job.id}/schedule`, {
+        method: 'PUT',
+        body: JSON.stringify({ scheduled_date: scheduledDate, end_date: endDate || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Save failed');
+      onSaved();
+      onClose();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-semibold text-gray-900">Edit Schedule</h3>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <input
+              type="date"
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">End Date (optional)</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              min={scheduledDate}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+
+        <div className="flex items-center gap-2 mt-6">
+          <button
+            onClick={handleSave}
+            disabled={saving || !scheduledDate}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Save
+          </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function AdminJobDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+  const jobId = resolvedParams.id;
+
   const router = useRouter();
-  const params = useParams();
-  const jobId = params.id as string;
-  const [job, setJob] = useState<JobOrder | null>(null);
-  const [workflows, setWorkflows] = useState<WorkflowWithOperator[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [job, setJob] = useState<JobSummary | null>(null);
+  const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
+  const [activityLog, setActivityLog] = useState<ActivityEntry[]>([]);
+  const [pageError, setPageError] = useState<string | null>(null);
 
+  const [showEditSchedule, setShowEditSchedule] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+  // Auth guard
   useEffect(() => {
-    checkAdminAndFetchData();
+    const user = getCurrentUser();
+    if (!user) { router.push('/login'); return; }
+    if (!['admin', 'super_admin', 'operations_manager', 'salesman', 'supervisor'].includes(user.role)) {
+      router.push('/dashboard');
+    }
+  }, [router]);
+
+  const fetchJob = useCallback(async () => {
+    try {
+      setPageError(null);
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/summary`);
+      if (!res.ok) {
+        if (res.status === 404) setPageError('Job not found.');
+        else setPageError('Failed to load job details.');
+        return;
+      }
+      const json = await res.json();
+      setJob(json.data);
+    } catch {
+      setPageError('Network error loading job.');
+    }
   }, [jobId]);
 
-  const checkAdminAndFetchData = async () => {
+  const fetchScope = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-        return;
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/scope`);
+      if (res.ok) {
+        const json = await res.json();
+        setScopeItems(json.data || []);
       }
+    } catch { /* ignore */ }
+  }, [jobId]);
 
-      // Check if user is admin
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
-
-      if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(profile?.role || '')) {
-        router.push('/dashboard');
-        return;
+  const fetchActivity = useCallback(async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token || '';
+      const res = await fetch(`/api/jobs/${jobId}/progress`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setActivityLog(json.data?.activityLog || []);
       }
+    } catch { /* ignore */ }
+  }, [jobId]);
 
-      setIsAdmin(true);
-      await Promise.all([
-        fetchJobDetails(session.access_token),
-        fetchWorkflowProgress(session.access_token)
-      ]);
-    } catch (error) {
-      console.error('Error checking admin:', error);
-    } finally {
+  // Initial load
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      await Promise.all([fetchJob(), fetchScope(), fetchActivity()]);
       setLoading(false);
-    }
-  };
+    };
+    load();
+  }, [fetchJob, fetchScope, fetchActivity]);
 
-  const fetchJobDetails = async (token: string) => {
+  const handleApprove = async () => {
+    if (!job) return;
+    setApproving(true);
+    setActionFeedback(null);
     try {
-      const response = await fetch(`/api/job-orders?id=${jobId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const res = await apiFetch(`/api/admin/jobs/${job.id}/completion-request`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'approve', review_notes: reviewNotes }),
       });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data.length > 0) {
-          setJob(result.data[0]);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching job:', error);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Approval failed');
+      setActionFeedback({ type: 'success', msg: json.message || 'Job approved.' });
+      setReviewNotes('');
+      await fetchJob();
+    } catch (e: unknown) {
+      setActionFeedback({ type: 'error', msg: e instanceof Error ? e.message : 'Action failed' });
+    } finally {
+      setApproving(false);
     }
   };
 
-  const fetchWorkflowProgress = async (token: string) => {
+  const handleReject = async () => {
+    if (!job) return;
+    setRejecting(true);
+    setActionFeedback(null);
     try {
-      // Fetch all workflow records for this job (from all operators)
-      const response = await fetch(`/api/admin/job-workflow?jobId=${jobId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const res = await apiFetch(`/api/admin/jobs/${job.id}/completion-request`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'reject', review_notes: reviewNotes }),
       });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setWorkflows(result.data || []);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching workflow:', error);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Rejection failed');
+      setActionFeedback({ type: 'success', msg: json.message || 'Completion request rejected.' });
+      setReviewNotes('');
+      await fetchJob();
+    } catch (e: unknown) {
+      setActionFeedback({ type: 'error', msg: e instanceof Error ? e.message : 'Action failed' });
+    } finally {
+      setRejecting(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'in_route': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'in_progress': return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'completed': return 'bg-green-100 text-green-800 border-green-300';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'urgent': return 'bg-red-200 text-red-900';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const workflowSteps = [
-    { key: 'equipment_checklist_completed', label: 'Equipment Checklist', icon: ClipboardCheck, description: 'Verified all equipment loaded' },
-    { key: 'sms_sent', label: 'In Route', icon: Navigation, description: 'Started traveling to job site' },
-    { key: 'silica_form_completed', label: 'Silica Form', icon: FileText, description: 'OSHA compliance form completed' },
-    { key: 'work_performed_completed', label: 'Work Performed', icon: Wrench, description: 'Job work details recorded' },
-    { key: 'pictures_submitted', label: 'Pictures', icon: Camera, description: 'Job photos uploaded' },
-    { key: 'customer_signature_received', label: 'Customer Signature', icon: PenTool, description: 'Customer signed off on work' },
-  ];
+  const statusConfig = job ? (STATUS_CONFIG[job.status] || STATUS_CONFIG['scheduled']) : null;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-500 font-medium">Loading job details...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <PageSkeleton />
       </div>
     );
   }
 
-  if (!job) {
+  if (pageError || !job) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Job Not Found</h1>
-          <Link href="/dashboard/admin" className="text-blue-600 hover:text-blue-700">
-            Return to Admin Dashboard
+          <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-600">{pageError || 'Job not found.'}</p>
+          <Link
+            href="/dashboard/admin/schedule-board"
+            className="mt-4 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Schedule Board
           </Link>
         </div>
       </div>
     );
   }
 
+  const isPendingCompletion = job.status === 'pending_completion';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header */}
-      <div className="bg-white/90 backdrop-blur-xl border-b border-gray-200 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link
-              href="/dashboard/admin/schedule-board"
-              className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all font-medium"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back to Schedule</span>
-            </Link>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-            <h1 className="text-xl font-bold text-gray-900">
-              Job #{job.job_number}
-            </h1>
+        {/* Back link */}
+        <Link
+          href="/dashboard/admin/schedule-board"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Schedule Board
+        </Link>
 
-            <div className={`px-4 py-2 rounded-xl font-bold border-2 ${getStatusColor(job.status)}`}>
-              {job.status?.replace('_', ' ').toUpperCase() || 'SCHEDULED'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Job Header Card */}
-        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden mb-6">
-          <div className="bg-gradient-to-r from-red-600 to-red-500 p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-3xl font-bold text-white mb-2">{job.title}</h2>
-                <div className="flex items-center gap-4 text-red-100">
-                  <div className="flex items-center gap-2">
-                    <Building className="w-5 h-5" />
-                    <span>{job.customer_name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Wrench className="w-5 h-5" />
-                    <span>{job.job_type}</span>
-                  </div>
-                </div>
-              </div>
-              <div className={`px-4 py-2 rounded-xl font-bold ${getPriorityColor(job.priority)}`}>
-                {job.priority?.toUpperCase()} PRIORITY
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Location */}
-              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-blue-400" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900">Location</h3>
-                </div>
-                <p className="text-gray-700 font-medium">{job.location}</p>
-                <p className="text-gray-500 text-sm mt-1">{job.address}</p>
-              </div>
-
-              {/* Schedule */}
-              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-green-400" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900">Schedule</h3>
-                </div>
-                <p className="text-gray-700 font-medium">
-                  {job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString() : 'Not scheduled'}
-                </p>
-                <div className="flex gap-4 mt-2 text-sm">
-                  {job.shop_arrival_time && (
-                    <span className="text-gray-500">Shop: <span className="text-green-400">{job.shop_arrival_time}</span></span>
-                  )}
-                  {job.arrival_time && (
-                    <span className="text-gray-500">Site: <span className="text-blue-400">{job.arrival_time}</span></span>
-                  )}
-                </div>
-              </div>
-
-              {/* Contact */}
-              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                    <User className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900">On-Site Contact</h3>
-                </div>
-                <p className="text-gray-700 font-medium">{job.foreman_name || 'N/A'}</p>
-                {job.foreman_phone && (
-                  <a href={`tel:${job.foreman_phone}`} className="flex items-center gap-2 text-blue-400 hover:text-blue-300 mt-1">
-                    <Phone className="w-4 h-4" />
-                    {job.foreman_phone}
-                  </a>
+        {/* Header */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 flex-wrap mb-1">
+                <h1 className="text-xl font-bold text-gray-900 font-mono">{job.job_number}</h1>
+                {statusConfig && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusConfig.bg} ${statusConfig.text}`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
+                    {statusConfig.label}
+                  </span>
                 )}
               </div>
+              <p className="text-base font-semibold text-gray-700">
+                {job.customer_name}
+                {job.job_type && (
+                  <span className="font-normal text-gray-500"> — {job.job_type}</span>
+                )}
+              </p>
 
-              {/* Estimated Hours */}
-              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-orange-400" />
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-sm text-gray-500">
+                {(job.scheduled_date || job.end_date) && (
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="w-4 h-4" />
+                    {formatDate(job.scheduled_date)}
+                    {job.end_date && ` – ${formatDate(job.end_date)}`}
+                  </span>
+                )}
+                {job.operator_name && (
+                  <span className="inline-flex items-center gap-1">
+                    <User className="w-4 h-4" />
+                    {job.operator_name}
+                    {job.helper_name && ` + ${job.helper_name}`}
+                  </span>
+                )}
+                {job.address && (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="w-4 h-4" />
+                    {job.address}
+                  </span>
+                )}
+                {job.arrival_time && (
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    {formatTime(job.arrival_time)}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+              <button
+                onClick={() => setShowEditSchedule(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Edit3 className="w-4 h-4" />
+                Edit Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Action feedback banner */}
+        {actionFeedback && (
+          <div
+            className={`rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2 ${
+              actionFeedback.type === 'success'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}
+          >
+            {actionFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            )}
+            {actionFeedback.msg}
+            <button
+              onClick={() => setActionFeedback(null)}
+              className="ml-auto p-1 hover:bg-black/10 rounded"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Main two-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* Left column: Scope + Chart */}
+          <div className="lg:col-span-2 space-y-6">
+            <JobScopePanel
+              jobId={jobId}
+              jobNumber={job.job_number}
+              readOnly={false}
+              onScopeChange={fetchScope}
+            />
+
+            <JobProgressChart jobId={jobId} scopeItems={scopeItems} />
+
+            {/* Completion Request Panel */}
+            {isPendingCompletion && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-amber-900">Completion Review Required</h3>
+                    <p className="text-sm text-amber-700 mt-1">
+                      {job.operator_name || 'Operator'} submitted on{' '}
+                      {formatDateTime(job.completion_requested_at)}
+                    </p>
+                    {job.completion_request_notes && (
+                      <p className="text-sm text-gray-700 mt-2 bg-white border border-amber-200 rounded-lg p-3 italic">
+                        &ldquo;{job.completion_request_notes}&rdquo;
+                      </p>
+                    )}
+                    <textarea
+                      value={reviewNotes}
+                      onChange={(e) => setReviewNotes(e.target.value)}
+                      placeholder="Review notes (optional)..."
+                      rows={3}
+                      className="mt-3 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none bg-white"
+                    />
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      <button
+                        onClick={handleApprove}
+                        disabled={approving || rejecting}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      >
+                        {approving ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4" />
+                        )}
+                        Approve &amp; Complete Job
+                      </button>
+                      <button
+                        onClick={handleReject}
+                        disabled={approving || rejecting}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors"
+                      >
+                        {rejecting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <XCircle className="w-4 h-4" />
+                        )}
+                        Send Back to Operator
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="font-semibold text-gray-900">Estimated Time</h3>
                 </div>
-                <p className="text-3xl font-bold text-orange-400">{job.estimated_hours || 0} hrs</p>
+              </div>
+            )}
+
+            {/* Activity / Progress Log */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ClipboardList className="w-5 h-5 text-blue-600" />
+                <h2 className="text-base font-semibold text-gray-900">Activity &amp; Progress Log</h2>
               </div>
 
-              {/* Quote */}
-              {job.quote_amount && (
-                <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
-                      <DollarSign className="w-5 h-5 text-green-400" />
+              {activityLog.length === 0 ? (
+                <div className="text-center py-8">
+                  <ClipboardList className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">No activity logged yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {job.completion_requested_at && (
+                    <div className="flex items-start gap-3 text-sm">
+                      <div className="w-2 h-2 mt-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                      <div>
+                        <span className="text-gray-400 text-xs">
+                          {formatDateTime(job.completion_requested_at)}
+                        </span>
+                        <p className="text-gray-700">
+                          <span className="font-medium">{job.operator_name || 'Operator'}</span>{' '}
+                          submitted completion request
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="font-semibold text-gray-900">Quote Amount</h3>
-                  </div>
-                  <p className="text-3xl font-bold text-green-400">${job.quote_amount.toLocaleString()}</p>
+                  )}
+
+                  {job.completion_approved_at && (
+                    <div className="flex items-start gap-3 text-sm">
+                      <div className="w-2 h-2 mt-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                      <div>
+                        <span className="text-gray-400 text-xs">
+                          {formatDateTime(job.completion_approved_at)}
+                        </span>
+                        <p className="text-gray-700">Admin approved job completion</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {job.completion_rejected_at && !job.completion_requested_at && (
+                    <div className="flex items-start gap-3 text-sm">
+                      <div className="w-2 h-2 mt-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                      <div>
+                        <span className="text-gray-400 text-xs">
+                          {formatDateTime(job.completion_rejected_at)}
+                        </span>
+                        <p className="text-gray-700">
+                          Completion request rejected
+                          {job.completion_rejection_notes && (
+                            <span className="text-gray-500 italic"> — &ldquo;{job.completion_rejection_notes}&rdquo;</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {activityLog.map((entry) => (
+                    <div key={entry.id} className="flex items-start gap-3 text-sm">
+                      <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-gray-400 text-xs">
+                          {formatDateTime(entry.timestamp)}
+                          {entry.day_number && (
+                            <span className="ml-1 text-blue-500">Day {entry.day_number}</span>
+                          )}
+                        </span>
+                        <p className="text-gray-700">
+                          <span className="font-medium">{entry.operator_name}</span> logged{' '}
+                          {entry.linear_feet
+                            ? `${entry.linear_feet} linear ft`
+                            : entry.cores
+                            ? `${entry.cores} cores`
+                            : `${entry.quantity} units`}{' '}
+                          <span className="text-gray-500">
+                            {WORK_TYPE_LABELS[entry.work_type] || entry.work_type}
+                          </span>
+                        </p>
+                        {entry.notes && (
+                          <p className="text-xs text-gray-400 italic mt-0.5 truncate">{entry.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
+            </div>
+          </div>
 
-              {/* Salesman */}
-              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
-                    <User className="w-5 h-5 text-yellow-400" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900">Salesman</h3>
+          {/* Right column: Job Details */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-600" />
+                Job Details
+              </h2>
+
+              <dl className="space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Customer</dt>
+                  <dd className="mt-0.5 text-gray-800 font-medium">{job.customer_name}</dd>
                 </div>
-                <p className="text-gray-700 font-medium">{job.salesman_name || 'N/A'}</p>
+
+                {job.contact_name && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Contact</dt>
+                    <dd className="mt-0.5 text-gray-700">{job.contact_name}</dd>
+                  </div>
+                )}
+
+                {job.customer_phone && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Phone</dt>
+                    <dd className="mt-0.5 text-gray-700 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-gray-400" />
+                      {job.customer_phone}
+                    </dd>
+                  </div>
+                )}
+
+                {job.operator_name && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Operator</dt>
+                    <dd className="mt-0.5 text-gray-700 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-gray-400" />
+                      {job.operator_name}
+                      {job.helper_name && (
+                        <span className="text-gray-400"> + {job.helper_name}</span>
+                      )}
+                    </dd>
+                  </div>
+                )}
+
+                <div>
+                  <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Scheduled</dt>
+                  <dd className="mt-0.5 text-gray-700 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                    {formatDate(job.scheduled_date)}
+                    {job.end_date && ` – ${formatDate(job.end_date)}`}
+                  </dd>
+                </div>
+
+                {job.arrival_time && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Arrival Time</dt>
+                    <dd className="mt-0.5 text-gray-700">{formatTime(job.arrival_time)}</dd>
+                  </div>
+                )}
+
+                {job.address && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Address</dt>
+                    <dd className="mt-0.5 text-gray-700 flex items-start gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <span>{job.address}</span>
+                    </dd>
+                  </div>
+                )}
+
+                {job.po_number && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">PO Number</dt>
+                    <dd className="mt-0.5 text-gray-700 font-mono">{job.po_number}</dd>
+                  </div>
+                )}
+
+                {(job.permit_required || job.permit_number) && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Permit</dt>
+                    <dd className="mt-0.5 text-gray-700 flex items-center gap-1.5">
+                      <Wrench className="w-3.5 h-3.5 text-gray-400" />
+                      {job.permit_number || 'Required'}
+                    </dd>
+                  </div>
+                )}
+
+                {job.description && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Description</dt>
+                    <dd className="mt-0.5 text-gray-600 text-xs leading-relaxed">{job.description}</dd>
+                  </div>
+                )}
+
+                {job.notes && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Notes</dt>
+                    <dd className="mt-0.5 text-gray-600 text-xs leading-relaxed bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+                      {job.notes}
+                    </dd>
+                  </div>
+                )}
+
+                {job.internal_notes && (
+                  <div>
+                    <dt className="text-xs font-medium text-amber-500 uppercase tracking-wide">Internal Notes</dt>
+                    <dd className="mt-0.5 text-gray-600 text-xs leading-relaxed bg-amber-50 rounded-lg p-2.5 border border-amber-100">
+                      {job.internal_notes}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+
+            {/* Quick links */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick Links</h3>
+              <div className="space-y-1">
+                <Link
+                  href={`/dashboard/admin/completed-job-tickets/${jobId}`}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors group"
+                >
+                  <span className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-gray-400" />
+                    View Dispatch Ticket
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500" />
+                </Link>
+                <Link
+                  href="/dashboard/admin/billing"
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors group"
+                >
+                  <span className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-gray-400" />
+                    Billing
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500" />
+                </Link>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Job Description */}
-        {job.description && (
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 mb-6">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <FileText className="w-6 h-6 text-blue-400" />
-              Job Description
-            </h3>
-            <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
-              <pre className="whitespace-pre-wrap text-gray-700 font-medium leading-relaxed">
-                {job.description}
-              </pre>
-            </div>
-          </div>
-        )}
-
-        {/* Equipment Checklist */}
-        {job.equipment_needed && job.equipment_needed.length > 0 && (
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 mb-6">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Wrench className="w-6 h-6 text-green-400" />
-              Equipment Required
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {job.equipment_needed.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-xl">
-                  <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-gray-700 font-medium">{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Operator Workflow Progress */}
-        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6">
-          <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <ClipboardCheck className="w-6 h-6 text-red-400" />
-            Operator Workflow Progress
-          </h3>
-
-          {workflows.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="w-8 h-8 text-yellow-400" />
-              </div>
-              <h4 className="text-xl font-semibold text-gray-900 mb-2">No Workflow Started</h4>
-              <p className="text-gray-500">No operator has started working on this job yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {workflows.map((workflow) => (
-                <div key={workflow.id} className="bg-slate-700/30 rounded-2xl p-6">
-                  {/* Operator Header */}
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
-                        <span className="text-white font-bold text-lg">
-                          {workflow.operator?.full_name?.charAt(0) || 'O'}
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white text-lg">
-                          {workflow.operator?.full_name || 'Unknown Operator'}
-                        </h4>
-                        <p className="text-gray-500 text-sm">{workflow.operator?.email}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-gray-500 text-sm">Current Step</p>
-                      <p className="text-white font-semibold">{workflow.current_step?.replace('_', ' ').toUpperCase()}</p>
-                    </div>
-                  </div>
-
-                  {/* Workflow Steps */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    {workflowSteps.map((step, idx) => {
-                      const isCompleted = workflow[step.key as keyof WorkflowStatus] === true;
-                      const StepIcon = step.icon;
-
-                      return (
-                        <div
-                          key={step.key}
-                          className={`relative p-4 rounded-xl border-2 transition-all ${
-                            isCompleted
-                              ? 'bg-green-500/20 border-green-500/50'
-                              : 'bg-slate-700/50 border-slate-600/50'
-                          }`}
-                        >
-                          <div className="flex flex-col items-center text-center">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                              isCompleted ? 'bg-green-500' : 'bg-slate-600'
-                            }`}>
-                              {isCompleted ? (
-                                <CheckCircle className="w-5 h-5 text-white" />
-                              ) : (
-                                <StepIcon className="w-5 h-5 text-gray-500" />
-                              )}
-                            </div>
-                            <span className={`text-xs font-semibold ${
-                              isCompleted ? 'text-green-400' : 'text-gray-500'
-                            }`}>
-                              {step.label}
-                            </span>
-                          </div>
-                          {/* Step Number Badge */}
-                          <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                            isCompleted ? 'bg-green-500 text-white' : 'bg-slate-600 text-gray-700'
-                          }`}>
-                            {idx + 1}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Timestamps */}
-                  <div className="mt-4 pt-4 border-t border-slate-600/50 flex justify-between text-sm text-gray-500">
-                    <span>Started: {new Date(workflow.created_at).toLocaleString()}</span>
-                    <span>Last Update: {new Date(workflow.updated_at).toLocaleString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Edit Schedule Modal */}
+      {showEditSchedule && (
+        <EditScheduleModal
+          job={job}
+          onClose={() => setShowEditSchedule(false)}
+          onSaved={fetchJob}
+        />
+      )}
     </div>
   );
 }

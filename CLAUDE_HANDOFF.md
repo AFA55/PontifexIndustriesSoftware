@@ -7,7 +7,7 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `664b0151` — "merge: security audit fixes from worktree"
+- **Last commit:** `b2c0b0c5` — "feat: smart schedule form, light theme audit, error boundaries, loading states"
 - **All worktree branches merged** — no pending merges
 - **Build:** PASSING (0 errors)
 
@@ -171,9 +171,36 @@ Key timecard tables: `timecards`, `timecard_entries`, `timecard_weeks`, `timecar
 
 ---
 
+## WHAT WAS DONE (This Session)
+
+### Dashboard Redesign
+- `components/DashboardSidebar.tsx` — collapsible sidebar, 4 sections, badges, mobile drawer
+- `app/api/admin/dashboard-summary/route.ts` — KPI data API (jobs, revenue, open items, team)
+- `app/dashboard/admin/layout.tsx` — admin-wide sidebar + header wrapper
+- `app/dashboard/admin/page.tsx` — rebuilt with KPI row, schedule, action required, team status
+
+### Smart Schedule Form
+- `app/api/admin/customers/[id]/po-numbers/route.ts` — PO history from past jobs
+- `app/api/admin/customers/[id]/site-contacts/route.ts` — contact history merged from two sources
+- `app/api/admin/customers/[id]/job-history/route.ts` — last 10 jobs for location hints
+- `components/SmartCombobox.tsx` — reusable combobox with chips, keyboard nav, Add New
+- `app/dashboard/admin/schedule-form/page.tsx` — PO + site contact fields replaced with smart dropdowns
+
+### Light Theme Conversion
+- `app/dashboard/admin/customers/[id]/page.tsx` — full dark→light conversion
+- `app/dashboard/admin/ops-hub/page.tsx` — full dark→light conversion
+- `app/dashboard/admin/form-builder/page.tsx` — full dark→light conversion
+
+### Error Boundaries & Loading States
+- `app/error.tsx` + `app/dashboard/error.tsx` — graceful error UIs with retry
+- `app/not-found.tsx` — clean 404 page
+- `loading.tsx` skeletons for: admin, timecards, billing, customers, schedule-board
+
+---
+
 ## NEXT SESSION PRIORITIES
-1. End-to-end testing of full operator workflow
-2. Mobile responsive audit
-3. Patriot-specific visual branding (logos, colors)
-4. Production deployment prep
-5. Merge to main
+1. Mobile responsive audit on all operator pages (`/dashboard/my-jobs`, `/dashboard/timecard`, `/dashboard/job-schedule/[id]/*`)
+2. E2E workflow test: schedule → dispatch → execute → complete → invoice (manual or scripted)
+3. Patriot-specific visual branding (logo upload, custom colors in tenant_branding)
+4. Production deployment prep (env vars, Vercel config, custom domain)
+5. Final build verification & merge to main
