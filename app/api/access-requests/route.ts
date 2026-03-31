@@ -11,7 +11,7 @@ import bcrypt from 'bcryptjs';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, email, phoneNumber, password, dateOfBirth, position, tenant_id } = body;
+    const { fullName, email, phoneNumber, password, dateOfBirth, position } = body;
 
     // Validation
     if (!fullName || !email || !phoneNumber || !password || !dateOfBirth) {
@@ -103,7 +103,6 @@ export async function POST(request: NextRequest) {
           date_of_birth: dateOfBirth,
           position: position || 'Not specified',
           status: 'pending',
-          tenant_id: tenant_id || null,
         },
       ])
       .select()
@@ -125,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     const emailSent = await sendEmail({
       to: email,
-      subject: `Access Request Received - ${process.env.COMPANY_NAME || 'Your Company'}`,
+      subject: 'Access Request Received - Patriot Concrete Cutting',
       html: confirmationEmailHtml,
     });
 

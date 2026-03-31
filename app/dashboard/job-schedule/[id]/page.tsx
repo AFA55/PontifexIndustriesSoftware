@@ -159,7 +159,7 @@ export default function JobDetail() {
         }
       }
     } catch (error) {
-      console.log('Error fetching workflow status:', error);
+      // silent
     }
   };
 

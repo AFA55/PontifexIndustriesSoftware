@@ -1,5 +1,5 @@
 /**
- * Document Types and Templates for Operations Platform
+ * Document Types and Templates for Patriot Concrete Cutting
  * Comprehensive list of required documents for concrete cutting and construction jobs
  */
 

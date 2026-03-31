@@ -70,7 +70,7 @@ export default function WorkOrderContract({ jobData, mode, onSign, onCancel }: W
     <div className="max-w-4xl mx-auto bg-white">
       {/* Header */}
       <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-6">
-        <h1 className="text-2xl font-bold mb-2">WORK ORDER & SERVICE AGREEMENT</h1>
+        <h1 className="text-2xl font-bold mb-2">PONTIFEX INDUSTRIES</h1>
         <h2 className="text-xl">Work Order & Service Agreement</h2>
         <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
           <div>
@@ -183,7 +183,7 @@ export default function WorkOrderContract({ jobData, mode, onSign, onCancel }: W
             <div className="bg-red-50 border-l-4 border-red-500 p-4">
               <h4 className="font-bold text-red-900 mb-2">Water Damage Disclaimer</h4>
               <p className="text-sm text-red-800">
-                the Company assumes NO responsibility for water damage, moisture intrusion, or water-related issues
+                Patriot Concrete Cutting assumes NO responsibility for water damage, moisture intrusion, or water-related issues
                 resulting from wet cutting operations, including damage to flooring, walls, ceilings, electrical systems, or
                 stored materials.
               </p>
@@ -192,7 +192,7 @@ export default function WorkOrderContract({ jobData, mode, onSign, onCancel }: W
             <div className="bg-purple-50 border-l-4 border-purple-500 p-4">
               <h4 className="font-bold text-purple-900 mb-2">Indemnification</h4>
               <p className="text-sm text-purple-800">
-                Customer agrees to indemnify, defend, and hold harmless the Company from any claims, damages, or expenses
+                Customer agrees to indemnify, defend, and hold harmless Patriot Concrete Cutting from any claims, damages, or expenses
                 arising from Customer's negligence, inaccurate information, or failure to fulfill obligations under this Agreement.
               </p>
             </div>
@@ -214,7 +214,7 @@ export default function WorkOrderContract({ jobData, mode, onSign, onCancel }: W
                 <div>
                   <h4 className="font-bold text-red-900 text-lg mb-2">CRITICAL NOTICE</h4>
                   <p className="text-red-800 font-semibold mb-2">
-                    the Company assumes NO responsibility and explicitly disclaims all liability for:
+                    Patriot Concrete Cutting assumes NO responsibility and explicitly disclaims all liability for:
                   </p>
                 </div>
               </div>
@@ -225,7 +225,7 @@ export default function WorkOrderContract({ jobData, mode, onSign, onCancel }: W
                 <h5 className="font-bold text-gray-900 mb-2">1. Layout & Location Accuracy</h5>
                 <p className="text-sm text-gray-700">
                   Customer is solely responsible for providing accurate work location layout and dimensions.
-                  the Company is not responsible for errors in customer-provided layouts.
+                  Patriot is not responsible for errors in customer-provided layouts.
                 </p>
               </div>
 
@@ -239,7 +239,7 @@ export default function WorkOrderContract({ jobData, mode, onSign, onCancel }: W
               <div className="border-l-4 border-gray-400 pl-4">
                 <h5 className="font-bold text-gray-900 mb-2">3. GPR Limitations - Items NOT Guaranteed to be Detected</h5>
                 <p className="text-sm text-gray-700 mb-2">
-                  When GPR services are performed, the Company DOES NOT GUARANTEE detection of:
+                  When GPR services are performed, Patriot DOES NOT GUARANTEE detection of:
                 </p>
                 <ul className="text-sm text-gray-700 space-y-1 ml-4">
                   <li>▸ Post-tension cables or small diameter rebar (less than #4)</li>
@@ -275,11 +275,11 @@ export default function WorkOrderContract({ jobData, mode, onSign, onCancel }: W
 
               <div className="bg-white p-4 rounded border-2 border-red-400 mb-3">
                 <p className="text-sm text-red-900 font-semibold mb-2">
-                  ⚠️ WARNING: the Company STRONGLY RECOMMENDS never cutting through any obstructions or
+                  ⚠️ WARNING: Patriot Concrete Cutting STRONGLY RECOMMENDS never cutting through any obstructions or
                   utilities identified during GPR investigation.
                 </p>
                 <p className="text-sm text-gray-700 mb-3">
-                  If you direct the Company to cut through, near, or around any marked obstruction, you assume 100% of
+                  If you direct Patriot to cut through, near, or around any marked obstruction, you assume 100% of
                   risk and liability for all resulting damages.
                 </p>
 
@@ -293,7 +293,7 @@ export default function WorkOrderContract({ jobData, mode, onSign, onCancel }: W
                   <span className="text-sm text-gray-900">
                     <strong>I authorize cutting through marked obstructions</strong> and acknowledge that I accept
                     full responsibility for any damages to utilities, embedments, or structures. I agree to indemnify
-                    and hold harmless the Company from all claims, damages, costs, and attorney fees.
+                    and hold harmless Patriot Concrete Cutting from all claims, damages, costs, and attorney fees.
                   </span>
                 </label>
               </div>

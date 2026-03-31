@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getTenantId } from '@/lib/get-tenant-id';
 
 // GET: Fetch all job orders (admin only)
 export async function GET(request: NextRequest) {
@@ -46,15 +45,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin
-    if (profile.role !== 'admin') {
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view all job orders' },
         { status: 403 }
       );
     }
-
-    // Resolve tenant scope
-    const tenantId = await getTenantId(user.id);
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
@@ -68,11 +64,6 @@ export async function GET(request: NextRequest) {
       .from('job_orders')
       .select('*')
       .order('created_at', { ascending: false });
-
-    // Scope to tenant
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
 
     // Apply filters
     if (status) {
@@ -174,15 +165,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is admin
-    if (profile.role !== 'admin') {
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can create job orders' },
         { status: 403 }
       );
     }
-
-    // Resolve tenant scope
-    const tenantId = await getTenantId(user.id);
 
     // Parse request body
     const body = await request.json();
@@ -222,7 +210,6 @@ export async function POST(request: NextRequest) {
       po_number: body.po_number,
       customer_job_number: body.customer_job_number,
       created_by: user.id,
-      tenant_id: tenantId || null,
     };
 
     // Set assigned_at if assigning to operator

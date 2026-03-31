@@ -1,35 +1,34 @@
 'use client';
 
-import { LayoutGrid, Users } from 'lucide-react';
+import { LayoutGrid, Users, CalendarDays } from 'lucide-react';
 
 interface ViewToggleProps {
-  viewMode: 'slots' | 'operators';
-  onChange: (mode: 'slots' | 'operators') => void;
+  viewMode: 'slots' | 'operators' | 'crew-grid';
+  onChange: (mode: 'slots' | 'operators' | 'crew-grid') => void;
 }
+
+const VIEWS = [
+  { key: 'slots' as const, label: 'Slots', icon: LayoutGrid },
+  { key: 'operators' as const, label: 'Operators', icon: Users },
+  { key: 'crew-grid' as const, label: 'Crew Grid', icon: CalendarDays },
+];
 
 export default function ViewToggle({ viewMode, onChange }: ViewToggleProps) {
   return (
     <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-      <button
-        onClick={() => onChange('slots')}
-        className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5 ${
-          viewMode === 'slots'
-            ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-md'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
-        }`}
-      >
-        <LayoutGrid className="w-3.5 h-3.5" /> Slots
-      </button>
-      <button
-        onClick={() => onChange('operators')}
-        className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5 ${
-          viewMode === 'operators'
-            ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-md'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
-        }`}
-      >
-        <Users className="w-3.5 h-3.5" /> Operators
-      </button>
+      {VIEWS.map(v => (
+        <button
+          key={v.key}
+          onClick={() => onChange(v.key)}
+          className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5 ${
+            viewMode === v.key
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-500 text-white shadow-md'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          <v.icon className="w-3.5 h-3.5" /> {v.label}
+        </button>
+      ))}
     </div>
   );
 }

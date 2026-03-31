@@ -1204,7 +1204,7 @@ export default function WorkPerformed() {
             completedStep: 'work_performed',
             currentStep: 'day_complete',
           })
-        }).catch(err => console.log('Workflow tracking unavailable:', err));
+        }).catch(() => {});
       }
 
       // Also save to localStorage as backup

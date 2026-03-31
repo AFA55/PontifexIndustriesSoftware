@@ -132,12 +132,10 @@ export default function InRoutePage() {
         } else if (result.success && !result.data) {
           // Workflow table doesn't exist yet — if operator navigated here
           // through the normal flow, assume checklist is done
-          console.log('Workflow table not available — assuming equipment checklist complete');
           setEquipmentChecklistComplete(true);
         }
       } else {
         // API error — don't block the operator, assume checklist is done
-        console.log('Workflow API error — assuming equipment checklist complete');
         setEquipmentChecklistComplete(true);
       }
     } catch (error) {
@@ -205,7 +203,7 @@ export default function InRoutePage() {
           timestamp: new Date().toISOString(),
           time: displayTime
         })
-      }).catch(err => console.log('History tracking unavailable:', err));
+      }).catch(() => {});
 
       // 2. Update workflow — fire and forget (optional tracking)
       fetch('/api/workflow', {
@@ -219,7 +217,7 @@ export default function InRoutePage() {
           completedStep: 'in_route',
           currentStep: 'work_performed'
         })
-      }).catch(err => console.log('Workflow tracking unavailable:', err));
+      }).catch(() => {});
 
       // 3. Update job status to in_progress via API (avoids RLS issues)
       // This is the important call — but don't let it block navigation
@@ -237,10 +235,10 @@ export default function InRoutePage() {
         });
 
         if (!statusResponse.ok) {
-          console.log('Status update returned non-ok, but continuing navigation');
+          // Status update returned non-ok, but continuing navigation
         }
       } catch (statusErr) {
-        console.log('Status update failed, but continuing navigation:', statusErr);
+        // Status update failed, but continuing navigation
       }
 
       // 4. Redirect to work-performed page — always navigate regardless of API results

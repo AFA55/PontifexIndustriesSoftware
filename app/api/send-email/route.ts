@@ -7,18 +7,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { requireAuth } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
-
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
 
 // Allowed domains for PDF URL fetching (SSRF protection)
-// Dynamically include the app domain from env vars
-const appDomain = process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL).hostname : '';
 const ALLOWED_PDF_DOMAINS = [
-  ...(appDomain ? [appDomain] : []),
+  'patriotconcretecutting.com',
+  'www.patriotconcretecutting.com',
+  'pontifex-industries-software-z8py.vercel.app',
   'localhost',
-  // Add Supabase storage domain
-  'klatddoyncxidgqtcjnu.supabase.co',
 ];
 
 function isAllowedPdfUrl(url: string): boolean {
@@ -39,7 +34,6 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) {
       return auth.response;
     }
-    const tenantId = await getTenantId(auth.userId);
 
     const body = await request.json();
     const { to, subject, html, pdfUrl, pdfName } = body;
@@ -51,7 +45,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[send-email] User ${auth.userId} (tenant: ${tenantId || 'none'}) sending email to: ${to}`);
+    console.log(`[send-email] User ${auth.userId} sending email to: ${to}`);
 
     // Check if Resend API key is configured
     if (!process.env.RESEND_API_KEY) {
@@ -64,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare email options
     const emailOptions: any = {
-      from: process.env.RESEND_FROM_EMAIL || `${process.env.COMPANY_NAME || 'Your Company'} <onboarding@resend.dev>`,
+      from: process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <onboarding@resend.dev>',
       to: [to],
       subject: subject,
       html: html,
@@ -110,6 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send email using Resend
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const { data, error } = await resend.emails.send(emailOptions);
 
     if (error) {

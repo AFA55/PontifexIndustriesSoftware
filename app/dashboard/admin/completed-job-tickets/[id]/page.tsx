@@ -95,7 +95,7 @@ export default function CompletedJobDetailsPage() {
         return;
       }
 
-      const userStr = localStorage.getItem('pontifex-user');
+      const userStr = localStorage.getItem('patriot-user');
       if (userStr) {
         const user = JSON.parse(userStr);
         if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(user.role)) {
@@ -130,7 +130,7 @@ export default function CompletedJobDetailsPage() {
             setOperatorName(profile.full_name);
           }
         } catch (err) {
-          console.log('Could not load operator name');
+          // silent
         }
       }
 

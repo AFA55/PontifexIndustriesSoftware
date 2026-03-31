@@ -65,20 +65,22 @@ export default function NetworkMonitor() {
     window.fetch = async (...args) => {
       try {
         const response = await originalFetch(...args);
-        // Reset fail count on any successful response
-        if (response.ok || response.status < 500) {
-          failCountRef.current = Math.max(0, failCountRef.current - 1);
-          if (failCountRef.current === 0 && !apiHealthy) {
-            setApiHealthy(true);
-            notify({
-              type: 'success',
-              title: 'Server connection restored',
-              message: 'Everything is working normally again.',
-              duration: 3000,
-            });
+        // Reset fail count on any non-5xx response
+        if (response.status < 500) {
+          if (failCountRef.current > 0) {
+            failCountRef.current = 0;
+            if (!apiHealthy) {
+              setApiHealthy(true);
+              notify({
+                type: 'success',
+                title: 'Server connection restored',
+                message: 'Everything is working normally again.',
+                duration: 3000,
+              });
+            }
           }
         }
-        // Track server errors
+        // Track consecutive server errors
         if (response.status >= 500) {
           failCountRef.current++;
           if (failCountRef.current >= 3 && apiHealthy) {

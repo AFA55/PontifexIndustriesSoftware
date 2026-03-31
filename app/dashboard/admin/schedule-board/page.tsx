@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,7 +7,7 @@ import {
   Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
   UserCheck, UserX, Eye, FolderOpen, Timer, Loader2, Settings, Search, X,
-  Megaphone, CheckCircle2, Sparkles, Zap, Brain, CalendarOff
+  Megaphone, CheckCircle2, Sparkles, Zap, Brain
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -18,10 +16,10 @@ import PendingQueueSidebar from './_components/PendingQueueSidebar';
 import Toast from './_components/Toast';
 import ApprovalModal from './_components/ApprovalModal';
 import MissingInfoModal from './_components/MissingInfoModal';
+import NotificationBell from './_components/NotificationBell';
 import AssignOperatorModal from './_components/AssignOperatorModal';
 import EditJobPanel from './_components/EditJobPanel';
 import ChangeRequestModal from './_components/ChangeRequestModal';
-import RejectFormModal from './_components/RejectFormModal';
 import NotesDrawer from './_components/NotesDrawer';
 import QuickAddModal, { type QuickAddData } from './_components/QuickAddModal';
 import ConflictModal from './_components/ConflictModal';
@@ -37,8 +35,7 @@ import JobDetailView from './_components/JobDetailView';
 import DndBoardWrapper from './_components/DndBoardWrapper';
 import OperatorRowView from './_components/OperatorRowView';
 import ViewToggle from './_components/ViewToggle';
-import AddTimeOffModal from './_components/AddTimeOffModal';
-import BatchPrintModal from './_components/BatchPrintModal';
+import CrewScheduleGrid from './_components/CrewScheduleGrid';
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
@@ -114,9 +111,6 @@ function toJobCard(job: any): JobCardData {
     po_number: job.po_number || null,
     day_label: computeDayLabel(job),
     status: job.status || null,
-    loading_started_at: job.loading_started_at || null,
-    route_started_at: job.route_started_at || null,
-    done_for_day_at: job.done_for_day_at || null,
   };
 }
 
@@ -155,9 +149,9 @@ export default function ScheduleBoardPage() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(toDateString(new Date()));
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
-  const [boardViewMode, setBoardViewMode] = useState<'slots' | 'operators'>(() => {
+  const [boardViewMode, setBoardViewMode] = useState<'slots' | 'operators' | 'crew-grid'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('schedule-board-view-mode') as 'slots' | 'operators') || 'slots';
+      return (localStorage.getItem('schedule-board-view-mode') as 'slots' | 'operators' | 'crew-grid') || 'slots';
     }
     return 'slots';
   });
@@ -192,15 +186,14 @@ export default function ScheduleBoardPage() {
   const [findingNextAvailable, setFindingNextAvailable] = useState(false);
   const [nextAvailableDate, setNextAvailableDate] = useState<{ date: string; jobCount: number; availableSlots: number } | null>(null);
 
+  // ═══ TIME-OFF STATE ═══
+  const [timeOffMap, setTimeOffMap] = useState<Record<string, { type: string; notes: string | null }>>({});
+
   // ═══ ROW ASSIGNMENTS — who's in which crew row (driven by capacityMaxSlots) ═══
   const [rowAssignments, setRowAssignments] = useState<{ operator: string | null; helper: string | null }[]>(
     Array.from({ length: 8 }, () => ({ operator: null, helper: null }))
   );
   const NUM_ROWS = capacityMaxSlots;
-
-  // ═══ TIME-OFF STATE ═══
-  const [timeOffMap, setTimeOffMap] = useState<Record<string, { type: string; notes: string | null }>>({});
-  const [showTimeOffModal, setShowTimeOffModal] = useState(false);
 
   // ═══ UI STATE ═══
   const [showPendingQueue, setShowPendingQueue] = useState(false);
@@ -212,13 +205,11 @@ export default function ScheduleBoardPage() {
   // Dispatch state
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [dispatchLoading, setDispatchLoading] = useState(false);
-  const [dispatchInfo, setDispatchInfo] = useState<{ total: number; dispatched: number; undispatched: number; ar_warnings?: { customer_name: string; balance_due: number; days_overdue: number }[] } | null>(null);
+  const [dispatchInfo, setDispatchInfo] = useState<{ total: number; dispatched: number; undispatched: number } | null>(null);
 
   // Modal states
   const [approvalTarget, setApprovalTarget] = useState<PendingJob | null>(null);
   const [missingInfoTarget, setMissingInfoTarget] = useState<PendingJob | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<PendingJob | null>(null);
-  const [rejectLoading, setRejectLoading] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ job: JobCardData; source: 'unassigned' | 'willcall' } | null>(null);
   const [editTarget, setEditTarget] = useState<{ job: JobCardData; rowIndex: number | null } | null>(null);
   const [changeRequestTarget, setChangeRequestTarget] = useState<JobCardData | null>(null);
@@ -227,7 +218,6 @@ export default function ScheduleBoardPage() {
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
   const [previewJob, setPreviewJob] = useState<{ job: JobCardData; operatorName?: string | null; helperName?: string | null } | null>(null);
   const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null } | null>(null);
-  const [showBatchPrint, setShowBatchPrint] = useState(false);
 
   // ═══ AI AUTO-SCHEDULE STATE ═══
   const [autoScheduleLoading, setAutoScheduleLoading] = useState(false);
@@ -256,7 +246,7 @@ export default function ScheduleBoardPage() {
       const res = await apiFetch(`/api/admin/schedule-board/dispatch?date=${date}`);
       if (res.ok) {
         const json = await res.json();
-        setDispatchInfo({ total: json.total, dispatched: json.dispatched, undispatched: json.undispatched, ar_warnings: json.ar_warnings || [] });
+        setDispatchInfo({ total: json.total, dispatched: json.dispatched, undispatched: json.undispatched });
       }
     } catch { /* ignore */ }
   }, []);
@@ -339,7 +329,7 @@ export default function ScheduleBoardPage() {
   }, []);
 
   // ═══ BOARD VIEW MODE HANDLER ═══
-  const handleBoardViewModeChange = useCallback((mode: 'slots' | 'operators') => {
+  const handleBoardViewModeChange = useCallback((mode: 'slots' | 'operators' | 'crew-grid') => {
     setBoardViewMode(mode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('schedule-board-view-mode', mode);
@@ -514,6 +504,9 @@ export default function ScheduleBoardPage() {
         scope_details: j.scope_details || null,
         additional_info: j.additional_info || null,
         special_equipment: j.special_equipment || null,
+        missing_info_flagged: j.missing_info_flagged || false,
+        missing_info_items: j.missing_info_items || [],
+        missing_info_note: j.missing_info_note || null,
       }));
       const willCall = (json.data?.willCall || []).map(toJobCard);
 
@@ -638,74 +631,6 @@ export default function ScheduleBoardPage() {
     }
     fetchTimeOff();
   }, [selectedDate]);
-
-  // ═══ REALTIME SUBSCRIPTION FOR JOB STATUS CHANGES ═══
-  useEffect(() => {
-    if (viewMode !== 'day') return;
-
-    const channel = supabase
-      .channel('board-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'job_orders',
-          filter: `scheduled_date=eq.${selectedDate}`,
-        },
-        (payload: any) => {
-          const updated = payload.new;
-          if (!updated?.id) return;
-
-          // Update in operatorJobs
-          setOperatorJobs(prev => {
-            const next = { ...prev };
-            for (const key in next) {
-              const idx = parseInt(key);
-              const jobs = next[idx];
-              if (jobs) {
-                const jobIdx = jobs.findIndex(j => j.id === updated.id);
-                if (jobIdx >= 0) {
-                  next[idx] = jobs.map(j =>
-                    j.id === updated.id
-                      ? {
-                          ...j,
-                          status: updated.status || j.status,
-                          loading_started_at: updated.loading_started_at || j.loading_started_at,
-                          route_started_at: updated.route_started_at || j.route_started_at,
-                          done_for_day_at: updated.done_for_day_at || j.done_for_day_at,
-                        }
-                      : j
-                  );
-                  return next;
-                }
-              }
-            }
-            return prev;
-          });
-
-          // Also update in unassignedJobs
-          setUnassignedJobs(prev =>
-            prev.map(j =>
-              j.id === updated.id
-                ? {
-                    ...j,
-                    status: updated.status || j.status,
-                    loading_started_at: updated.loading_started_at || j.loading_started_at,
-                    route_started_at: updated.route_started_at || j.route_started_at,
-                    done_for_day_at: updated.done_for_day_at || j.done_for_day_at,
-                  }
-                : j
-            )
-          );
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedDate, viewMode]);
 
   // ═══ FETCH CAPACITY SETTINGS ═══
   useEffect(() => {
@@ -1053,31 +978,6 @@ export default function ScheduleBoardPage() {
     if (pendingJobs.length <= 1) setShowPendingQueue(false);
   };
 
-  // --- Pending: Reject ---
-  const handleReject = async (data: { rejection_reason: string; rejection_notes: string }) => {
-    if (!rejectTarget) return;
-    setRejectLoading(true);
-    try {
-      const res = await apiFetch(`/api/admin/job-orders/${rejectTarget.id}/reject`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(err.error || 'Failed to reject');
-      }
-    } catch (e: any) {
-      addToast('error', 'Rejection Failed', e.message || 'Could not reject form');
-      setRejectLoading(false);
-      return;
-    }
-    setPendingJobs(prev => prev.filter(p => p.id !== rejectTarget.id));
-    addToast('info', `${rejectTarget.customer_name} — Rejected`, `Form rejected: ${data.rejection_reason.replace(/_/g, ' ')}`);
-    setRejectTarget(null);
-    setRejectLoading(false);
-    if (pendingJobs.length <= 1) setShowPendingQueue(false);
-  };
-
   // --- Will Call: Move to Schedule ---
   const handleMoveWillCallToSchedule = async (job: JobCardData) => {
     try {
@@ -1231,12 +1131,7 @@ export default function ScheduleBoardPage() {
     const apiPayload: Record<string, unknown> = {};
     if (jobUpdates.arrival_time !== undefined) apiPayload.arrival_time = jobUpdates.arrival_time;
     if (jobUpdates.scheduled_date !== undefined) apiPayload.scheduled_date = jobUpdates.scheduled_date;
-    if (jobUpdates.end_date !== undefined) apiPayload.end_date = jobUpdates.end_date;
     if (jobUpdates.description !== undefined) apiPayload.description = jobUpdates.description;
-    if (jobUpdates.po_number !== undefined) apiPayload.po_number = jobUpdates.po_number;
-    if (jobUpdates.equipment_needed !== undefined) apiPayload.equipment_needed = jobUpdates.equipment_needed;
-    if ((jobUpdates as any).customer_contact !== undefined) apiPayload.customer_contact = (jobUpdates as any).customer_contact;
-    if ((jobUpdates as any).site_contact_phone !== undefined) apiPayload.site_contact_phone = (jobUpdates as any).site_contact_phone;
 
     const currentOp = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.operator : null;
     const operatorChanged = newOpName !== undefined && newOpName !== currentOp;
@@ -1574,14 +1469,21 @@ export default function ScheduleBoardPage() {
           durationDays: data.durationDays,
           scope: data.scope,
           salesmanName: data.salesmanName,
+          salesmanId: data.salesmanId,
+          jobType: data.jobType,
+          address: data.address,
+          contactName: data.contactName,
+          contactPhone: data.contactPhone,
+          priority: data.priority,
+          estimatedCost: data.estimatedCost,
         }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Failed to create quick-add job');
       }
-      addToast('success', `Quick Add: ${data.contractorName}`, `Pending — reminder sent to ${data.salesmanName} to fill full form`);
-      fetchScheduleData(selectedDate); // refresh to pick up new pending
+      addToast('success', `Quick Add: ${data.contractorName}`, `${data.jobType} job created — ${data.salesmanName} notified to complete Schedule Form`);
+      fetchScheduleData(selectedDate);
     } catch (err: any) {
       addToast('error', 'Quick Add Failed', err.message || 'Could not create job');
     }
@@ -1625,6 +1527,9 @@ export default function ScheduleBoardPage() {
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+              {/* Notification bell for all users */}
+              <NotificationBell />
+
               {canEdit && (
                 <button onClick={() => setShowPendingQueue(true)} className="relative px-3 py-2 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl text-orange-700 text-sm font-semibold transition-all flex items-center gap-2">
                   <Bell className="w-4 h-4" /> Pending
@@ -1674,18 +1579,6 @@ export default function ScheduleBoardPage() {
                     <Plus className="w-4 h-4" /> Quick Add
                   </button>
                   <button
-                    onClick={() => setShowTimeOffModal(true)}
-                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-slate-700 text-sm font-semibold transition-all flex items-center gap-1.5"
-                  >
-                    <CalendarOff className="w-4 h-4" /> Time Off
-                  </button>
-                  <button
-                    onClick={() => setShowBatchPrint(true)}
-                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-slate-700 text-sm font-semibold transition-all flex items-center gap-1.5"
-                  >
-                    <FileText className="w-4 h-4" /> Print Schedules
-                  </button>
-                  <button
                     onClick={() => {
                       fetchDispatchStatus(selectedDate);
                       setShowDispatchModal(true);
@@ -1733,9 +1626,7 @@ export default function ScheduleBoardPage() {
                   <CalendarDays className="w-4 h-4" /> Week
                 </button>
               </div>
-              {viewMode === 'day' && (
-                <ViewToggle viewMode={boardViewMode} onChange={handleBoardViewModeChange} />
-              )}
+              <ViewToggle viewMode={boardViewMode} onChange={handleBoardViewModeChange} />
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -1861,8 +1752,20 @@ export default function ScheduleBoardPage() {
         </div>
       )}
 
+      {/* ═══ CREW GRID VIEW ═══════════════════════════════════════════════ */}
+      {boardViewMode === 'crew-grid' && (
+        <div className="container mx-auto px-4 md:px-6 pb-6">
+          <CrewScheduleGrid
+            onDateClick={(date) => {
+              setSelectedDate(date);
+              setBoardViewMode('slots');
+            }}
+          />
+        </div>
+      )}
+
       {/* ═══ WEEKLY VIEW ═══════════════════════════════════════════════════ */}
-      {viewMode === 'week' && (
+      {viewMode === 'week' && boardViewMode !== 'crew-grid' && (
         <div className="container mx-auto px-4 md:px-6 pb-6">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-x-auto">
             <div className="grid grid-cols-1 md:grid-cols-5 divide-x divide-gray-200 min-w-0 md:min-w-[800px]">
@@ -1936,7 +1839,7 @@ export default function ScheduleBoardPage() {
       )}
 
       {/* ═══ DAY VIEW — OPERATOR ROWS ════════════════════════════════════ */}
-      {viewMode === 'day' && <DndBoardWrapper canDrag={canEdit} onReorder={handleDndReorder}>
+      {viewMode === 'day' && boardViewMode !== 'crew-grid' && <DndBoardWrapper canDrag={canEdit} onReorder={handleDndReorder}>
       <div className="container mx-auto px-4 md:px-6 pb-6 space-y-4">
         {boardViewMode === 'slots' ? (
           <>
@@ -1954,8 +1857,7 @@ export default function ScheduleBoardPage() {
                 allHelpers={allHelpersList}
                 busyOperators={busyOperators}
                 busyHelpers={busyHelpers}
-                timeOff={rowAssignments[idx]?.operator && operatorIdMap[rowAssignments[idx]?.operator!] ? timeOffMap[operatorIdMap[rowAssignments[idx]?.operator!]] : undefined}
-                onEditJob={(job) => canEdit ? setEditTarget({ job, rowIndex: idx }) : setChangeRequestTarget(job)}
+                onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setChangeRequestTarget(job)}
                 onRequestChange={(job) => setChangeRequestTarget(job)}
                 onViewNotes={(job) => handleViewNotes(job)}
                 onPreviewJob={(job) => setPreviewJob({ job, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
@@ -2030,7 +1932,7 @@ export default function ScheduleBoardPage() {
                       (e.currentTarget as HTMLElement).style.opacity = '0.5';
                     }}
                     onDragEnd={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-                    onClick={() => setEditTarget({ job, rowIndex: null })}
+                    onClick={() => setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null })}
                     className={`rounded-xl border-2 border-orange-200 bg-orange-50/50 p-4 hover:shadow-md transition-all cursor-pointer ${canEdit ? 'active:cursor-grabbing' : ''}`}
                   >
                     <h4 className="font-bold text-gray-900 text-sm mb-1">{job.customer_name}</h4>
@@ -2075,14 +1977,12 @@ export default function ScheduleBoardPage() {
         onClose={() => setShowPendingQueue(false)}
         pendingJobs={pendingJobs}
         onApprove={(job) => { setShowPendingQueue(false); setApprovalTarget(job); }}
-        onReject={(job) => { setShowPendingQueue(false); setRejectTarget(job); }}
         onMissingInfo={(job) => { setShowPendingQueue(false); setMissingInfoTarget(job); }}
       />
 
       {/* ═══ MODALS ════════════════════════════════════════════════════ */}
       {approvalTarget && <ApprovalModal job={approvalTarget} onConfirm={handleApprove} onClose={() => setApprovalTarget(null)} />}
       {missingInfoTarget && <MissingInfoModal job={missingInfoTarget} onConfirm={handleMissingInfo} onClose={() => setMissingInfoTarget(null)} />}
-      {rejectTarget && <RejectFormModal job={rejectTarget} onConfirm={handleReject} onClose={() => setRejectTarget(null)} loading={rejectLoading} />}
       {assignTarget && (
         <AssignOperatorModal
           job={assignTarget.job}
@@ -2110,63 +2010,11 @@ export default function ScheduleBoardPage() {
           onViewNotes={() => { setEditTarget(null); handleViewNotes(editTarget.job); }}
           onMakeWillCall={handleMakeWillCall}
           onRemoveFromSchedule={handleRemoveFromSchedule}
-          onRefresh={() => fetchScheduleData(selectedDate)}
-        />
-      )}
-      {showBatchPrint && (
-        <BatchPrintModal
-          jobs={[
-            ...Object.values(operatorJobs).flat().map(j => ({
-              id: j.id,
-              job_number: j.job_number,
-              customer_name: j.customer_name,
-              job_type: j.job_type,
-              location: j.location,
-              assigned_to_name: (() => {
-                for (const [idx, jobs] of Object.entries(operatorJobs)) {
-                  if (jobs.some(jj => jj.id === j.id)) return rowAssignments[Number(idx)]?.operator || null;
-                }
-                return null;
-              })(),
-            })),
-            ...unassignedJobs.map(j => ({
-              id: j.id,
-              job_number: j.job_number,
-              customer_name: j.customer_name,
-              job_type: j.job_type,
-              location: j.location,
-              assigned_to_name: null,
-            })),
-          ]}
-          onClose={() => setShowBatchPrint(false)}
         />
       )}
       {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSubmit={handleChangeRequest} onClose={() => setChangeRequestTarget(null)} />}
       {notesTarget && <NotesDrawer job={notesTarget} notes={jobNotes[notesTarget.id] || []} onAddNote={handleAddNote} onClose={() => setNotesTarget(null)} />}
       {showQuickAdd && <QuickAddModal salesmen={SALESMEN} onSubmit={handleQuickAdd} onClose={() => setShowQuickAdd(false)} />}
-      {showTimeOffModal && (
-        <AddTimeOffModal
-          operators={allOperatorsList.map(name => ({ id: operatorIdMap[name] || '', name }))}
-          defaultDate={selectedDate}
-          onSuccess={() => {
-            setShowTimeOffModal(false);
-            addToast('success', 'Time Off Added', 'Operator marked as unavailable');
-            // Refresh time-off data
-            apiFetch(`/api/admin/schedule-board/time-off?date=${selectedDate}`).then(res => {
-              if (res.ok) return res.json();
-            }).then(json => {
-              if (json?.data) {
-                const map: Record<string, { type: string; notes: string | null }> = {};
-                for (const entry of json.data) {
-                  map[entry.operator_id] = { type: entry.type, notes: entry.notes };
-                }
-                setTimeOffMap(map);
-              }
-            }).catch(() => {});
-          }}
-          onClose={() => setShowTimeOffModal(false)}
-        />
-      )}
 
       {/* ═══ AI AUTO-SCHEDULE RESULTS MODAL ═══ */}
       {autoScheduleResults && (
@@ -2303,7 +2151,21 @@ export default function ScheduleBoardPage() {
         />
       )}
 
-      {/* JobDetailView sidebar removed — all editing goes through EditJobPanel */}
+      {/* ═══ JOB DETAIL VIEW (full-page overlay) ═══════════════════════ */}
+      {jobDetailTarget && (
+        <JobDetailView
+          job={jobDetailTarget.job}
+          operatorName={jobDetailTarget.operatorName}
+          helperName={jobDetailTarget.helperName}
+          rowIndex={jobDetailTarget.rowIndex}
+          onClose={() => setJobDetailTarget(null)}
+          onEdit={() => {
+            const target = jobDetailTarget;
+            setJobDetailTarget(null);
+            setEditTarget({ job: target.job, rowIndex: target.rowIndex });
+          }}
+        />
+      )}
 
       {/* ═══ NEXT AVAILABLE DATE BANNER ════════════════════════════════ */}
       {nextAvailableDate && (
@@ -2390,33 +2252,6 @@ export default function ScheduleBoardPage() {
                         <div>
                           <p className="text-sm font-bold text-orange-800">{dispatchInfo.undispatched} job(s) ready to dispatch</p>
                           <p className="text-xs text-orange-600">This will notify all assigned operators and helpers.</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* AR Aging Warnings */}
-                    {dispatchInfo.ar_warnings && dispatchInfo.ar_warnings.length > 0 && (
-                      <div className="border border-red-200 rounded-xl overflow-hidden">
-                        <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border-b border-red-200">
-                          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                          <p className="text-xs font-bold text-red-700 uppercase tracking-wide">
-                            AR Warning — {dispatchInfo.ar_warnings.length} customer{dispatchInfo.ar_warnings.length !== 1 ? 's' : ''} with outstanding balance{dispatchInfo.ar_warnings.length !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                        <div className="divide-y divide-red-100">
-                          {dispatchInfo.ar_warnings.map((w, i) => (
-                            <div key={i} className="flex items-center justify-between px-4 py-2.5 bg-white">
-                              <span className="text-sm font-medium text-gray-800 truncate">{w.customer_name}</span>
-                              <div className="text-right flex-shrink-0 ml-3">
-                                <span className="text-sm font-bold text-red-600">
-                                  ${w.balance_due.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                </span>
-                                {w.days_overdue > 0 && (
-                                  <span className="ml-2 text-xs text-red-500 font-medium">{w.days_overdue}d overdue</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
                         </div>
                       </div>
                     )}

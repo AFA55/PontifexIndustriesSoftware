@@ -76,7 +76,7 @@ export async function PATCH(
       'customer_name', 'customer_email', 'billing_address',
       'due_date', 'subtotal', 'tax_rate', 'tax_amount',
       'discount_amount', 'discount_description', 'total_amount',
-      'balance_due', 'status', 'payment_terms', 'po_number',
+      'amount_paid', 'status', 'payment_terms', 'po_number',
       'contract_number', 'notes', 'internal_notes',
     ];
 
@@ -88,9 +88,41 @@ export async function PATCH(
     }
 
     // Handle status transitions
-    if (updates.status === 'sent' && !body.sent_at) {
-      updates.sent_at = new Date().toISOString();
-      updates.sent_by = auth.userId;
+    if (updates.status) {
+      const now = new Date().toISOString();
+      switch (updates.status) {
+        case 'sent':
+          if (!body.sent_at) {
+            updates.sent_at = now;
+            updates.sent_by = auth.userId;
+          }
+          break;
+        case 'paid':
+          if (!body.paid_date) {
+            updates.paid_date = now.split('T')[0];
+          }
+          // Set amount_paid = total_amount so balance_due (generated) becomes 0
+          if (body.amount_paid === undefined) {
+            // Fetch current invoice to get total_amount
+            const { data: currentInvoice } = await supabaseAdmin
+              .from('invoices')
+              .select('total_amount')
+              .eq('id', id)
+              .single();
+            if (currentInvoice) {
+              updates.amount_paid = currentInvoice.total_amount;
+            }
+          }
+          break;
+        case 'overdue':
+          // No extra fields needed
+          break;
+        case 'void':
+          if (!body.void_reason) {
+            updates.internal_notes = (body.internal_notes || '') + `\nVoided on ${now.split('T')[0]} by user ${auth.userId}`;
+          }
+          break;
+      }
     }
 
     updates.updated_at = new Date().toISOString();
@@ -124,7 +156,6 @@ export async function PATCH(
           quantity: item.quantity || 1,
           unit: item.unit || 'each',
           unit_rate: item.unit_rate || 0,
-          amount: item.amount || 0,
           job_order_id: item.job_order_id || null,
           operator_id: item.operator_id || null,
           taxable: item.taxable !== false,

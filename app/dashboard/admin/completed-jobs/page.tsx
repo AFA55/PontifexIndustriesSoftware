@@ -1,12 +1,10 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { FileText, Clock, DollarSign, TrendingUp, Star, MapPin, User, Receipt, ExternalLink } from 'lucide-react';
+import { FileText, Clock, DollarSign, TrendingUp, Star, MapPin, User } from 'lucide-react';
 
 interface CompletedJob {
   id: string;
@@ -94,6 +92,7 @@ export default function CompletedJobsArchivePage() {
 
   const loadCompletedJobs = async () => {
     try {
+      console.log('Loading completed jobs...');
       const { data, error } = await supabase
         .from('job_orders')
         .select('*')
@@ -101,70 +100,118 @@ export default function CompletedJobsArchivePage() {
         .not('completion_signed_at', 'is', null)
         .order('completion_signed_at', { ascending: false });
 
-      if (error) throw error;
+      if (error && error.message) {
+        console.error('Error loading completed jobs:', error);
+        throw error;
+      }
+
+      console.log('Completed jobs loaded:', data?.length || 0, 'jobs');
+      console.log('First job:', data?.[0]);
       setJobs(data || []);
     } catch (error: any) {
-      console.error('Error loading completed jobs:', error.message);
+      // Only log/alert if there's an actual error message
+      if (error?.message) {
+        console.error('Error loading completed jobs:', error.message);
+        alert('Error loading completed jobs. Check console for details.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const loadJobDetails = async (job: CompletedJob) => {
+    console.log('Loading details for job:', job.id);
     setLoadingDetails(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setLoadingDetails(false); return; }
+      if (!session) {
+        console.log('No session found');
+        setLoadingDetails(false);
+        return;
+      }
 
-      // Fetch all job detail data in parallel
-      const [profileRes, standbyRes, dailyLogsRes] = await Promise.all([
-        supabase
+      // Get operator name
+      console.log('Fetching operator profile for:', job.assigned_to);
+      let operatorName = 'Unknown';
+      try {
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('full_name')
           .eq('id', job.assigned_to)
-          .single(),
-        supabase
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+        } else {
+          operatorName = profile?.full_name || 'Unknown';
+        }
+      } catch (err) {
+        console.error('Profile fetch failed:', err);
+      }
+
+      // Get standby logs
+      let standbyLogs: any[] = [];
+      try {
+        const { data, error: standbyError } = await supabase
           .from('standby_logs')
           .select('*')
           .eq('job_order_id', job.id)
-          .eq('status', 'completed'),
-        supabase
-          .from('daily_job_logs')
-          .select('work_performed, hours_worked')
-          .eq('job_order_id', job.id)
-          .order('log_date', { ascending: true }),
-      ]);
+          .eq('status', 'completed');
 
-      const operatorName = profileRes.data?.full_name || 'Unknown';
-      const standbyLogs = standbyRes.data || [];
-
-      // Aggregate work performed from all daily logs
-      const workPerformed: any[] = [];
-      let totalDailyHours = 0;
-      for (const log of (dailyLogsRes.data || [])) {
-        const items = log.work_performed;
-        if (Array.isArray(items)) {
-          workPerformed.push(...items);
-        } else if (items && typeof items === 'object' && Array.isArray((items as any).items)) {
-          workPerformed.push(...(items as any).items);
+        if (standbyError) {
+          console.error('Error fetching standby logs:', standbyError);
+        } else {
+          standbyLogs = data || [];
         }
-        totalDailyHours += Number(log.hours_worked || 0);
+      } catch (err) {
+        console.error('Standby logs fetch failed:', err);
       }
 
-      const totalStandbyHours = standbyLogs.reduce((sum: number, log: any) => sum + (log.duration_hours || 0), 0);
+      // Calculate standby totals
+      const totalStandbyHours = standbyLogs.reduce((sum, log) => sum + (log.duration_hours || 0), 0);
       const totalStandbyCost = totalStandbyHours * 189; // $189/hr standby rate
 
-      // Calculate total job hours: prefer daily log sum, fall back to timestamps
-      const totalJobHours = totalDailyHours > 0
-        ? totalDailyHours
-        : (() => {
-            const start = new Date(job.arrival_time || job.scheduled_date);
-            const end = new Date(job.completion_signed_at);
-            return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-          })();
+      // Fetch work items from database (not localStorage — admin doesn't have operator's local data)
+      let workPerformed: any[] = [];
+      try {
+        const { data: workItems } = await supabase
+          .from('work_items')
+          .select('*')
+          .eq('job_order_id', job.id)
+          .order('day_number', { ascending: true });
+        workPerformed = workItems || [];
+      } catch (e) {
+        // Fallback: no work items available
+      }
 
-      const laborCost = totalJobHours * 75; // $75/hr base rate
+      // Calculate total job hours
+      const startTime = new Date(job.arrival_time || job.scheduled_date);
+      const endTime = new Date(job.completion_signed_at);
+      const totalJobHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
 
+      // Calculate labor cost (assuming $75/hr base rate - adjust as needed)
+      const laborCost = totalJobHours * 75;
+
+      // Get documents
+      let documents: any[] = [];
+      try {
+        const { data, error: docsError } = await supabase
+          .from('pdf_documents')
+          .select('*')
+          .eq('job_id', job.id)
+          .eq('is_latest', true)
+          .order('generated_at', { ascending: false });
+
+        if (docsError) {
+          console.error('Error fetching documents:', docsError);
+        } else {
+          documents = data || [];
+        }
+      } catch (err) {
+        console.error('Documents fetch failed:', err);
+      }
+
+      console.log('Job details loaded successfully');
       setSelectedJobDetails({
         job,
         operatorName,
@@ -174,7 +221,7 @@ export default function CompletedJobsArchivePage() {
         totalStandbyCost,
         totalJobHours,
         laborCost,
-        documents: [],
+        documents
       });
     } catch (error) {
       console.error('Error loading job details:', error);
@@ -376,18 +423,7 @@ export default function CompletedJobsArchivePage() {
               <div className="space-y-6">
                 {/* Job Overview Card */}
                 <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-gray-900">Job Details</h2>
-                    <Link
-                      href="/dashboard/admin/billing"
-                      className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md"
-                      title="Go to Billing to create invoice for this job"
-                    >
-                      <Receipt className="w-4 h-4" />
-                      Create Invoice
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Job Details</h2>
 
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>

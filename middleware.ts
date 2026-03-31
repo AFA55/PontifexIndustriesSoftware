@@ -22,6 +22,13 @@ function isRateLimited(key: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(key);
 
+  // Lazy cleanup: remove expired entries every 100 checks (no setInterval needed for Edge)
+  if (rateLimitMap.size > 50) {
+    for (const [k, v] of rateLimitMap.entries()) {
+      if (now > v.resetAt) rateLimitMap.delete(k);
+    }
+  }
+
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
     return false;
@@ -34,40 +41,6 @@ function isRateLimited(key: string): boolean {
   return false;
 }
 
-// Clean up old entries periodically (avoid memory leak)
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(key);
-    }
-  }
-}, 60_000);
-
-// Stricter limits for communication endpoints (per IP)
-const COMM_RATE_LIMIT_WINDOW = 60_000; // 1 minute
-const SMS_RATE_LIMIT_MAX = 5;   // 5 SMS per minute per IP
-const EMAIL_RATE_LIMIT_MAX = 10; // 10 emails per minute per IP
-const commRateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-function isCommRateLimited(key: string, max: number): boolean {
-  const now = Date.now();
-  const entry = commRateLimitMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    commRateLimitMap.set(key, { count: 1, resetAt: now + COMM_RATE_LIMIT_WINDOW });
-    return false;
-  }
-  entry.count++;
-  return entry.count > max;
-}
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of commRateLimitMap.entries()) {
-    if (now > entry.resetAt) commRateLimitMap.delete(key);
-  }
-}, 60_000);
-
 // Public API endpoints that should be rate-limited
 const RATE_LIMITED_PATHS = [
   '/api/demo-request',
@@ -79,33 +52,16 @@ const RATE_LIMITED_PATHS = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-             request.headers.get('x-real-ip') ||
-             'unknown';
-
   // Rate limit public API endpoints
   if (RATE_LIMITED_PATHS.some(path => pathname.startsWith(path))) {
-    if (isRateLimited(`${ip}:${pathname}`)) {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+               request.headers.get('x-real-ip') ||
+               'unknown';
+    const key = `${ip}:${pathname}`;
+
+    if (isRateLimited(key)) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
-        { status: 429 }
-      );
-    }
-  }
-
-  // Stricter rate limiting for communication endpoints
-  if (pathname.startsWith('/api/send-sms') || pathname.startsWith('/api/sms/')) {
-    if (isCommRateLimited(`sms:${ip}`, SMS_RATE_LIMIT_MAX)) {
-      return NextResponse.json(
-        { error: 'SMS rate limit exceeded. Maximum 5 messages per minute.' },
-        { status: 429 }
-      );
-    }
-  }
-  if (pathname.startsWith('/api/send-email')) {
-    if (isCommRateLimited(`email:${ip}`, EMAIL_RATE_LIMIT_MAX)) {
-      return NextResponse.json(
-        { error: 'Email rate limit exceeded. Maximum 10 emails per minute.' },
         { status: 429 }
       );
     }
@@ -120,7 +76,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set(
     'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(self), payment=()'
+    'camera=(self), microphone=(), geolocation=(self), payment=()'
   );
 
   // Prevent caching of API responses with sensitive data

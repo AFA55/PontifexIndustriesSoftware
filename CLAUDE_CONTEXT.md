@@ -1,282 +1,215 @@
-# Pontifex Industries Platform — Claude Context Document
-**Last Updated:** March 21, 2026
-**Use this as context when starting a new Claude session on this project.**
+# Patriot Concrete Cutting Platform — Architecture Reference
+**Last Updated:** March 23, 2026 | **Build Status:** PASSING
 
 ---
 
 ## Project Overview
-A full-stack construction operations platform for **Pontifex Industries** (white-label as **Patriot Concrete Cutting**). Manages field operators, job scheduling, time tracking, equipment inventory, compliance documents (OSHA silica, JHA, liability releases), invoicing, customer CRM, AI-powered scheduling, and multi-tenant SaaS infrastructure.
+Full-stack construction operations platform for **Patriot Concrete Cutting** (formerly Pontifex Industries). Manages job scheduling, field operator workflows, time tracking, equipment inventory, OSHA compliance (silica, JHA, liability releases), invoicing, customer CRM, AI-powered scheduling, analytics dashboards, and multi-tenant SaaS infrastructure.
 
 ## Tech Stack
-- **Frontend:** Next.js 15.5.12 (App Router), React 19, TypeScript 5, Tailwind CSS 3.3
-- **Backend:** Next.js API Routes (100+ route handlers across 38 categories)
-- **Database:** Supabase (PostgreSQL) with Row Level Security — project ref: `klatddoyncxidgqtcjnu`
-- **Auth:** Supabase Auth with Bearer token validation, 8-tier role hierarchy
-- **Email:** Resend API (from: `noreply@admin.pontifexindustries.com`)
-- **SMS:** Telnyx
-- **PDF Generation:** @react-pdf/renderer + jspdf + html2canvas
-- **Charts:** Recharts
-- **Maps:** Google Maps (Places API, geocoding, GPS geofencing)
-- **Icons:** lucide-react
-- **Animations:** Framer Motion 12
-- **QR/Barcode:** ZXing
-- **Voice:** Web Speech API (SpeechRecognition)
-- **Deployment:** Vercel
-- **Git:** GitHub (AFA55/PontifexIndustriesSoftware), branch: `feature/schedule-board-v2`
+| Layer | Technology |
+|-------|------------|
+| **Framework** | Next.js 15.5.12 (App Router) + React 19 + TypeScript 5 |
+| **Styling** | Tailwind CSS 3.3 |
+| **Database** | Supabase (PostgreSQL) — project ref: `klatddoyncxidgqtcjnu` |
+| **Auth** | Supabase Auth with Bearer token validation, 9-tier role hierarchy |
+| **Email** | Resend API |
+| **SMS** | Telnyx (primary) + Twilio (legacy) |
+| **PDF** | @react-pdf/renderer + jspdf + html2canvas |
+| **Charts** | Recharts (bar, line, pie, donut) |
+| **Maps** | Google Maps (Places, geocoding, GPS geofencing) |
+| **Drag & Drop** | react-grid-layout (analytics dashboard), @dnd-kit (schedule board) |
+| **Icons** | lucide-react |
+| **Animations** | Framer Motion 12 |
+| **Voice** | Web Speech API (SpeechRecognition) |
+| **Deployment** | Vercel (ready, not yet deployed) |
+| **Git** | GitHub: `AFA55/PontifexIndustriesSoftware`, branch: `claude/mystifying-diffie` |
 
-## Project Location
-```
-/Users/afa55/Documents/Pontifex Industres/pontifex-platform
-```
-
-## Vercel Deployment
-- **Project:** `pontifex-industries-software-z8py` (ID: `prj_xWRkagEyB6C1rxX81IOQKJynLQd1`)
-- **Team:** `team_9PEEftgbKgEZCHzklblcjKKa`
-- **Production URL:** `https://pontifex-industries-software-z8py.vercel.app`
+## Scale
+- **153 API route handlers** across 40+ categories
+- **67 page components** (admin, operator, public)
+- **76 database tables** + 12 views
+- **75 migration files**
+- **271 indexes**, 82 foreign key constraints
+- **All 76 tables have RLS enabled**
 
 ---
 
-## Key Architecture
+## Infrastructure Architecture
 
 ### Root Layout Provider Stack
 ```
 ThemeProvider > BrandingProvider > NotificationProvider > ErrorBoundary > NetworkMonitor > GoogleMapsProvider > App
 ```
 
-### Authentication Flow
-1. POST `{ email, password }` → `/api/auth/login`
-2. Server calls `supabase.auth.signInWithPassword()`
-3. Fetches profile via `supabaseAdmin` (service_role, bypasses RLS)
-4. Checks `profile.active` — inactive = 403
-5. Returns `{ success, user: { id, email, full_name, role }, session }`
-6. Frontend stores in `localStorage('supabase-user')`, uses JWT for API calls
-
 ### Two Supabase Clients
 - `lib/supabase.ts` — public client (anon key), client-side, subject to RLS
 - `lib/supabase-admin.ts` — admin client (service_role key), server-side only, bypasses RLS
 
+### Authentication Flow
+1. `POST /api/auth/login` with `{ email, password }`
+2. Server: `supabase.auth.signInWithPassword()` → fetch profile via admin client
+3. Check `profile.active` (inactive = 403)
+4. Return `{ success, user: { id, email, full_name, role }, session }`
+5. Frontend: stores user in `localStorage('supabase-user')`, uses JWT for API calls
+6. API routes: extract Bearer token → `supabaseAdmin.auth.getUser(token)` → verify role
+
 ### API Route Guards (`lib/api-auth.ts`)
-- `requireAuth(request)` — any authenticated user
-- `requireAdmin(request)` — admin, super_admin, operations_manager, supervisor, salesman
-- `requireSuperAdmin(request)` — super_admin only
-- `requireScheduleBoardAccess(request)` — admin, super_admin, salesman, operations_manager, supervisor
-- `requireOpsManager(request)` — super_admin, operations_manager
-- `requireShopUser(request)` / `requireShopManager(request)` — stubs
-- Returns discriminated union: `{ authorized: true, userId, userEmail, role }` or `{ authorized: false, response }`
-- Also exports `isTableNotFoundError(error)` helper for graceful missing-table handling
-
-### Client-Side Auth (`lib/auth.ts`)
-- `getCurrentUser()` — reads from localStorage (synchronous, returns User | null)
-- `isAdmin()`, `isSuperAdmin()`, `isSalesman()`, `isOperator()`, `isShopUser()`, `isShopManager()`, `hasRole()`
-
-### Role System (8 tiers, priority order)
+```typescript
+requireAuth(request)              // any authenticated user
+requireAdmin(request)             // admin, super_admin, ops_manager, supervisor, salesman
+requireSuperAdmin(request)        // super_admin only
+requireScheduleBoardAccess(request) // admin, super_admin, salesman, ops_manager, supervisor
+requireOpsManager(request)        // super_admin, operations_manager
 ```
-super_admin > operations_manager > admin > salesman > shop_manager > inventory_manager > operator > apprentice
+Returns: `{ authorized: true, userId, userEmail, role }` or `{ authorized: false, response }`
+
+### Client Auth (`lib/auth.ts`)
+```typescript
+getCurrentUser()  // reads from localStorage (synchronous)
+isAdmin(), isSuperAdmin(), isSalesman(), isOperator(), hasRole()
 ```
 
-| Role | Dashboard | Schedule Board | Job Creation | Special |
-|------|-----------|---------------|--------------|---------|
-| `super_admin` | All cards | Full edit (`canEdit`) | Auto-approved | Approve changes, settings, capacity, tenant mgmt, system health |
-| `operations_manager` | Most cards | View + diagnostics | Via admin | Ops hub, system monitoring |
-| `admin` | Configurable cards | View only | → `pending_approval` | Change requests, notes |
-| `salesman` | 3 cards | View only | → `pending_approval` | Change requests, notes |
-| `supervisor` | Configurable | View only | — | Notes, view schedules |
-| `shop_manager` | Shop module | No | — | Shop management |
-| `operator` | My Jobs | No | — | Job workflow, clock in/out |
-| `apprentice` | My Jobs | No | — | Same as operator |
+### Middleware (Edge Runtime)
+- Security headers (X-Frame-Options, CSP, Referrer-Policy, Permissions-Policy)
+- Rate limiting on public endpoints (10 req/min per IP, lazy cleanup)
+- API response cache prevention
 
-### RBAC Card System (`lib/rbac.ts`)
-- `ADMIN_CARDS` array — 17 dashboard cards with key, title, icon, href, features
-- `ROLE_PERMISSION_PRESETS` — default card access per role
-- Cards include: Timecards, Schedule Form, Schedule Board, Team Management, Analytics, Equipment Performance, Operator Profiles, Completed Jobs, Blade Inventory, Tools & Equipment, Billing, Customer Profiles, Operations Hub, Platform Management, System Health, Settings
+---
+
+## Role System (9 tiers)
+
+```
+super_admin > operations_manager > admin > salesman > supervisor > shop_manager > inventory_manager > operator > apprentice
+```
+
+| Role | Dashboard | Schedule Board | Analytics | Special Access |
+|------|-----------|---------------|-----------|----------------|
+| `super_admin` | All widgets + all cards | Full edit | All 20 widgets | Tenant mgmt, system health, backups, settings |
+| `operations_manager` | Most widgets + cards | View + diagnostics | 14 widgets | Ops hub, crew utilization |
+| `admin` | Configurable widgets | View only | 12 widgets | Change requests, billing, customers |
+| `salesman` | Commission + pipeline | View only | 6 widgets | Commission tracking, my jobs |
+| `supervisor` | Configurable | View only | Limited | Notes, view schedules |
+| `shop_manager` | Shop module | No | No | Shop management |
+| `inventory_manager` | Inventory | No | No | Equipment inventory |
+| `operator` | My Jobs | No | No | Job workflow, clock in/out |
+| `apprentice` | My Jobs | No | No | Same as operator |
 
 ---
 
 ## Database Schema (Key Tables)
 
-### Core Tables
-- **`profiles`**: id (FK auth.users), email, full_name, role, phone, active, avatar_url
-- **`job_orders`**: job_number, title, customer_name, customer_contact, job_type, location, address, assigned_to (UUID), helper_assigned_to (UUID), status, priority, scheduled_date, end_date, arrival_time, estimated_hours, estimated_cost, equipment_needed[], jobsite_conditions (JSONB), site_compliance (JSONB), scheduling_flexibility (JSONB), is_will_call, difficulty_rating, photo_urls[], created_via
-- **`customers`**: name, email, phone, company, address, city, state, zip, notes, contact_persons (JSONB)
-- **`invoices`**: invoice_number, job_order_id, customer data, line_items (JSONB), subtotal, tax, total, status (draft/sent/paid/overdue), due_date, paid_date
-- **`daily_job_logs`**: job_order_id, operator_id, day_number (auto-increment trigger), work_items, notes, photos
-- **`work_items`**: job_log_id, service_type, quantity, unit, depth, notes
+### Core Operations
+- **`job_orders`** (139 columns): job_number, customer_name, address, job_type, status, scheduled_date, assigned_to, estimated_cost, completion_signature, photo_urls[], work_started_at, work_completed_at, is_multi_day, equipment_needed[], created_via
+- **`profiles`** (37 columns): id (FK auth.users), full_name, email, role, active, phone, commission_rate, skills, avatar_url
+- **`customers`** (33 columns): name, primary_contact_email, primary_contact_phone, address, city, state, zip, notes
+- **`work_items`** (20 columns): job_order_id, operator_id, work_type, quantity, day_number, core_quantity, core_size, linear_feet_cut, cut_depth_inches
+- **`daily_job_logs`** (20 columns): job_order_id, operator_id, log_date, day_number, hours_worked, work_performed (JSONB)
 
-### Auth & Access
-- **`access_requests`**: Self-registration. Public INSERT. Admin approves → creates auth user + profile
-- **`audit_logs`**: user_id, action, resource_type, resource_id, details (JSONB)
+### Billing
+- **`invoices`** (28 columns): invoice_number, customer_name, subtotal, total_amount, balance_due, status (draft/sent/paid/overdue/void), due_date, payment_terms
+- **`invoice_line_items`** (14 columns): invoice_id, job_order_id, description, quantity, unit_rate, amount, billing_type
+
+### Analytics Dashboard
+- **`dashboard_layouts`**: user_id (unique), layout (JSONB) — persists widget positions per user
+- **`dashboard_notes`**: user_id, title, content, color, pinned, shared — personal sticky notes
+- **`dashboard_tasks`**: user_id, title, completed, priority, due_date — personal todo items
+- **`team_messages`**: author_id, author_name, content, channel — internal chat feed
 
 ### Schedule Board
-- **`schedule_change_requests`**: request_type (reschedule/reassign/cancel), status (pending/approved/rejected)
-- **`schedule_settings`**: Key-value JSONB config (capacity: max_slots, warning_threshold)
-- **`job_notes`**: note_type (manual/change_log)
+- **`schedule_change_requests`**: request_type, status (pending/approved/rejected)
+- **`schedule_settings`**: key-value JSONB config
+- **`job_notes`**: note_type (manual/change_log), content
 - **`schedule_notifications`**: operator_id, type, message, is_read
 
-### Equipment & Inventory
-- **`equipment`**: name, type, serial_number, status, assigned_to, location
-- **`blade_assignments`**: Blade inventory tracking
-- **`maintenance_requests`**: Equipment maintenance tracking
-
-### SaaS Multi-Tenant (NEW — migration pending)
-- **`tenants`**: name, slug, domain, status (active/suspended/trial/cancelled), plan (starter/professional/enterprise), max_users, max_jobs_per_month, features (JSONB), owner_id
-- **`tenant_users`**: tenant_id, user_id, role, invited_by
-- **`error_logs`**: type, error_message, stack_trace, url, user_agent, metadata (JSONB)
+### SaaS Infrastructure
+- **`tenants`**: name, slug, domain, status, plan, features (JSONB), max_users
+- **`tenant_users`**: tenant_id, user_id, role
+- **`error_logs`**: type, error_message, stack_trace, url, metadata (JSONB)
 - **`backup_logs`**: backup_type, status, size_bytes, duration_ms, storage_path
+- **`tenant_branding`**: company_name, logo_url, colors
 
-### Key Views
-- `schedule_board_view` — joins job_orders with profiles, includes notes_count + pending_change_requests_count
-- `active_job_orders` — non-deleted jobs with operator name
-- `recent_completed_jobs` — last 90 days
-- `operator_performance_summary` — aggregated stats
+### Key Views (12)
+```
+schedule_board_view, active_job_orders, recent_completed_jobs,
+operator_performance_summary, ar_aging, financial_dashboard,
+current_operator_rates, job_document_stats, job_orders_history_readable,
+payroll_period_summary, timecards_with_users, work_accessibility_analytics
+```
 
 ### Key Business Rules
-- Job created by super_admin → status = `scheduled` (auto-approved)
-- Job created by admin/salesman → status = `pending_approval`
-- Job lifecycle: `pending_approval → scheduled → assigned → in_route → in_progress → completed`
-- Will-call jobs: fetched globally (not date-filtered), shown separately on board
-- Job numbers: `JOB-{year}-{6 digits}` (schedule form) or `QA-{year}-{6 digits}` (quick add)
+- Job by super_admin → `scheduled` (auto-approved)
+- Job by admin/salesman → `pending_approval`
+- Job lifecycle: `pending_approval → scheduled → assigned → dispatched → in_route → on_site → in_progress → completed`
+- Job numbers: `JOB-{year}-{6 digits}` or `QA-{year}-{6 digits}`
+- Invoice numbers: `INV-{year}-{6 digits}` (5 retry collision avoidance)
+- Default billing rates: Core Drilling $150/core, Wall Sawing $12/LF, Labor $125/hr
 - Soft deletes on job_orders via `deleted_at`/`deleted_by`
-- All views filter `WHERE deleted_at IS NULL`
-- Capacity: configurable max_slots (default 10) and warning_threshold (default 8)
+- Work items persisted to DB via daily-log API (fire-and-forget)
+- Photos awaited before job completion (not fire-and-forget)
 
 ---
 
-## API Routes (38 categories, 100+ handlers)
+## Analytics Dashboard Architecture
 
-### Core Operations
-- `api/job-orders/` — CRUD, submit, status, daily logs, history, photos
-- `api/timecard/` — Clock in/out, current, history
-- `api/time-clock/` — Time clock system
-- `api/workflow/` — Workflow management
-- `api/work-items/` — Work item tracking
+### 20 Customizable Widgets
+**Financial (6):** Revenue Overview, Financial Summary, Top Customers, Commission, Pipeline, Invoice Summary
+**Operations (8):** Job Status, Schedule Preview, Active Crews, Top Operators, System Health, Completion Rate, My Jobs, Crew Utilization
+**Communication (3):** Recent Activity, Team Messages, Notifications Feed
+**Personal (3):** Quick Notes, My Tasks, Mini Calendar
 
-### Admin
-- `api/admin/schedule-board/` — Main board + assign, auto-schedule, capacity, dispatch, missing-info, notify, operators, quick-add, reorder, settings, skill-match
-- `api/admin/schedule-form/ai-parse` — NLP job description parser
-- `api/admin/job-orders/[id]` — Admin job CRUD with audit
-- `api/admin/billing/` — Invoice management
-- `api/admin/customers/` — Customer CRM
-- `api/admin/tenants/` — Multi-tenant management (super_admin)
-- `api/admin/system-health/` — System monitoring (super_admin)
-- `api/admin/backups/` — Manual backup system (super_admin)
-- `api/admin/branding/` — White-label branding settings
-- `api/admin/change-requests/` — Schedule change requests
-- `api/admin/team/` — Team management
-- `api/admin/users/` — User management
-- `api/admin/timecards/` — Timecard admin
+### Widget Infrastructure
+- Drag-and-drop grid: `react-grid-layout` with `ResponsiveGridLayout`
+- Layout saved per user in `dashboard_layouts` table
+- 3 presets: Operations Manager, Salesman, Billing & Finance
+- Settings panel: Widgets toggle, Presets, Appearance (density)
+- Role-based visibility (super_admin sees all, salesman sees 6)
+- 60-second auto-refresh, daily/weekly/monthly time ranges
+- Self-managed widgets (Notes, Tasks, Messages) fetch their own data
 
-### Infrastructure
-- `api/health/` — Public health check (no auth), DB/Auth/Storage status + latency
-- `api/log-error/` — Client error logging (no auth), stores in error_logs table
-
-### Equipment & Inventory
-- `api/equipment/` — Damage reports, maintenance, turn-in, repair
-- `api/equipment-units/` — Equipment unit management
-- `api/equipment-usage/` — Usage logs
-- `api/inventory/` — Stock, assignments, history
-
-### Compliance & Documents
-- `api/silica-plan/` — OSHA silica exposure plans
-- `api/job-hazard-analysis/` — JHA forms
-- `api/liability-release/` — Liability releases + PDF
-- `api/work-order-agreement/` — Work order PDFs
-- `api/service-completion-agreement/` — Service completion
-
-### Communication
-- `api/send-email/` — Resend email (auth required)
-- `api/send-sms/` — Telnyx SMS (auth required)
+### API Routes
+- `GET /api/admin/dashboard-stats?timeRange=monthly` — aggregated stats by role
+- `GET/PUT /api/admin/dashboard-layout` — user layout persistence
+- `CRUD /api/admin/dashboard-notes` — personal notes
+- `CRUD /api/admin/dashboard-tasks` — personal tasks
+- `GET/POST /api/admin/team-messages` — team chat
+- `GET/PATCH /api/admin/commission` — commission rate + earnings
 
 ---
 
-## Dashboard Pages
+## Environment Variables
+```bash
+# Required
+NEXT_PUBLIC_SUPABASE_URL=https://klatddoyncxidgqtcjnu.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NEXT_PUBLIC_APP_URL=https://your-vercel-url.vercel.app
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-maps-key
+RESEND_API_KEY=re_your-key
+RESEND_FROM_EMAIL=Patriot Concrete Cutting <noreply@patriotconcretecutting.com>
 
-### Admin Pages (27)
-```
-/dashboard/admin/
-  access-requests, active-jobs, all-equipment, analytics, billing,
-  completed-job-tickets, completed-jobs, create-estimate, create-job,
-  customers, debug, equipment-performance, equipment-units, jobs,
-  maintenance-schedules, operator-profiles, operators, ops-hub,
-  schedule-board, schedule-form, settings (+ settings/branding),
-  system-health, team-management, tenant-management, timecards, upcoming-projects
-```
-
-### Operator Pages
-```
-/dashboard/ — Main dashboard (role-based cards)
-/dashboard/my-jobs — Assigned jobs for today
-/dashboard/my-jobs/[id] — Job detail
-/dashboard/my-jobs/[id]/jobsite — Jobsite info
-/dashboard/job-schedule/[id]/ — Job workflow pages:
-  in-route, jobsite, work-performed, day-complete, complete, standby
-/dashboard/timecard — Time clock
-/dashboard/my-profile — Profile management
-/dashboard/request-time-off — PTO requests
-/dashboard/tools/ — Equipment scanning, blade management, damage, maintenance
-/dashboard/shop — Shop management
-/dashboard/inventory — Equipment inventory
-```
-
----
-
-## Key Components
-
-### Schedule Board Components (`app/dashboard/admin/schedule-board/_components/`)
-ApprovalModal, AssignOperatorModal, ChangeRequestModal, ConflictModal, DailyNotesSection, DndBoardWrapper, DraggableJobCard, DroppableOperatorRow, EditJobPanel, JobCard, JobDetailView, JobPreviewPanel, MissingInfoModal, NotesDrawer, OperatorRow, OperatorRowView, PendingQueueSidebar, QuickAddModal, ScheduleDatePicker, SendBackModal, SkillMatchIndicator, Toast, ViewToggle
-
-### Global Components
-- `components/ErrorBoundary.tsx` — Full-page + SectionErrorBoundary
-- `components/NetworkMonitor.tsx` — Offline/online detection + server health
-- `components/AuthGuard.tsx` — Route protection
-- `components/AdminProtection.tsx` — Admin route guard
-- `components/PhotoUploader.tsx` — Camera/file upload to Supabase Storage
-- `components/SignatureCanvas.tsx` — Touch signature capture
-
-### Contexts
-- `contexts/NotificationContext.tsx` — Global toast notifications
-- `contexts/ThemeContext.tsx` — Dark/light mode
-- `lib/branding-context.tsx` — Tenant branding (company name, colors, logos)
-
-### Hooks
-- `hooks/useApi.ts` — Authenticated fetch with auto error handling
-- `hooks/useAuth.ts` — Auth state management
-- `hooks/useVoiceInput.ts` — Web Speech API voice input
-- `hooks/useWorkflow.ts` — Operator job workflow state
-- `hooks/useJobs.ts` — Job data fetching
-
----
-
-## Environment Variables Required
-```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
-TELNYX_API_KEY=
-TELNYX_FROM_NUMBER=
-NEXT_PUBLIC_APP_URL=
+# Optional
+TWILIO_ACCOUNT_SID=    # SMS (legacy)
+TWILIO_AUTH_TOKEN=     # SMS (legacy)
+TWILIO_PHONE_NUMBER=   # SMS (legacy)
+NEXT_PUBLIC_BYPASS_LOCATION_CHECK=false  # GPS bypass for testing
 ```
 
 ## Build & Deploy
 ```bash
 npm run dev        # Dev server (port 3000)
-npm run build      # Production build check (must pass with 0 errors)
-git push origin feature/schedule-board-v2  # Push to working branch
-git push origin main  # Triggers Vercel auto-deploy (production)
+npm run build      # Production build (must pass with 0 errors)
+# Deploy: Connect GitHub repo to Vercel, set env vars, auto-deploy on push
 ```
 
-## Security Posture
-- All API routes use `requireAuth()` or `requireAdmin()` (except intentionally public ones)
-- All tables have RLS enabled with proper ownership-based policies
-- Rate limiting on public endpoints (10 req/min per IP)
-- Security headers: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
-- SSRF protection on PDF URL fetching
-- HTML sanitization in email templates
-- Global error boundary prevents crash data leakage
-- Client errors logged to `error_logs` table for monitoring
-- Network monitor detects connectivity issues before they cause data loss
-
-## 73 Database Migrations in `supabase/migrations/`
-- Latest: `20260320_add_error_logs_tenants_backups.sql` (UNAPPLIED — Supabase MCP network error)
+## Security
+- All 153 API routes use auth guards (except /api/health and /api/log-error)
+- All 76 tables have RLS enabled
+- Rate limiting on public endpoints (10 req/min)
+- Security headers in middleware + next.config.js
+- E-sign consent required for job completion
+- GPS tracking consent during onboarding
+- Privacy Policy + Terms of Service pages
+- Photo endpoints require job assignment or admin role
+- Invoice number collision retry (5 attempts)
+- `isTableNotFoundError()` tightened to avoid swallowing real 404s

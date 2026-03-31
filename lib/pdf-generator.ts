@@ -93,7 +93,7 @@ export class PDFGenerator {
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(24);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('WORK ORDER', margin, 20);
+      pdf.text('PONTIFEX INDUSTRIES', margin, 20);
 
       pdf.setFontSize(16);
       pdf.text('Work Order & Service Agreement', margin, 30);
@@ -266,7 +266,7 @@ export class PDFGenerator {
       yPosition = pageHeight - 15;
       pdf.setFontSize(8);
       pdf.setTextColor(100, 100, 100);
-      pdf.text('Generated with Operations Platform', margin, yPosition);
+      pdf.text('Generated with Patriot Concrete Cutting Platform', margin, yPosition);
       pdf.text(`Page ${pdf.internal.pages.length - 1}`, pageWidth - margin - 15, yPosition);
 
       // Upload to Supabase Storage
@@ -300,7 +300,7 @@ export class PDFGenerator {
       // Header
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('WORK ORDER', margin, yPosition);
+      pdf.text('PONTIFEX INDUSTRIES', margin, yPosition);
       yPosition += 8;
 
       pdf.setFontSize(16);

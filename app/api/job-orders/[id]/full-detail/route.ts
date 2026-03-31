@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
@@ -17,12 +18,16 @@ export async function GET(
 
     const { id } = await params;
 
+    // Tenant filtering
+    const tenantId = await getTenantId(auth.userId);
+
     // Fetch full job record
-    const { data: job, error: jobError } = await supabaseAdmin
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });

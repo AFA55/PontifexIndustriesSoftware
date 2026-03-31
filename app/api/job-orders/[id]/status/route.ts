@@ -5,8 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -50,16 +48,12 @@ async function updateJobStatus(
       );
     }
 
-    // Get tenant scope
-    const tenantId = await getTenantId(user.id);
-
-    // Check if job exists and user has permission (scoped to tenant)
-    let jobCheckQuery = supabaseAdmin
+    // Check if job exists and user has permission
+    const { data: existingJob, error: checkError } = await supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', jobId);
-    if (tenantId) jobCheckQuery = jobCheckQuery.eq('tenant_id', tenantId);
-    const { data: existingJob, error: checkError } = await jobCheckQuery.single();
+      .eq('id', jobId)
+      .single();
 
     if (checkError || !existingJob) {
       return NextResponse.json(
@@ -75,8 +69,9 @@ async function updateJobStatus(
       .eq('id', user.id)
       .single();
 
-    // Check permissions: operator can only update their own jobs, admin can update any
-    if (profile?.role !== 'admin' && existingJob.assigned_to !== user.id) {
+    // Check permissions: operator can only update their own jobs, admin roles can update any
+    const adminRoles = ['admin', 'super_admin', 'operations_manager'];
+    if (!adminRoles.includes(profile?.role || '') && existingJob.assigned_to !== user.id) {
       return NextResponse.json(
         { error: 'You can only update jobs assigned to you' },
         { status: 403 }
@@ -134,6 +129,10 @@ async function updateJobStatus(
       'job_difficulty_rating', 'job_access_rating',
       'job_difficulty_notes', 'job_access_notes',
       'feedback_submitted_at',
+      // Equipment confirmation tracking (per-operator)
+      'equipment_confirmed_by',
+      // Job survey (smart post-work survey)
+      'job_survey',
     ];
 
     for (const field of allowedExtraFields) {
@@ -227,7 +226,7 @@ async function updateJobStatus(
   }
 }
 
-// Export both POST and PUT handlers
+// Export POST, PUT, and PATCH handlers (day-complete page uses PATCH)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -236,6 +235,13 @@ export async function POST(
 }
 
 export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return updateJobStatus(request, params);
+}
+
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {

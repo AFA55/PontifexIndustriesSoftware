@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -19,10 +17,9 @@ import {
   Trophy,
   PenTool,
   Camera,
-  PauseCircle,
-  Calendar,
 } from 'lucide-react';
 import PhotoUploader from '@/components/PhotoUploader';
+import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
 
 export default function DayCompletePage() {
   const router = useRouter();
@@ -37,12 +34,7 @@ export default function DayCompletePage() {
   const [signatureData, setSignatureData] = useState('');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [completionPhotos, setCompletionPhotos] = useState<string[]>([]);
-  const [confirmSkipSignature, setConfirmSkipSignature] = useState(false);
-
-  // On-hold state
-  const [showHoldModal, setShowHoldModal] = useState(false);
-  const [holdReason, setHoldReason] = useState('');
-  const [holdReturnDate, setHoldReturnDate] = useState('');
+  const [esignConsented, setEsignConsented] = useState(false);
 
   // Signature canvas
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -101,16 +93,20 @@ export default function DayCompletePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Save completion photos if any
+      // Save completion photos (await to ensure saved)
       if (completionPhotos.length > 0) {
-        fetch(`/api/job-orders/${jobId}/photos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ photo_urls: completionPhotos })
-        }).catch(err => console.error('Photo save error:', err));
+        try {
+          await fetch(`/api/job-orders/${jobId}/photos`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ photo_urls: completionPhotos })
+          });
+        } catch (err) {
+          console.error('Photo save error:', err);
+        }
       }
 
       // Get work performed from localStorage
@@ -149,76 +145,6 @@ export default function DayCompletePage() {
     }
   };
 
-  // ─── PUT JOB ON HOLD ─────────────────────────────────────
-  const handlePutOnHold = async () => {
-    if (!holdReason.trim()) return;
-    setSubmitting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      // Save any completion photos
-      if (completionPhotos.length > 0) {
-        fetch(`/api/job-orders/${jobId}/photos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ photo_urls: completionPhotos })
-        }).catch(err => console.error('Photo save error:', err));
-      }
-
-      // Save daily log entry before going on hold
-      const stored = localStorage.getItem(`work-performed-${jobId}`);
-      const workPerformed = stored ? JSON.parse(stored).items : [];
-
-      fetch(`/api/job-orders/${jobId}/daily-log`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          workPerformed,
-          notes: `Job paused. Reason: ${holdReason}${holdReturnDate ? ` Return date: ${holdReturnDate}` : ''}`,
-          continueNextDay: false,
-          latitude: null,
-          longitude: null,
-        })
-      }).catch(() => {});
-
-      // Mark job as on_hold
-      const statusRes = await fetch(`/api/job-orders/${jobId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          status: 'on_hold',
-          pause_reason: holdReason.trim(),
-          return_date: holdReturnDate || null,
-          paused_at: new Date().toISOString(),
-        })
-      });
-
-      if (statusRes.ok) {
-        showNotif('Job put on hold. You can resume it anytime.', 'success');
-        localStorage.removeItem(`work-performed-${jobId}`);
-        setTimeout(() => router.push('/dashboard/my-jobs'), 1500);
-      } else {
-        const data = await statusRes.json();
-        showNotif(data.error || 'Failed to put job on hold', 'error');
-      }
-    } catch (err) {
-      console.error('Error putting job on hold:', err);
-      showNotif('Failed to save. Please try again.', 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   // ─── JOB FULLY COMPLETE ──────────────────────────────────
   const handleJobComplete = async () => {
     setSubmitting(true);
@@ -229,23 +155,28 @@ export default function DayCompletePage() {
       // Upload signature to storage
       const signatureUrl = await uploadSignature();
 
-      // Save completion photos
+      // Save completion photos (await to ensure they're saved before completing)
       if (completionPhotos.length > 0) {
-        fetch(`/api/job-orders/${jobId}/photos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ photo_urls: completionPhotos })
-        }).catch(err => console.error('Photo save error:', err));
+        try {
+          await fetch(`/api/job-orders/${jobId}/photos`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ photo_urls: completionPhotos })
+          });
+        } catch (err) {
+          console.error('Photo save error:', err);
+          // Continue even if photos fail — don't block job completion
+        }
       }
 
       // Get work performed from localStorage
       const stored = localStorage.getItem(`work-performed-${jobId}`);
       const workPerformed = stored ? JSON.parse(stored).items : [];
 
-      // Create final daily log entry
+      // Create final daily log entry (also saves work items to DB)
       await fetch(`/api/job-orders/${jobId}/daily-log`, {
         method: 'POST',
         headers: {
@@ -401,7 +332,7 @@ export default function DayCompletePage() {
 
       {/* Notification */}
       {notification && (
-        <div className={`fixed top-20 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium text-center ${
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${
           notification.type === 'success' ? 'bg-emerald-500' :
           notification.type === 'error' ? 'bg-red-500' : 'bg-amber-500'
         }`}>
@@ -409,7 +340,7 @@ export default function DayCompletePage() {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-6 pb-24 max-w-lg space-y-6">
+      <div className="container mx-auto px-4 py-6 max-w-lg space-y-6">
         {/* Hours Worked Today */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
@@ -452,67 +383,6 @@ export default function DayCompletePage() {
           />
         </div>
 
-        {/* On-Hold Modal */}
-        {showHoldModal && (
-          <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="p-2 bg-purple-100 rounded-xl">
-                  <PauseCircle className="w-5 h-5 text-purple-600" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-800">Put Job On Hold</h3>
-              </div>
-              <p className="text-sm text-slate-500">
-                All work logged so far will be saved. You can resume this job anytime.
-              </p>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Reason for hold <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={holdReason}
-                  onChange={(e) => setHoldReason(e.target.value)}
-                  placeholder="e.g. Waiting for permit approval, Customer requested pause..."
-                  rows={3}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-slate-900 resize-none text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" />
-                  Expected return date (optional)
-                </label>
-                <input
-                  type="date"
-                  value={holdReturnDate}
-                  onChange={(e) => setHoldReturnDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-slate-900"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-1">
-                <button
-                  onClick={() => { setShowHoldModal(false); setHoldReason(''); setHoldReturnDate(''); }}
-                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handlePutOnHold}
-                  disabled={submitting || !holdReason.trim()}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <PauseCircle className="w-4 h-4" />}
-                  {submitting ? 'Saving...' : 'Put On Hold'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Main Decision */}
         {!showSignature ? (
           <div className="space-y-4">
@@ -537,25 +407,6 @@ export default function DayCompletePage() {
                   </p>
                 </div>
                 {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
-              </div>
-            </button>
-
-            {/* Put On Hold */}
-            <button
-              onClick={() => setShowHoldModal(true)}
-              disabled={submitting}
-              className="w-full bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white/20 rounded-xl">
-                  <PauseCircle className="w-7 h-7" />
-                </div>
-                <div className="text-left flex-1">
-                  <p className="text-lg font-bold">Put On Hold</p>
-                  <p className="text-sm text-purple-100">
-                    Pause project. Resume at a later date.
-                  </p>
-                </div>
               </div>
             </button>
 
@@ -613,7 +464,7 @@ export default function DayCompletePage() {
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
                     <PenTool className="w-3.5 h-3.5" />
-                    Customer Signature <span className="text-red-500 ml-0.5">*</span>
+                    Signature (optional)
                   </label>
                   {signatureData && (
                     <button
@@ -627,8 +478,8 @@ export default function DayCompletePage() {
                 <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50">
                   <canvas
                     ref={canvasRef}
-                    width={320}
-                    height={140}
+                    width={350}
+                    height={150}
                     className="w-full touch-none cursor-crosshair"
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
@@ -640,15 +491,21 @@ export default function DayCompletePage() {
                   />
                 </div>
                 <p className="text-xs text-slate-400 mt-1 text-center">
-                  {signatureData ? '✓ Signature captured' : 'Have customer sign above to complete job'}
+                  Draw signature above or skip
                 </p>
               </div>
 
-              {/* Complete Button — requires signature */}
+              {/* E-Sign Consent */}
+              <EsignConsentCheckbox
+                onConsentChange={setEsignConsented}
+                consented={esignConsented}
+              />
+
+              {/* Complete Button */}
               <button
                 onClick={handleJobComplete}
-                disabled={submitting || !signatureData}
-                className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl py-4 font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                disabled={submitting || !esignConsented}
+                className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl py-4 font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -658,43 +515,14 @@ export default function DayCompletePage() {
                 {submitting ? 'Completing...' : 'Complete Job'}
               </button>
 
-              {!signatureData && (
-                <p className="text-center text-xs text-slate-400">
-                  Signature required to complete job
-                </p>
-              )}
-
-              {/* Emergency escape — customer unavailable */}
-              {!confirmSkipSignature ? (
-                <button
-                  onClick={() => setConfirmSkipSignature(true)}
-                  disabled={submitting}
-                  className="w-full text-slate-400 text-xs hover:text-slate-600 py-1"
-                >
-                  Customer not available to sign?
-                </button>
-              ) : (
-                <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 space-y-2">
-                  <p className="text-xs text-amber-700 font-medium text-center">
-                    Completing without a signature may delay invoicing. Are you sure?
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setConfirmSkipSignature(false)}
-                      className="flex-1 px-3 py-2 bg-slate-100 text-slate-700 text-xs rounded-lg hover:bg-slate-200"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleJobComplete}
-                      disabled={submitting}
-                      className="flex-1 px-3 py-2 bg-amber-500 text-white text-xs rounded-lg hover:bg-amber-600 disabled:opacity-50"
-                    >
-                      Complete Anyway
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Skip signature option */}
+              <button
+                onClick={handleJobComplete}
+                disabled={submitting || !esignConsented}
+                className="w-full text-slate-500 text-sm hover:text-slate-700 py-2 disabled:opacity-40"
+              >
+                Skip signature and complete
+              </button>
             </div>
           </div>
         )}
@@ -704,9 +532,8 @@ export default function DayCompletePage() {
           <div className="flex gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-amber-700">
-              <strong>Done for Today</strong> — saves progress, job resumes tomorrow.{' '}
-              <strong>Put On Hold</strong> — pauses project, resume at a later date.{' '}
-              <strong>Job Fully Complete</strong> — marks job finished, goes to billing.
+              <strong>Done for Today</strong> saves your progress and resets the job for tomorrow.
+              <strong> Job Fully Complete</strong> marks the job as finished and sends it to billing.
             </p>
           </div>
         </div>

@@ -1,12 +1,9 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
-import { Clock, Briefcase, Calendar, User as UserIcon } from 'lucide-react';
 import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
 import OnboardingTour from '@/components/OnboardingTour';
@@ -28,7 +25,7 @@ function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: 
       <g>
         <path
           d="M20 15L35 5L50 15L50 35L35 45L20 35L20 25L35 25L35 35L42 30L42 20L35 15L28 20L28 30L20 25V15Z"
-          fill="url(#op-pontifex-gradient)"
+          fill="url(#op-patriot-gradient)"
         />
         <path
           d="M25 20L30 17L35 20L35 25L30 28L25 25V20Z"
@@ -38,14 +35,14 @@ function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: 
       </g>
       <g fill="currentColor">
         <text x="65" y="25" className="text-lg font-bold" style={{fontSize: '18px', fontFamily: 'Inter, sans-serif'}}>
-          {(companyName || 'OPERATIONS').toUpperCase().split(' ')[0]}
+          {(companyName || 'PONTIFEX').toUpperCase().split(' ')[0]}
         </text>
         <text x="65" y="45" className="text-sm" style={{fontSize: '12px', fontFamily: 'Inter, sans-serif', opacity: '0.8'}}>
-          {(companyName || 'OPERATIONS PLATFORM').toUpperCase().split(' ').slice(1).join(' ') || 'PLATFORM'}
+          {(companyName || 'PONTIFEX INDUSTRIES').toUpperCase().split(' ').slice(1).join(' ') || 'INDUSTRIES'}
         </text>
       </g>
       <defs>
-        <linearGradient id="op-pontifex-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
+        <linearGradient id="op-patriot-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
           <stop stopColor="#dc2626" />
           <stop offset="0.5" stopColor="#2563eb" />
           <stop offset="1" stopColor="#1e40af" />
@@ -82,8 +79,6 @@ export default function Dashboard() {
   const [isShopHours, setIsShopHours] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showNfcClockInModal, setShowNfcClockInModal] = useState(false);
-  const [selectedJobId, setSelectedJobId] = useState<string>('');
-  const [todaysJobs, setTodaysJobs] = useState<{ id: string; job_number: string; customer_name: string; title: string }[]>([]);
   const [clockOutBlock, setClockOutBlock] = useState<{
     show: boolean;
     blockType: string;
@@ -111,20 +106,15 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('🔍 Checking authentication status...');
     const currentUser = getCurrentUser();
 
     if (!currentUser) {
-      console.log('❌ No authenticated user found, redirecting to login...');
       router.push('/login');
       return;
     }
 
-    console.log('✅ User authenticated:', currentUser);
-
     // Redirect based on role
     if (currentUser.role === 'admin') {
-      console.log('🔑 Admin user, redirecting to admin dashboard...');
       router.push('/dashboard/admin');
       return;
     }
@@ -147,7 +137,6 @@ export default function Dashboard() {
 
     checkClockStatus();
     fetchActiveJobs();
-    fetchTodaysJobs();
     fetchWeeklyHours();
 
     // Check if user should see onboarding tour
@@ -166,19 +155,17 @@ export default function Dashboard() {
   // Check if user should see onboarding tour
   const checkOnboardingStatus = (currentUser: User) => {
     const isDemoAccount = currentUser.email.toLowerCase().includes('demo');
-    const onboardingKey = `pontifex-onboarding-${currentUser.id}`;
+    const onboardingKey = `patriot-onboarding-${currentUser.id}`;
     const hasSeenOnboarding = localStorage.getItem(onboardingKey);
 
     // Demo accounts: always show tour
     if (isDemoAccount) {
-      console.log('🎯 Demo account detected - showing onboarding tour');
       setShowOnboarding(true);
       return;
     }
 
     // Regular accounts: only show on first login
     if (!hasSeenOnboarding) {
-      console.log('🆕 New user detected - showing onboarding tour');
       setShowOnboarding(true);
     }
   };
@@ -229,7 +216,7 @@ export default function Dashboard() {
       if (!session) {
         console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
         localStorage.removeItem('supabase-user');
-        localStorage.removeItem('pontifex-user');
+        localStorage.removeItem('patriot-user');
         window.location.href = '/login';
         return;
       }
@@ -308,33 +295,6 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error fetching active jobs:', error);
-    }
-  };
-
-  // Fetch today's assigned jobs for the job selector
-  const fetchTodaysJobs = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const today = new Date().toISOString().split('T')[0];
-      const response = await fetch('/api/job-orders', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      });
-      const result = await response.json();
-      if (result.success && result.data) {
-        const jobs = result.data.filter((j: any) => {
-          const jDate = j.scheduled_date ? new Date(j.scheduled_date).toISOString().split('T')[0] : null;
-          return jDate === today && j.status !== 'completed' && j.status !== 'cancelled';
-        });
-        setTodaysJobs(jobs.map((j: any) => ({
-          id: j.id,
-          job_number: j.job_number,
-          customer_name: j.customer_name,
-          title: j.title,
-        })));
-      }
-    } catch (err) {
-      console.error('Error fetching today\'s jobs:', err);
     }
   };
 
@@ -421,7 +381,6 @@ export default function Dashboard() {
   }, [isClockedIn, currentTimecard]);
 
   const handleLogout = () => {
-    console.log('🚪 Logging out user...');
     logout();
     router.push('/login');
   };
@@ -481,7 +440,6 @@ export default function Dashboard() {
           longitude: data.longitude,
           accuracy: data.accuracy,
           is_shop_hours: isShopHours,
-          job_order_id: (!isShopHours && selectedJobId) ? selectedJobId : null,
           clock_in_method: data.method,
           nfc_tag_id: data.nfc_tag_id,
           nfc_tag_uid: data.nfc_tag_uid,
@@ -561,7 +519,6 @@ export default function Dashboard() {
     setClockMessage(null);
 
     try {
-      console.log('📍 Getting location for clock out...');
       setDebugInfo(prev => ({ ...prev, gpsStatus: 'requesting...', timestamp: new Date().toISOString() }));
 
       // Get Supabase session token
@@ -595,8 +552,6 @@ export default function Dashboard() {
         setClockLoading(false);
         return;
       }
-
-      console.log('✅ Location verified:', verification.distanceFormatted, 'from shop');
 
       // Call clock-out API with auth token
       const response = await fetch('/api/timecard/clock-out', {
@@ -640,7 +595,6 @@ export default function Dashboard() {
         return;
       }
 
-      console.log('✅ Clocked out successfully. Total hours:', result.data.totalHours);
       setIsClockedIn(false);
       setCurrentTimecard(null);
       setCurrentHours(0);
@@ -666,89 +620,6 @@ export default function Dashboard() {
     }
   };
 
-  // Called by NfcClockInModal when user taps NFC to clock OUT
-  const performNfcClockOut = async (data: {
-    method: 'nfc' | 'gps';
-    nfc_tag_id?: string;
-    nfc_tag_uid?: string;
-    latitude: number;
-    longitude: number;
-    accuracy?: number;
-  }) => {
-    setClockLoading(true);
-    setClockMessage(null);
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setClockMessage({ type: 'error', text: 'Session expired. Please log in again.' });
-        setClockLoading(false);
-        throw new Error('Session expired');
-      }
-
-      const response = await fetch('/api/timecard/clock-out', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          latitude: data.latitude,
-          longitude: data.longitude,
-          accuracy: data.accuracy,
-          clock_out_method: data.method,
-          nfc_tag_id: data.nfc_tag_id,
-          nfc_tag_uid: data.nfc_tag_uid,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 403 && result.block_type) {
-          setClockOutBlock({
-            show: true,
-            blockType: result.block_type,
-            incompleteJobs: result.incomplete_jobs || [],
-          });
-          setClockLoading(false);
-          setShowNfcClockInModal(false);
-          throw new Error(result.error || 'Clock-out blocked');
-        }
-        const errorText = result.error || 'Failed to clock out';
-        setClockMessage({ type: 'error', text: errorText });
-        setClockLoading(false);
-        throw new Error(errorText);
-      }
-
-      setIsClockedIn(false);
-      setCurrentTimecard(null);
-      setCurrentHours(0);
-      setShowNfcClockInModal(false);
-      setClockMessage({
-        type: 'success',
-        text: `${result.message} — Total hours: ${result.data.totalHours}${data.method === 'nfc' ? ' (NFC verified)' : ''}`,
-      });
-
-      fetchWeeklyHours();
-      setTimeout(() => setClockMessage(null), 5000);
-    } catch (error: unknown) {
-      console.error('Error clocking out via NFC:', error);
-      const msg = error instanceof Error ? error.message : 'An error occurred';
-      if (!clockMessage) {
-        setClockMessage({ type: 'error', text: msg });
-      }
-      throw error;
-    } finally {
-      setClockLoading(false);
-    }
-  };
-
-  // When user taps the clock-out button, show the NFC modal in clock-out mode
-  const handleClockOutWithModal = () => {
-    setShowNfcClockInModal(true);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -772,8 +643,8 @@ export default function Dashboard() {
 
       {/* Clock-Out Block Modal */}
       {clockOutBlock.show && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -826,10 +697,10 @@ export default function Dashboard() {
 
       {/* Demo Operator Walkthrough */}
       {showWalkthrough && isDemoOperator && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-2 sm:p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 sm:p-8 rounded-t-3xl text-white">
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-8 rounded-t-3xl text-white">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
                   <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -837,14 +708,14 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold">Welcome to {branding.company_short_name || 'the Platform'}!</h2>
+                  <h2 className="text-3xl font-bold">Welcome to {branding.company_short_name || 'Patriot'}!</h2>
                   <p className="text-blue-100 mt-1">Demo Operator Dashboard Tour</p>
                 </div>
               </div>
             </div>
 
             {/* Content */}
-            <div className="p-5 sm:p-8 space-y-6">
+            <div className="p-8 space-y-6">
               <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-6">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
@@ -855,7 +726,7 @@ export default function Dashboard() {
                   <div className="flex-1">
                     <h3 className="font-bold text-blue-900 text-lg mb-2">This is a Demo Account</h3>
                     <p className="text-blue-800 text-sm leading-relaxed">
-                      You&apos;re exploring a limited demonstration of the {branding.company_short_name || ''} operator platform.
+                      You&apos;re exploring a limited demonstration of the {branding.company_short_name || 'Patriot'} operator platform.
                       Some features are restricted to showcase the full platform capabilities.
                     </p>
                   </div>
@@ -910,7 +781,6 @@ export default function Dashboard() {
                     </p>
                     <ul className="text-orange-800 text-sm space-y-1 list-disc list-inside">
                       <li>Request time off and vacation</li>
-                      <li>Access tools and equipment management</li>
                       <li>And much more...</li>
                     </ul>
                   </div>
@@ -991,26 +861,26 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 pb-28 sm:pb-8 relative">
+      <div className="container mx-auto px-4 py-8 relative">
         {/* Modern Animated Greeting */}
-        <div className="text-center mb-8 sm:mb-10 animate-fade-in">
+        <div className="text-center mb-10 animate-fade-in">
           <div className="inline-block">
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
+            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
               Welcome back, {user?.name?.split(' ')[0] || 'Demo'}!
             </h1>
-            <p className="text-gray-700 text-base sm:text-lg font-medium">
+            <p className="text-gray-700 text-lg font-medium">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
           </div>
 
-          {/* Quick Stats Bar — 2-column grid on mobile, horizontal on larger */}
-          <div className="grid grid-cols-2 sm:flex sm:justify-center gap-4 sm:gap-6 mt-8">
-            <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-5 sm:p-6 shadow-xl sm:min-w-[140px] transform hover:scale-105 transition-all">
-              <p className="text-3xl sm:text-4xl font-bold text-white drop-shadow-lg">{activeJobsCount}</p>
+          {/* Quick Stats Bar with Professional Gradients */}
+          <div className="flex justify-center gap-6 mt-8">
+            <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
+              <p className="text-4xl font-bold text-white drop-shadow-lg">{activeJobsCount}</p>
               <p className="text-sm text-white/90 font-semibold mt-1">Active Jobs</p>
             </div>
-            <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl p-5 sm:p-6 shadow-xl sm:min-w-[140px] transform hover:scale-105 transition-all">
-              <p className="text-3xl sm:text-4xl font-bold text-white drop-shadow-lg">{currentHours.toFixed(1)}</p>
+            <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
+              <p className="text-4xl font-bold text-white drop-shadow-lg">{currentHours.toFixed(1)}</p>
               <p className="text-sm text-white/90 font-semibold mt-1">Hours Today</p>
             </div>
           </div>
@@ -1059,23 +929,23 @@ export default function Dashboard() {
             HERO CLOCK IN/OUT CARD — Primary Feature
             ═══════════════════════════════════════════════════════ */}
         <div className="max-w-5xl mx-auto mb-10 animate-fade-in">
-          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-5 sm:p-8 shadow-2xl border-2 border-white/50">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-              <div className="flex items-center space-x-4">
-                <div className={`w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br ${
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-white/50">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+              <div className="flex items-center space-x-5">
+                <div className={`w-20 h-20 bg-gradient-to-br ${
                   isClockedIn
                     ? 'from-rose-500 via-red-500 to-pink-600'
                     : 'from-emerald-500 via-green-500 to-teal-600'
                 } rounded-3xl flex items-center justify-center shadow-2xl ring-4 ring-white`}>
-                  <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-10 h-10 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <div className="min-w-0">
-                  <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">
                     {isClockedIn ? 'Ready to Clock Out?' : 'Start Your Shift'}
                   </h3>
-                  <p className="text-gray-700 font-semibold text-sm sm:text-base">
+                  <p className="text-gray-700 font-semibold text-base">
                     {isClockedIn
                       ? `You've been working for ${currentHours.toFixed(1)} hours`
                       : 'Clock in when you arrive at the shop'
@@ -1089,17 +959,14 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
+              <div className="flex flex-col items-end gap-3 w-full sm:w-auto">
                 {/* Shop Hours Checkbox — only visible when NOT clocked in (for re-clock-in) */}
                 {!isClockedIn && (
                   <label className="flex items-center gap-3 px-4 py-3 bg-amber-50 border-2 border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100 transition-colors w-full sm:w-auto">
                     <input
                       type="checkbox"
                       checked={isShopHours}
-                      onChange={(e) => {
-                        setIsShopHours(e.target.checked);
-                        if (e.target.checked) setSelectedJobId('');
-                      }}
+                      onChange={(e) => setIsShopHours(e.target.checked)}
                       className="w-5 h-5 rounded border-2 border-amber-400 text-amber-600 focus:ring-amber-500"
                     />
                     <div>
@@ -1109,33 +976,14 @@ export default function Dashboard() {
                   </label>
                 )}
 
-                {/* Job Selector — only visible when NOT clocked in and NOT shop hours */}
-                {!isClockedIn && !isShopHours && todaysJobs.length > 0 && (
-                  <div className="w-full sm:w-auto">
-                    <select
-                      value={selectedJobId}
-                      onChange={(e) => setSelectedJobId(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-blue-200 bg-blue-50 rounded-xl text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400"
-                    >
-                      <option value="">📋 Select today&apos;s job (optional)</option>
-                      {todaysJobs.map(j => (
-                        <option key={j.id} value={j.id}>
-                          {j.job_number} — {j.customer_name}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-slate-400 mt-1 px-1">Link this shift to a job for P&amp;L tracking</p>
-                  </div>
-                )}
-
                 <button
-                  onClick={isClockedIn ? handleClockOutWithModal : handleClockIn}
+                  onClick={isClockedIn ? handleClockOut : handleClockIn}
                   disabled={clockLoading}
-                  className={`group flex items-center justify-center space-x-3 w-full ${
+                  className={`group flex items-center justify-center space-x-3 w-full sm:w-auto ${
                     isClockedIn
                       ? 'bg-gradient-to-r from-rose-600 via-red-600 to-pink-600 hover:from-rose-700 hover:via-red-700 hover:to-pink-700'
                       : 'bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700'
-                  } text-white font-bold py-4 sm:py-5 px-10 rounded-2xl transition-all duration-300 sm:hover:scale-105 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 min-h-[52px]`}
+                  } text-white font-bold py-5 px-10 rounded-2xl transition-all duration-300 hover:scale-105 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
                 >
                   {clockLoading ? (
                     <>
@@ -1169,7 +1017,7 @@ export default function Dashboard() {
 
               {showDebugPanel && (
                 <div className="mt-3 bg-gray-900 text-green-400 rounded-xl p-4 font-mono text-xs overflow-x-auto">
-                  <div className="grid grid-cols-2 gap-1 min-w-0">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>GPS Status:</div><div className="text-white">{debugInfo.gpsStatus}</div>
                     <div>Your Lat:</div><div className="text-white">{debugInfo.latitude?.toFixed(8) || 'N/A'}</div>
                     <div>Your Lng:</div><div className="text-white">{debugInfo.longitude?.toFixed(8) || 'N/A'}</div>
@@ -1199,11 +1047,11 @@ export default function Dashboard() {
         </div>
 
         {/* Ultra Modern Card Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
 
           {/* My Schedule - ACTIVE */}
           <Link href="/dashboard/my-jobs" className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 p-1.5 shadow-2xl animate-fade-in-up hover:shadow-3xl transition-all duration-300 hover:scale-[1.02] text-left">
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-5 sm:p-7">
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7">
               <div className="flex items-start justify-between mb-5">
                 <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-red-100 group-hover:ring-red-200 transition-all">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1216,7 +1064,7 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 group-hover:text-red-700 transition-colors">My Schedule</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-red-700 transition-colors">My Schedule</h3>
               <p className="text-gray-700 font-semibold">View today&apos;s dispatched job tickets</p>
               <p className="text-sm text-gray-500 mt-1">Equipment checklists, routes, work logs</p>
             </div>
@@ -1228,7 +1076,7 @@ export default function Dashboard() {
             className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-indigo-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.03] text-left animate-fade-in-up delay-200"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-5 sm:p-7 group-hover:bg-transparent transition-colors duration-500">
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
               <div className="flex items-start justify-between mb-5">
                 <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-indigo-100 group-hover:ring-white/30">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1239,7 +1087,7 @@ export default function Dashboard() {
                   {weeklyHours.toFixed(1)} HRS
                 </span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
                 View Timecard
               </h3>
               <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
@@ -1268,7 +1116,7 @@ export default function Dashboard() {
             }`}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-5 sm:p-7 group-hover:bg-transparent transition-colors duration-500">
+            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
               <div className="flex items-start justify-between mb-5">
                 <div className="w-16 h-16 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-purple-100 group-hover:ring-white/30">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1279,7 +1127,7 @@ export default function Dashboard() {
                   AVAILABLE
                 </span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
                 Request Time Off
               </h3>
               <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
@@ -1301,54 +1149,15 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Tools & Equipment - Coming Soon */}
-          <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-blue-50 p-1.5 shadow-2xl animate-fade-in-up delay-300">
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-5 sm:p-7">
-              <div className="flex items-start justify-between mb-5">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-blue-100">
-                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <span className="px-4 py-2 bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-700 text-xs font-bold rounded-full shadow-md">
-                  COMING SOON
-                </span>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
-                Tools & Equipment
-              </h3>
-              <p className="text-gray-700 font-semibold mb-4">
-                Manage and track your equipment
-              </p>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Track equipment usage, maintenance schedules, and inventory. Check out tools, report issues, and view equipment history all in one place.
-              </p>
-            </div>
-            {/* Coming Soon Overlay */}
-            <div className="absolute inset-0 bg-white/60 backdrop-blur-md rounded-3xl flex items-center justify-center">
-              <div className="text-center p-6">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl mb-4 shadow-2xl">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-                <p className="text-2xl font-bold text-gray-900 mb-2">Coming Soon</p>
-                <p className="text-sm text-gray-600 max-w-xs mx-auto">
-                  We're working on this feature to help you manage your tools more efficiently
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Quick Actions Bar — hidden on mobile since bottom nav covers it */}
-        <div className="mt-10 max-w-5xl mx-auto hidden sm:block">
+        {/* Quick Actions Bar */}
+        <div className="mt-10 max-w-5xl mx-auto">
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border-2 border-white/50">
             <p className="text-sm font-bold text-gray-600 mb-4 uppercase tracking-wide">QUICK ACTIONS</p>
             <div className="flex gap-3 overflow-x-auto pb-2">
               <button
-                onClick={isClockedIn ? handleClockOutWithModal : handleClockIn}
+                onClick={isClockedIn ? handleClockOut : handleClockIn}
                 disabled={clockLoading}
                 className={`flex items-center gap-2 px-5 py-3 ${
                   isClockedIn
@@ -1449,73 +1258,13 @@ export default function Dashboard() {
         }
       `}</style>
 
-      {/* NFC Clock-In / Clock-Out Modal */}
+      {/* NFC Clock-In Modal */}
       {showNfcClockInModal && (
         <NfcClockInModal
           isShopHours={isShopHours}
-          isClockedIn={isClockedIn}
           onClockIn={performClockIn}
-          onClockOut={performNfcClockOut}
           onClose={() => setShowNfcClockInModal(false)}
         />
-      )}
-
-      {/* ── Sticky Bottom Navigation (mobile operators only) ── */}
-      {user && !isAdmin() && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 z-50 sm:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-          <div className="flex items-center justify-around px-1 py-1">
-            {/* Clock In/Out */}
-            <button
-              onClick={isClockedIn ? handleClockOutWithModal : handleClockIn}
-              disabled={clockLoading}
-              className="flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl transition-all min-w-[64px] min-h-[56px] disabled:opacity-50"
-            >
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${
-                isClockedIn
-                  ? 'bg-gradient-to-br from-rose-500 to-red-600'
-                  : 'bg-gradient-to-br from-emerald-500 to-green-600'
-              }`}>
-                <Clock size={18} className="text-white" />
-              </div>
-              <span className={`text-[10px] font-bold ${isClockedIn ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {isClockedIn ? 'Clock Out' : 'Clock In'}
-              </span>
-            </button>
-
-            {/* My Jobs */}
-            <Link
-              href="/dashboard/my-jobs"
-              className="flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl transition-all min-w-[64px] min-h-[56px]"
-            >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-sm">
-                <Briefcase size={18} className="text-white" />
-              </div>
-              <span className="text-[10px] font-bold text-red-600">My Jobs</span>
-            </Link>
-
-            {/* Timecard */}
-            <Link
-              href="/dashboard/timecard"
-              className="flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl transition-all min-w-[64px] min-h-[56px]"
-            >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
-                <Calendar size={18} className="text-white" />
-              </div>
-              <span className="text-[10px] font-bold text-indigo-600">Timecard</span>
-            </Link>
-
-            {/* Profile / Logout */}
-            <button
-              onClick={handleLogout}
-              className="flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl transition-all min-w-[64px] min-h-[56px]"
-            >
-              <div className="w-9 h-9 rounded-xl bg-slate-600 flex items-center justify-center shadow-sm">
-                <UserIcon size={18} className="text-white" />
-              </div>
-              <span className="text-[10px] font-bold text-slate-600">Logout</span>
-            </button>
-          </div>
-        </nav>
       )}
     </div>
   );

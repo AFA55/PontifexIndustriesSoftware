@@ -43,7 +43,7 @@ export async function DELETE(
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if (!['admin', 'super_admin', 'operations_manager'].includes(profile?.role || '')) {
       return NextResponse.json(
         { error: 'Forbidden. Admin access required.' },
         { status: 403 }

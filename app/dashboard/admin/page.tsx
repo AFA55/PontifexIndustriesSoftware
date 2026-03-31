@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { LogOut, LayoutGrid, BarChart3 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
 import AdminOnboardingTour from '@/components/AdminOnboardingTour';
@@ -17,6 +17,22 @@ import {
   type PermissionLevel,
 } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
+import nextDynamic from 'next/dynamic';
+
+// Lazy-load the analytics dashboard to avoid loading Recharts upfront
+const EmbeddedAnalytics = nextDynamic(
+  () => import('./analytics/_components/AnalyticsDashboardContent').then((mod) => ({
+    default: () => <mod.default embedded />
+  })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
+    ),
+  }
+);
 
 // Dynamic Logo Component — uses branding if available
 function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: string; logoUrl?: string | null; companyName?: string }) {
@@ -33,7 +49,7 @@ function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: 
       <g>
         <path
           d="M20 15L35 5L50 15L50 35L35 45L20 35L20 25L35 25L35 35L42 30L42 20L35 15L28 20L28 30L20 25V15Z"
-          fill="url(#pontifex-gradient)"
+          fill="url(#patriot-gradient)"
         />
         <path
           d="M25 20L30 17L35 20L35 25L30 28L25 25V20Z"
@@ -50,7 +66,7 @@ function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: 
         </text>
       </g>
       <defs>
-        <linearGradient id="pontifex-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
+        <linearGradient id="patriot-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
           <stop stopColor="#dc2626" />
           <stop offset="0.5" stopColor="#2563eb" />
           <stop offset="1" stopColor="#1e40af" />
@@ -69,7 +85,7 @@ interface QuickStats {
 const FEATURE_FLAG_CARD_MAP: Record<string, string[]> = {
   show_billing_module: ['billing'],
   show_analytics_module: ['analytics'],
-  show_inventory_module: ['blade_inventory', 'tools_equipment', 'equipment_performance'],
+  show_inventory_module: ['blade_inventory'],
   show_customer_crm: ['customer_profiles'],
 };
 
@@ -85,24 +101,26 @@ export default function AdminDashboard() {
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isDemoAdmin, setIsDemoAdmin] = useState(false);
   const [userPermissions, setUserPermissions] = useState<Record<string, PermissionLevel> | null>(null);
+  const [activeView, setActiveView] = useState<'modules' | 'analytics'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('admin-dashboard-view') as 'modules' | 'analytics') || 'modules';
+    }
+    return 'modules';
+  });
 
   useEffect(() => {
-    console.log('🔍 Checking admin access...');
     const currentUser = getCurrentUser();
 
     if (!currentUser) {
-      console.log('❌ No authenticated user found, redirecting to login...');
       router.push('/login');
       return;
     }
 
     if (!ADMIN_DASHBOARD_ROLES.includes(currentUser.role)) {
-      console.log('🚫 User does not have admin dashboard access, redirecting to operator dashboard...');
       router.push('/dashboard');
       return;
     }
 
-    console.log('✅ Admin access granted');
     setUser(currentUser);
 
     // Fetch card permissions for this user
@@ -111,7 +129,7 @@ export default function AdminDashboard() {
     // Check if this is demo admin account
     const isDemo = currentUser.email?.toLowerCase().includes('demo') ||
                    currentUser.email === 'admin@demo.com' ||
-                   currentUser.email === 'admin@pontifex.com';
+                   currentUser.email === 'admin@patriotcc.com';
     setIsDemoAdmin(isDemo);
 
     // Show walkthrough for demo admin on first visit
@@ -158,7 +176,7 @@ export default function AdminDashboard() {
       if (!session) {
         console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
         localStorage.removeItem('supabase-user');
-        localStorage.removeItem('pontifex-user');
+        localStorage.removeItem('patriot-user');
         window.location.href = '/login';
         return;
       }
@@ -230,7 +248,6 @@ export default function AdminDashboard() {
   }
 
   const handleLogout = () => {
-    console.log('🚪 Admin logging out...');
     logout();
     router.push('/login');
   };
@@ -257,7 +274,7 @@ export default function AdminDashboard() {
   const sortedCards = [...ADMIN_CARDS]
     .filter(card => !hiddenByFeatureFlags.has(card.key))
     .sort((a, b) => {
-      const order: Record<PermissionLevel, number> = { full: 0, view: 1, none: 2 };
+      const order: Record<PermissionLevel, number> = { full: 0, submit: 1, view: 2, none: 3 };
       return order[getPermission(a.key)] - order[getPermission(b.key)];
     });
 
@@ -329,6 +346,34 @@ export default function AdminDashboard() {
             </p>
           </div>
 
+          {/* View Toggle */}
+          <div className="flex justify-center mt-6">
+            <div className="inline-flex bg-white/80 backdrop-blur-sm rounded-xl p-1 shadow-lg border border-gray-200">
+              <button
+                onClick={() => { setActiveView('modules'); localStorage.setItem('admin-dashboard-view', 'modules'); }}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  activeView === 'modules'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Modules
+              </button>
+              <button
+                onClick={() => { setActiveView('analytics'); localStorage.setItem('admin-dashboard-view', 'analytics'); }}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  activeView === 'analytics'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                Analytics
+              </button>
+            </div>
+          </div>
+
           {/* Quick Stats Bar with Professional Gradients */}
           <div className="flex justify-center gap-6 mt-8">
             <Link
@@ -346,7 +391,15 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Analytics Dashboard View */}
+        {activeView === 'analytics' && (
+          <div className="max-w-7xl mx-auto -mt-2">
+            <EmbeddedAnalytics />
+          </div>
+        )}
+
         {/* Admin Modules Grid — sorted by permission: full → view → none */}
+        {activeView === 'modules' && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">
           {sortedCards.map((card, index) => {
             const perm = getPermission(card.key);
@@ -420,6 +473,7 @@ export default function AdminDashboard() {
             );
           })}
         </div>
+        )}
 
       </div>
 

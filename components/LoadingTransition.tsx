@@ -29,10 +29,10 @@ export default function LoadingTransition({ isLoading, message = 'Processing...'
       }`}
     >
       <div className="text-center">
-        {/* Company Logo with Animation */}
+        {/* Patriot Logo with Animation */}
         <div className="mb-8 animate-pulse">
           <h1 className="text-6xl font-bold text-white tracking-tight">
-            LOADING
+            PONTIFEX
           </h1>
           <p className="text-white/80 text-sm uppercase tracking-widest mt-2">
             Industries

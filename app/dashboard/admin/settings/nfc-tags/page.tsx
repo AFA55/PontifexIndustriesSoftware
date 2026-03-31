@@ -1,58 +1,77 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ChevronLeft, Wifi, Plus, Building2, Truck, MapPin, Key,
-  Loader2, CheckCircle, Save, X, AlertTriangle, Trash2,
-  Info, ExternalLink, Clock, ChevronDown, ChevronUp,
-  Copy, Power, PowerOff
+  ChevronLeft, Wifi, Plus, Building2, Key, Truck, MapPin, User as UserIcon,
+  Loader2, CheckCircle, Save, X, AlertTriangle, Smartphone, Search, Shield,
+  Power, PowerOff, RefreshCw
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import NfcProgrammer from '@/components/NfcProgrammer';
 
 interface NfcTag {
   id: string;
   tag_uid: string;
-  tag_type: 'shop' | 'truck' | 'jobsite';
+  tag_type: string;
   label: string;
-  truck_number: string | null;
-  jobsite_address: string | null;
+  location_description: string | null;
   is_active: boolean;
   last_scanned_at: string | null;
-  last_scanned_by: string | null;
   created_at: string;
+  operator_id: string | null;
+  pontifex_nfc_id: string | null;
+  programmed_at: string | null;
 }
 
-const TAG_TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string; border: string }> = {
-  shop:    { label: 'Shop',    icon: <Building2 className="w-4 h-4" />, color: 'text-blue-700',   bg: 'bg-blue-100',   border: 'border-blue-200' },
-  truck:   { label: 'Truck',   icon: <Truck className="w-4 h-4" />,     color: 'text-violet-700', bg: 'bg-violet-100', border: 'border-violet-200' },
-  jobsite: { label: 'Jobsite', icon: <MapPin className="w-4 h-4" />,    color: 'text-amber-700',  bg: 'bg-amber-100',  border: 'border-amber-200' },
-};
+interface OperatorProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+}
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.pontifexindustries.com';
+const TAG_TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string; darkColor: string; darkBg: string }> = {
+  shop: { label: 'Shop', icon: <Building2 className="w-4 h-4" />, color: 'text-blue-700', bg: 'bg-blue-100', darkColor: 'text-blue-400', darkBg: 'bg-blue-500/10' },
+  truck: { label: 'Truck', icon: <Truck className="w-4 h-4" />, color: 'text-orange-700', bg: 'bg-orange-100', darkColor: 'text-orange-400', darkBg: 'bg-orange-500/10' },
+  jobsite: { label: 'Jobsite', icon: <MapPin className="w-4 h-4" />, color: 'text-purple-700', bg: 'bg-purple-100', darkColor: 'text-purple-400', darkBg: 'bg-purple-500/10' },
+  operator: { label: 'Operator', icon: <UserIcon className="w-4 h-4" />, color: 'text-emerald-700', bg: 'bg-emerald-100', darkColor: 'text-emerald-400', darkBg: 'bg-emerald-500/10' },
+};
 
 export default function NfcTagsPage() {
   const router = useRouter();
   const [tags, setTags] = useState<NfcTag[]>([]);
+  const [operators, setOperators] = useState<OperatorProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showWriteInstructions, setShowWriteInstructions] = useState<string | null>(null);
+  const [showProgramModal, setShowProgramModal] = useState(false);
+  const [showReassignModal, setShowReassignModal] = useState<NfcTag | null>(null);
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [copiedUid, setCopiedUid] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Programming modal state
+  const [programStep, setProgramStep] = useState<'scan' | 'configure' | 'saving'>('scan');
+  const [scannedUid, setScannedUid] = useState('');
+  const [existingNdefData, setExistingNdefData] = useState<string | undefined>();
+  const [programForm, setProgramForm] = useState({
+    label: '',
+    tag_type: 'shop' as string,
+    operator_id: '' as string,
+    pontifex_nfc_id: '',
+    write_to_tag: false,
+  });
 
   const [newTag, setNewTag] = useState({
     tag_uid: '',
-    tag_type: 'shop' as 'shop' | 'truck' | 'jobsite',
+    tag_type: 'shop',
     label: '',
-    truck_number: '',
-    jobsite_address: '',
+    location_description: '',
   });
+
+  // Reassign state
+  const [reassignOperatorId, setReassignOperatorId] = useState('');
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -67,7 +86,6 @@ export default function NfcTagsPage() {
       const { supabase } = await import('@/lib/supabase');
       const { data: session } = await supabase.auth.getSession();
       const token = session.session?.access_token || '';
-
       const res = await fetch('/api/admin/nfc-tags', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -82,49 +100,46 @@ export default function NfcTagsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchTags(); }, [fetchTags]);
+  const fetchOperators = useCallback(async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role')
+        .in('role', ['operator', 'apprentice', 'shop_manager'])
+        .order('full_name');
+      if (!error && data) setOperators(data);
+    } catch (err) {
+      console.error('Failed to fetch operators:', err);
+    }
+  }, []);
 
-  const showMessage = (type: 'success' | 'error', text: string) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 4000);
-  };
-
-  const getToken = async () => {
-    const { supabase } = await import('@/lib/supabase');
-    const { data: session } = await supabase.auth.getSession();
-    return session.session?.access_token || '';
-  };
+  useEffect(() => { fetchTags(); fetchOperators(); }, [fetchTags, fetchOperators]);
 
   const handleAddTag = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-
+    setMessage(null);
     try {
-      const token = await getToken();
-
+      const { supabase } = await import('@/lib/supabase');
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token || '';
       const res = await fetch('/api/admin/nfc-tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          tag_uid: newTag.tag_uid.trim(),
-          tag_type: newTag.tag_type,
-          label: newTag.label.trim(),
-          truck_number: newTag.truck_number.trim() || undefined,
-          jobsite_address: newTag.jobsite_address.trim() || undefined,
-        }),
+        body: JSON.stringify(newTag),
       });
-
       const json = await res.json();
       if (res.ok) {
-        showMessage('success', json.message || 'Tag registered!');
-        setNewTag({ tag_uid: '', tag_type: 'shop', label: '', truck_number: '', jobsite_address: '' });
+        setMessage({ type: 'success', text: json.message || 'Tag registered!' });
+        setNewTag({ tag_uid: '', tag_type: 'shop', label: '', location_description: '' });
         setShowAddForm(false);
         fetchTags();
       } else {
-        showMessage('error', json.error || 'Failed to register tag');
+        setMessage({ type: 'error', text: json.error || 'Failed to register tag' });
       }
     } catch {
-      showMessage('error', 'Network error');
+      setMessage({ type: 'error', text: 'Network error' });
     } finally {
       setSaving(false);
     }
@@ -132,424 +147,382 @@ export default function NfcTagsPage() {
 
   const toggleTagActive = async (tag: NfcTag) => {
     try {
-      const token = await getToken();
-
-      const res = await fetch(`/api/admin/nfc-tags/${tag.id}`, {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token || '';
+      const res = await fetch('/api/admin/nfc-tags', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ is_active: !tag.is_active }),
+        body: JSON.stringify({ id: tag.id, is_active: !tag.is_active }),
       });
-
       if (res.ok) {
         fetchTags();
-        showMessage('success', `Tag "${tag.label}" ${tag.is_active ? 'deactivated' : 'activated'}`);
-      } else {
-        showMessage('error', 'Failed to update tag');
+        setMessage({ type: 'success', text: `Tag "${tag.label}" ${tag.is_active ? 'deactivated' : 'activated'}` });
       }
     } catch {
-      showMessage('error', 'Failed to update tag');
+      setMessage({ type: 'error', text: 'Failed to update tag' });
     }
   };
 
-  const handleDeleteTag = async (tag: NfcTag) => {
-    setDeletingId(tag.id);
+  const handleReassign = async () => {
+    if (!showReassignModal) return;
     try {
-      const token = await getToken();
-
-      const res = await fetch(`/api/admin/nfc-tags/${tag.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+      const { supabase } = await import('@/lib/supabase');
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token || '';
+      const res = await fetch('/api/admin/nfc-tags', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: showReassignModal.id, operator_id: reassignOperatorId || null }),
       });
+      if (res.ok) {
+        fetchTags();
+        setMessage({ type: 'success', text: `Tag "${showReassignModal.label}" reassigned` });
+        setShowReassignModal(null);
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to reassign tag' });
+    }
+  };
 
+  // ── Program New Tag Modal Logic ──
+  const openProgramModal = () => {
+    setShowProgramModal(true);
+    setProgramStep('scan');
+    setScannedUid('');
+    setExistingNdefData(undefined);
+    const nextNum = tags.length + 1;
+    setProgramForm({
+      label: '', tag_type: 'shop', operator_id: '',
+      pontifex_nfc_id: `PCC-NFC-${String(nextNum).padStart(3, '0')}`,
+      write_to_tag: false,
+    });
+  };
+
+  const handleTagRead = (tagUid: string, existingData?: string) => {
+    setScannedUid(tagUid);
+    setExistingNdefData(existingData);
+    setProgramStep('configure');
+  };
+
+  const handleProgramSave = async () => {
+    if (!scannedUid || !programForm.label) return;
+    setProgramStep('saving');
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token || '';
+      const res = await fetch('/api/admin/nfc-tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          tag_uid: scannedUid,
+          tag_type: programForm.tag_type,
+          label: programForm.label,
+          operator_id: programForm.operator_id || null,
+          pontifex_nfc_id: programForm.pontifex_nfc_id || null,
+        }),
+      });
       const json = await res.json();
       if (res.ok) {
-        showMessage('success', json.message || `Tag "${tag.label}" deleted`);
-        setConfirmDeleteId(null);
+        setMessage({ type: 'success', text: `Tag "${programForm.label}" programmed and registered!` });
+        setShowProgramModal(false);
         fetchTags();
       } else {
-        showMessage('error', json.error || 'Failed to delete tag');
+        setMessage({ type: 'error', text: json.error || 'Failed to register tag' });
+        setProgramStep('configure');
       }
     } catch {
-      showMessage('error', 'Failed to delete tag');
-    } finally {
-      setDeletingId(null);
+      setMessage({ type: 'error', text: 'Network error' });
+      setProgramStep('configure');
     }
   };
 
-  const copyToClipboard = async (text: string, uid: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedUid(uid);
-      setTimeout(() => setCopiedUid(null), 2000);
-    } catch {
-      // fallback
-    }
+  const getOperatorName = (operatorId: string | null) => {
+    if (!operatorId) return null;
+    const op = operators.find(o => o.id === operatorId);
+    return op ? op.full_name : 'Unknown';
   };
 
-  const getWriteUrl = (tagUid: string) =>
-    `${APP_URL}/dashboard/tools/nfc-scan?tag=${encodeURIComponent(tagUid)}`;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
-      </div>
-    );
-  }
+  // Filter tags
+  const filteredTags = searchQuery
+    ? tags.filter(t =>
+        t.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.tag_uid.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (getOperatorName(t.operator_id) || '').toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : tags;
 
   const activeTags = tags.filter(t => t.is_active);
   const inactiveTags = tags.filter(t => !t.is_active);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900">
+    <div className="min-h-screen bg-[#f8fafc]">
       {/* Header */}
-      <div className="backdrop-blur-xl bg-black/30 border-b border-white/10 sticky top-0 z-30">
-        <div className="container mx-auto px-4 md:px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboard/admin/settings"
-                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all"
-              >
-                <ChevronLeft className="w-5 h-5 text-white" />
-              </Link>
-              <div>
-                <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Wifi className="w-5 h-5 text-emerald-400" />
-                  NFC Tag Management
-                </h1>
-                <p className="text-white/50 text-xs">Register and manage clock-in NFC chips</p>
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+        <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/admin" className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all text-sm font-medium">
+              <ChevronLeft size={16} />
+              <span className="hidden sm:inline">Admin</span>
+            </Link>
+            <div className="h-6 w-px bg-slate-200" />
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+                <Wifi size={16} className="text-white" />
               </div>
-            </div>
+              NFC Tag Management
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openProgramModal}
+              className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-lg font-bold text-sm flex items-center gap-2 shadow-md transition-all"
+            >
+              <Smartphone className="w-4 h-4" /> Program Tag
+            </button>
             <button
               onClick={() => setShowAddForm(true)}
-              className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all"
+              className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-lg font-bold text-sm flex items-center gap-2 shadow-md transition-all"
             >
-              <Plus className="w-4 h-4" /> Register Chip
+              <Plus className="w-4 h-4" /> Register Tag
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="container mx-auto px-4 md:px-6 py-6 max-w-4xl">
+      <div className="max-w-[1200px] mx-auto px-6 py-6">
         {/* Messages */}
         {message && (
-          <div className={`mb-4 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold ${
-            message.type === 'success'
-              ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
-              : 'bg-red-500/20 border border-red-500/30 text-red-300'
+          <div className={`mb-4 flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-semibold ${
+            message.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'
           }`}>
-            {message.type === 'success'
-              ? <CheckCircle className="w-4 h-4 flex-shrink-0" />
-              : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
+            {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
             {message.text}
+            <button onClick={() => setMessage(null)} className="ml-auto p-0.5 hover:bg-black/5 rounded">
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
 
-        {/* Add Form */}
+        {/* Add Form (manual registration) */}
         {showAddForm && (
-          <div className="mb-6 bg-white/5 backdrop-blur rounded-2xl border border-white/10 p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-white">Register New NFC Chip</h2>
-              <button
-                onClick={() => setShowAddForm(false)}
-                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-white/60" />
+          <div className="mb-6 bg-white rounded-xl shadow-sm border border-slate-200/60 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Plus size={16} className="text-emerald-600" />
+                Register New NFC Tag
+              </h2>
+              <button onClick={() => setShowAddForm(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
             <form onSubmit={handleAddTag} className="space-y-4">
-              {/* Tag UID */}
               <div>
-                <label className="block text-xs font-bold text-white/70 mb-1.5">NFC Tag UID *</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">NFC Tag UID</label>
                 <input
                   type="text"
                   value={newTag.tag_uid}
                   onChange={(e) => setNewTag(prev => ({ ...prev, tag_uid: e.target.value }))}
-                  placeholder="e.g. 04:A3:B2:11:C4:2D:80 or CLK-SHOP-001"
+                  placeholder="Scan the tag with your phone to read the UID, or type it in"
                   required
-                  className="w-full px-3 py-2.5 bg-white/10 border border-white/20 rounded-xl text-sm text-white placeholder-white/30 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
                 />
-                <p className="text-[10px] text-white/40 mt-1">
-                  Scan the chip with NFC Tools app to read the UID, or type a custom identifier
-                </p>
+                <p className="text-[10px] text-slate-400 mt-1">The unique serial number printed on or read from the NFC chip</p>
               </div>
-
-              {/* Label + Type row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-white/70 mb-1.5">Label *</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Label *</label>
                   <input
                     type="text"
                     value={newTag.label}
                     onChange={(e) => setNewTag(prev => ({ ...prev, label: e.target.value }))}
-                    placeholder="e.g. Shop Front Door, Truck #3"
+                    placeholder="e.g. Admin Keychain"
                     required
-                    className="w-full px-3 py-2.5 bg-white/10 border border-white/20 rounded-xl text-sm text-white placeholder-white/30 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-white/70 mb-1.5">Type *</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Type</label>
                   <select
                     value={newTag.tag_type}
-                    onChange={(e) => setNewTag(prev => ({ ...prev, tag_type: e.target.value as 'shop' | 'truck' | 'jobsite' }))}
-                    className="w-full px-3 py-2.5 bg-white/10 border border-white/20 rounded-xl text-sm text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    onChange={(e) => setNewTag(prev => ({ ...prev, tag_type: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
                   >
-                    <option value="shop" className="bg-slate-800">Shop</option>
-                    <option value="truck" className="bg-slate-800">Truck</option>
-                    <option value="jobsite" className="bg-slate-800">Jobsite</option>
+                    <option value="shop">Shop</option>
+                    <option value="truck">Truck</option>
+                    <option value="jobsite">Jobsite</option>
+                    <option value="operator">Operator</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Location <span className="text-slate-400 font-normal">(optional)</span></label>
+                  <input
+                    type="text"
+                    value={newTag.location_description}
+                    onChange={(e) => setNewTag(prev => ({ ...prev, location_description: e.target.value }))}
+                    placeholder="e.g. Front wall"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
+                  />
+                </div>
               </div>
-
-              {/* Conditional fields */}
-              {newTag.tag_type === 'truck' && (
-                <div>
-                  <label className="block text-xs font-bold text-white/70 mb-1.5">Truck Number</label>
-                  <input
-                    type="text"
-                    value={newTag.truck_number}
-                    onChange={(e) => setNewTag(prev => ({ ...prev, truck_number: e.target.value }))}
-                    placeholder="e.g. 3, T-07, Unit 12"
-                    className="w-full px-3 py-2.5 bg-white/10 border border-white/20 rounded-xl text-sm text-white placeholder-white/30 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
-              )}
-              {newTag.tag_type === 'jobsite' && (
-                <div>
-                  <label className="block text-xs font-bold text-white/70 mb-1.5">Jobsite Address</label>
-                  <input
-                    type="text"
-                    value={newTag.jobsite_address}
-                    onChange={(e) => setNewTag(prev => ({ ...prev, jobsite_address: e.target.value }))}
-                    placeholder="e.g. 123 Main St, Greenville SC"
-                    className="w-full px-3 py-2.5 bg-white/10 border border-white/20 rounded-xl text-sm text-white placeholder-white/30 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
-              )}
-
-              {/* Write URL preview */}
-              {newTag.tag_uid.trim() && (
-                <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-                  <p className="text-[10px] font-bold text-purple-300 mb-1">URL to write to chip (for iOS NFC):</p>
-                  <p className="text-[10px] text-purple-200 font-mono break-all">
-                    {getWriteUrl(newTag.tag_uid.trim())}
-                  </p>
-                </div>
-              )}
-
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-lg font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 shadow-md transition-all"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saving ? 'Registering...' : 'Register NFC Chip'}
+                {saving ? 'Registering...' : 'Register NFC Tag'}
               </button>
             </form>
           </div>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-white/5 rounded-xl p-4 border border-white/10 text-center">
-            <div className="text-2xl font-bold text-white">{tags.length}</div>
-            <div className="text-[10px] font-bold text-white/40 uppercase mt-0.5">Total Chips</div>
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total</span>
+              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                <Wifi size={15} className="text-slate-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">{tags.length}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Registered tags</p>
           </div>
-          <div className="bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20 text-center">
-            <div className="text-2xl font-bold text-emerald-400">{activeTags.length}</div>
-            <div className="text-[10px] font-bold text-emerald-400/70 uppercase mt-0.5">Active</div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <Power size={15} className="text-emerald-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-emerald-600">{activeTags.length}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Ready for scanning</p>
           </div>
-          <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/20 text-center">
-            <div className="text-2xl font-bold text-red-400">{inactiveTags.length}</div>
-            <div className="text-[10px] font-bold text-red-400/70 uppercase mt-0.5">Deactivated</div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Inactive</span>
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+                <PowerOff size={15} className="text-red-500" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-red-600">{inactiveTags.length}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Deactivated</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Assigned</span>
+              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                <UserIcon size={15} className="text-blue-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-blue-600">{tags.filter(t => t.operator_id).length}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Linked to operators</p>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="mb-4">
+          <div className="relative max-w-md">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by label, UID, or employee..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200/60 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all"
+            />
           </div>
         </div>
 
         {/* Tags List */}
-        <div className="bg-white/5 backdrop-blur rounded-2xl border border-white/10 overflow-hidden mb-6">
-          <div className="px-6 py-4 border-b border-white/10">
-            <h2 className="font-bold text-white">Registered NFC Chips</h2>
-            <p className="text-xs text-white/40 mt-0.5">
-              {tags.length === 0 ? 'No chips registered yet' : `${tags.length} chip${tags.length !== 1 ? 's' : ''} registered`}
-            </p>
+        <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm">Registered Tags</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{filteredTags.length} tags</p>
+            </div>
+            <button onClick={fetchTags} className="p-2 hover:bg-slate-100 rounded-lg transition-colors" title="Refresh">
+              <RefreshCw size={15} className="text-slate-400" />
+            </button>
           </div>
 
-          {tags.length === 0 ? (
+          {filteredTags.length === 0 ? (
             <div className="p-12 text-center">
-              <Wifi className="w-12 h-12 text-white/20 mx-auto mb-3" />
-              <p className="font-semibold text-white/50">No NFC chips registered yet</p>
-              <p className="text-sm text-white/30 mt-1">Click &quot;Register Chip&quot; to add your first NFC tag</p>
+              <Wifi className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+              <p className="font-semibold text-slate-500">No NFC tags found</p>
+              <p className="text-sm text-slate-400 mt-1">
+                {searchQuery ? 'Try a different search' : 'Click "Program Tag" or "Register Tag" to add your first tag'}
+              </p>
             </div>
           ) : (
-            <div className="divide-y divide-white/5">
-              {tags.map(tag => {
+            <div className="divide-y divide-slate-100">
+              {filteredTags.map(tag => {
                 const typeConfig = TAG_TYPE_CONFIG[tag.tag_type] || TAG_TYPE_CONFIG.shop;
-                const writeUrl = getWriteUrl(tag.tag_uid);
-                const isShowingWrite = showWriteInstructions === tag.id;
-                const isConfirmingDelete = confirmDeleteId === tag.id;
-
+                const operatorName = getOperatorName(tag.operator_id);
                 return (
-                  <div key={tag.id} className={`px-6 py-4 transition-colors ${!tag.is_active ? 'opacity-50' : ''}`}>
-                    <div className="flex items-start gap-4">
-                      {/* Type Icon */}
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${typeConfig.bg} ${typeConfig.border} border`}>
-                        <span className={typeConfig.color}>{typeConfig.icon}</span>
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-bold text-white">{tag.label}</p>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${typeConfig.bg} ${typeConfig.color} border ${typeConfig.border}`}>
-                            {typeConfig.label}
-                          </span>
-                          {tag.is_active ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                              Active
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
-                              Deactivated
-                            </span>
-                          )}
-                        </div>
-
-                        {/* UID */}
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <Key className="w-3 h-3 text-white/30 flex-shrink-0" />
-                          <p className="text-xs text-white/40 font-mono truncate">{tag.tag_uid}</p>
-                          <button
-                            onClick={() => copyToClipboard(tag.tag_uid, tag.id)}
-                            className="p-0.5 hover:bg-white/10 rounded transition-colors flex-shrink-0"
-                            title="Copy UID"
-                          >
-                            {copiedUid === tag.id
-                              ? <CheckCircle className="w-3 h-3 text-emerald-400" />
-                              : <Copy className="w-3 h-3 text-white/30" />
-                            }
-                          </button>
-                        </div>
-
-                        {/* Extra info */}
-                        {tag.truck_number && (
-                          <p className="text-xs text-violet-300 mt-0.5 flex items-center gap-1">
-                            <Truck className="w-3 h-3" /> Truck #{tag.truck_number}
-                          </p>
-                        )}
-                        {tag.jobsite_address && (
-                          <p className="text-xs text-amber-300 mt-0.5 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> {tag.jobsite_address}
-                          </p>
-                        )}
-
-                        {/* Last scanned */}
-                        {tag.last_scanned_at ? (
-                          <p className="text-[10px] text-white/25 mt-1 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            Last scanned: {new Date(tag.last_scanned_at).toLocaleString()}
-                          </p>
-                        ) : (
-                          <p className="text-[10px] text-white/20 mt-1">Never scanned</p>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex flex-col gap-1.5 flex-shrink-0">
-                        {/* Write instructions toggle */}
-                        <button
-                          onClick={() => setShowWriteInstructions(isShowingWrite ? null : tag.id)}
-                          className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-colors bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/20 flex items-center gap-1"
-                          title="Write URL to chip"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          Write
-                          {isShowingWrite ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </button>
-
-                        {/* Toggle active */}
-                        <button
-                          onClick={() => toggleTagActive(tag)}
-                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 border ${
-                            tag.is_active
-                              ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/20'
-                              : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border-emerald-500/20'
-                          }`}
-                        >
-                          {tag.is_active
-                            ? <><PowerOff className="w-3 h-3" /> Deactivate</>
-                            : <><Power className="w-3 h-3" /> Activate</>
-                          }
-                        </button>
-
-                        {/* Delete */}
-                        {isConfirmingDelete ? (
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => handleDeleteTag(tag)}
-                              disabled={deletingId === tag.id}
-                              className="px-2 py-1.5 rounded-lg text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center gap-1"
-                            >
-                              {deletingId === tag.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Confirm'}
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="px-2 py-1.5 rounded-lg text-[10px] font-bold bg-white/10 hover:bg-white/20 text-white/60 transition-colors"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmDeleteId(tag.id)}
-                            className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-colors bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-400 border border-white/10 hover:border-red-500/20 flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3 h-3" /> Delete
-                          </button>
-                        )}
-                      </div>
+                  <div key={tag.id} className={`px-6 py-4 flex items-center gap-4 transition-colors hover:bg-slate-50/60 ${!tag.is_active ? 'opacity-60' : ''}`}>
+                    <div className={`w-10 h-10 rounded-xl ${typeConfig.bg} flex items-center justify-center ${typeConfig.color}`}>
+                      {typeConfig.icon}
                     </div>
-
-                    {/* Write Instructions (expandable) */}
-                    {isShowingWrite && (
-                      <div className="mt-4 ml-14 p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-3">
-                        <h4 className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                          <Info className="w-3.5 h-3.5" />
-                          How to Write URL to This Chip (iOS NFC / Android)
-                        </h4>
-
-                        <div className="space-y-2 text-xs text-white/60">
-                          <p><strong className="text-white/80">Step 1:</strong> Download &quot;NFC Tools&quot; app (free, iOS App Store or Google Play)</p>
-                          <p><strong className="text-white/80">Step 2:</strong> Open NFC Tools → tap <strong className="text-white/80">Write</strong> → <strong className="text-white/80">Add a record</strong> → <strong className="text-white/80">URL</strong></p>
-                          <p><strong className="text-white/80">Step 3:</strong> Paste this URL:</p>
-                        </div>
-
-                        <div className="flex items-start gap-2 p-2.5 bg-black/30 rounded-lg border border-white/10">
-                          <p className="text-[10px] text-purple-200 font-mono break-all flex-1">{writeUrl}</p>
-                          <button
-                            onClick={() => copyToClipboard(writeUrl, `url-${tag.id}`)}
-                            className="flex-shrink-0 p-1 hover:bg-white/10 rounded transition-colors"
-                            title="Copy URL"
-                          >
-                            {copiedUid === `url-${tag.id}`
-                              ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                              : <Copy className="w-3.5 h-3.5 text-white/40" />
-                            }
-                          </button>
-                        </div>
-
-                        <div className="space-y-1 text-xs text-white/60">
-                          <p><strong className="text-white/80">Step 4:</strong> Tap <strong className="text-white/80">Write / OK</strong> and hold your phone on the NFC chip until it confirms</p>
-                          <p><strong className="text-white/80">Step 5:</strong> Test it — tap the chip with a phone. It should open the Pontifex app and auto-recognize the tag.</p>
-                        </div>
-
-                        <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                          <p className="text-[10px] text-amber-300">
-                            <strong>Android Web NFC:</strong> Android Chrome reads the chip&apos;s hardware serial number automatically — no need to write a URL. iOS requires the URL approach above.
-                          </p>
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-slate-800 text-sm truncate">{tag.label}</p>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${typeConfig.bg} ${typeConfig.color}`}>
+                          {typeConfig.label}
+                        </span>
+                        {tag.is_active ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Active</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">Deactivated</span>
+                        )}
                       </div>
-                    )}
+                      <p className="text-xs text-slate-400 font-mono truncate mt-0.5">{tag.tag_uid}</p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        {tag.pontifex_nfc_id && (
+                          <p className="text-xs text-indigo-600 font-mono">{tag.pontifex_nfc_id}</p>
+                        )}
+                        {operatorName && (
+                          <p className="text-xs text-emerald-600 flex items-center gap-1">
+                            <UserIcon className="w-3 h-3" /> {operatorName}
+                          </p>
+                        )}
+                        {tag.location_description && <p className="text-xs text-slate-400">{tag.location_description}</p>}
+                      </div>
+                      {tag.last_scanned_at && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Last scanned: {new Date(tag.last_scanned_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setShowReassignModal(tag); setReassignOperatorId(tag.operator_id || ''); }}
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1"
+                      >
+                        <RefreshCw size={11} />
+                        Reassign
+                      </button>
+                      <button
+                        onClick={() => toggleTagActive(tag)}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                          tag.is_active
+                            ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
+                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                        }`}
+                      >
+                        {tag.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -557,32 +530,184 @@ export default function NfcTagsPage() {
           )}
         </div>
 
-        {/* Info Box */}
-        <div className="bg-white/5 rounded-xl p-5 border border-white/10">
-          <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-            <Info className="w-4 h-4 text-blue-400" />
-            How NFC Clock-In Works
-          </h3>
-          <div className="space-y-2.5 text-xs text-white/50">
-            <div className="flex gap-2">
-              <span className="text-emerald-400 flex-shrink-0 font-bold">Android:</span>
-              <p>Chrome reads the chip&apos;s hardware UID via Web NFC API. Operators tap phone → app auto-identifies chip → clocks them in/out instantly. No app install needed.</p>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-blue-400 flex-shrink-0 font-bold">iOS:</span>
-              <p>Write a URL to the chip (see &quot;Write&quot; button above). When tapped, iPhone opens the URL which identifies the tag and prompts clock-in/out.</p>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-amber-400 flex-shrink-0 font-bold">Hardware:</span>
-              <p>NTAG215 or NTAG216 stickers work great — waterproof, no battery, under $1 each. Stick to shop wall, truck dashboard, or jobsite sign-in box.</p>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-violet-400 flex-shrink-0 font-bold">Out of town:</span>
-              <p>Operators who can&apos;t scan an NFC tag use Remote Clock-In (selfie + GPS), which goes to admin for approval.</p>
-            </div>
+        {/* Info */}
+        <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
+          <h3 className="text-sm font-bold text-blue-900 mb-2">How NFC Clock-In Works</h3>
+          <div className="space-y-2 text-xs text-blue-700">
+            <p><strong>Shop Wall / Admin Keychain:</strong> Operators scan the NFC tag at the shop to clock in each morning.</p>
+            <p><strong>Out of Town:</strong> Remote operators use GPS + selfie instead. Goes to admin for approval.</p>
+            <p><strong>Tip:</strong> NTAG215 or NTAG216 stickers work great. Waterproof, no battery, under $1 each.</p>
           </div>
         </div>
       </div>
+
+      {/* ═══ Program New Tag Modal ═══ */}
+      {showProgramModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-blue-600" />
+                Program New Tag
+              </h2>
+              <button onClick={() => setShowProgramModal(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {programStep === 'scan' && (
+                <div>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Hold an NFC tag near your device to read its UID. On Android Chrome over HTTPS, you can also write data to the tag.
+                  </p>
+                  <NfcProgrammer
+                    onTagRead={handleTagRead}
+                    onTagWritten={() => {}}
+                    onError={(err) => setMessage({ type: 'error', text: err })}
+                  />
+                </div>
+              )}
+
+              {programStep === 'configure' && (
+                <div className="space-y-4">
+                  <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      <span className="text-sm font-bold text-slate-900">Tag Read Successfully</span>
+                    </div>
+                    <p className="text-xs text-slate-600">UID: <span className="font-mono font-bold">{scannedUid}</span></p>
+                    {existingNdefData && (
+                      <p className="text-xs text-slate-500 mt-1">Existing NDEF: <span className="font-mono">{existingNdefData}</span></p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Label *</label>
+                    <input
+                      type="text"
+                      value={programForm.label}
+                      onChange={(e) => setProgramForm(prev => ({ ...prev, label: e.target.value }))}
+                      placeholder="e.g. Shop Wall Tag, Truck 5 Tag"
+                      required
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Tag Type *</label>
+                    <select
+                      value={programForm.tag_type}
+                      onChange={(e) => setProgramForm(prev => ({ ...prev, tag_type: e.target.value }))}
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                    >
+                      <option value="shop">Shop</option>
+                      <option value="truck">Truck</option>
+                      <option value="jobsite">Jobsite</option>
+                      <option value="operator">Operator</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Assign to Operator <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <select
+                      value={programForm.operator_id}
+                      onChange={(e) => setProgramForm(prev => ({ ...prev, operator_id: e.target.value }))}
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                    >
+                      <option value="">-- No operator --</option>
+                      {operators.map(op => (
+                        <option key={op.id} value={op.id}>{op.full_name} ({op.role.replace(/_/g, ' ')})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">System NFC ID</label>
+                    <input
+                      type="text"
+                      value={programForm.pontifex_nfc_id}
+                      onChange={(e) => setProgramForm(prev => ({ ...prev, pontifex_nfc_id: e.target.value }))}
+                      placeholder="PCC-NFC-001"
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 font-mono transition-all"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Auto-generated ID. Can be written to the tag on supported devices.</p>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => { setProgramStep('scan'); setScannedUid(''); }}
+                      className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-sm transition-all"
+                    >
+                      Re-scan
+                    </button>
+                    <button
+                      onClick={handleProgramSave}
+                      disabled={!programForm.label}
+                      className="flex-1 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-lg font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+                    >
+                      <Save className="w-4 h-4" />
+                      Save Tag
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {programStep === 'saving' && (
+                <div className="flex flex-col items-center gap-3 py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  <p className="text-sm font-semibold text-slate-600">Registering tag...</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Reassign Modal ═══ */}
+      {showReassignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-blue-600" />
+                Reassign Tag
+              </h2>
+              <button onClick={() => setShowReassignModal(null)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                <p className="text-xs text-slate-500">Tag</p>
+                <p className="font-bold text-slate-800">{showReassignModal.label}</p>
+                <p className="text-xs text-slate-400 font-mono">{showReassignModal.tag_uid}</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Assign to Operator</label>
+                <select
+                  value={reassignOperatorId}
+                  onChange={(e) => setReassignOperatorId(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                >
+                  <option value="">-- Unassigned --</option>
+                  {operators.map(op => (
+                    <option key={op.id} value={op.id}>{op.full_name} ({op.role.replace(/_/g, ' ')})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setShowReassignModal(null)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-sm transition-all">
+                  Cancel
+                </button>
+                <button onClick={handleReassign} className="flex-1 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-lg font-bold text-sm transition-all">
+                  Save Assignment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,69 +1,31 @@
 /**
  * API Route: PUT /api/admin/timecards/[id]/update
- * Update a timecard (admin only)
+ * Update a timecard entry (admin/operations_manager/super_admin only).
+ *
+ * Validates:
+ * - clock_out_time must be after clock_in_time
+ * - total_hours must be positive and reasonable (< 24)
+ * - Records audit trail (edited_by, edited_at)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getTenantId } from '@/lib/get-tenant-id';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await params in Next.js 15+
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
     const { id: timecardId } = await params;
-
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is admin
-    if (profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only administrators can update timecards' },
-        { status: 403 }
-      );
-    }
+    const tenantId = auth.tenantId;
 
     // Parse request body
     const body = await request.json();
-    const { clock_in_time, clock_out_time, notes } = body;
-
-    // Resolve tenant scope
-    const tenantId = await getTenantId(user.id);
+    const { clock_in_time, clock_out_time, notes, is_shop_hours, hour_type } = body;
 
     // Check if timecard exists (scoped to tenant)
     let checkQuery = supabaseAdmin
@@ -82,25 +44,57 @@ export async function PUT(
       );
     }
 
-    // Calculate new total hours if both times are provided
+    // Determine final times for validation
+    const finalClockInTime = clock_in_time || existingTimecard.clock_in_time;
+    const finalClockOutTime = clock_out_time !== undefined ? clock_out_time : existingTimecard.clock_out_time;
+
+    // Validate: clock_out must be after clock_in when both are present
     let total_hours = existingTimecard.total_hours;
-    let finalClockInTime = clock_in_time || existingTimecard.clock_in_time;
-    let finalClockOutTime = clock_out_time !== undefined ? clock_out_time : existingTimecard.clock_out_time;
 
     if (finalClockInTime && finalClockOutTime) {
       const clockIn = new Date(finalClockInTime);
       const clockOut = new Date(finalClockOutTime);
+
+      if (isNaN(clockIn.getTime()) || isNaN(clockOut.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid date format for clock-in or clock-out time.' },
+          { status: 400 }
+        );
+      }
+
       const milliseconds = clockOut.getTime() - clockIn.getTime();
+
+      if (milliseconds <= 0) {
+        return NextResponse.json(
+          { error: 'Clock-out time must be after clock-in time.' },
+          { status: 400 }
+        );
+      }
+
       total_hours = parseFloat((milliseconds / (1000 * 60 * 60)).toFixed(2));
+
+      // Sanity check
+      if (total_hours > 24) {
+        return NextResponse.json(
+          { error: 'A single timecard entry cannot exceed 24 hours. Please check the dates.' },
+          { status: 400 }
+        );
+      }
     }
 
-    // Update timecard
-    const updateData: any = {};
+    // Build update data
+    const updateData: Record<string, unknown> = {};
 
     if (clock_in_time) updateData.clock_in_time = clock_in_time;
     if (clock_out_time !== undefined) updateData.clock_out_time = clock_out_time;
     if (notes !== undefined) updateData.notes = notes;
     if (total_hours !== null) updateData.total_hours = total_hours;
+    if (typeof is_shop_hours === 'boolean') updateData.is_shop_hours = is_shop_hours;
+    if (hour_type) updateData.hour_type = hour_type;
+
+    // Audit trail
+    updateData.edited_by = auth.userId;
+    updateData.edited_at = new Date().toISOString();
 
     let updateQuery = supabaseAdmin
       .from('timecards')
@@ -114,6 +108,40 @@ export async function PUT(
       .single();
 
     if (updateError) {
+      // If edited_by / edited_at columns don't exist yet, retry without them
+      if (updateError.message?.includes('edited_by') || updateError.message?.includes('edited_at')) {
+        delete updateData.edited_by;
+        delete updateData.edited_at;
+
+        let retryQuery = supabaseAdmin
+          .from('timecards')
+          .update(updateData)
+          .eq('id', timecardId);
+        if (tenantId) {
+          retryQuery = retryQuery.eq('tenant_id', tenantId);
+        }
+        const { data: retryData, error: retryError } = await retryQuery
+          .select()
+          .single();
+
+        if (retryError) {
+          console.error('Error updating timecard (retry):', retryError);
+          return NextResponse.json(
+            { error: 'Failed to update timecard' },
+            { status: 500 }
+          );
+        }
+
+        return NextResponse.json(
+          {
+            success: true,
+            message: 'Timecard updated successfully',
+            data: retryData,
+          },
+          { status: 200 }
+        );
+      }
+
       console.error('Error updating timecard:', updateError);
       return NextResponse.json(
         { error: 'Failed to update timecard' },
@@ -129,7 +157,7 @@ export async function PUT(
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Unexpected error in timecard update route:', error);
     return NextResponse.json(
       { error: 'Internal server error' },

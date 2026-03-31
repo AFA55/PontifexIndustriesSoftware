@@ -48,7 +48,7 @@ export const checkCredentials = async (email: string, password: string): Promise
 
     // Store user in localStorage
     if (typeof window !== 'undefined') {
-      localStorage.setItem('pontifex-user', JSON.stringify(matchingCredential.user));
+      localStorage.setItem('patriot-user', JSON.stringify(matchingCredential.user));
       console.log('💾 User stored in localStorage');
     }
 
@@ -79,7 +79,7 @@ export const getCurrentUser = (): User | null => {
     }
 
     // Fallback to old localStorage system for backwards compatibility
-    const userStr = localStorage.getItem('pontifex-user');
+    const userStr = localStorage.getItem('patriot-user');
     if (userStr && userStr.trim()) {
       const user = JSON.parse(userStr);
       console.log('👤 Current user from localStorage:', user);
@@ -88,7 +88,7 @@ export const getCurrentUser = (): User | null => {
   } catch (error) {
     console.error('Error getting user from localStorage:', error);
     // Clear corrupted data
-    localStorage.removeItem('pontifex-user');
+    localStorage.removeItem('patriot-user');
     localStorage.removeItem('supabase-user');
   }
 
@@ -106,7 +106,7 @@ export const logout = async (): Promise<void> => {
     // Supabase signOut may fail if no session exists
   }
 
-  localStorage.removeItem('pontifex-user');
+  localStorage.removeItem('patriot-user');
   localStorage.removeItem('supabase-user');
   localStorage.removeItem('platform-user');
   localStorage.removeItem('current-tenant');

@@ -10,23 +10,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS } from '@/lib/geolocation';
-import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
+    const user = { id: auth.userId, email: auth.userEmail };
+
     const body = await request.json();
-    const {
-      latitude,
-      longitude,
-      accuracy,
-      // NFC clock-out fields
-      clock_out_method = 'gps',  // 'nfc' | 'gps'
-      nfc_tag_id,
-      nfc_tag_uid,
-    } = body;
+    const { latitude, longitude, accuracy } = body;
 
     // Validation
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
@@ -36,60 +29,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const locationCheck = isWithinShopRadius({ latitude, longitude, accuracy });
+    // Verify location is within shop radius — but only enforce for GPS-clocked-in users.
+    // NFC and remote clock-ins may be at jobsites, so we record location but don't block.
+    const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
+    const locationCheck = hasLocation
+      ? isWithinShopRadius({ latitude, longitude, accuracy })
+      : { isWithinRange: false, distance: 0, distanceFormatted: 'unknown' };
 
-    if (clock_out_method === 'nfc') {
-      // NFC clock-out: verify the tag instead of GPS
-      if (!nfc_tag_id && !nfc_tag_uid) {
-        return NextResponse.json(
-          { error: 'NFC tag verification required for NFC clock-out.' },
-          { status: 400 }
-        );
-      }
+    // Look up how this user clocked in to decide whether to enforce GPS radius
+    // (We fetch the active timecard below, so we'll do the enforcement check after that)
 
-      const tagQuery = nfc_tag_id
-        ? supabaseAdmin.from('nfc_tags').select('id, tag_uid, is_active, label').eq('id', nfc_tag_id).maybeSingle()
-        : supabaseAdmin.from('nfc_tags').select('id, tag_uid, is_active, label').eq('tag_uid', nfc_tag_uid).maybeSingle();
+    // Check for incomplete dispatched jobs (work-performed hard block)
+    const { data: userProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
 
-      const { data: tag } = await tagQuery;
-
-      if (!tag || !tag.is_active) {
-        return NextResponse.json(
-          { error: 'NFC tag not recognized or deactivated. Contact your supervisor.' },
-          { status: 403 }
-        );
-      }
-
-      // Update last scanned (fire-and-forget)
-      Promise.resolve(
-        supabaseAdmin.from('nfc_tags').update({
-          last_scanned_at: new Date().toISOString(),
-          last_scanned_by: auth.userId,
-        }).eq('id', tag.id)
-      ).catch(() => {});
-    } else {
-      // GPS clock-out: verify location is within shop radius
-      if (!locationCheck.isWithinRange) {
-        return NextResponse.json(
-          {
-            error: `You must be at ${SHOP_LOCATION.name} to clock out.`,
-            details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(ALLOWED_RADIUS_METERS * 3.28084).toFixed(0)} feet (${ALLOWED_RADIUS_METERS}m).`,
-            distance: locationCheck.distance,
-            distanceFormatted: locationCheck.distanceFormatted,
-            allowedRadius: ALLOWED_RADIUS_METERS,
-            shopLocation: {
-              latitude: SHOP_LOCATION.latitude,
-              longitude: SHOP_LOCATION.longitude,
-              name: SHOP_LOCATION.name,
-            },
-            userLocation: { latitude, longitude, accuracy },
-          },
-          { status: 403 }
-        );
-      }
-    }
-
-    const userRole = auth.role || '';
+    const userRole = userProfile?.role || '';
     const today = new Date().toISOString().split('T')[0];
 
     if (['operator', 'apprentice'].includes(userRole)) {
@@ -98,7 +55,7 @@ export async function POST(request: NextRequest) {
         const { data: incompleteJobs } = await supabaseAdmin
           .from('job_orders')
           .select('id, job_number, customer_name')
-          .eq('assigned_to', auth.userId)
+          .eq('assigned_to', user.id)
           .eq('scheduled_date', today)
           .not('dispatched_at', 'is', null)
           .is('work_completed_at', null)
@@ -125,7 +82,7 @@ export async function POST(request: NextRequest) {
         const { data: helperJobs } = await supabaseAdmin
           .from('job_orders')
           .select('id, job_number, customer_name')
-          .eq('helper_assigned_to', auth.userId)
+          .eq('helper_assigned_to', user.id)
           .eq('scheduled_date', today)
           .not('dispatched_at', 'is', null)
           .neq('status', 'cancelled');
@@ -136,7 +93,7 @@ export async function POST(request: NextRequest) {
           const { data: workLogs } = await supabaseAdmin
             .from('helper_work_logs')
             .select('job_order_id')
-            .eq('helper_id', auth.userId)
+            .eq('helper_id', user.id)
             .eq('log_date', today)
             .in('job_order_id', jobIds);
 
@@ -165,7 +122,7 @@ export async function POST(request: NextRequest) {
     const { data: activeTimecard, error: fetchError } = await supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('user_id', auth.userId)
+      .eq('user_id', user.id)
       .is('clock_out_time', null)
       .maybeSingle();
 
@@ -188,6 +145,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Enforce GPS radius check for GPS-based clock-ins only.
+    // NFC and remote users are at jobsites, so we just record their location.
+    const clockInMethod = activeTimecard.clock_in_method || 'gps';
+    if (clockInMethod === 'gps' && hasLocation && !locationCheck.isWithinRange) {
+      return NextResponse.json(
+        {
+          error: `You must be at ${SHOP_LOCATION.name} to clock out.`,
+          details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(ALLOWED_RADIUS_METERS * 3.28084).toFixed(0)} feet (${ALLOWED_RADIUS_METERS}m).`,
+          distance: locationCheck.distance,
+          distanceFormatted: locationCheck.distanceFormatted,
+          allowedRadius: ALLOWED_RADIUS_METERS,
+          shopLocation: {
+            latitude: SHOP_LOCATION.latitude,
+            longitude: SHOP_LOCATION.longitude,
+            name: SHOP_LOCATION.name,
+          },
+          userLocation: { latitude, longitude, accuracy },
+        },
+        { status: 403 }
+      );
+    }
+
     // Calculate total hours
     const now = new Date();
     const clockInTime = new Date(activeTimecard.clock_in_time);
@@ -200,7 +179,7 @@ export async function POST(request: NextRequest) {
       const { data: openLogs } = await supabaseAdmin
         .from('helper_work_logs')
         .select('id, started_at')
-        .eq('helper_id', auth.userId)
+        .eq('helper_id', user.id)
         .eq('log_date', today)
         .is('completed_at', null)
         .not('started_at', 'is', null);
@@ -231,8 +210,6 @@ export async function POST(request: NextRequest) {
         clock_out_longitude: longitude,
         clock_out_accuracy: accuracy || null,
         total_hours: parseFloat(totalHours.toFixed(2)),
-        clock_out_method: clock_out_method,
-        nfc_tag_id: (clock_out_method === 'nfc' && nfc_tag_id) ? nfc_tag_id : (activeTimecard.nfc_tag_id || null),
       })
       .eq('id', activeTimecard.id)
       .select()
@@ -246,7 +223,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`✅ User ${auth.userEmail} clocked out at ${now.toLocaleTimeString()} [Method: ${clock_out_method.toUpperCase()}]`);
+    // Get user's profile for name
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single();
+
+    console.log(`✅ User ${profile?.full_name || user.email} clocked out at ${now.toLocaleTimeString()}`);
     console.log(`⏰ Total hours this entry: ${totalHours.toFixed(2)}`);
     console.log(`📍 Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (${locationCheck.distanceFormatted} from shop)`);
 

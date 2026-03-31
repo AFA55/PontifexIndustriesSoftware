@@ -120,36 +120,6 @@ export function formatPhoneNumber(phone: string): string | null {
 }
 
 /**
- * Send job dispatch notification to an operator or helper
- */
-export async function sendJobDispatchSMS(options: {
-  to: string;
-  operatorName: string;
-  jobNumber: string;
-  customerName: string;
-  location: string;
-  scheduledDate: string; // e.g., "Mon, Mar 25"
-  arrivalTime?: string;  // e.g., "7:00 AM"
-  jobType?: string;
-  isHelper?: boolean;
-  appUrl?: string;
-}): Promise<{ success: boolean; error?: string }> {
-  const lines = [
-    `📋 Job Dispatched — ${options.scheduledDate}`,
-    `Hi ${options.operatorName},`,
-    `Job #: ${options.jobNumber}`,
-    `Customer: ${options.customerName}`,
-    `Location: ${options.location}`,
-    options.arrivalTime ? `Arrival: ${options.arrivalTime}` : null,
-    options.jobType ? `Type: ${options.jobType}` : null,
-    options.isHelper ? '(You are assigned as Helper)' : null,
-    options.appUrl ? `View: ${options.appUrl}/dashboard/job-schedule` : null,
-  ].filter(Boolean);
-
-  return sendSMS({ to: options.to, message: lines.join('\n') });
-}
-
-/**
  * Send "In Route" notification
  */
 export async function sendInRouteNotification(options: {
@@ -159,7 +129,7 @@ export async function sendInRouteNotification(options: {
   jobNumber?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const message = `
-🚗 Service Update
+🚗 Patriot Concrete Cutting Update
 
 ${options.operatorName} is on the way!
 
@@ -184,7 +154,7 @@ export async function send15MinuteNotification(options: {
   jobNumber?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const message = `
-📍 Service Update
+📍 Patriot Concrete Cutting Update
 
 ${options.operatorName} is 15 minutes away!
 
@@ -210,7 +180,7 @@ export async function sendStandbyNotification(options: {
   jobNumber?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const message = `
-⏱️ Standby Notice
+⏱️ Patriot Concrete Cutting - Standby Notice
 
 ${options.operatorName} is on-site but unable to proceed.
 
@@ -238,7 +208,7 @@ export async function sendArrivedNotification(options: {
   jobNumber?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const message = `
-✅ Service Update
+✅ Patriot Concrete Cutting Update
 
 ${options.operatorName} has arrived on-site and is beginning work.
 

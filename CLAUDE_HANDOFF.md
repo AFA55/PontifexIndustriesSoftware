@@ -1,174 +1,270 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 28, 2026 (Session 7) | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING
+**Date:** March 23, 2026 | **Branch:** `claude/mystifying-diffie` | **Build Status:** PASSING ✅
 
 ---
 
 ## CURRENT STATE
 
 ### Git Status
-- **Branch:** `feature/schedule-board-v2` (pushed to origin)
-- **Last commit:** `a396302a` — "Merge branch 'worktree-agent-af1c2db8' into feature/schedule-board-v2"
+- **Branch:** `claude/mystifying-diffie` (worktree off `feature/schedule-board-v2`)
+- **Last commit:** `7a786904` — "fix: Remove setInterval from middleware for Vercel Edge Runtime compatibility"
 - **Clean working tree** (all changes committed and pushed)
+- **Remote:** `origin/claude/mystifying-diffie` — up to date
 
-### Recent Commits (March 28, Session 7)
+### Recent Commits (March 23 — this session)
 ```
-a396302a Merge branch 'worktree-agent-af1c2db8' into feature/schedule-board-v2
-23efb397 feat: remove all hardcoded Pontifex branding for white-label support
-4ced5c34 fix: add tenant_id isolation to equipment, inventory, access-request, and misc API routes
-65faa431 merge: operator route gaps + layout debranded (resolved)
-549324f3 merge: 27 admin routes tenant filtering
-d843f0e7 merge: login tenant fix (resolved)
-00813fb2 fix: operator route tenant gaps + layout metadata debranded
-b34afd07 fix: add tenant filtering to 27 remaining admin API routes
-8007c685 fix: login page now stores tenant_id from API response
-244e2cff fix: rebrand company page — remove Pontifex references
-db4f3ade chore: permanently ignore worktree directories
-bc768631 feat: multi-tenant white-label foundation — complete implementation
-```
-
----
-
-## SESSION 7 WORK COMPLETED (March 28)
-
-### Multi-Tenant White-Label Architecture (COMPLETE)
-Full multi-tenant SaaS architecture implemented. Platform name: **Pontifex Platform**. First tenant: **Patriot Concrete Cutting** (company code: `PATRIOT`).
-
-#### Database Foundation
-- **Migration:** `20260328_multi_tenant_foundation.sql` (applied to production Supabase)
-- Added `company_code` (unique, uppercase) to `tenants` table
-- Added `tenant_id` (nullable UUID FK) to **all 71+ data tables**
-- Created PATRIOT tenant: `ee3d8081-cec2-47f3-ac23-bdc0bb2d142d`
-- Backfilled all existing data with PATRIOT tenant_id
-- Created indexes on `tenant_id` for every table
-- Helper function: `get_tenant_id_for_user(uuid)` for RLS policies
-
-#### Company Code Login Flow
-- **`/company`** — New entry page: enter company code (e.g., "PATRIOT") → looks up tenant → caches branding → redirects to `/login?company=CODE`
-- **`/api/auth/lookup-company`** — Public GET endpoint returns tenant info + branding for a company code
-- **`/login`** — Reads `?company=` param, shows tenant-branded login, stores tenant_id from API response
-- **Login API** — Now returns tenant object + user.tenant_id in response
-
-#### Tenant Data Isolation (85+ API Routes Secured)
-Every API route now filters by `tenant_id`:
-- **Reads:** `if (tenantId) { query = query.eq('tenant_id', tenantId); }`
-- **Writes:** `tenant_id: tenantId || null`
-- **Two auth patterns supported:**
-  - Routes using `requireAuth()`/`requireAdmin()` → get `auth.tenantId` from AuthSuccess
-  - Routes with manual auth → use `getTenantId(user.id)` helper
-- **Backward compatible:** null tenantId = no filtering (legacy/demo users)
-- Secured: admin routes, job orders, operators, equipment, inventory, timecards, billing, CRM, facilities, badges, forms, notifications, access requests, and more
-
-#### New Files Created
-| File | Purpose |
-|------|---------|
-| `lib/get-tenant-id.ts` | Shared helper to resolve tenant from user ID |
-| `lib/tenant-context.tsx` | Client-side TenantProvider + useTenant hook |
-| `app/company/page.tsx` | Company code entry page |
-| `app/api/auth/lookup-company/route.ts` | Public company code lookup API |
-| `app/error.tsx` | Professional error boundary (dark theme) |
-| `app/not-found.tsx` | Professional 404 page (dark theme) |
-| `app/api/log-error/route.ts` | Error logging endpoint |
-
-#### Branding Debranded
-- Removed hardcoded "Pontifex" from 39+ files (PDFs, emails, SMS, components, metadata)
-- All text now uses dynamic `branding.company_name` from tenant_branding table
-- `DEFAULT_BRANDING` uses generic "Concrete Cutting Platform" / "Operations Platform"
-- `app/layout.tsx` metadata debranded to "Operations Management Platform"
-- `components/landing/brand-config.ts` uses env vars with generic fallbacks
-- 306 console.log statements removed from 68 files
-
-#### Auth Updates
-- `lib/api-auth.ts` — `AuthSuccess` now includes `tenantId: string`
-- `lib/auth.ts` — User interface has `tenant_id?`, logout clears tenant data
-- `lib/branding-context.tsx` — Tenant-aware with per-tenant caching (`branding-{tenantId}`)
-
----
-
-## FEATURES COMPLETED (Sessions 4-6, preserved)
-
-### 1. Schedule Board Enhancements
-- All Operators View, Time-Off System, Skill Match Warnings, Real-Time Status Colors
-- Supabase Realtime, Inline Editing, Notes Sidebar, Work History Tab, AddTimeOffModal
-
-### 2. Schedule Form Redesign
-- Customer-first flow, Project Name, smart contact dropdown, facility compliance
-
-### 3. Timecard + NFC System
-- Admin weekly grid, per-operator breakdown, NFC management, operator clock-in, PDF export
-
-### 4. Facilities & Badging System
-- Facility CRUD, badge tracking, auto-expiration, profile integration
-
-### 5. Approval Workflow
-- Reject/approve/resubmit with notes, form history page
-
-### 6. Customer Portal & Forms
-- Public signature page, signature requests, surveys, form builder, work-performed gate
-
-### 7. Additional Work
-- My-Jobs enhancements, job documents, job on-hold status
-
----
-
-## DATABASE MIGRATIONS APPLIED
-All applied to production Supabase:
-1. `20260325_timecards_facilities_badges_approval.sql` — timecards, facilities, badges, approval columns
-2. `20260325_job_on_hold_and_documents.sql` — on_hold status, job_documents table
-3. `20260326_time_off_and_status_tracking.sql` — operator_time_off, status tracking
-4. `20260326_signature_requests_forms.sql` — signature_requests, surveys, form_templates
-5. `20260328_multi_tenant_foundation.sql` — tenants company_code, tenant_id on 71 tables, PATRIOT tenant, indexes
-
----
-
-## WHAT'S NEXT (Sprint Backlog Remaining)
-
-### High Priority (Monday Deploy Target)
-- [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
-- [ ] Patriot logo + favicon assets (need actual image files from user)
-- [ ] Production environment variables (Resend, Twilio, Google Maps API keys)
-- [ ] RLS policies at database level for defense-in-depth (currently API-level only)
-
-### Medium Priority
-- [ ] Make `tenant_id` NOT NULL after confirming no breakage
-- [ ] Mobile responsive audit on new pages
-- [ ] Loading states & error handling audit
-- [ ] Production deployment prep (custom domain, SSL)
-
-### Polish
-- [ ] Schedule board performance optimization
-- [ ] SMS/email notification integration for signature requests
-- [ ] Notification system polish
-- [ ] Final build verification & merge to main
-
----
-
-## ARCHITECTURE NOTES
-
-### Multi-Tenant Data Flow
-```
-/company → enter "PATRIOT" → /api/auth/lookup-company?code=PATRIOT
-  → returns tenant info + branding
-  → stored in localStorage (current-tenant, branding-{id})
-  → redirect to /login?company=PATRIOT
-  → login → API returns user.tenant_id + tenant object
-  → all subsequent API calls filter by tenant_id
+7a786904 fix: Remove setInterval from middleware for Vercel Edge Runtime compatibility
+189a4a95 fix: Frontend QA — login roles, work items from DB, camera policy, nav fixes
+061d3c70 fix: QA audit — 4 critical + 6 high priority security and data fixes
+081d70af feat: Professional dashboard command center — compact UI, settings panel, notes/tasks/messages/calendar widgets
+23e62466 feat: Modules/Analytics toggle on admin dashboard
+3fe8cdc1 feat: 7-day operator crew schedule grid with color-coded availability
+b75b8e1f fix: Align analytics dashboard UI with platform design system
+ac57d354 fix: Rewrite dashboard-stats API to match widget data shapes
+a42b5261 feat: Professional analytics dashboard with drag-and-drop widgets, charts, and commission tracking
+ceb8d3c3 feat: Legal compliance — Privacy Policy, Terms, E-Sign consent, GPS consent
 ```
 
-### Tenant ID Resolution
-- **API routes with requireAuth/requireAdmin:** `auth.tenantId` from AuthSuccess
-- **API routes with manual auth:** `getTenantId(user.id)` from lib/get-tenant-id.ts
-- **Client-side:** `useTenant()` hook from lib/tenant-context.tsx
-
-### Key Tenant IDs
-- **PATRIOT** (Patriot Concrete Cutting): `ee3d8081-cec2-47f3-ac23-bdc0bb2d142d`
+### Previous Commits (March 22)
+```
+990e9339 feat: Production deployment prep — env template, security headers, image optimization
+d31f016f feat: White-label rebrand — Pontifex Industries → Patriot Concrete Cutting
+c9251b90 fix: E2E workflow critical fixes — invoice rates, work item persistence, photo uploads
+```
 
 ---
 
-## IMPORTANT NOTES FOR NEXT SESSION
-- **All worktree branches cleaned up** — 13 worktree branches deleted after merge
-- **Build is PASSING** with zero errors as of session 7
-- **All 5 migrations applied** to production Supabase — no pending migrations
-- **Tenant isolation is API-level** — RLS policies at DB level would add defense-in-depth but are not yet implemented
-- **tenant_id is nullable** — set to NULL for legacy/demo data; make NOT NULL once confident
-- **`.env.local` in worktrees**: Worktrees don't inherit `.env.local` — must copy from main repo
-- **Dev server cache**: Delete `.next/` and restart if you see "routes-manifest.json" errors
+## WHAT WAS DONE (March 23 Session)
+
+### 1. Professional Analytics Dashboard (20 Widgets)
+Complete dashboard command center with customizable drag-and-drop widgets:
+
+**Financial widgets (6):** Revenue Overview (LineChart), Financial Summary (BarChart), Top Customers (horizontal bars), Commission (salesman), Pipeline (stacked bar), Invoice Summary (PieChart)
+
+**Operations widgets (8):** Job Status (donut), Schedule Preview (table), Active Crews (status cards), Top Operators (leaderboard), System Health (status dots), Completion Rate (donut), My Jobs (salesman), Crew Utilization (SVG ring)
+
+**Communication widgets (3):** Recent Activity (timeline), Team Messages (chat with channels), Notifications Feed (alerts)
+
+**Personal widgets (3):** Quick Notes (color-coded sticky notes), My Tasks (todo checklist with priorities), Mini Calendar (monthly grid with job dots)
+
+**Infrastructure:**
+- 3 new API routes: `/api/admin/dashboard-stats`, `/api/admin/dashboard-layout`, `/api/admin/commission`
+- 3 new API routes: `/api/admin/dashboard-notes`, `/api/admin/dashboard-tasks`, `/api/admin/team-messages`
+- DB tables: `dashboard_layouts`, `dashboard_notes`, `dashboard_tasks`, `team_messages` (all with RLS)
+- Settings panel with Widgets/Presets/Appearance tabs
+- Layout saved per user, 60s auto-refresh, role-based widget visibility
+- 3 layout presets: Operations Manager, Salesman, Billing & Finance
+
+### 2. Legal Compliance Pages
+- Privacy Policy page (`/privacy`) with OSHA, TCPA, GPS tracking disclosures
+- Terms of Service page (`/terms`) with data retention, liability, compliance terms
+- E-Sign consent checkbox component on job completion flow
+- GPS tracking consent during operator onboarding
+
+### 3. Comprehensive QA Audit (3 parallel agents)
+**Database audit (76 tables):** All 14 core tables verified, 64/64 RLS enabled, 271 indexes, 82 FK constraints, 12 views
+
+**API route audit (30+ routes):**
+- Fixed 4 CRITICAL: photo endpoint auth missing, DELETE role check excluded super_admin, photo race condition
+- Fixed 6 HIGH: admin job-orders role checks too restrictive, invoice number collision, isTableNotFoundError too broad
+- 8 MEDIUM noted (perf, non-blocking)
+
+**Frontend audit (75+ pages, 21 widgets):**
+- Fixed CRITICAL: login rejected shop_manager/inventory_manager/supervisor roles
+- Fixed HIGH: completed-jobs page read work items from localStorage (admin doesn't have it) → now reads from DB
+- Fixed: system-health back button went to /dashboard instead of /dashboard/admin
+- Fixed: camera permission policy blocked PhotoUploader on mobile
+
+### 4. Vercel Deployment Prep
+- Fixed middleware `setInterval` → lazy cleanup (Edge Runtime compatible)
+- Verified all env vars documented in `.env.example`
+- No hardcoded localhost URLs (all use `process.env` with fallbacks)
+- next.config.js verified Vercel-compatible
+- Build passes cleanly with 0 errors
+
+### 5. Admin Dashboard Toggle
+- Modules/Analytics view toggle on `/dashboard/admin`
+- Toggle between card grid (module access) and analytics dashboard (charts/widgets)
+
+### 6. Crew Schedule Grid
+- 7-day operator schedule grid on schedule board
+- Color-coded availability (green=available, blue=scheduled, purple=multi-job)
+
+---
+
+## SPRINT STATUS (Target: April 2, 2026)
+
+### Week 1 — Core Features ✅ COMPLETE
+- [x] Dispatch ticket PDF generation
+- [x] Customer signature capture in job completion flow
+- [x] Photo upload during job execution
+- [x] PDF invoice generation
+
+### Week 2 — Polish & Launch ✅ COMPLETE
+- [x] Mobile responsive audit
+- [x] Loading states & error handling audit
+- [x] Global error handling + crash prevention
+- [x] System health monitoring dashboard
+- [x] SaaS multi-tenant foundation + backup system
+- [x] Apply all pending migrations
+- [x] E2E workflow audit + critical fixes
+- [x] White-label rebrand (Pontifex → Patriot, 52 files)
+- [x] Production deployment prep (.env.example, security headers)
+- [x] Comprehensive QA audit (DB + API + Frontend)
+- [x] Vercel deployment readiness verified
+
+### Bonus Features Built (Ahead of Schedule)
+- [x] AI Auto-Scheduling Engine
+- [x] AI Smart Fill (voice/text NLP)
+- [x] Customer CRM system with autocomplete
+- [x] Drag-and-drop schedule board
+- [x] Professional analytics dashboard (20 customizable widgets)
+- [x] Personal notes, tasks, team messages widgets
+- [x] Commission tracking system
+- [x] Legal compliance (Privacy Policy, Terms, E-Sign consent, GPS consent)
+- [x] Crew schedule grid (7-day operator availability)
+- [x] White-label branding system
+- [x] Global notification system + network monitoring
+- [x] Multi-tenant SaaS foundation
+
+---
+
+## WHAT TO DO NEXT
+
+### Immediate Priority
+1. **Deploy to Vercel** — connect repo, set env vars, deploy
+2. **Add favicon.ico + og-image.jpg** to `/public/` (missing, causes 404s)
+3. **Update Supabase Auth settings** — add Vercel URL to Site URL + Redirect URLs
+4. **Test with real users** — create production accounts, run E2E workflow
+
+### Nice-to-Have (If Time Allows)
+- Stripe payment links on invoices
+- Schedule board performance optimization for large datasets
+- Notification system polish (SMS/email for job assignments)
+- SOC 2 readiness (see compliance report)
+
+### Compliance Priorities (Before Production Use)
+1. TCPA-compliant SMS opt-in/opt-out flow
+2. GPS tracking consent per state (CA requires work-hours-only tracking)
+3. 30-year data retention architecture for OSHA silica records
+4. Digital signature metadata capture (IP, timestamp, GPS, device)
+5. Tech E&O insurance
+
+---
+
+## UNAPPLIED MIGRATIONS
+None — all migrations applied to Supabase.
+
+---
+
+## KEY PATTERNS & CONVENTIONS
+
+### Authentication
+- **Token retrieval**: Always `supabase.auth.getSession()` — NEVER localStorage for tokens
+- **API auth**: `requireAdmin()` / `requireSuperAdmin()` / `requireAuth()` from `lib/api-auth.ts`
+- **Client guard**: `getCurrentUser()` from `lib/auth.ts` with role array checks in useEffect
+- **Schedule board access**: `requireScheduleBoardAccess()` — admin, super_admin, salesman, ops_manager, supervisor
+
+### UI/Styling
+- Purple/dark theme with Tailwind CSS
+- lucide-react icons throughout
+- Input fields: always `text-gray-900 bg-white`
+- Cards: `bg-white rounded-xl border border-gray-200 p-5` (analytics uses rounded-xl not rounded-2xl)
+- Mobile-first responsive design
+
+### Data
+- **Branding**: `useBranding()` hook for dynamic company name/colors
+- **Notifications**: `useNotifications()` hook for toast messages
+- **API calls**: `useApi()` hook or manual fetch with bearer token
+- **PDFs**: Server-side only with @react-pdf/renderer
+- **Photos**: PhotoUploader → Supabase Storage `job-photos` bucket
+- **Signatures**: Upload to Storage as PNG, fallback to base64
+- **Fire-and-forget logging**: `Promise.resolve(supabaseAdmin.from(...).insert(...)).then(...).catch(() => {})`
+
+### Response Format
+```
+Success: { success: true, data: {...} }
+Error: { error: 'message' } with HTTP status 4xx/5xx
+```
+
+### Roles (priority order)
+super_admin > operations_manager > admin > salesman > supervisor > shop_manager > inventory_manager > operator > apprentice
+
+---
+
+## FILE STRUCTURE REFERENCE
+
+### Root Layout Provider Stack
+```
+ThemeProvider > BrandingProvider > NotificationProvider > ErrorBoundary > NetworkMonitor > GoogleMapsProvider > App
+```
+
+### Analytics Dashboard Structure
+```
+app/dashboard/admin/analytics/
+  page.tsx                          — Main analytics page
+  _components/
+    AnalyticsDashboardContent.tsx    — Core dashboard with grid layout
+    DashboardHeader.tsx              — Sticky header with time range + controls
+    DashboardSettingsPanel.tsx       — Slide-out settings drawer (3 tabs)
+    KPIRow.tsx                       — Revenue/Jobs/Completion/Crews KPI bar
+    WidgetWrapper.tsx                — Card wrapper with drag handle
+    WidgetRegistry.ts                — 20 widget entries with metadata
+    LayoutPresets.ts                 — 3 preset layouts
+    AddWidgetModal.tsx               — Widget picker modal
+    TimeRangeSelector.tsx            — Daily/Weekly/Monthly toggle
+    types.ts                         — TimeRange, WidgetProps, WidgetConfig
+    widgets/
+      RevenueOverviewWidget.tsx      — LineChart + 3 KPIs
+      JobStatusWidget.tsx            — Donut PieChart by status
+      SchedulePreviewWidget.tsx      — Today's jobs table
+      ActiveCrewsWidget.tsx          — 4 status boxes
+      FinancialSummaryWidget.tsx     — Monthly revenue BarChart
+      TopOperatorsWidget.tsx         — Leaderboard with progress bars
+      CustomerOverviewWidget.tsx     — Horizontal BarChart
+      SystemHealthWidget.tsx         — Service status dots
+      RecentActivityWidget.tsx       — Timeline with icons
+      CompletionRateWidget.tsx       — Donut with center %
+      CommissionWidget.tsx           — Commission KPIs + BarChart
+      MyJobsWidget.tsx               — PieChart + recent jobs table
+      PipelineWidget.tsx             — Stacked horizontal bar
+      InvoiceSummaryWidget.tsx       — Invoice status PieChart
+      QuickNotesWidget.tsx           — Color-coded sticky notes (self-managed)
+      MyTasksWidget.tsx              — Todo checklist (self-managed)
+      TeamMessagesWidget.tsx         — Chat with channels (self-managed)
+      MiniCalendarWidget.tsx         — Monthly calendar with job dots
+      NotificationsFeedWidget.tsx    — Alerts timeline
+      CrewUtilizationWidget.tsx      — SVG ring chart
+      LoadingSkeleton.tsx            — Shared loading states
+```
+
+### New API Routes (this session)
+```
+/api/admin/dashboard-stats     — Aggregated stats with role filtering
+/api/admin/dashboard-layout    — User layout persistence (GET/PUT)
+/api/admin/dashboard-notes     — Personal notes CRUD
+/api/admin/dashboard-tasks     — Personal tasks CRUD
+/api/admin/team-messages       — Team chat messages CRUD
+/api/admin/commission          — Commission rate + earnings (GET/PATCH)
+```
+
+### Database (76 tables, 12 views)
+- Project ref: `klatddoyncxidgqtcjnu`
+- All 76 tables have RLS enabled
+- 271 indexes across all tables
+- Key new tables: `dashboard_layouts`, `dashboard_notes`, `dashboard_tasks`, `team_messages`
+
+### Environment Variables (11 required for deployment)
+```
+NEXT_PUBLIC_SUPABASE_URL          — Supabase project URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY     — Supabase anon key
+SUPABASE_SERVICE_ROLE_KEY         — Supabase service role key (server-side)
+NEXT_PUBLIC_APP_URL               — Production app URL
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY   — Google Maps for GPS/routing
+RESEND_API_KEY                    — Email sending
+RESEND_FROM_EMAIL                 — From address for emails
+TWILIO_ACCOUNT_SID                — (optional) SMS
+TWILIO_AUTH_TOKEN                 — (optional) SMS
+TWILIO_PHONE_NUMBER               — (optional) SMS
+NEXT_PUBLIC_BYPASS_LOCATION_CHECK — (optional) GPS bypass for testing
+```
