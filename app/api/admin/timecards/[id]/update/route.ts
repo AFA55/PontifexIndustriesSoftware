@@ -2,83 +2,40 @@
  * API Route: PUT /api/admin/timecards/[id]/update
  * Update a timecard entry (admin/operations_manager/super_admin only).
  *
- * Permission rules:
- * - operator / apprentice: CANNOT edit timecards (even their own)
- * - admin / operations_manager: Can edit any timecard for corrections
- * - super_admin: Full access
- *
  * Validates:
  * - clock_out_time must be after clock_in_time
  * - total_hours must be positive and reasonable (< 24)
- * - Records audit trail (edited_by, edited_at, edit_reason)
+ * - Records audit trail (edited_by, edited_at)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-
-const EDIT_ROLES = ['admin', 'super_admin', 'operations_manager'];
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await params in Next.js 15+
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
     const { id: timecardId } = await params;
-
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Get user's role from profiles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role, full_name')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Failed to verify user role' },
-        { status: 403 }
-      );
-    }
-
-    // Strict permission check: only admin+ can edit timecards
-    if (!EDIT_ROLES.includes(profile.role)) {
-      return NextResponse.json(
-        { error: 'Only administrators can edit timecards. Operators cannot modify time entries.' },
-        { status: 403 }
-      );
-    }
+    const tenantId = auth.tenantId;
 
     // Parse request body
     const body = await request.json();
-    const { clock_in_time, clock_out_time, notes } = body;
+    const { clock_in_time, clock_out_time, notes, is_shop_hours, hour_type } = body;
 
-    // Check if timecard exists
-    const { data: existingTimecard, error: checkError } = await supabaseAdmin
+    // Check if timecard exists (scoped to tenant)
+    let checkQuery = supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('id', timecardId)
-      .single();
+      .eq('id', timecardId);
+    if (tenantId) {
+      checkQuery = checkQuery.eq('tenant_id', tenantId);
+    }
+    const { data: existingTimecard, error: checkError } = await checkQuery.single();
 
     if (checkError || !existingTimecard) {
       return NextResponse.json(
@@ -116,7 +73,7 @@ export async function PUT(
 
       total_hours = parseFloat((milliseconds / (1000 * 60 * 60)).toFixed(2));
 
-      // Sanity check: a single entry shouldn't exceed 24 hours
+      // Sanity check
       if (total_hours > 24) {
         return NextResponse.json(
           { error: 'A single timecard entry cannot exceed 24 hours. Please check the dates.' },
@@ -132,15 +89,21 @@ export async function PUT(
     if (clock_out_time !== undefined) updateData.clock_out_time = clock_out_time;
     if (notes !== undefined) updateData.notes = notes;
     if (total_hours !== null) updateData.total_hours = total_hours;
+    if (typeof is_shop_hours === 'boolean') updateData.is_shop_hours = is_shop_hours;
+    if (hour_type) updateData.hour_type = hour_type;
 
-    // Audit trail: record who edited and when
-    updateData.edited_by = user.id;
+    // Audit trail
+    updateData.edited_by = auth.userId;
     updateData.edited_at = new Date().toISOString();
 
-    const { data: updatedTimecard, error: updateError } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from('timecards')
       .update(updateData)
-      .eq('id', timecardId)
+      .eq('id', timecardId);
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId);
+    }
+    const { data: updatedTimecard, error: updateError } = await updateQuery
       .select()
       .single();
 
@@ -150,10 +113,14 @@ export async function PUT(
         delete updateData.edited_by;
         delete updateData.edited_at;
 
-        const { data: retryData, error: retryError } = await supabaseAdmin
+        let retryQuery = supabaseAdmin
           .from('timecards')
           .update(updateData)
-          .eq('id', timecardId)
+          .eq('id', timecardId);
+        if (tenantId) {
+          retryQuery = retryQuery.eq('tenant_id', tenantId);
+        }
+        const { data: retryData, error: retryError } = await retryQuery
           .select()
           .single();
 
@@ -164,8 +131,6 @@ export async function PUT(
             { status: 500 }
           );
         }
-
-        console.log(`Timecard ${timecardId} updated by ${profile.full_name || user.email} (audit columns not yet migrated)`);
 
         return NextResponse.json(
           {
@@ -183,8 +148,6 @@ export async function PUT(
         { status: 500 }
       );
     }
-
-    console.log(`Timecard ${timecardId} updated by ${profile.full_name || user.email} at ${new Date().toISOString()}`);
 
     return NextResponse.json(
       {

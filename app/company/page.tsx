@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, ArrowRight, Loader2, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -10,21 +10,6 @@ export default function CompanyCodePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-
-  // Check if tenant already stored — skip to login
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('current-tenant');
-      if (stored) {
-        const tenant = JSON.parse(stored);
-        if (tenant?.company_code) {
-          router.replace(`/login?company=${tenant.company_code}`);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

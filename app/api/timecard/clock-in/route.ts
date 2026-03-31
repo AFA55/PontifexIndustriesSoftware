@@ -17,24 +17,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS } from '@/lib/geolocation';
 
 const NIGHT_SHIFT_START_HOUR = 15;
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
-    }
+    const user = { id: auth.userId, email: auth.userEmail };
 
     const body = await request.json();
     const {
@@ -157,6 +150,7 @@ export async function POST(request: NextRequest) {
     // -- Create timecard entry --
     const insertData: Record<string, unknown> = {
       user_id: user.id,
+      tenant_id: auth.tenantId || null,
       clock_in_time: now.toISOString(),
       clock_in_latitude: latitude,
       clock_in_longitude: longitude,
@@ -202,10 +196,14 @@ export async function POST(request: NextRequest) {
     if (isMandatoryOvertime) flags.push('Mandatory OT (Weekend)');
     flags.push(`Method: ${clock_in_method.toUpperCase()}`);
 
-    const locationCheck = isWithinShopRadius({ latitude, longitude, accuracy });
+    const locationCheck = hasLocation
+      ? isWithinShopRadius({ latitude, longitude, accuracy })
+      : { isWithinRange: false, distance: 0, distanceFormatted: 'N/A' };
 
     console.log(`Clock in: ${profile?.full_name || user.email} at ${now.toLocaleTimeString()} [${flags.join(', ')}]`);
-    console.log(`Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (${locationCheck.distanceFormatted} from shop)`);
+    if (hasLocation) {
+      console.log(`Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (${locationCheck.distanceFormatted} from shop)`);
+    }
 
     return NextResponse.json(
       {

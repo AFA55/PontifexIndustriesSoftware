@@ -104,11 +104,11 @@ async function generateCSV(weekStart: string, weekEnd: string) {
 }
 
 // ── PDF Export (multi-page, one page per operator) ────────
-async function generateBatchPDF(weekStart: string, weekEnd: string) {
+async function generateBatchPDF(weekStart: string, weekEnd: string, userId?: string) {
   const weekDates = getWeekDates(weekStart);
 
   // Get all distinct operators who have timecards this week
-  const { data: allTimecards, error: tcError } = await supabaseAdmin
+  let tcQuery = supabaseAdmin
     .from('timecards')
     .select('*')
     .gte('date', weekStart)
@@ -116,6 +116,12 @@ async function generateBatchPDF(weekStart: string, weekEnd: string) {
     .order('user_id')
     .order('date')
     .order('clock_in_time');
+
+  if (userId) {
+    tcQuery = tcQuery.eq('user_id', userId);
+  }
+
+  const { data: allTimecards, error: tcError } = await tcQuery;
 
   if (tcError) {
     throw new Error(`Failed to fetch timecards: ${tcError.message}`);
@@ -455,6 +461,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const weekStart = searchParams.get('weekStart');
     const format = searchParams.get('format') || 'pdf';
+    const userId = searchParams.get('userId') || undefined;
 
     if (!weekStart) {
       return NextResponse.json(
@@ -491,7 +498,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Default: PDF
-    const pdfBytes = await generateBatchPDF(weekStart, weekEnd);
+    const pdfBytes = await generateBatchPDF(weekStart, weekEnd, userId);
     const filename = `timecards_batch_${weekStart}_to_${weekEnd}.pdf`;
 
     return new NextResponse(pdfBytes, {

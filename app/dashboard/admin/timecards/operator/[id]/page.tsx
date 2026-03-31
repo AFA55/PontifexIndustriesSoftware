@@ -296,7 +296,7 @@ export default function OperatorTimecardPage() {
             <button
               onClick={() => {
                 const mondayStr = monday.toISOString().split('T')[0];
-                window.open(`/api/admin/timecards/${operatorId}/pdf?weekStart=${mondayStr}`, '_blank');
+                window.open(`/api/admin/timecards/export?weekStart=${mondayStr}&userId=${operatorId}&format=pdf`, '_blank');
               }}
               className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-slate-50 text-blue-700 rounded-lg transition-all text-sm font-medium border border-blue-200 shadow-sm hover:shadow"
             >
