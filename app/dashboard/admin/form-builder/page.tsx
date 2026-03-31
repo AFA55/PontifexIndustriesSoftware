@@ -262,20 +262,20 @@ export default function FormBuilderPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
-      <div className="bg-black/20 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50">
+      <div className="bg-white/90 backdrop-blur-xl border-b border-gray-200 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="p-2 bg-white/10 rounded-xl border border-white/10 hover:bg-white/20 transition-all">
-              <ArrowLeft className="w-5 h-5 text-white" />
+            <Link href="/dashboard" className="p-2 bg-gray-100 rounded-xl border border-gray-200 hover:bg-gray-200 transition-all">
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
             </Link>
             <div>
               <h1 className="text-xl font-bold text-white">Form Builder</h1>

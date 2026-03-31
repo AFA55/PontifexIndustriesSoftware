@@ -217,7 +217,7 @@ export default function OperatorProfilesPage() {
     const currentUser = getCurrentUser();
     if (!currentUser) { router.push('/login'); return; }
     const role = currentUser.role || '';
-    if (!['admin', 'super_admin', 'operations_manager'].includes(role)) {
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor'].includes(role)) {
       router.push('/dashboard');
       return;
     }

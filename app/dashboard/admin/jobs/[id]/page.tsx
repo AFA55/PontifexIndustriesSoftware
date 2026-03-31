@@ -193,10 +193,10 @@ export default function AdminJobDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-300 font-medium">Loading job details...</p>
+          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500 font-medium">Loading job details...</p>
         </div>
       </div>
     );
@@ -204,10 +204,10 @@ export default function AdminJobDetailPage() {
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">Job Not Found</h1>
-          <Link href="/dashboard/admin" className="text-red-400 hover:text-red-300">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Job Not Found</h1>
+          <Link href="/dashboard/admin" className="text-blue-600 hover:text-blue-700">
             Return to Admin Dashboard
           </Link>
         </div>
@@ -216,20 +216,20 @@ export default function AdminJobDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
-      <div className="bg-slate-800/50 backdrop-blur-xl border-b border-slate-700/50 sticky top-0 z-50">
+      <div className="bg-white/90 backdrop-blur-xl border-b border-gray-200 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link
               href="/dashboard/admin/schedule-board"
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all font-medium"
+              className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all font-medium"
             >
               <ArrowLeft className="w-5 h-5" />
               <span>Back to Schedule</span>
             </Link>
 
-            <h1 className="text-xl font-bold text-white">
+            <h1 className="text-xl font-bold text-gray-900">
               Job #{job.job_number}
             </h1>
 
@@ -242,7 +242,7 @@ export default function AdminJobDetailPage() {
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Job Header Card */}
-        <div className="bg-slate-800/50 backdrop-blur-lg rounded-3xl border border-slate-700/50 overflow-hidden mb-6">
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden mb-6">
           <div className="bg-gradient-to-r from-red-600 to-red-500 p-6">
             <div className="flex items-start justify-between">
               <div>
@@ -267,47 +267,47 @@ export default function AdminJobDetailPage() {
           <div className="p-6">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Location */}
-              <div className="bg-slate-700/50 rounded-2xl p-4">
+              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
                     <MapPin className="w-5 h-5 text-blue-400" />
                   </div>
-                  <h3 className="font-semibold text-white">Location</h3>
+                  <h3 className="font-semibold text-gray-900">Location</h3>
                 </div>
-                <p className="text-gray-300 font-medium">{job.location}</p>
-                <p className="text-gray-400 text-sm mt-1">{job.address}</p>
+                <p className="text-gray-700 font-medium">{job.location}</p>
+                <p className="text-gray-500 text-sm mt-1">{job.address}</p>
               </div>
 
               {/* Schedule */}
-              <div className="bg-slate-700/50 rounded-2xl p-4">
+              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
                     <Calendar className="w-5 h-5 text-green-400" />
                   </div>
-                  <h3 className="font-semibold text-white">Schedule</h3>
+                  <h3 className="font-semibold text-gray-900">Schedule</h3>
                 </div>
-                <p className="text-gray-300 font-medium">
+                <p className="text-gray-700 font-medium">
                   {job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString() : 'Not scheduled'}
                 </p>
                 <div className="flex gap-4 mt-2 text-sm">
                   {job.shop_arrival_time && (
-                    <span className="text-gray-400">Shop: <span className="text-green-400">{job.shop_arrival_time}</span></span>
+                    <span className="text-gray-500">Shop: <span className="text-green-400">{job.shop_arrival_time}</span></span>
                   )}
                   {job.arrival_time && (
-                    <span className="text-gray-400">Site: <span className="text-blue-400">{job.arrival_time}</span></span>
+                    <span className="text-gray-500">Site: <span className="text-blue-400">{job.arrival_time}</span></span>
                   )}
                 </div>
               </div>
 
               {/* Contact */}
-              <div className="bg-slate-700/50 rounded-2xl p-4">
+              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
                     <User className="w-5 h-5 text-purple-400" />
                   </div>
-                  <h3 className="font-semibold text-white">On-Site Contact</h3>
+                  <h3 className="font-semibold text-gray-900">On-Site Contact</h3>
                 </div>
-                <p className="text-gray-300 font-medium">{job.foreman_name || 'N/A'}</p>
+                <p className="text-gray-700 font-medium">{job.foreman_name || 'N/A'}</p>
                 {job.foreman_phone && (
                   <a href={`tel:${job.foreman_phone}`} className="flex items-center gap-2 text-blue-400 hover:text-blue-300 mt-1">
                     <Phone className="w-4 h-4" />
@@ -317,38 +317,38 @@ export default function AdminJobDetailPage() {
               </div>
 
               {/* Estimated Hours */}
-              <div className="bg-slate-700/50 rounded-2xl p-4">
+              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center">
                     <Clock className="w-5 h-5 text-orange-400" />
                   </div>
-                  <h3 className="font-semibold text-white">Estimated Time</h3>
+                  <h3 className="font-semibold text-gray-900">Estimated Time</h3>
                 </div>
                 <p className="text-3xl font-bold text-orange-400">{job.estimated_hours || 0} hrs</p>
               </div>
 
               {/* Quote */}
               {job.quote_amount && (
-                <div className="bg-slate-700/50 rounded-2xl p-4">
+                <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
                       <DollarSign className="w-5 h-5 text-green-400" />
                     </div>
-                    <h3 className="font-semibold text-white">Quote Amount</h3>
+                    <h3 className="font-semibold text-gray-900">Quote Amount</h3>
                   </div>
                   <p className="text-3xl font-bold text-green-400">${job.quote_amount.toLocaleString()}</p>
                 </div>
               )}
 
               {/* Salesman */}
-              <div className="bg-slate-700/50 rounded-2xl p-4">
+              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
                     <User className="w-5 h-5 text-yellow-400" />
                   </div>
-                  <h3 className="font-semibold text-white">Salesman</h3>
+                  <h3 className="font-semibold text-gray-900">Salesman</h3>
                 </div>
-                <p className="text-gray-300 font-medium">{job.salesman_name || 'N/A'}</p>
+                <p className="text-gray-700 font-medium">{job.salesman_name || 'N/A'}</p>
               </div>
             </div>
           </div>
@@ -356,13 +356,13 @@ export default function AdminJobDetailPage() {
 
         {/* Job Description */}
         {job.description && (
-          <div className="bg-slate-800/50 backdrop-blur-lg rounded-3xl border border-slate-700/50 p-6 mb-6">
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 mb-6">
             <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
               <FileText className="w-6 h-6 text-blue-400" />
               Job Description
             </h3>
-            <div className="bg-slate-700/50 rounded-2xl p-4">
-              <pre className="whitespace-pre-wrap text-gray-300 font-medium leading-relaxed">
+            <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+              <pre className="whitespace-pre-wrap text-gray-700 font-medium leading-relaxed">
                 {job.description}
               </pre>
             </div>
@@ -371,7 +371,7 @@ export default function AdminJobDetailPage() {
 
         {/* Equipment Checklist */}
         {job.equipment_needed && job.equipment_needed.length > 0 && (
-          <div className="bg-slate-800/50 backdrop-blur-lg rounded-3xl border border-slate-700/50 p-6 mb-6">
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 mb-6">
             <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
               <Wrench className="w-6 h-6 text-green-400" />
               Equipment Required
@@ -380,7 +380,7 @@ export default function AdminJobDetailPage() {
               {job.equipment_needed.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-xl">
                   <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-gray-300 font-medium">{item}</span>
+                  <span className="text-gray-700 font-medium">{item}</span>
                 </div>
               ))}
             </div>
@@ -388,7 +388,7 @@ export default function AdminJobDetailPage() {
         )}
 
         {/* Operator Workflow Progress */}
-        <div className="bg-slate-800/50 backdrop-blur-lg rounded-3xl border border-slate-700/50 p-6">
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6">
           <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <ClipboardCheck className="w-6 h-6 text-red-400" />
             Operator Workflow Progress
@@ -399,8 +399,8 @@ export default function AdminJobDetailPage() {
               <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="w-8 h-8 text-yellow-400" />
               </div>
-              <h4 className="text-xl font-semibold text-white mb-2">No Workflow Started</h4>
-              <p className="text-gray-400">No operator has started working on this job yet.</p>
+              <h4 className="text-xl font-semibold text-gray-900 mb-2">No Workflow Started</h4>
+              <p className="text-gray-500">No operator has started working on this job yet.</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -418,11 +418,11 @@ export default function AdminJobDetailPage() {
                         <h4 className="font-bold text-white text-lg">
                           {workflow.operator?.full_name || 'Unknown Operator'}
                         </h4>
-                        <p className="text-gray-400 text-sm">{workflow.operator?.email}</p>
+                        <p className="text-gray-500 text-sm">{workflow.operator?.email}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-gray-400 text-sm">Current Step</p>
+                      <p className="text-gray-500 text-sm">Current Step</p>
                       <p className="text-white font-semibold">{workflow.current_step?.replace('_', ' ').toUpperCase()}</p>
                     </div>
                   </div>
@@ -449,18 +449,18 @@ export default function AdminJobDetailPage() {
                               {isCompleted ? (
                                 <CheckCircle className="w-5 h-5 text-white" />
                               ) : (
-                                <StepIcon className="w-5 h-5 text-gray-400" />
+                                <StepIcon className="w-5 h-5 text-gray-500" />
                               )}
                             </div>
                             <span className={`text-xs font-semibold ${
-                              isCompleted ? 'text-green-400' : 'text-gray-400'
+                              isCompleted ? 'text-green-400' : 'text-gray-500'
                             }`}>
                               {step.label}
                             </span>
                           </div>
                           {/* Step Number Badge */}
                           <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                            isCompleted ? 'bg-green-500 text-white' : 'bg-slate-600 text-gray-300'
+                            isCompleted ? 'bg-green-500 text-white' : 'bg-slate-600 text-gray-700'
                           }`}>
                             {idx + 1}
                           </div>
@@ -470,7 +470,7 @@ export default function AdminJobDetailPage() {
                   </div>
 
                   {/* Timestamps */}
-                  <div className="mt-4 pt-4 border-t border-slate-600/50 flex justify-between text-sm text-gray-400">
+                  <div className="mt-4 pt-4 border-t border-slate-600/50 flex justify-between text-sm text-gray-500">
                     <span>Started: {new Date(workflow.created_at).toLocaleString()}</span>
                     <span>Last Update: {new Date(workflow.updated_at).toLocaleString()}</span>
                   </div>
