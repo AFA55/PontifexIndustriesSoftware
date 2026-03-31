@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS timecard_settings_v2 (
   auto_clock_out_hours numeric DEFAULT 16,
   break_duration_minutes integer DEFAULT 30,
   auto_deduct_break boolean DEFAULT true,
+  break_threshold_hours numeric(4,2) DEFAULT 6,
+  break_is_paid boolean DEFAULT false,
   round_to_nearest_minutes integer DEFAULT 15,
   week_start_day text DEFAULT 'monday' CHECK (week_start_day IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')),
   require_admin_approval boolean DEFAULT true,
@@ -158,7 +160,7 @@ CREATE TABLE IF NOT EXISTS timecard_gps_logs (
   latitude double precision NOT NULL,
   longitude double precision NOT NULL,
   accuracy double precision,
-  event_type text NOT NULL CHECK (event_type IN ('clock_in', 'clock_out', 'start_route', 'arrive_site', 'start_work', 'break_start', 'break_end', 'complete', 'periodic')),
+  event_type text NOT NULL CHECK (event_type IN ('clock_in', 'clock_out', 'start_route', 'arrive_site', 'start_work', 'complete', 'periodic')),
   job_order_id uuid,
   timestamp timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz DEFAULT now()

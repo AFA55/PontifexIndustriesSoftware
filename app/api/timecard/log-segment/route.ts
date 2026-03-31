@@ -1,6 +1,6 @@
 /**
  * POST /api/timecard/log-segment
- * Log a work segment (in_route, on_site, working, break, complete) to the
+ * Log a work segment (in_route, on_site, working, complete) to the
  * active timecard entry. Appends to the segments JSONB array and optionally
  * writes a GPS breadcrumb to timecard_gps_logs.
  */
@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 
-const VALID_SEGMENT_TYPES = ['in_route', 'on_site', 'working', 'break', 'complete'] as const;
+const VALID_SEGMENT_TYPES = ['in_route', 'on_site', 'working', 'complete'] as const;
 
 export async function POST(request: NextRequest) {
   try {

@@ -25,6 +25,10 @@ const DEFAULT_SETTINGS = {
   night_shift_start: 15,
   auto_clock_out: 0,
   shop_radius_meters: 6.1,
+  auto_deduct_break: true,
+  break_duration_minutes: 30,
+  break_threshold_hours: 6,
+  break_is_paid: false,
 };
 
 export async function GET(request: NextRequest) {
@@ -84,6 +88,8 @@ export async function PUT(request: NextRequest) {
       'require_nfc', 'require_gps', 'allow_remote',
       'overtime_threshold', 'night_shift_start',
       'auto_clock_out', 'shop_radius_meters',
+      'auto_deduct_break', 'break_duration_minutes',
+      'break_threshold_hours', 'break_is_paid',
     ];
 
     const updates: Record<string, unknown> = {};
