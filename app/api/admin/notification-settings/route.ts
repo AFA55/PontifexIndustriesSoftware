@@ -15,10 +15,15 @@ export async function GET(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
-    // Fetch settings (there should be one row per tenant, or a single global row)
-    let { data, error } = await supabaseAdmin
+    // Fetch settings scoped by tenant
+    const tenantId = auth.tenantId;
+    let query = supabaseAdmin
       .from('notification_settings')
-      .select('*')
+      .select('*');
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+    let { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -60,10 +65,13 @@ export async function PUT(request: NextRequest) {
       auto_timecard_approval_reminder,
     } = body;
 
-    // Check if a settings row already exists
-    const { data: existing } = await supabaseAdmin
+    // Check if a settings row already exists (scoped to tenant)
+    const tenantId = auth.tenantId;
+    let existingQuery = supabaseAdmin
       .from('notification_settings')
-      .select('id')
+      .select('id');
+    if (tenantId) existingQuery = existingQuery.eq('tenant_id', tenantId);
+    const { data: existing } = await existingQuery
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();

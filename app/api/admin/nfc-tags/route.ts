@@ -16,11 +16,15 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active') === 'true';
     const tagType = searchParams.get('type'); // shop | truck | jobsite
 
+    const tenantId = auth.tenantId;
+
     let query = supabaseAdmin
       .from('nfc_tags')
       .select('*')
       .order('created_at', { ascending: false });
 
+    // Scope to tenant
+    if (tenantId) query = query.eq('tenant_id', tenantId);
     if (activeOnly) query = query.eq('is_active', true);
     if (tagType) query = query.eq('tag_type', tagType);
 
@@ -87,6 +91,7 @@ export async function POST(request: NextRequest) {
         pontifex_nfc_id: pontifex_nfc_id || null,
         programmed_at: pontifex_nfc_id ? new Date().toISOString() : null,
         programmed_by: pontifex_nfc_id ? auth.userId : null,
+        tenant_id: auth.tenantId || null,
       })
       .select()
       .single();
@@ -132,10 +137,13 @@ export async function PATCH(request: NextRequest) {
       updates.programmed_by = auth.userId;
     }
 
-    const { data, error } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from('nfc_tags')
       .update(updates)
-      .eq('id', id)
+      .eq('id', id);
+    if (auth.tenantId) updateQuery = updateQuery.eq('tenant_id', auth.tenantId);
+
+    const { data, error } = await updateQuery
       .select()
       .single();
 

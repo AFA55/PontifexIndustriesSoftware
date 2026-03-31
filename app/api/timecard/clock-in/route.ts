@@ -43,6 +43,15 @@ export async function POST(request: NextRequest) {
       remote_photo_url,           // selfie URL for remote clock-in
     } = body;
 
+    // Validate clock_in_method to prevent injection of unexpected values
+    const VALID_CLOCK_METHODS = ['nfc', 'gps', 'remote'] as const;
+    if (!VALID_CLOCK_METHODS.includes(clock_in_method as any)) {
+      return NextResponse.json(
+        { error: 'Invalid clock_in_method. Must be nfc, gps, or remote.' },
+        { status: 400 }
+      );
+    }
+
     // Validation - location required for GPS and remote; optional for NFC
     const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
 
@@ -51,6 +60,51 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid location data. Latitude and longitude are required.' },
         { status: 400 }
       );
+    }
+
+    // --- Server-side bypass_nfc verification ---
+    // If NFC is required by settings but user is using GPS method, verify they have
+    // an admin-issued bypass notification (prevents manual URL param bypass)
+    if (clock_in_method === 'gps') {
+      try {
+        let settingsQuery = supabaseAdmin
+          .from('timecard_settings')
+          .select('require_nfc');
+        if (auth.tenantId) {
+          settingsQuery = settingsQuery.eq('tenant_id', auth.tenantId);
+        }
+        const { data: tcSettings } = await settingsQuery.limit(1).maybeSingle();
+
+        if (tcSettings?.require_nfc) {
+          // NFC is required — check for a valid bypass notification from an admin
+          const { data: bypassNotification } = await supabaseAdmin
+            .from('notifications')
+            .select('id')
+            .eq('user_id', auth.userId)
+            .eq('bypass_nfc', true)
+            .eq('is_read', false)
+            .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+            .limit(1)
+            .maybeSingle();
+
+          if (!bypassNotification) {
+            return NextResponse.json(
+              { error: 'NFC scan is required to clock in. If you cannot use NFC, ask your supervisor for a bypass.' },
+              { status: 403 }
+            );
+          }
+
+          // Mark the bypass notification as read (single-use)
+          Promise.resolve(
+            supabaseAdmin
+              .from('notifications')
+              .update({ is_read: true, read: true, updated_at: new Date().toISOString() })
+              .eq('id', bypassNotification.id)
+          ).catch(() => {});
+        }
+      } catch {
+        // If settings table doesn't exist, NFC is not required
+      }
     }
 
     // -- Method-specific validation --
@@ -185,7 +239,7 @@ export async function POST(request: NextRequest) {
       }
       console.error('Error creating timecard:', insertError);
       return NextResponse.json(
-        { error: 'Failed to clock in', details: insertError.message },
+        { error: 'Failed to clock in' },
         { status: 500 }
       );
     }
@@ -201,9 +255,6 @@ export async function POST(request: NextRequest) {
       : { isWithinRange: false, distance: 0, distanceFormatted: 'N/A' };
 
     console.log(`Clock in: ${profile?.full_name || user.email} at ${now.toLocaleTimeString()} [${flags.join(', ')}]`);
-    if (hasLocation) {
-      console.log(`Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (${locationCheck.distanceFormatted} from shop)`);
-    }
 
     return NextResponse.json(
       {
@@ -232,7 +283,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Unexpected error in clock-in route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

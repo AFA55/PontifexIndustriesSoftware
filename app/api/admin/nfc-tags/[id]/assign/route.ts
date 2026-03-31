@@ -22,12 +22,14 @@ export async function POST(
     const body = await request.json();
     const { operator_id } = body;
 
-    // Fetch the tag
-    const { data: tag, error: fetchError } = await supabaseAdmin
+    // Fetch the tag (scoped to tenant)
+    let fetchQuery = supabaseAdmin
       .from('nfc_tags')
       .select('id, label, tag_uid, operator_id, is_active')
-      .eq('id', tagId)
-      .maybeSingle();
+      .eq('id', tagId);
+    if (auth.tenantId) fetchQuery = fetchQuery.eq('tenant_id', auth.tenantId);
+
+    const { data: tag, error: fetchError } = await fetchQuery.maybeSingle();
 
     if (fetchError || !tag) {
       return NextResponse.json({ error: 'NFC tag not found' }, { status: 404 });

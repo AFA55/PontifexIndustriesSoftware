@@ -103,7 +103,19 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/** Escape HTML special characters to prevent XSS in email templates */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function generateClockInReminderEmail(name: string, actionUrl: string): string {
+  const safeName = escapeHtml(name);
+  const safeActionUrl = encodeURI(actionUrl);
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -125,7 +137,7 @@ function generateClockInReminderEmail(name: string, actionUrl: string): string {
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi <strong>${name}</strong>,</p>
+              <p style="margin: 0 0 16px; color: #475569; font-size: 16px;">Hi <strong>${safeName}</strong>,</p>
               <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">
                 Our records show you have not clocked in yet today. Please clock in as soon as possible to ensure your hours are accurately recorded.
               </p>
@@ -137,7 +149,7 @@ function generateClockInReminderEmail(name: string, actionUrl: string): string {
               <table role="presentation" style="width: 100%; margin: 0 0 32px;">
                 <tr>
                   <td style="text-align: center;">
-                    <a href="${actionUrl}" style="display: inline-block; padding: 16px 48px; background-color: #dc2626; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Clock In Now</a>
+                    <a href="${safeActionUrl}" style="display: inline-block; padding: 16px 48px; background-color: #dc2626; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Clock In Now</a>
                   </td>
                 </tr>
               </table>

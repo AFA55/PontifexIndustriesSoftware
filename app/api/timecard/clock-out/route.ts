@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error('Error updating timecard:', updateError);
       return NextResponse.json(
-        { error: 'Failed to clock out', details: updateError.message },
+        { error: 'Failed to clock out' },
         { status: 500 }
       );
     }
@@ -283,9 +283,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    console.log(`✅ User ${profile?.full_name || user.email} clocked out at ${now.toLocaleTimeString()}`);
-    console.log(`⏰ Total hours this entry: ${totalHours.toFixed(2)}`);
-    console.log(`📍 Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (${locationCheck.distanceFormatted} from shop)`);
+    console.log(`Clock out: ${profile?.full_name || user.email} at ${now.toLocaleTimeString()}, ${totalHours.toFixed(2)} hrs`);
 
     return NextResponse.json(
       {
@@ -313,7 +311,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Unexpected error in clock-out route:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
