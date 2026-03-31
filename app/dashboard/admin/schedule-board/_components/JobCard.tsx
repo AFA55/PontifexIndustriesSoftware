@@ -27,6 +27,7 @@ export interface JobCardData {
   loading_started_at?: string | null;
   route_started_at?: string | null;
   done_for_day_at?: string | null;
+  overall_pct?: number | null; // scope progress 0-100
 }
 
 function getStatusColor(job: JobCardData): { border: string; dot: string; bg: string } {
@@ -252,6 +253,30 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
             </span>
           )}
         </div>
+
+        {/* Scope progress bar — only shown when overall_pct is set */}
+        {job.overall_pct != null && (
+          <div className="mt-3 pt-2.5 border-t border-gray-100">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-400">Scope progress</span>
+              <span className={`text-xs font-semibold tabular-nums ${
+                job.overall_pct >= 75 ? 'text-green-600' :
+                job.overall_pct >= 25 ? 'text-amber-600' : 'text-red-500'
+              }`}>
+                {job.overall_pct}%
+              </span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-1.5">
+              <div
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  job.overall_pct >= 75 ? 'bg-green-500' :
+                  job.overall_pct >= 25 ? 'bg-amber-400' : 'bg-red-400'
+                }`}
+                style={{ width: `${job.overall_pct}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
