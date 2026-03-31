@@ -1,270 +1,179 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** March 23, 2026 | **Branch:** `claude/mystifying-diffie` | **Build Status:** PASSING ✅
+**Date:** March 31, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅
 
 ---
 
 ## CURRENT STATE
 
 ### Git Status
-- **Branch:** `claude/mystifying-diffie` (worktree off `feature/schedule-board-v2`)
-- **Last commit:** `7a786904` — "fix: Remove setInterval from middleware for Vercel Edge Runtime compatibility"
-- **Clean working tree** (all changes committed and pushed)
-- **Remote:** `origin/claude/mystifying-diffie` — up to date
+- **Branch:** `feature/schedule-board-v2`
+- **Last commit:** `664b0151` — "merge: security audit fixes from worktree"
+- **All worktree branches merged** — no pending merges
+- **Build:** PASSING (0 errors)
 
-### Recent Commits (March 23 — this session)
+### Recent Commits (March 31 — this session)
 ```
-7a786904 fix: Remove setInterval from middleware for Vercel Edge Runtime compatibility
-189a4a95 fix: Frontend QA — login roles, work items from DB, camera policy, nav fixes
-061d3c70 fix: QA audit — 4 critical + 6 high priority security and data fixes
-081d70af feat: Professional dashboard command center — compact UI, settings panel, notes/tasks/messages/calendar widgets
-23e62466 feat: Modules/Analytics toggle on admin dashboard
-3fe8cdc1 feat: 7-day operator crew schedule grid with color-coded availability
-b75b8e1f fix: Align analytics dashboard UI with platform design system
-ac57d354 fix: Rewrite dashboard-stats API to match widget data shapes
-a42b5261 feat: Professional analytics dashboard with drag-and-drop widgets, charts, and commission tracking
-ceb8d3c3 feat: Legal compliance — Privacy Policy, Terms, E-Sign consent, GPS consent
-```
-
-### Previous Commits (March 22)
-```
-990e9339 feat: Production deployment prep — env template, security headers, image optimization
-d31f016f feat: White-label rebrand — Pontifex Industries → Patriot Concrete Cutting
-c9251b90 fix: E2E workflow critical fixes — invoice rates, work item persistence, photo uploads
+664b0151 merge: security audit fixes from worktree
+946005c9 security: comprehensive audit fixes — NFC bypass, XSS, tenant isolation, data exposure
+3ab02db5 merge: operator detail, team payroll, notifications from worktree
+af86e0e5 feat: operator timecard detail, team payroll overview, notification system with reminders
+118d76d4 feat: configurable auto break deduction — remove break segment, add paid/unpaid lunch settings
+8e6c3a67 merge: timecard system overhaul from worktree — DB, API, UI, NFC, GPS, settings
+de2cc50a feat: comprehensive timecard system overhaul — DB schema, API routes, UI, NFC, GPS, settings
+81c1688c fix: resolve [id] vs [userId] dynamic route conflict in timecards API
+4604ab88 fix: restore all 230 files from feature/schedule-board-v2
+3b8869ed merge: restore claude/mystifying-diffie — analytics, NFC, schedule board, operator profiles
+823572af merge: restore claude/compassionate-germain — security audit fixes
+03891a59 feat: add multi-step Request Demo funnel with API and migration
 ```
 
 ---
 
-## WHAT WAS DONE (March 23 Session)
+## WHAT WAS DONE (March 31 Session)
 
-### 1. Professional Analytics Dashboard (20 Widgets)
-Complete dashboard command center with customizable drag-and-drop widgets:
+### 1. Branch Recovery & Consolidation
+- Merged 4 unmerged worktree branches back into feature/schedule-board-v2:
+  - `claude/mystifying-diffie` (25 commits — dashboard, analytics, NFC, QA, rebrand, legal)
+  - `claude/compassionate-germain` (security audit)
+  - `claude/confident-nobel` (operator tenant filtering)
+  - `claude/goofy-shockley` (deployment migrations)
+- Restored 230+ files that were missing from the working branch
+- Fixed route conflicts ([id] vs [userId] in timecards API)
 
-**Financial widgets (6):** Revenue Overview (LineChart), Financial Summary (BarChart), Top Customers (horizontal bars), Commission (salesman), Pipeline (stacked bar), Invoice Summary (PieChart)
+### 2. Login & Auth Fixes
+- Fixed super_admin login — was returning "Invalid user role" (only recognized admin/operator)
+- Now supports all 8 roles with correct redirect routing
+- Removed auto-redirect on /company page (no more localStorage bypass)
+- Company code `PATRIOT` works correctly
 
-**Operations widgets (8):** Job Status (donut), Schedule Preview (table), Active Crews (status cards), Top Operators (leaderboard), System Health (status dots), Completion Rate (donut), My Jobs (salesman), Crew Utilization (SVG ring)
+### 3. Dashboard & RBAC Fixes
+- Fixed admin role RBAC — Schedule Board, Schedule Form, Team Management etc. now `full` access (were `view`/`none`)
+- Fixed header branding fallback — no longer shows "Concrete Cutting Platform"
+- Login page shows all 3 demo accounts (Operator, Team Member, Admin)
 
-**Communication widgets (3):** Recent Activity (timeline), Team Messages (chat with channels), Notifications Feed (alerts)
+### 4. Request Demo Funnel (NEW)
+- `/request-demo` — 3-step conversion funnel (company type → team size/challenges → contact info)
+- `/api/demo-requests` — API to save submissions
+- `demo_requests` table with migration
+- Landing page updated with "Request a Demo" CTA in hero, nav, and footer
 
-**Personal widgets (3):** Quick Notes (color-coded sticky notes), My Tasks (todo checklist with priorities), Mini Calendar (monthly grid with job dots)
+### 5. Comprehensive Timecard System Overhaul
+**Database (migration: 20260330_timecard_system_v2.sql):**
+- New tables: `timecard_entries`, `timecard_weeks`, `timecard_settings_v2`, `timecard_gps_logs`
+- Enhanced `timecards` with segments JSONB, GPS, NFC, entry_type, admin notes
+- Enhanced `nfc_tags` with assigned_to, status enum, tag_type
+- JWT metadata RLS, 16 indexes, auto-update triggers
+- Default settings seeded for Patriot tenant
 
-**Infrastructure:**
-- 3 new API routes: `/api/admin/dashboard-stats`, `/api/admin/dashboard-layout`, `/api/admin/commission`
-- 3 new API routes: `/api/admin/dashboard-notes`, `/api/admin/dashboard-tasks`, `/api/admin/team-messages`
-- DB tables: `dashboard_layouts`, `dashboard_notes`, `dashboard_tasks`, `team_messages` (all with RLS)
-- Settings panel with Widgets/Presets/Appearance tabs
-- Layout saved per user, 60s auto-refresh, role-based widget visibility
-- 3 layout presets: Operations Manager, Salesman, Billing & Finance
+**API Routes (19 timecard + 5 notification routes):**
+- Clock in/out with NFC + GPS validation
+- Segment logging: in_route → on_site → working → complete (no break)
+- My entries, time-off requests
+- Admin: list/detail/approve/reject/update timecards
+- Team summary with per-employee weekly breakdown
+- Operator detail with segments, GPS, coworkers, notes
+- Timecard settings GET/PUT (OT, breaks, NFC/GPS requirements)
+- NFC tag program/assign/deactivate
+- Export: PDF and CSV
+- Notification send, send-reminder, mark-read, settings
 
-### 2. Legal Compliance Pages
-- Privacy Policy page (`/privacy`) with OSHA, TCPA, GPS tracking disclosures
-- Terms of Service page (`/terms`) with data retention, liability, compliance terms
-- E-Sign consent checkbox component on job completion flow
-- GPS tracking consent during operator onboarding
+**UI Pages:**
+- `/dashboard/admin/timecards` — Team payroll overview with Mon-Sun grid, batch approve, export
+- `/dashboard/admin/timecards/operator/[id]` — Individual weekly breakdown, segments, GPS, notes
+- `/dashboard/admin/settings/timecard` — Configurable settings (hours, OT, breaks, NFC, GPS)
+- `/dashboard/admin/settings/nfc-tags` — Program, assign, deactivate NFC tags
+- `/dashboard/admin/notifications` — Send notifications, auto-settings, sent history
+- `/dashboard/timecard` — Operator clock in/out, week grid, segment timeline, NFC bypass
+- `/dashboard/notifications` — Operator notification inbox
+- `/nfc-clock` — Kiosk-style NFC clock-in page
+- NotificationBell component on admin + operator dashboards
 
-### 3. Comprehensive QA Audit (3 parallel agents)
-**Database audit (76 tables):** All 14 core tables verified, 64/64 RLS enabled, 271 indexes, 82 FK constraints, 12 views
+### 6. Configurable Break Deduction
+- Auto-deduct lunch break (default 30 min after 6 hrs)
+- Configurable: enable/disable, duration, threshold hours, paid/unpaid
+- Clock-out logic auto-applies based on tenant settings
 
-**API route audit (30+ routes):**
-- Fixed 4 CRITICAL: photo endpoint auth missing, DELETE role check excluded super_admin, photo race condition
-- Fixed 6 HIGH: admin job-orders role checks too restrictive, invoice number collision, isTableNotFoundError too broad
-- 8 MEDIUM noted (perf, non-blocking)
+### 7. Security Audit (Comprehensive)
+**Critical fixes:**
+- Server-side NFC bypass verification (single-use admin-issued tokens)
+- Cross-tenant NFC tag data leakage — added tenant_id scoping
+- XSS in notification email templates — added escapeHtml()
 
-**Frontend audit (75+ pages, 21 widgets):**
-- Fixed CRITICAL: login rejected shop_manager/inventory_manager/supervisor roles
-- Fixed HIGH: completed-jobs page read work items from localStorage (admin doesn't have it) → now reads from DB
-- Fixed: system-health back button went to /dashboard instead of /dashboard/admin
-- Fixed: camera permission policy blocked PhotoUploader on mobile
+**High/Medium fixes:**
+- Removed sensitive data from error responses
+- Removed GPS coordinate console logging
+- Capped unbounded limit at 500
+- Added clock_in_method validation whitelist
+- Fixed export auth bypass (fetch+blob instead of window.open)
+- Added tenant scoping to export, remote-verify, notification-settings
 
-### 4. Vercel Deployment Prep
-- Fixed middleware `setInterval` → lazy cleanup (Edge Runtime compatible)
-- Verified all env vars documented in `.env.example`
-- No hardcoded localhost URLs (all use `process.env` with fallbacks)
-- next.config.js verified Vercel-compatible
-- Build passes cleanly with 0 errors
-
-### 5. Admin Dashboard Toggle
-- Modules/Analytics view toggle on `/dashboard/admin`
-- Toggle between card grid (module access) and analytics dashboard (charts/widgets)
-
-### 6. Crew Schedule Grid
-- 7-day operator schedule grid on schedule board
-- Color-coded availability (green=available, blue=scheduled, purple=multi-job)
-
----
-
-## SPRINT STATUS (Target: April 2, 2026)
-
-### Week 1 — Core Features ✅ COMPLETE
-- [x] Dispatch ticket PDF generation
-- [x] Customer signature capture in job completion flow
-- [x] Photo upload during job execution
-- [x] PDF invoice generation
-
-### Week 2 — Polish & Launch ✅ COMPLETE
-- [x] Mobile responsive audit
-- [x] Loading states & error handling audit
-- [x] Global error handling + crash prevention
-- [x] System health monitoring dashboard
-- [x] SaaS multi-tenant foundation + backup system
-- [x] Apply all pending migrations
-- [x] E2E workflow audit + critical fixes
-- [x] White-label rebrand (Pontifex → Patriot, 52 files)
-- [x] Production deployment prep (.env.example, security headers)
-- [x] Comprehensive QA audit (DB + API + Frontend)
-- [x] Vercel deployment readiness verified
-
-### Bonus Features Built (Ahead of Schedule)
-- [x] AI Auto-Scheduling Engine
-- [x] AI Smart Fill (voice/text NLP)
-- [x] Customer CRM system with autocomplete
-- [x] Drag-and-drop schedule board
-- [x] Professional analytics dashboard (20 customizable widgets)
-- [x] Personal notes, tasks, team messages widgets
-- [x] Commission tracking system
-- [x] Legal compliance (Privacy Policy, Terms, E-Sign consent, GPS consent)
-- [x] Crew schedule grid (7-day operator availability)
-- [x] White-label branding system
-- [x] Global notification system + network monitoring
-- [x] Multi-tenant SaaS foundation
+**Database fixes:**
+- Added missing notification indexes
+- Seeded default notification_settings
+- Removed duplicate indexes
 
 ---
 
-## WHAT TO DO NEXT
+## FEATURE STATUS
 
-### Immediate Priority
-1. **Deploy to Vercel** — connect repo, set env vars, deploy
-2. **Add favicon.ico + og-image.jpg** to `/public/` (missing, causes 404s)
-3. **Update Supabase Auth settings** — add Vercel URL to Site URL + Redirect URLs
-4. **Test with real users** — create production accounts, run E2E workflow
+### Complete ✅
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Multi-tenant architecture | ✅ | Company code login, tenant_id on all tables |
+| White-label branding | ✅ | Tenant branding context, debranded defaults |
+| Schedule Board | ✅ | All operators view, time-off, editing, crew grid, notifications |
+| Schedule Form | ✅ | Customer-first flow, project name, facility compliance |
+| Timecard System | ✅ | Full clock in/out, NFC, GPS, segments, approval workflow |
+| Timecard Settings | ✅ | OT thresholds, break deduction, NFC/GPS requirements |
+| NFC Management | ✅ | Program, assign, deactivate, verify tags |
+| Notification System | ✅ | In-app + email, auto-reminders, NFC bypass, bell component |
+| Analytics Dashboard | ✅ | 20 widgets, drag-and-drop, charts, commission tracking |
+| Billing & Invoicing | ✅ | Create, send, remind, payment tracking, QuickBooks CSV |
+| Customer Management | ✅ | COD payment, contacts, billing dashboard |
+| Operator Workflow | ✅ | My jobs → jobsite → work-performed → complete |
+| Facilities & Badges | ✅ | Facility CRUD, badge tracking, auto-expiration |
+| Approval Workflow | ✅ | Reject/approve/resubmit, form history |
+| Customer Portal | ✅ | Public signature page, form builder |
+| Legal Compliance | ✅ | Privacy policy, terms, e-sign consent, GPS consent |
+| Landing Page | ✅ | Product showcase with comparison table |
+| Request Demo Funnel | ✅ | 3-step funnel with API |
+| Security Audit | ✅ | NFC bypass, XSS, tenant isolation, data exposure fixes |
 
-### Nice-to-Have (If Time Allows)
-- Stripe payment links on invoices
-- Schedule board performance optimization for large datasets
-- Notification system polish (SMS/email for job assignments)
-- SOC 2 readiness (see compliance report)
-
-### Compliance Priorities (Before Production Use)
-1. TCPA-compliant SMS opt-in/opt-out flow
-2. GPS tracking consent per state (CA requires work-hours-only tracking)
-3. 30-year data retention architecture for OSHA silica records
-4. Digital signature metadata capture (IP, timestamp, GPS, device)
-5. Tech E&O insurance
-
----
-
-## UNAPPLIED MIGRATIONS
-None — all migrations applied to Supabase.
-
----
-
-## KEY PATTERNS & CONVENTIONS
-
-### Authentication
-- **Token retrieval**: Always `supabase.auth.getSession()` — NEVER localStorage for tokens
-- **API auth**: `requireAdmin()` / `requireSuperAdmin()` / `requireAuth()` from `lib/api-auth.ts`
-- **Client guard**: `getCurrentUser()` from `lib/auth.ts` with role array checks in useEffect
-- **Schedule board access**: `requireScheduleBoardAccess()` — admin, super_admin, salesman, ops_manager, supervisor
-
-### UI/Styling
-- Purple/dark theme with Tailwind CSS
-- lucide-react icons throughout
-- Input fields: always `text-gray-900 bg-white`
-- Cards: `bg-white rounded-xl border border-gray-200 p-5` (analytics uses rounded-xl not rounded-2xl)
-- Mobile-first responsive design
-
-### Data
-- **Branding**: `useBranding()` hook for dynamic company name/colors
-- **Notifications**: `useNotifications()` hook for toast messages
-- **API calls**: `useApi()` hook or manual fetch with bearer token
-- **PDFs**: Server-side only with @react-pdf/renderer
-- **Photos**: PhotoUploader → Supabase Storage `job-photos` bucket
-- **Signatures**: Upload to Storage as PNG, fallback to base64
-- **Fire-and-forget logging**: `Promise.resolve(supabaseAdmin.from(...).insert(...)).then(...).catch(() => {})`
-
-### Response Format
-```
-Success: { success: true, data: {...} }
-Error: { error: 'message' } with HTTP status 4xx/5xx
-```
-
-### Roles (priority order)
-super_admin > operations_manager > admin > salesman > supervisor > shop_manager > inventory_manager > operator > apprentice
+### Remaining — Week 2 Sprint
+- [ ] White-label rebrand: logos/colors specific to Patriot (visual assets)
+- [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
+- [ ] Mobile responsive audit on all operator pages
+- [ ] Loading states & error handling audit across remaining pages
+- [ ] Production deployment prep (env vars, custom domain, SSL)
+- [ ] Final build verification & merge to main
 
 ---
 
-## FILE STRUCTURE REFERENCE
+## KEY ARCHITECTURE
 
-### Root Layout Provider Stack
-```
-ThemeProvider > BrandingProvider > NotificationProvider > ErrorBoundary > NetworkMonitor > GoogleMapsProvider > App
-```
+### Timecard Flow
+1. Operator opens `/dashboard/timecard` → clicks Clock In
+2. If NFC required: scan badge → verify against DB → clock in with GPS
+3. If GPS only: capture location → clock in
+4. During shift: log segments (in_route → on_site → working → complete) with GPS
+5. Clock out: capture GPS, calculate hours, auto-deduct break if applicable
+6. Admin reviews on `/dashboard/admin/timecards` → approve/reject per entry or week
+7. Export to PDF/CSV for payroll
 
-### Analytics Dashboard Structure
-```
-app/dashboard/admin/analytics/
-  page.tsx                          — Main analytics page
-  _components/
-    AnalyticsDashboardContent.tsx    — Core dashboard with grid layout
-    DashboardHeader.tsx              — Sticky header with time range + controls
-    DashboardSettingsPanel.tsx       — Slide-out settings drawer (3 tabs)
-    KPIRow.tsx                       — Revenue/Jobs/Completion/Crews KPI bar
-    WidgetWrapper.tsx                — Card wrapper with drag handle
-    WidgetRegistry.ts                — 20 widget entries with metadata
-    LayoutPresets.ts                 — 3 preset layouts
-    AddWidgetModal.tsx               — Widget picker modal
-    TimeRangeSelector.tsx            — Daily/Weekly/Monthly toggle
-    types.ts                         — TimeRange, WidgetProps, WidgetConfig
-    widgets/
-      RevenueOverviewWidget.tsx      — LineChart + 3 KPIs
-      JobStatusWidget.tsx            — Donut PieChart by status
-      SchedulePreviewWidget.tsx      — Today's jobs table
-      ActiveCrewsWidget.tsx          — 4 status boxes
-      FinancialSummaryWidget.tsx     — Monthly revenue BarChart
-      TopOperatorsWidget.tsx         — Leaderboard with progress bars
-      CustomerOverviewWidget.tsx     — Horizontal BarChart
-      SystemHealthWidget.tsx         — Service status dots
-      RecentActivityWidget.tsx       — Timeline with icons
-      CompletionRateWidget.tsx       — Donut with center %
-      CommissionWidget.tsx           — Commission KPIs + BarChart
-      MyJobsWidget.tsx               — PieChart + recent jobs table
-      PipelineWidget.tsx             — Stacked horizontal bar
-      InvoiceSummaryWidget.tsx       — Invoice status PieChart
-      QuickNotesWidget.tsx           — Color-coded sticky notes (self-managed)
-      MyTasksWidget.tsx              — Todo checklist (self-managed)
-      TeamMessagesWidget.tsx         — Chat with channels (self-managed)
-      MiniCalendarWidget.tsx         — Monthly calendar with job dots
-      NotificationsFeedWidget.tsx    — Alerts timeline
-      CrewUtilizationWidget.tsx      — SVG ring chart
-      LoadingSkeleton.tsx            — Shared loading states
-```
+### Notification Flow
+1. Admin sends reminder from `/dashboard/admin/notifications`
+2. Creates notification record + optional email
+3. Operator sees bell badge + notification in inbox
+4. Clock-in reminders include NFC bypass link (server-verified, single-use)
 
-### New API Routes (this session)
-```
-/api/admin/dashboard-stats     — Aggregated stats with role filtering
-/api/admin/dashboard-layout    — User layout persistence (GET/PUT)
-/api/admin/dashboard-notes     — Personal notes CRUD
-/api/admin/dashboard-tasks     — Personal tasks CRUD
-/api/admin/team-messages       — Team chat messages CRUD
-/api/admin/commission          — Commission rate + earnings (GET/PATCH)
-```
+### Database Tables (90+)
+Key timecard tables: `timecards`, `timecard_entries`, `timecard_weeks`, `timecard_settings_v2`, `timecard_gps_logs`, `nfc_tags`, `notifications`, `notification_settings`
 
-### Database (76 tables, 12 views)
-- Project ref: `klatddoyncxidgqtcjnu`
-- All 76 tables have RLS enabled
-- 271 indexes across all tables
-- Key new tables: `dashboard_layouts`, `dashboard_notes`, `dashboard_tasks`, `team_messages`
+---
 
-### Environment Variables (11 required for deployment)
-```
-NEXT_PUBLIC_SUPABASE_URL          — Supabase project URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY     — Supabase anon key
-SUPABASE_SERVICE_ROLE_KEY         — Supabase service role key (server-side)
-NEXT_PUBLIC_APP_URL               — Production app URL
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY   — Google Maps for GPS/routing
-RESEND_API_KEY                    — Email sending
-RESEND_FROM_EMAIL                 — From address for emails
-TWILIO_ACCOUNT_SID                — (optional) SMS
-TWILIO_AUTH_TOKEN                 — (optional) SMS
-TWILIO_PHONE_NUMBER               — (optional) SMS
-NEXT_PUBLIC_BYPASS_LOCATION_CHECK — (optional) GPS bypass for testing
-```
+## NEXT SESSION PRIORITIES
+1. End-to-end testing of full operator workflow
+2. Mobile responsive audit
+3. Patriot-specific visual branding (logos, colors)
+4. Production deployment prep
+5. Merge to main

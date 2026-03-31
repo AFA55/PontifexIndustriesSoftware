@@ -42,7 +42,8 @@ Next.js 15 (App Router) + React 19 + TypeScript + Supabase (PostgreSQL) + Tailwi
 
 ## Database
 - Supabase project: `klatddoyncxidgqtcjnu`
-- 58+ migrations in `supabase/migrations/`
+- 70+ migrations in `supabase/migrations/`
+- 90+ tables in production
 - All tables have RLS enabled
 - New tables should use JWT metadata for RLS: `auth.jwt() -> 'user_metadata' ->> 'role'`
 
@@ -84,16 +85,33 @@ npm run build      # Production build check (must pass with 0 errors)
 - [x] Customer portal: public signature page, form builder, surveys
 - [x] Work-performed gate: block completion without logging work
 
-### Week 2 — Polish, Rebrand & Launch Prep (March 26 – April 2)
-- [ ] White-label rebrand: Pontifex → Patriot Concrete Cutting (logos, names, colors)
+### Sessions 7-8 — Multi-Tenant & Landing (March 28-29) ✅ COMPLETE
+- [x] Multi-tenant architecture (tenant_id on all tables, company code login)
+- [x] White-label branding system (tenant_branding, BrandingProvider)
+- [x] Debranded all hardcoded Pontifex references
+- [x] Landing page rebuild as product showcase
+- [x] Request Demo funnel (3-step with API)
+
+### Session 9 — Timecard System & Security (March 31) ✅ COMPLETE
+- [x] Timecard system overhaul (DB, API, UI, NFC, GPS, segments)
+- [x] Configurable break deduction (auto-deduct, paid/unpaid, threshold)
+- [x] Operator timecard detail view (segments, GPS, coworkers, notes)
+- [x] Team payroll overview (Mon-Sun grid, batch approve, export)
+- [x] Notification system (in-app + email, auto-reminders, NFC bypass)
+- [x] NotificationBell on admin + operator dashboards
+- [x] Comprehensive security audit (NFC bypass, XSS, tenant isolation)
+- [x] Database audit (indexes, RLS, seeded defaults)
+- [x] Restored all 230+ files from unmerged worktree branches
+- [x] Fixed login (all 8 roles), RBAC (admin full access), dashboard branding
+
+### Week 2 — Final Polish & Launch (April 1-2)
 - [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
 - [ ] Mobile responsive audit on all operator pages
-- [ ] Loading states & error handling audit across all pages
+- [ ] Loading states & error handling audit across remaining pages
+- [ ] Patriot-specific visual assets (logos, custom colors)
 - [ ] Production deployment prep (env vars, custom domain, SSL)
 - [ ] Final build verification & merge to main
 
 ### Ongoing / As-Needed
-- [ ] Add audit logging to remaining admin API routes
-- [ ] Schedule board performance optimization
-- [ ] Notification system polish (SMS/email for job assignments)
 - [ ] SMS integration for signature request delivery
+- [ ] Schedule board performance optimization
