@@ -19,6 +19,7 @@ import {
   Plus,
   FileText,
   CreditCard,
+  UserCircle2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
@@ -171,6 +172,30 @@ export default function AdminDashboard() {
   const [dashData, setDashData] = useState<DashboardData | null>(null);
   const [dashLoading, setDashLoading] = useState(true);
 
+  // ── scope toggle (personal / team) ────────────────────────────────────────
+  const [scope, setScope] = useState<'personal' | 'team'>('personal');
+
+  // Initialise scope from localStorage once user is known
+  useEffect(() => {
+    if (!user) return;
+    const isSenior = user.role === 'super_admin' || user.role === 'operations_manager';
+    const saved = localStorage.getItem('admin-dashboard-scope') as 'personal' | 'team' | null;
+    if (saved === 'personal' || saved === 'team') {
+      setScope(saved);
+    } else {
+      // super_admin / ops_manager default to team; everyone else personal
+      setScope(isSenior ? 'team' : 'personal');
+    }
+  }, [user]);
+
+  const handleScopeChange = (s: 'personal' | 'team') => {
+    setScope(s);
+    localStorage.setItem('admin-dashboard-scope', s);
+    // Trigger a fresh fetch with the new scope
+    setDashLoading(true);
+    setDashData(null);
+  };
+
   // ── auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -205,11 +230,13 @@ export default function AdminDashboard() {
     if (!user) return;
 
     const fetchDash = async () => {
+      setDashLoading(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        const res = await fetch('/api/admin/dashboard-summary', {
+        const params = new URLSearchParams({ scope });
+        const res = await fetch(`/api/admin/dashboard-summary?${params}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
 
@@ -225,7 +252,7 @@ export default function AdminDashboard() {
     };
 
     fetchDash();
-  }, [user]);
+  }, [user, scope]);
 
   // ── onboarding ────────────────────────────────────────────────────────────
   const checkOnboardingStatus = async (userId: string) => {
@@ -274,15 +301,84 @@ export default function AdminDashboard() {
     day: 'numeric',
   });
 
+  // In personal scope, exclude unassigned_jobs from the open-items total
   const openItemsTotal = dashData
-    ? dashData.open_items.pending_timecards +
-      dashData.open_items.unassigned_jobs +
-      dashData.open_items.overdue_invoices
+    ? scope === 'personal'
+      ? dashData.open_items.pending_timecards +
+        dashData.open_items.overdue_invoices
+      : dashData.open_items.pending_timecards +
+        dashData.open_items.unassigned_jobs +
+        dashData.open_items.overdue_invoices
     : 0;
+
+  const isSeniorRole = user?.role === 'super_admin' || user?.role === 'operations_manager';
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-full">
+
+      {/* ── Scope toggle header ───────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {scope === 'personal' ? 'Your Dashboard' : 'Team Dashboard'}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {scope === 'personal'
+              ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+              : `All operators · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
+            }
+          </p>
+        </div>
+
+        {/* Toggle — senior roles only */}
+        {isSeniorRole && (
+          <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+            <button
+              onClick={() => handleScopeChange('personal')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                scope === 'personal'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <UserCircle2 className="w-4 h-4" />
+              My View
+            </button>
+            <button
+              onClick={() => handleScopeChange('team')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                scope === 'team'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Team View
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Personal identity banner (personal scope only) ────────────────── */}
+      {scope === 'personal' && (
+        <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl px-4 py-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+            {user?.name?.charAt(0) || '?'}
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
+            <p className="text-xs text-gray-500 capitalize">
+              {user?.role?.replace(/_/g, ' ')} · Viewing your personal metrics
+            </p>
+          </div>
+          <div className="ml-auto">
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+              Personal View
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── KPI Row ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -303,7 +399,9 @@ export default function AdminDashboard() {
           ) : (
             <p className="text-4xl font-bold text-gray-900">{dashData?.jobs_today.count ?? 0}</p>
           )}
-          <p className="text-sm text-gray-500 mt-1">Jobs Today</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {scope === 'personal' ? 'Your Jobs Today' : 'Jobs Today'}
+          </p>
         </Link>
 
         {/* Revenue MTD */}
@@ -336,7 +434,9 @@ export default function AdminDashboard() {
               {formatCurrency(dashData?.revenue_mtd.total ?? 0)}
             </p>
           )}
-          <p className="text-sm text-gray-500 mt-1">Revenue MTD</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {scope === 'personal' ? 'Your Revenue MTD' : 'Revenue MTD'}
+          </p>
         </div>
 
         {/* Open Items */}
@@ -354,31 +454,51 @@ export default function AdminDashboard() {
           ) : (
             <p className="text-4xl font-bold text-gray-900">{openItemsTotal}</p>
           )}
-          <p className="text-sm text-gray-500 mt-1">Open Items</p>
-        </div>
-
-        {/* Crew Utilization */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-              <Users className="w-5 h-5 text-purple-600" />
-            </div>
-          </div>
-          {dashLoading ? (
-            <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
-          ) : (
-            <p className="text-4xl font-bold text-gray-900">
-              {dashData?.crew_utilization.pct ?? 0}%
-            </p>
-          )}
           <p className="text-sm text-gray-500 mt-1">
-            {dashLoading ? (
-              <span className="inline-block animate-pulse bg-gray-200 rounded h-3 w-20" />
-            ) : (
-              `${dashData?.crew_utilization.active ?? 0} of ${dashData?.crew_utilization.total ?? 0} active`
-            )}
+            {scope === 'personal' ? 'Your Open Items' : 'Open Items'}
           </p>
         </div>
+
+        {/* Crew Utilization (team) / Your Active Jobs (personal) */}
+        {scope === 'personal' ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-purple-600" />
+              </div>
+            </div>
+            {dashLoading ? (
+              <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
+            ) : (
+              <p className="text-4xl font-bold text-gray-900">
+                {dashData?.jobs_today.count ?? 0}
+              </p>
+            )}
+            <p className="text-sm text-gray-500 mt-1">Your Active Jobs</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                <Users className="w-5 h-5 text-purple-600" />
+              </div>
+            </div>
+            {dashLoading ? (
+              <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
+            ) : (
+              <p className="text-4xl font-bold text-gray-900">
+                {dashData?.crew_utilization.pct ?? 0}%
+              </p>
+            )}
+            <p className="text-sm text-gray-500 mt-1">
+              {dashLoading ? (
+                <span className="inline-block animate-pulse bg-gray-200 rounded h-3 w-20" />
+              ) : (
+                `${dashData?.crew_utilization.active ?? 0} of ${dashData?.crew_utilization.total ?? 0} active`
+              )}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── Two-column layout ─────────────────────────────────────────────── */}
@@ -392,7 +512,9 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-gray-400" />
-                <h2 className="text-sm font-semibold text-gray-900">Today's Schedule</h2>
+                <h2 className="text-sm font-semibold text-gray-900">
+                  {scope === 'personal' ? 'Your Schedule Today' : "Today's Schedule"}
+                </h2>
                 <span className="text-xs text-gray-400">{today}</span>
               </div>
               <Link
@@ -414,13 +536,17 @@ export default function AdminDashboard() {
               ) : !dashData || dashData.jobs_today.jobs.length === 0 ? (
                 <div className="py-12 text-center">
                   <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500 mb-3">No jobs scheduled today</p>
+                  <p className="text-sm text-gray-500 mb-3">
+                    {scope === 'personal'
+                      ? 'You have no jobs scheduled today'
+                      : 'No jobs scheduled today'}
+                  </p>
                   <Link
                     href="/dashboard/admin/schedule-form"
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Create Job
+                    Schedule a Job
                   </Link>
                 </div>
               ) : (
@@ -473,14 +599,16 @@ export default function AdminDashboard() {
                 </>
               ) : (
                 <>
-                  {/* Pending Timecards */}
+                  {/* Pending Timecards / Your Pending Timecard */}
                   <Link
                     href="/dashboard/admin/timecards"
                     className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 transition-colors group"
                   >
                     <div className="flex items-center gap-3">
                       <Clock className="w-4 h-4 text-amber-500" />
-                      <span className="text-sm text-gray-700">Pending Timecards</span>
+                      <span className="text-sm text-gray-700">
+                        {scope === 'personal' ? 'Your Pending Timecard' : 'Pending Timecards'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span
@@ -496,37 +624,41 @@ export default function AdminDashboard() {
                     </div>
                   </Link>
 
-                  {/* Unassigned Jobs */}
-                  <Link
-                    href="/dashboard/admin/schedule-board"
-                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 transition-colors group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-4 h-4 text-blue-500" />
-                      <span className="text-sm text-gray-700">Unassigned Jobs</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          (dashData?.open_items.unassigned_jobs ?? 0) > 0
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-gray-400'
-                        }`}
-                      >
-                        {dashData?.open_items.unassigned_jobs ?? 0}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
-                    </div>
-                  </Link>
+                  {/* Unassigned Jobs — team scope only */}
+                  {scope === 'team' && (
+                    <Link
+                      href="/dashboard/admin/schedule-board"
+                      className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 transition-colors group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm text-gray-700">Unassigned Jobs</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            (dashData?.open_items.unassigned_jobs ?? 0) > 0
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-400'
+                          }`}
+                        >
+                          {dashData?.open_items.unassigned_jobs ?? 0}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                      </div>
+                    </Link>
+                  )}
 
-                  {/* Overdue Invoices */}
+                  {/* Overdue Invoices / Your Overdue Invoices */}
                   <Link
                     href="/dashboard/admin/billing"
                     className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors group"
                   >
                     <div className="flex items-center gap-3">
                       <DollarSign className="w-4 h-4 text-red-500" />
-                      <span className="text-sm text-gray-700">Overdue Invoices</span>
+                      <span className="text-sm text-gray-700">
+                        {scope === 'personal' ? 'Your Overdue Invoices' : 'Overdue Invoices'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span
@@ -546,16 +678,18 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Team Status */}
+          {/* Team Status / Your Status */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
               <Users className="w-5 h-5 text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-900">Team Status</h2>
+              <h2 className="text-sm font-semibold text-gray-900">
+                {scope === 'personal' ? 'Your Status' : 'Team Status'}
+              </h2>
             </div>
 
             <div className="px-2 py-2">
               {dashLoading ? (
-                Array.from({ length: 4 }).map((_, i) => (
+                Array.from({ length: scope === 'personal' ? 1 : 4 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-2 py-2">
                     <div className="animate-pulse bg-gray-200 rounded-full w-2.5 h-2.5" />
                     <div className="animate-pulse bg-gray-200 rounded h-3 flex-1" />
@@ -563,10 +697,12 @@ export default function AdminDashboard() {
                   </div>
                 ))
               ) : !dashData || dashData.team_status.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-400">No crew data available</div>
+                <div className="py-8 text-center text-sm text-gray-400">
+                  {scope === 'personal' ? 'No status available' : 'No crew data available'}
+                </div>
               ) : (
                 <>
-                  {dashData.team_status.slice(0, 8).map((member) => (
+                  {dashData.team_status.slice(0, scope === 'personal' ? 1 : 8).map((member) => (
                     <div key={member.id} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors">
                       <span
                         className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
@@ -583,7 +719,7 @@ export default function AdminDashboard() {
                       </span>
                     </div>
                   ))}
-                  {dashData.team_status.length > 8 && (
+                  {scope === 'team' && dashData.team_status.length > 8 && (
                     <p className="text-xs text-gray-400 text-center py-2">
                       +{dashData.team_status.length - 8} more
                     </p>

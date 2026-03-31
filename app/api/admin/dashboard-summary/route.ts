@@ -3,6 +3,14 @@
  * Main data feed for the admin dashboard KPI row, schedule view, and team status.
  * All queries are tenant-scoped. Each section catches independently so partial
  * data is always returned even if one query fails.
+ *
+ * Query params:
+ *   scope   = 'team' | 'personal'  (default: 'team')
+ *   userId  = UUID  — super_admin only: view another user's personal metrics
+ *
+ * Security:
+ *   - super_admin: may use either scope and pass any userId within their tenant
+ *   - All other admin roles: scope is always forced to 'personal', userId param ignored
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -27,11 +35,14 @@ function monthEndISO(offset = 0): string {
 
 // ─── section fetchers ────────────────────────────────────────────────────────
 
-async function getJobsToday(tenantId: string) {
+async function getJobsToday(
+  tenantId: string,
+  opts: { isPersonal: boolean; targetUserId: string }
+) {
   try {
     const today = todayISO();
 
-    const { data: jobs, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('job_orders')
       .select(`
         id,
@@ -46,6 +57,28 @@ async function getJobsToday(tenantId: string) {
       .is('deleted_at', null)
       .order('arrival_time', { ascending: true })
       .limit(20);
+
+    // Personal scope: only jobs this user is assigned to OR created by them
+    if (opts.isPersonal) {
+      query = supabaseAdmin
+        .from('job_orders')
+        .select(`
+          id,
+          job_number,
+          arrival_time,
+          customer_name,
+          assigned_to,
+          status
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('scheduled_date', today)
+        .is('deleted_at', null)
+        .or(`assigned_to.eq.${opts.targetUserId},created_by.eq.${opts.targetUserId}`)
+        .order('arrival_time', { ascending: true })
+        .limit(20);
+    }
+
+    const { data: jobs, error } = await query;
 
     if (error) {
       console.error('[dashboard-summary] jobs_today query error:', error.message);
@@ -85,25 +118,30 @@ async function getJobsToday(tenantId: string) {
   }
 }
 
-async function getRevenueMtd(tenantId: string) {
+async function getRevenueMtd(
+  tenantId: string,
+  opts: { isPersonal: boolean; targetUserId: string }
+) {
   try {
-    // Current month: sum total_amount from paid/sent invoices
-    const [currentRes, lastRes] = await Promise.all([
-      supabaseAdmin
+    const buildQuery = (monthOffset: number) => {
+      let q = supabaseAdmin
         .from('invoices')
         .select('total_amount')
         .eq('tenant_id', tenantId)
         .in('status', ['paid', 'sent', 'partial'])
-        .gte('invoice_date', monthStartISO(0).split('T')[0])
-        .lte('invoice_date', monthEndISO(0).split('T')[0]),
+        .gte('invoice_date', monthStartISO(monthOffset).split('T')[0])
+        .lte('invoice_date', monthEndISO(monthOffset).split('T')[0]);
 
-      supabaseAdmin
-        .from('invoices')
-        .select('total_amount')
-        .eq('tenant_id', tenantId)
-        .in('status', ['paid', 'sent', 'partial'])
-        .gte('invoice_date', monthStartISO(-1).split('T')[0])
-        .lte('invoice_date', monthEndISO(-1).split('T')[0]),
+      if (opts.isPersonal) {
+        q = q.eq('created_by', opts.targetUserId);
+      }
+
+      return q;
+    };
+
+    const [currentRes, lastRes] = await Promise.all([
+      buildQuery(0),
+      buildQuery(-1),
     ]);
 
     const sum = (rows: { total_amount: number }[] | null) =>
@@ -120,23 +158,56 @@ async function getRevenueMtd(tenantId: string) {
   }
 }
 
-async function getOpenItems(tenantId: string) {
+async function getOpenItems(
+  tenantId: string,
+  opts: { isPersonal: boolean; targetUserId: string }
+) {
   try {
     const today = todayISO();
 
+    if (opts.isPersonal) {
+      // For personal scope: show jobs created by or assigned to this user that are
+      // unassigned (would only apply to created_by) and overdue invoices they created.
+      // Pending timecards are not applicable to admin personal view (timecards belong to operators).
+      const [unassignedJobsRes, overdueInvoicesRes] = await Promise.all([
+        supabaseAdmin
+          .from('job_orders')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+          .eq('created_by', opts.targetUserId)
+          .is('assigned_to', null)
+          .eq('status', 'scheduled')
+          .is('deleted_at', null),
+
+        supabaseAdmin
+          .from('invoices')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+          .eq('created_by', opts.targetUserId)
+          .lt('due_date', today)
+          .not('status', 'in', '("paid","void","cancelled")'),
+      ]);
+
+      return {
+        pending_timecards: 0,
+        unassigned_jobs: unassignedJobsRes.count ?? 0,
+        overdue_invoices: overdueInvoicesRes.count ?? 0,
+        unsigned_estimates: 0,
+      };
+    }
+
+    // Team scope — original logic
     const [
       pendingTimecardsRes,
       unassignedJobsRes,
       overdueInvoicesRes,
     ] = await Promise.all([
-      // Timecards awaiting approval (approval_status = 'pending')
       supabaseAdmin
         .from('timecards')
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
         .eq('approval_status', 'pending'),
 
-      // Scheduled jobs with no operator assigned
       supabaseAdmin
         .from('job_orders')
         .select('id', { count: 'exact', head: true })
@@ -145,7 +216,6 @@ async function getOpenItems(tenantId: string) {
         .eq('status', 'scheduled')
         .is('deleted_at', null),
 
-      // Invoices past due date and not yet paid
       supabaseAdmin
         .from('invoices')
         .select('id', { count: 'exact', head: true })
@@ -158,7 +228,7 @@ async function getOpenItems(tenantId: string) {
       pending_timecards: pendingTimecardsRes.count ?? 0,
       unassigned_jobs: unassignedJobsRes.count ?? 0,
       overdue_invoices: overdueInvoicesRes.count ?? 0,
-      unsigned_estimates: 0, // TODO: implement when estimates table exists
+      unsigned_estimates: 0,
     };
   } catch (err: any) {
     console.error('[dashboard-summary] open_items error:', err?.message);
@@ -171,7 +241,15 @@ async function getOpenItems(tenantId: string) {
   }
 }
 
-async function getCrewUtilization(tenantId: string) {
+async function getCrewUtilization(
+  tenantId: string,
+  opts: { isPersonal: boolean }
+) {
+  // Personal scope: crew utilization is not meaningful for a single admin user
+  if (opts.isPersonal) {
+    return { active: 0, total: 0, pct: 0, personal: true };
+  }
+
   try {
     // Total operators/apprentices in this tenant
     const { count: total } = await supabaseAdmin
@@ -210,11 +288,65 @@ async function getCrewUtilization(tenantId: string) {
   }
 }
 
-async function getTeamStatus(tenantId: string) {
+async function getTeamStatus(
+  tenantId: string,
+  opts: { isPersonal: boolean; targetUserId: string }
+) {
   try {
     const today = todayISO();
 
-    // All operators/apprentices for this tenant
+    // Personal scope: return only the requesting/target user's own status
+    if (opts.isPersonal) {
+      const { data: member } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name, role')
+        .eq('id', opts.targetUserId)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (!member) return [];
+
+      const { data: activeTc } = await supabaseAdmin
+        .from('timecards')
+        .select('user_id, job_order_id')
+        .eq('tenant_id', tenantId)
+        .eq('date', today)
+        .eq('user_id', opts.targetUserId)
+        .is('clock_out_time', null)
+        .maybeSingle();
+
+      const { data: timeOffRow } = await supabaseAdmin
+        .from('operator_time_off')
+        .select('user_id')
+        .eq('tenant_id', tenantId)
+        .lte('start_date', today)
+        .gte('end_date', today)
+        .eq('user_id', opts.targetUserId)
+        .maybeSingle();
+
+      let jobNumber: string | null = null;
+      if (activeTc?.job_order_id) {
+        const { data: jobRow } = await supabaseAdmin
+          .from('job_orders')
+          .select('job_number')
+          .eq('id', activeTc.job_order_id)
+          .single();
+        jobNumber = jobRow?.job_number ?? null;
+      }
+
+      const isOff = !!timeOffRow;
+      const isActive = !isOff && !!activeTc;
+
+      return [{
+        id: member.id,
+        name: member.full_name,
+        status: isOff ? 'off' : isActive ? 'active' : 'idle',
+        current_job: jobNumber,
+        current_job_id: activeTc?.job_order_id ?? null,
+      }];
+    }
+
+    // Team scope — original logic
     const { data: crew, error: crewError } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, role')
@@ -232,7 +364,6 @@ async function getTeamStatus(tenantId: string) {
 
     const crewIds = crew.map((c) => c.id);
 
-    // Active timecards today (no clock_out = still working)
     const { data: activeTcs } = await supabaseAdmin
       .from('timecards')
       .select('user_id, job_order_id')
@@ -241,13 +372,11 @@ async function getTeamStatus(tenantId: string) {
       .is('clock_out_time', null)
       .in('user_id', crewIds);
 
-    // Build map: operatorId -> job_order_id (if on a job)
     const activeMap: Record<string, string | null> = {};
     for (const tc of activeTcs ?? []) {
       activeMap[tc.user_id] = tc.job_order_id ?? null;
     }
 
-    // Collect job ids to resolve job numbers
     const activeJobIds = [...new Set(Object.values(activeMap).filter(Boolean))] as string[];
     let jobNumberMap: Record<string, string> = {};
 
@@ -264,7 +393,6 @@ async function getTeamStatus(tenantId: string) {
       }
     }
 
-    // Time off today: fetch operator_time_off records that cover today
     const { data: timeOffRows } = await supabaseAdmin
       .from('operator_time_off')
       .select('user_id')
@@ -294,10 +422,12 @@ async function getTeamStatus(tenantId: string) {
   }
 }
 
-async function getRecentActivity(tenantId: string) {
+async function getRecentActivity(
+  tenantId: string,
+  opts: { isPersonal: boolean; targetUserId: string }
+) {
   try {
-    // Pull from audit_logs — richest recent-activity source in this codebase
-    const { data: logs, error } = await supabaseAdmin
+    let logsQuery = supabaseAdmin
       .from('audit_logs')
       .select('id, action, resource_type, resource_id, details, created_at')
       .eq('tenant_id', tenantId)
@@ -313,15 +443,29 @@ async function getRecentActivity(tenantId: string) {
       .order('created_at', { ascending: false })
       .limit(10);
 
+    if (opts.isPersonal) {
+      logsQuery = logsQuery.eq('user_id', opts.targetUserId);
+    }
+
+    const { data: logs, error } = await logsQuery;
+
     if (error || !logs) {
-      // Fallback: use recent job_orders completions + creations
-      const { data: recentJobs } = await supabaseAdmin
+      // Fallback: use recent job_orders
+      let fallbackQuery = supabaseAdmin
         .from('job_orders')
         .select('id, job_number, customer_name, status, work_completed_at, created_at')
         .eq('tenant_id', tenantId)
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
         .limit(10);
+
+      if (opts.isPersonal) {
+        fallbackQuery = fallbackQuery.or(
+          `assigned_to.eq.${opts.targetUserId},created_by.eq.${opts.targetUserId}`
+        );
+      }
+
+      const { data: recentJobs } = await fallbackQuery;
 
       return (recentJobs ?? []).map((j) => ({
         id: j.id,
@@ -338,7 +482,6 @@ async function getRecentActivity(tenantId: string) {
     return logs.map((log) => {
       const details = (log.details ?? {}) as Record<string, any>;
 
-      // Build human-readable description from action type
       let description = '';
       let link: string | null = null;
 
@@ -398,26 +541,91 @@ export async function GET(request: NextRequest) {
     return auth.response;
   }
 
-  const { tenantId } = auth;
+  const { tenantId, userId: authUserId, role } = auth;
 
   if (!tenantId) {
     return NextResponse.json({ error: 'Tenant context required.' }, { status: 403 });
   }
 
-  // Run all independent sections in parallel for speed
+  // ── Scope + targetUserId resolution ──────────────────────────────────────
+  const params = request.nextUrl.searchParams;
+  const rawScope = params.get('scope') ?? 'team';
+  const rawUserId = params.get('userId') ?? null;
+
+  // Roles that are NOT super_admin are always forced into personal scope
+  const isSuperAdmin = role === 'super_admin';
+
+  let scope: 'personal' | 'team';
+  let targetUserId: string;
+
+  if (isSuperAdmin) {
+    // super_admin may choose scope; defaults to team
+    scope = rawScope === 'personal' ? 'personal' : 'team';
+
+    if (scope === 'personal' && rawUserId) {
+      // Verify the requested userId belongs to the same tenant before allowing it
+      const { data: targetProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id, tenant_id')
+        .eq('id', rawUserId)
+        .single();
+
+      if (!targetProfile || targetProfile.tenant_id !== tenantId) {
+        return NextResponse.json(
+          { error: 'userId not found within your tenant.' },
+          { status: 403 }
+        );
+      }
+
+      targetUserId = rawUserId;
+    } else {
+      targetUserId = authUserId;
+    }
+  } else {
+    // All other admin roles: force personal, always use own userId
+    scope = 'personal';
+    targetUserId = authUserId;
+  }
+
+  const isPersonal = scope === 'personal';
+  const opts = { isPersonal, targetUserId };
+
+  // ── Fetch viewed_user profile when personal ───────────────────────────────
+  let viewed_user: { id: string; name: string; role: string } | null = null;
+
+  if (isPersonal) {
+    const { data: vProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, full_name, role')
+      .eq('id', targetUserId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (vProfile) {
+      viewed_user = {
+        id: vProfile.id,
+        name: vProfile.full_name,
+        role: vProfile.role,
+      };
+    }
+  }
+
+  // ── Run all sections in parallel ──────────────────────────────────────────
   const [jobs_today, revenue_mtd, open_items, crew_utilization, team_status, recent_activity] =
     await Promise.all([
-      getJobsToday(tenantId),
-      getRevenueMtd(tenantId),
-      getOpenItems(tenantId),
-      getCrewUtilization(tenantId),
-      getTeamStatus(tenantId),
-      getRecentActivity(tenantId),
+      getJobsToday(tenantId, opts),
+      getRevenueMtd(tenantId, opts),
+      getOpenItems(tenantId, opts),
+      getCrewUtilization(tenantId, opts),
+      getTeamStatus(tenantId, opts),
+      getRecentActivity(tenantId, opts),
     ]);
 
   return NextResponse.json({
     success: true,
     data: {
+      scope,
+      viewed_user,
       jobs_today,
       revenue_mtd,
       open_items,
