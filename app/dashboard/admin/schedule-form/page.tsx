@@ -23,6 +23,7 @@ import { VoiceMicButton } from '@/components/ui/VoiceMicButton';
 import AISmartFillModal from './_components/AISmartFillModal';
 // Equipment presets no longer displayed as grid; now using SERVICE_EQUIPMENT config
 import PhotoUploader from '@/components/PhotoUploader';
+import SmartCombobox, { ContactCombobox } from '@/components/SmartCombobox';
 // Equipment detail type (inline after equipment-recommendations removal)
 interface EquipmentDetail {
   selected: boolean;
@@ -606,6 +607,21 @@ export default function ScheduleFormPage() {
   const [poLookupLoading, setPoLookupLoading] = useState(false);
   const poLookupTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // Customer history state (PO numbers + site contacts from past jobs)
+  const [customerPONumbers, setCustomerPONumbers] = useState<Array<{
+    po_number: string;
+    last_used: string;
+    job_count: number;
+    last_job_number: string;
+  }>>([]);
+  const [customerContacts, setCustomerContacts] = useState<Array<{
+    name: string;
+    phone: string | null;
+    email: string | null;
+    job_count: number;
+  }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   // Schedule preview state
   const [showSchedulePreview, setShowSchedulePreview] = useState(false);
   const [schedulePreviewData, setSchedulePreviewData] = useState<any[]>([]);
@@ -768,6 +784,40 @@ export default function ScheduleFormPage() {
     setShowDraftPicker(false);
   };
 
+  // Fetch PO number and site contact history for selected customer
+  const fetchCustomerHistory = useCallback(async (customerId: string) => {
+    if (!customerId) return;
+    setHistoryLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const headers = { Authorization: `Bearer ${session.access_token}` };
+
+      const [poRes, contactRes] = await Promise.all([
+        fetch(`/api/admin/customers/${customerId}/po-numbers`, { headers }),
+        fetch(`/api/admin/customers/${customerId}/site-contacts`, { headers }),
+      ]);
+
+      if (poRes.ok) {
+        const json = await poRes.json();
+        setCustomerPONumbers(json.data || []);
+      }
+      if (contactRes.ok) {
+        const json = await contactRes.json();
+        setCustomerContacts((json.data || []).map((c: any) => ({
+          name: c.name,
+          phone: c.phone || null,
+          email: c.email || null,
+          job_count: c.job_count || 0,
+        })));
+      }
+    } catch {
+      // silently fail — dropdowns just show empty
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -813,6 +863,10 @@ export default function ScheduleFormPage() {
       contact_phone: '',
     });
     setShowCustomerDropdown(false);
+    // Clear and fetch customer history (PO numbers + site contacts from past jobs)
+    setCustomerPONumbers([]);
+    setCustomerContacts([]);
+    fetchCustomerHistory(customer.id);
     // Fetch CRM contacts for this customer
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) return;
@@ -950,6 +1004,9 @@ export default function ScheduleFormPage() {
           contact_phone: newCustomerData.primary_contact_phone || '',
           site_address: newCustomerData.address ? `${newCustomerData.address}${newCustomerData.city ? ', ' + newCustomerData.city : ''}${newCustomerData.state ? ', ' + newCustomerData.state : ''}${newCustomerData.zip ? ' ' + newCustomerData.zip : ''}` : '',
         });
+        // New customer has no history yet — clear any stale history state
+        setCustomerPONumbers([]);
+        setCustomerContacts([]);
         setShowNewCustomerModal(false);
         setNewCustomerData({ company_name: '', primary_contact_name: '', primary_contact_phone: '', primary_contact_email: '', address: '', city: '', state: '', zip: '', notes: '' });
       } else {
@@ -1577,15 +1634,26 @@ export default function ScheduleFormPage() {
 
             {/* PO Number (moved from old step 1) */}
             <div>
-              <Label>PO Number</Label>
-              <InputField
-                icon={FileText}
-                placeholder="Enter PO # (optional)"
-                value={form.po_number || form.po_number_step2}
-                onChange={e => {
-                  handlePoChange(e.target.value);
-                  updateForm({ po_number_step2: e.target.value });
+              <SmartCombobox
+                label="PO Number"
+                placeholder="Select or enter PO number"
+                options={customerPONumbers.map(po => ({
+                  value: po.po_number,
+                  label: po.po_number,
+                  sublabel: `Used ${po.job_count} time${po.job_count !== 1 ? 's' : ''}`,
+                  meta: `Last: ${po.last_job_number}`,
+                }))}
+                value={form.po_number || form.po_number_step2 || ''}
+                onChange={(val) => {
+                  handlePoChange(val);
+                  updateForm({ po_number_step2: val });
                 }}
+                onAddNew={(val) => {
+                  handlePoChange(val);
+                  updateForm({ po_number_step2: val });
+                }}
+                loading={historyLoading}
+                addNewLabel="Use new PO number"
               />
               {poLookupLoading && (
                 <p className="mt-1.5 text-xs text-blue-500 font-medium flex items-center gap-1.5">
@@ -1621,64 +1689,30 @@ export default function ScheduleFormPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {/* Site Contact with Autocomplete */}
+              {/* Site Contact with Smart History Dropdown */}
               <div ref={contactDropdownRef} className="relative">
-                <Label>Site Contact Name</Label>
-                <InputField
-                  icon={UserIcon}
-                  placeholder="Contact person on site"
+                <ContactCombobox
+                  label="Site Contact Name"
+                  placeholder="Select or enter contact name"
+                  options={customerContacts.length > 0
+                    ? customerContacts
+                    : contactSuggestions.map(c => ({
+                        name: c.contact_name,
+                        phone: c.contact_phone || null,
+                        email: null,
+                        job_count: 0,
+                      }))
+                  }
                   value={form.site_contact}
-                  onChange={e => handleContactChange(e.target.value)}
-                  onFocus={() => {
-                    if (contactSuggestions.length > 0) setShowContactDropdown(true);
+                  onChange={(name, phone) => {
+                    updateForm({
+                      site_contact: name,
+                      ...(phone ? { contact_phone: phone } : {}),
+                    });
                   }}
-                  autoComplete="off"
+                  onAddNew={(name) => updateForm({ site_contact: name })}
+                  loading={historyLoading}
                 />
-                {showContactDropdown && contactSuggestions.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150">
-                    {contactSuggestions
-                      .filter(c => c.contact_name && (!form.site_contact.trim() || c.contact_name.toLowerCase().includes(form.site_contact.toLowerCase())))
-                      .map((contact, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => selectContact(contact)}
-                        className="w-full flex items-center justify-between px-4 py-3 text-sm text-left text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-all"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{contact.contact_name}</span>
-                          {(contact.role || contact.is_primary) && (
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${
-                              contact.is_primary
-                                ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                : contact.role?.toLowerCase() === 'billing'
-                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                  : 'bg-slate-50 text-slate-500 border-slate-200'
-                            }`}>
-                              {contact.is_primary ? 'Primary' : contact.role}
-                            </span>
-                          )}
-                        </div>
-                        {contact.contact_phone && (
-                          <span className="text-xs text-slate-400 ml-2 flex-shrink-0">{contact.contact_phone}</span>
-                        )}
-                      </button>
-                    ))}
-                    {/* Add New Contact option */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowContactDropdown(false);
-                        // Clear so user can free-type a new name
-                        updateForm({ site_contact: '', contact_phone: '' });
-                      }}
-                      className="w-full flex items-center gap-2 px-4 py-3 text-sm text-left text-blue-600 hover:bg-blue-50 border-t border-slate-100 font-semibold"
-                    >
-                      <Plus size={14} />
-                      Add New Contact
-                    </button>
-                  </div>
-                )}
               </div>
               <div>
                 <Label>Contact Phone</Label>

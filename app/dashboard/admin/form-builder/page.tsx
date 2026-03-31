@@ -262,24 +262,24 @@ export default function FormBuilderPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white/90 backdrop-blur-xl border-b border-gray-200 sticky top-0 z-50">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
             <Link href="/dashboard" className="p-2 bg-gray-100 rounded-xl border border-gray-200 hover:bg-gray-200 transition-all">
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </Link>
             <div>
-              <h1 className="text-xl font-bold text-white">Form Builder</h1>
-              <p className="text-sm text-purple-300">Create custom forms for waivers, completion, and more</p>
+              <h1 className="text-xl font-bold text-gray-900">Form Builder</h1>
+              <p className="text-sm text-gray-500">Create custom forms for waivers, completion, and more</p>
             </div>
           </div>
         </div>
@@ -312,7 +312,7 @@ export default function FormBuilderPage() {
               const typeInfo = FORM_TYPE_OPTIONS.find(o => o.value === type)!;
               return (
                 <div key={type} className="space-y-2">
-                  <p className="text-xs font-bold text-purple-400 uppercase tracking-wider px-1">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider px-1">
                     {typeInfo.label} ({group.length})
                   </p>
                   {group.map(t => (
@@ -321,12 +321,12 @@ export default function FormBuilderPage() {
                       onClick={() => loadTemplate(t)}
                       className={`w-full text-left px-4 py-3 rounded-xl border transition-all text-sm ${
                         selectedTemplate?.id === t.id
-                          ? 'bg-purple-600/30 border-purple-500 text-white'
-                          : 'bg-white/5 border-white/10 text-purple-200 hover:bg-white/10'
+                          ? 'bg-purple-50 border-purple-300 text-purple-900'
+                          : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <p className="font-semibold truncate">{t.name}</p>
-                      <p className="text-xs text-purple-400 mt-0.5">{(t.fields || []).length} fields</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{(t.fields || []).length} fields</p>
                     </button>
                   ))}
                 </div>
@@ -335,9 +335,9 @@ export default function FormBuilderPage() {
 
             {templates.length === 0 && (
               <div className="text-center py-8">
-                <ClipboardList className="w-10 h-10 text-purple-500/40 mx-auto mb-2" />
-                <p className="text-sm text-purple-400">No templates yet</p>
-                <p className="text-xs text-purple-500">Create your first form template</p>
+                <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No templates yet</p>
+                <p className="text-xs text-gray-400">Create your first form template</p>
               </div>
             )}
           </div>
@@ -345,16 +345,16 @@ export default function FormBuilderPage() {
           {/* Main Area — Form Builder */}
           <div className="lg:col-span-9 space-y-6">
             {/* Form Meta */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 space-y-4">
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Settings2 className="w-5 h-5 text-purple-400" />
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Settings2 className="w-5 h-5 text-purple-600" />
                   {isEditing ? 'Edit Template' : 'New Template'}
                 </h2>
                 {isEditing && selectedTemplate && (
                   <button
                     onClick={() => handleDelete(selectedTemplate.id)}
-                    className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg border border-red-500/20 transition-all"
+                    className="px-3 py-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg border border-red-200 transition-all"
                   >
                     <Trash2 className="w-3.5 h-3.5 inline mr-1" />
                     Archive
@@ -364,17 +364,17 @@ export default function FormBuilderPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-purple-300 mb-1">Template Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Template Name *</label>
                   <input
                     type="text"
                     value={formName}
                     onChange={e => setFormName(e.target.value)}
                     placeholder="e.g. Utility Waiver Form"
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-purple-400/50 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
+                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-purple-300 mb-1">Form Type *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Form Type *</label>
                   <div className="flex gap-2">
                     {FORM_TYPE_OPTIONS.map(opt => (
                       <button
@@ -382,8 +382,8 @@ export default function FormBuilderPage() {
                         onClick={() => setFormType(opt.value as typeof formType)}
                         className={`flex-1 px-3 py-3 rounded-xl text-sm font-semibold border transition-all ${
                           formType === opt.value
-                            ? opt.color + ' ring-2 ring-offset-1 ring-offset-slate-900 ring-current'
-                            : 'bg-white/5 border-white/10 text-purple-300 hover:bg-white/10'
+                            ? opt.color + ' ring-2 ring-offset-1 ring-offset-white ring-current'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                         }`}
                       >
                         {opt.label}
@@ -394,13 +394,13 @@ export default function FormBuilderPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-purple-300 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
                   value={formDescription}
                   onChange={e => setFormDescription(e.target.value)}
                   placeholder="What is this form for?"
                   rows={2}
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-purple-400/50 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all resize-none"
+                  className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all resize-none"
                 />
               </div>
 
@@ -408,25 +408,25 @@ export default function FormBuilderPage() {
                 <div
                   onClick={() => setRequiresSignature(!requiresSignature)}
                   className={`w-10 h-6 rounded-full relative transition-colors ${
-                    requiresSignature ? 'bg-purple-600' : 'bg-white/20'
+                    requiresSignature ? 'bg-purple-600' : 'bg-gray-300'
                   }`}
                 >
-                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${
                     requiresSignature ? 'translate-x-4' : ''
                   }`} />
                 </div>
-                <span className="text-sm text-purple-300">Requires signature</span>
+                <span className="text-sm text-gray-700">Requires signature</span>
               </label>
             </div>
 
             {/* Fields */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 space-y-4">
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-white">Fields ({fields.length})</h3>
+                <h3 className="text-lg font-bold text-gray-900">Fields ({fields.length})</h3>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowPreview(!showPreview)}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-purple-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-all"
                   >
                     <Eye className="w-3.5 h-3.5" />
                     {showPreview ? 'Hide Preview' : 'Preview'}
@@ -442,10 +442,10 @@ export default function FormBuilderPage() {
               </div>
 
               {fields.length === 0 ? (
-                <div className="text-center py-10 border-2 border-dashed border-white/10 rounded-xl">
-                  <FileText className="w-10 h-10 text-purple-500/40 mx-auto mb-2" />
-                  <p className="text-sm text-purple-400">No fields yet</p>
-                  <p className="text-xs text-purple-500">Click "Add Field" to start building</p>
+                <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-xl">
+                  <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No fields yet</p>
+                  <p className="text-xs text-gray-400">Click &quot;Add Field&quot; to start building</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -456,51 +456,51 @@ export default function FormBuilderPage() {
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={e => handleDragOver(e, index)}
                       onDragEnd={handleDragEnd}
-                      className={`bg-white/5 border border-white/10 rounded-xl p-4 transition-all ${
+                      className={`bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all ${
                         dragIndex === index ? 'opacity-50 scale-95' : ''
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="cursor-grab active:cursor-grabbing pt-2 text-purple-500 hover:text-purple-300">
+                        <div className="cursor-grab active:cursor-grabbing pt-2 text-gray-400 hover:text-gray-600">
                           <GripVertical className="w-4 h-4" />
                         </div>
 
                         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-3">
                           {/* Type selector */}
                           <div className="md:col-span-3">
-                            <label className="block text-xs font-medium text-purple-400 mb-1">Type</label>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
                             <select
                               value={field.type}
                               onChange={e => updateField(index, { type: e.target.value as FormField['type'] })}
-                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:ring-2 focus:ring-purple-500/50"
+                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
                             >
                               {FIELD_TYPE_OPTIONS.map(opt => (
-                                <option key={opt.value} value={opt.value} className="bg-slate-800">{opt.label}</option>
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
                               ))}
                             </select>
                           </div>
 
                           {/* Label */}
                           <div className="md:col-span-4">
-                            <label className="block text-xs font-medium text-purple-400 mb-1">Label *</label>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Label *</label>
                             <input
                               type="text"
                               value={field.label}
                               onChange={e => updateField(index, { label: e.target.value })}
                               placeholder="Field label"
-                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-purple-400/50 focus:ring-2 focus:ring-purple-500/50"
+                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
                             />
                           </div>
 
                           {/* Placeholder */}
                           <div className="md:col-span-3">
-                            <label className="block text-xs font-medium text-purple-400 mb-1">Placeholder</label>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Placeholder</label>
                             <input
                               type="text"
                               value={field.placeholder || ''}
                               onChange={e => updateField(index, { placeholder: e.target.value })}
                               placeholder="Placeholder text"
-                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-purple-400/50 focus:ring-2 focus:ring-purple-500/50"
+                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
                             />
                           </div>
 
@@ -511,16 +511,16 @@ export default function FormBuilderPage() {
                                 type="checkbox"
                                 checked={field.required}
                                 onChange={e => updateField(index, { required: e.target.checked })}
-                                className="w-4 h-4 rounded border-white/30 bg-white/10 text-purple-600 focus:ring-purple-500"
+                                className="w-4 h-4 rounded border-gray-300 bg-white text-purple-600 focus:ring-purple-500"
                               />
-                              <span className="text-xs text-purple-300">Required</span>
+                              <span className="text-xs text-gray-600">Required</span>
                             </label>
                           </div>
                         </div>
 
                         <button
                           onClick={() => removeField(index)}
-                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all mt-5"
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all mt-5"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -529,13 +529,13 @@ export default function FormBuilderPage() {
                       {/* Options for select type */}
                       {field.type === 'select' && (
                         <div className="mt-3 ml-7 space-y-2">
-                          <label className="block text-xs font-medium text-purple-400">Options (one per line)</label>
+                          <label className="block text-xs font-medium text-gray-600">Options (one per line)</label>
                           <textarea
                             value={(field.options || []).join('\n')}
                             onChange={e => updateField(index, { options: e.target.value.split('\n').filter(Boolean) })}
                             placeholder={"Option 1\nOption 2\nOption 3"}
                             rows={3}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-purple-400/50 focus:ring-2 focus:ring-purple-500/50 resize-none"
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 resize-none"
                           />
                         </div>
                       )}
@@ -547,44 +547,44 @@ export default function FormBuilderPage() {
 
             {/* Preview */}
             {showPreview && fields.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-                <h3 className="text-lg font-bold text-slate-800">Preview: {formName || 'Untitled Form'}</h3>
-                {formDescription && <p className="text-sm text-slate-500">{formDescription}</p>}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <h3 className="text-lg font-bold text-gray-900">Preview: {formName || 'Untitled Form'}</h3>
+                {formDescription && <p className="text-sm text-gray-500">{formDescription}</p>}
 
                 {fields.filter(f => f.label.trim()).map(field => (
                   <div key={field.id}>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       {field.label}
                       {field.required && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     {field.type === 'text' && (
-                      <input type="text" disabled placeholder={field.placeholder} className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50 text-slate-400" />
+                      <input type="text" disabled placeholder={field.placeholder} className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-400" />
                     )}
                     {field.type === 'textarea' && (
-                      <textarea disabled placeholder={field.placeholder} rows={3} className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50 text-slate-400 resize-none" />
+                      <textarea disabled placeholder={field.placeholder} rows={3} className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-400 resize-none" />
                     )}
                     {field.type === 'number' && (
-                      <input type="number" disabled placeholder={field.placeholder} className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50 text-slate-400" />
+                      <input type="number" disabled placeholder={field.placeholder} className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-400" />
                     )}
                     {field.type === 'date' && (
-                      <input type="date" disabled className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50 text-slate-400" />
+                      <input type="date" disabled className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-400" />
                     )}
                     {field.type === 'checkbox' && (
                       <label className="flex items-center gap-2">
                         <input type="checkbox" disabled className="w-4 h-4 rounded" />
-                        <span className="text-sm text-slate-500">{field.placeholder || field.label}</span>
+                        <span className="text-sm text-gray-500">{field.placeholder || field.label}</span>
                       </label>
                     )}
                     {field.type === 'select' && (
-                      <select disabled className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50 text-slate-400">
+                      <select disabled className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-400">
                         <option>{field.placeholder || 'Select...'}</option>
                         {(field.options || []).map((opt, i) => <option key={i}>{opt}</option>)}
                       </select>
                     )}
                     {field.type === 'signature' && (
-                      <div className="border-2 border-dashed border-slate-300 rounded-xl h-24 flex items-center justify-center bg-slate-50">
-                        <PenTool className="w-5 h-5 text-slate-300 mr-2" />
-                        <span className="text-sm text-slate-400">Signature pad</span>
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl h-24 flex items-center justify-center bg-gray-50">
+                        <PenTool className="w-5 h-5 text-gray-300 mr-2" />
+                        <span className="text-sm text-gray-400">Signature pad</span>
                       </div>
                     )}
                   </div>
@@ -592,12 +592,12 @@ export default function FormBuilderPage() {
 
                 {requiresSignature && !fields.some(f => f.type === 'signature') && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Signature <span className="text-red-500">*</span>
                     </label>
-                    <div className="border-2 border-dashed border-slate-300 rounded-xl h-24 flex items-center justify-center bg-slate-50">
-                      <PenTool className="w-5 h-5 text-slate-300 mr-2" />
-                      <span className="text-sm text-slate-400">Signature pad (auto-added)</span>
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl h-24 flex items-center justify-center bg-gray-50">
+                      <PenTool className="w-5 h-5 text-gray-300 mr-2" />
+                      <span className="text-sm text-gray-400">Signature pad (auto-added)</span>
                     </div>
                   </div>
                 )}
@@ -609,7 +609,7 @@ export default function FormBuilderPage() {
               {isEditing && (
                 <button
                   onClick={resetForm}
-                  className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold text-sm border border-white/10 transition-all"
+                  className="px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-semibold text-sm border border-gray-200 transition-all"
                 >
                   Cancel
                 </button>
