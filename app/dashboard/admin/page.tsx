@@ -5,110 +5,173 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LogOut, LayoutGrid, BarChart3 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
-import AdminOnboardingTour from '@/components/AdminOnboardingTour';
-import NotificationBell from '@/components/NotificationBell';
 import {
-  ADMIN_CARDS,
-  ADMIN_DASHBOARD_ROLES,
-  BYPASS_ROLES,
-  getCardPermission,
-  type PermissionLevel,
-} from '@/lib/rbac';
+  Calendar,
+  AlertCircle,
+  ChevronRight,
+  CheckCircle2,
+  DollarSign,
+  Clock,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  Briefcase,
+  Plus,
+  FileText,
+  CreditCard,
+} from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { getCurrentUser, type User } from '@/lib/auth';
+import AdminOnboardingTour from '@/components/AdminOnboardingTour';
+import { ADMIN_DASHBOARD_ROLES } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
-import nextDynamic from 'next/dynamic';
 
-// Lazy-load the analytics dashboard to avoid loading Recharts upfront
-const EmbeddedAnalytics = nextDynamic(
-  () => import('./analytics/_components/AnalyticsDashboardContent').then((mod) => ({
-    default: () => <mod.default embedded />
-  })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-      </div>
-    ),
-  }
-);
+// ─── API response types ───────────────────────────────────────────────────────
 
-// Dynamic Logo Component — uses branding if available
-function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: string; logoUrl?: string | null; companyName?: string }) {
-  if (logoUrl) {
-    return <img src={logoUrl} alt={companyName || 'Company Logo'} className={`${className} w-auto object-contain`} />;
-  }
+interface JobToday {
+  id: string;
+  job_number: string;
+  scheduled_time: string | null;
+  customer_name: string;
+  operator_name: string | null;
+  status: string;
+}
+
+interface RevenueMtd {
+  total: number;
+  last_month: number;
+  trend_pct: number;
+}
+
+interface OpenItems {
+  pending_timecards: number;
+  unassigned_jobs: number;
+  overdue_invoices: number;
+}
+
+interface CrewUtilization {
+  active: number;
+  total: number;
+  pct: number;
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  status: 'active' | 'off' | 'idle';
+  current_job: string | null;
+  current_job_id: string | null;
+}
+
+interface ActivityItem {
+  id: string;
+  type: string;
+  description: string;
+  created_at: string;
+  link: string | null;
+}
+
+interface DashboardData {
+  jobs_today: { count: number; jobs: JobToday[] };
+  revenue_mtd: RevenueMtd;
+  open_items: OpenItems;
+  crew_utilization: CrewUtilization;
+  team_status: TeamMember[];
+  recent_activity: ActivityItem[];
+}
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+}
+
+function formatCurrency(amount: number): string {
+  if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
+  if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}K`;
+  return `$${amount.toFixed(0)}`;
+}
+
+function formatTime(timeStr: string | null): string {
+  if (!timeStr) return '--:--';
+  // Handle HH:MM:SS or HH:MM
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  const h = parseInt(parts[0], 10);
+  const m = parts[1];
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${m} ${period}`;
+}
+
+const STATUS_STYLES: Record<string, { pill: string; label: string }> = {
+  scheduled:  { pill: 'bg-blue-100 text-blue-700',   label: 'Scheduled'  },
+  in_route:   { pill: 'bg-amber-100 text-amber-700',  label: 'En Route'   },
+  on_site:    { pill: 'bg-green-100 text-green-700',  label: 'On Site'    },
+  in_progress:{ pill: 'bg-green-100 text-green-700',  label: 'In Progress'},
+  completed:  { pill: 'bg-emerald-100 text-emerald-700', label: 'Completed'},
+  cancelled:  { pill: 'bg-red-100 text-red-700',      label: 'Cancelled'  },
+};
+
+function StatusPill({ status }: { status: string }) {
+  const s = STATUS_STYLES[status] ?? { pill: 'bg-gray-100 text-gray-600', label: status };
   return (
-    <svg
-      className={className}
-      viewBox="0 0 250 60"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <g>
-        <path
-          d="M20 15L35 5L50 15L50 35L35 45L20 35L20 25L35 25L35 35L42 30L42 20L35 15L28 20L28 30L20 25V15Z"
-          fill="url(#patriot-gradient)"
-        />
-        <path
-          d="M25 20L30 17L35 20L35 25L30 28L25 25V20Z"
-          fill="currentColor"
-          opacity="0.3"
-        />
-      </g>
-      <g fill="currentColor">
-        <text x="65" y="25" className="text-lg font-bold" style={{fontSize: '18px', fontFamily: 'Inter, sans-serif'}}>
-          {(companyName || 'OPERATIONS').toUpperCase().split(' ')[0]}
-        </text>
-        <text x="65" y="45" className="text-sm" style={{fontSize: '12px', fontFamily: 'Inter, sans-serif', opacity: '0.8'}}>
-          {(companyName || 'OPERATIONS PLATFORM').toUpperCase().split(' ').slice(1).join(' ') || 'PLATFORM'}
-        </text>
-      </g>
-      <defs>
-        <linearGradient id="patriot-gradient" x1="20" y1="5" x2="50" y2="45" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#dc2626" />
-          <stop offset="0.5" stopColor="#2563eb" />
-          <stop offset="1" stopColor="#1e40af" />
-        </linearGradient>
-      </defs>
-    </svg>
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.pill}`}>
+      {s.label}
+    </span>
   );
 }
 
-interface QuickStats {
-  activeJobs: number;
-  crewsWorking: number;
+function ActivityIcon({ type }: { type: string }) {
+  const base = 'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0';
+  switch (type) {
+    case 'job_completed':
+      return <div className={`${base} bg-emerald-100`}><CheckCircle2 className="w-4 h-4 text-emerald-600" /></div>;
+    case 'invoice_paid':
+      return <div className={`${base} bg-green-100`}><DollarSign className="w-4 h-4 text-green-600" /></div>;
+    case 'invoice_created':
+      return <div className={`${base} bg-blue-100`}><FileText className="w-4 h-4 text-blue-600" /></div>;
+    case 'job_created':
+      return <div className={`${base} bg-purple-100`}><Calendar className="w-4 h-4 text-purple-600" /></div>;
+    case 'timecard_approved':
+    case 'timecard_submitted':
+      return <div className={`${base} bg-amber-100`}><Clock className="w-4 h-4 text-amber-600" /></div>;
+    default:
+      return <div className={`${base} bg-gray-100`}><Briefcase className="w-4 h-4 text-gray-500" /></div>;
+  }
 }
 
-// Feature flag to card key mapping
-const FEATURE_FLAG_CARD_MAP: Record<string, string[]> = {
-  show_billing_module: ['billing'],
-  show_analytics_module: ['analytics'],
-  show_inventory_module: ['blade_inventory'],
-  show_customer_crm: ['customer_profiles'],
-};
+// ─── skeleton helpers ──────────────────────────────────────────────────────────
+
+function SkeletonRow({ cols = 3 }: { cols?: number }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+      {Array.from({ length: cols }).map((_, i) => (
+        <div key={i} className="animate-pulse bg-gray-200 rounded h-4" style={{ flex: 1 }} />
+      ))}
+    </div>
+  );
+}
+
+// ─── main component ───────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const router = useRouter();
   const { branding } = useBranding();
+
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<QuickStats>({
-    activeJobs: 0,
-    crewsWorking: 0,
-  });
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isDemoAdmin, setIsDemoAdmin] = useState(false);
-  const [userPermissions, setUserPermissions] = useState<Record<string, PermissionLevel> | null>(null);
-  const [activeView, setActiveView] = useState<'modules' | 'analytics'>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('admin-dashboard-view') as 'modules' | 'analytics') || 'modules';
-    }
-    return 'modules';
-  });
 
+  const [dashData, setDashData] = useState<DashboardData | null>(null);
+  const [dashLoading, setDashLoading] = useState(true);
+
+  // ── auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const currentUser = getCurrentUser();
 
@@ -124,43 +187,60 @@ export default function AdminDashboard() {
 
     setUser(currentUser);
 
-    // Fetch card permissions for this user
-    fetchCardPermissions();
-
-    // Check if this is demo admin account
-    const isDemo = currentUser.email?.toLowerCase().includes('demo') ||
-                   currentUser.email === 'admin@demo.com' ||
-                   currentUser.email === 'admin@patriotcc.com';
+    const isDemo =
+      currentUser.email?.toLowerCase().includes('demo') ||
+      currentUser.email === 'admin@demo.com' ||
+      currentUser.email === 'admin@patriotcc.com';
     setIsDemoAdmin(isDemo);
 
-    // Show walkthrough for demo admin on first visit
     if (isDemo) {
       checkOnboardingStatus(currentUser.id);
     }
 
     setLoading(false);
-    fetchDashboardStats();
   }, [router]);
 
+  // ── dashboard data ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchDash = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const res = await fetch('/api/admin/dashboard-summary', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          setDashData(json.data);
+        }
+      } catch {
+        // silently fail — UI handles null dashData gracefully
+      } finally {
+        setDashLoading(false);
+      }
+    };
+
+    fetchDash();
+  }, [user]);
+
+  // ── onboarding ────────────────────────────────────────────────────────────
   const checkOnboardingStatus = async (userId: string) => {
     try {
-      // Check if walkthrough was already shown in this session
       const shownThisSession = sessionStorage.getItem('admin-walkthrough-shown-this-session');
-      if (shownThisSession === 'true') {
-        return; // Don't show again in the same session
-      }
+      if (shownThisSession === 'true') return;
 
       const response = await fetch(`/api/onboarding?userId=${userId}&type=admin`);
       const data = await response.json();
 
       if (!data.hasCompleted && !data.hasSkipped) {
         setShowWalkthrough(true);
-        // Mark as shown for this session
         sessionStorage.setItem('admin-walkthrough-shown-this-session', 'true');
       }
-    } catch (error) {
-      console.error('Error checking onboarding status:', error);
-      // Fallback to localStorage
+    } catch {
       const hasSeenWalkthrough = localStorage.getItem('demo-admin-walkthrough-seen');
       const shownThisSession = sessionStorage.getItem('admin-walkthrough-shown-this-session');
       if (!hasSeenWalkthrough && shownThisSession !== 'true') {
@@ -170,389 +250,424 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchDashboardStats = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
-        localStorage.removeItem('supabase-user');
-        localStorage.removeItem('patriot-user');
-        window.location.href = '/login';
-        return;
-      }
-
-      // Fetch active jobs for today
-      const today = new Date().toISOString().split('T')[0];
-      const { data: jobs } = await supabase
-        .from('job_orders')
-        .select('id, status, scheduled_date')
-        .eq('scheduled_date', today)
-        .neq('status', 'completed')
-        .neq('status', 'cancelled');
-
-      // Fetch operators currently working via admin API (handles RLS + correct table)
-      let uniqueOperators = 0;
-      try {
-        const session = await supabase.auth.getSession();
-        const token = session.data.session?.access_token;
-        if (token) {
-          const res = await fetch('/api/admin/operators/active', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const json = await res.json();
-            uniqueOperators = json.data?.summary?.totalActive || 0;
-          }
-        }
-      } catch {
-        // Silently default to 0 — no operators active
-      }
-
-      setStats({
-        activeJobs: jobs?.length || 0,
-        crewsWorking: uniqueOperators,
-      });
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-    }
-  };
-
-  const fetchCardPermissions = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const res = await fetch('/api/card-permissions/me', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.permissions) {
-          setUserPermissions(json.permissions);
-        }
-      }
-    } catch (e) {
-      console.error('Error fetching card permissions:', e);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
-  };
-
   const markWalkthroughComplete = () => {
     localStorage.setItem('demo-admin-walkthrough-seen', 'true');
     setShowWalkthrough(false);
   };
 
-  // Resolve permission for each card using the RBAC system
-  const getPermission = (cardKey: string): PermissionLevel => {
-    return getCardPermission(userPermissions, cardKey, user?.role || 'operator');
-  };
-
-  // Determine which card keys are hidden by feature flags
-  const hiddenByFeatureFlags = new Set<string>();
-  for (const [flag, cardKeys] of Object.entries(FEATURE_FLAG_CARD_MAP)) {
-    if (!(branding as unknown as Record<string, unknown>)[flag]) {
-      cardKeys.forEach(k => hiddenByFeatureFlags.add(k));
-    }
+  // ── loading screen ────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-500 text-sm">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Build card list from centralized ADMIN_CARDS, filtered by feature flags, sorted: full → view → none
-  const sortedCards = [...ADMIN_CARDS]
-    .filter(card => !hiddenByFeatureFlags.has(card.key))
-    .sort((a, b) => {
-      const order: Record<PermissionLevel, number> = { full: 0, submit: 1, view: 2, none: 3 };
-      return order[getPermission(a.key)] - order[getPermission(b.key)];
-    });
+  // ── derived values ────────────────────────────────────────────────────────
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
 
+  const openItemsTotal = dashData
+    ? dashData.open_items.pending_timecards +
+      dashData.open_items.unassigned_jobs +
+      dashData.open_items.overdue_invoices
+    : 0;
+
+  // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full opacity-10 blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full opacity-10 blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full opacity-5 blur-3xl animate-pulse delay-2000"></div>
-      </div>
+    <div className="p-6 space-y-6 bg-gray-50 min-h-full">
 
-      {/* Modern Header with Professional Gradient */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            {/* Company Logo with Animation */}
-            <div className="transform hover:scale-105 transition-transform duration-200">
-              <BrandedLogo className="h-10 text-white" logoUrl={branding.logo_dark_url || branding.logo_url} companyName={branding.company_name} />
+      {/* ── KPI Row ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+        {/* Jobs Today */}
+        <Link
+          href="/dashboard/admin/schedule-board"
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow group"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <Calendar className="w-5 h-5 text-blue-600" />
             </div>
-
-            {/* Modern Profile Section */}
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-3 bg-white/10 backdrop-blur-lg px-4 py-2 rounded-xl border border-white/20">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white/30">
-                  {user?.name?.charAt(0) || 'A'}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-white">{user?.name || 'Admin'}</p>
-                  <p className="text-xs text-blue-200 capitalize font-medium">{user?.role?.replace('_', ' ') || 'Admin'}</p>
-                </div>
-              </div>
-
-              {/* Notification Bell */}
-              <NotificationBell variant="dark" />
-
-              {/* Operator View Button */}
-              <Link
-                href="/dashboard"
-                className="px-4 py-2.5 bg-white/10 backdrop-blur-lg hover:bg-white/20 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg flex items-center gap-2 border border-white/20"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span>Operator View</span>
-              </Link>
-
-              {/* Premium Logout Button */}
-              <button
-                onClick={handleLogout}
-                className="group flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-red-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
-              >
-                <svg className="w-4 h-4 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                <span>Logout</span>
-              </button>
-            </div>
+            <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
           </div>
-        </div>
-      </div>
+          {dashLoading ? (
+            <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
+          ) : (
+            <p className="text-4xl font-bold text-gray-900">{dashData?.jobs_today.count ?? 0}</p>
+          )}
+          <p className="text-sm text-gray-500 mt-1">Jobs Today</p>
+        </Link>
 
-      <div className="container mx-auto px-4 py-8 relative">
-        {/* Modern Animated Greeting */}
-        <div className="text-center mb-10 animate-fade-in">
-          <div className="inline-block">
-            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
-              Welcome back, {user?.name?.split(' ')[0] || 'Super'}!
-            </h1>
-            <p className="text-gray-700 text-lg font-medium">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        {/* Revenue MTD */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-green-600" />
+            </div>
+            {!dashLoading && dashData && (
+              <span
+                className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  dashData.revenue_mtd.trend_pct >= 0
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-red-100 text-red-700'
+                }`}
+              >
+                {dashData.revenue_mtd.trend_pct >= 0 ? (
+                  <TrendingUp className="w-3 h-3" />
+                ) : (
+                  <TrendingDown className="w-3 h-3" />
+                )}
+                {Math.abs(dashData.revenue_mtd.trend_pct)}%
+              </span>
+            )}
+          </div>
+          {dashLoading ? (
+            <div className="animate-pulse bg-gray-200 rounded h-8 w-24 mb-2" />
+          ) : (
+            <p className="text-4xl font-bold text-gray-900">
+              {formatCurrency(dashData?.revenue_mtd.total ?? 0)}
             </p>
-          </div>
+          )}
+          <p className="text-sm text-gray-500 mt-1">Revenue MTD</p>
+        </div>
 
-          {/* View Toggle */}
-          <div className="flex justify-center mt-6">
-            <div className="inline-flex bg-white/80 backdrop-blur-sm rounded-xl p-1 shadow-lg border border-gray-200">
-              <button
-                onClick={() => { setActiveView('modules'); localStorage.setItem('admin-dashboard-view', 'modules'); }}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                  activeView === 'modules'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
+        {/* Open Items */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+            </div>
+            {!dashLoading && openItemsTotal > 0 && (
+              <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
+            )}
+          </div>
+          {dashLoading ? (
+            <div className="animate-pulse bg-gray-200 rounded h-8 w-12 mb-2" />
+          ) : (
+            <p className="text-4xl font-bold text-gray-900">{openItemsTotal}</p>
+          )}
+          <p className="text-sm text-gray-500 mt-1">Open Items</p>
+        </div>
+
+        {/* Crew Utilization */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+              <Users className="w-5 h-5 text-purple-600" />
+            </div>
+          </div>
+          {dashLoading ? (
+            <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
+          ) : (
+            <p className="text-4xl font-bold text-gray-900">
+              {dashData?.crew_utilization.pct ?? 0}%
+            </p>
+          )}
+          <p className="text-sm text-gray-500 mt-1">
+            {dashLoading ? (
+              <span className="inline-block animate-pulse bg-gray-200 rounded h-3 w-20" />
+            ) : (
+              `${dashData?.crew_utilization.active ?? 0} of ${dashData?.crew_utilization.total ?? 0} active`
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Two-column layout ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+
+        {/* Left column — 3/5 */}
+        <div className="xl:col-span-3 space-y-6">
+
+          {/* Today's Schedule */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-gray-400" />
+                <h2 className="text-sm font-semibold text-gray-900">Today's Schedule</h2>
+                <span className="text-xs text-gray-400">{today}</span>
+              </div>
+              <Link
+                href="/dashboard/admin/schedule-board"
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
-                <LayoutGrid className="w-4 h-4" />
-                Modules
-              </button>
-              <button
-                onClick={() => { setActiveView('analytics'); localStorage.setItem('admin-dashboard-view', 'analytics'); }}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                  activeView === 'analytics'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                Analytics
-              </button>
+                View Full Board
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div>
+              {dashLoading ? (
+                <>
+                  <SkeletonRow cols={4} />
+                  <SkeletonRow cols={4} />
+                  <SkeletonRow cols={4} />
+                </>
+              ) : !dashData || dashData.jobs_today.jobs.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500 mb-3">No jobs scheduled today</p>
+                  <Link
+                    href="/dashboard/admin/schedule-form"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Create Job
+                  </Link>
+                </div>
+              ) : (
+                dashData.jobs_today.jobs.map((job) => (
+                  <Link
+                    key={job.id}
+                    href={`/dashboard/admin/schedule-board`}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors"
+                  >
+                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600 flex-shrink-0 w-20 text-center">
+                      {formatTime(job.scheduled_time)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{job.job_number}</p>
+                      <p className="text-xs text-gray-500 truncate">{job.customer_name}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {job.operator_name && (
+                        <span className="text-xs text-gray-500 hidden sm:inline">{job.operator_name}</span>
+                      )}
+                      <StatusPill status={job.status} />
+                    </div>
+                  </Link>
+                ))
+              )}
             </div>
           </div>
 
-          {/* Quick Stats Bar with Professional Gradients */}
-          <div className="flex justify-center gap-6 mt-8">
-            <Link
-              href="/dashboard/admin/active-jobs"
-              className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all cursor-pointer group"
-            >
-              <p className="text-4xl font-bold text-white drop-shadow-lg">{stats.activeJobs}</p>
-              <p className="text-sm text-white/90 font-semibold mt-1">Active Jobs</p>
-              <p className="text-xs text-white/70 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">View progress</p>
-            </Link>
-            <div className="bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
-              <p className="text-4xl font-bold text-white drop-shadow-lg">{stats.crewsWorking}</p>
-              <p className="text-sm text-white/90 font-semibold mt-1">Crews Working</p>
+          {/* Recent Notifications placeholder — NotificationBell handles the popover */}
+          {/* Removed: notifications are in layout header bell */}
+
+        </div>
+
+        {/* Right column — 2/5 */}
+        <div className="xl:col-span-2 space-y-6">
+
+          {/* Action Required */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
+              <AlertCircle className="w-5 h-5 text-gray-400" />
+              <h2 className="text-sm font-semibold text-gray-900">Action Required</h2>
+            </div>
+
+            <div>
+              {dashLoading ? (
+                <>
+                  <SkeletonRow cols={3} />
+                  <SkeletonRow cols={3} />
+                  <SkeletonRow cols={3} />
+                </>
+              ) : (
+                <>
+                  {/* Pending Timecards */}
+                  <Link
+                    href="/dashboard/admin/timecards"
+                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Clock className="w-4 h-4 text-amber-500" />
+                      <span className="text-sm text-gray-700">Pending Timecards</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          (dashData?.open_items.pending_timecards ?? 0) > 0
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-400'
+                        }`}
+                      >
+                        {dashData?.open_items.pending_timecards ?? 0}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                    </div>
+                  </Link>
+
+                  {/* Unassigned Jobs */}
+                  <Link
+                    href="/dashboard/admin/schedule-board"
+                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Calendar className="w-4 h-4 text-blue-500" />
+                      <span className="text-sm text-gray-700">Unassigned Jobs</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          (dashData?.open_items.unassigned_jobs ?? 0) > 0
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-400'
+                        }`}
+                      >
+                        {dashData?.open_items.unassigned_jobs ?? 0}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                    </div>
+                  </Link>
+
+                  {/* Overdue Invoices */}
+                  <Link
+                    href="/dashboard/admin/billing"
+                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <DollarSign className="w-4 h-4 text-red-500" />
+                      <span className="text-sm text-gray-700">Overdue Invoices</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          (dashData?.open_items.overdue_invoices ?? 0) > 0
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-400'
+                        }`}
+                      >
+                        {dashData?.open_items.overdue_invoices ?? 0}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                    </div>
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Team Status */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
+              <Users className="w-5 h-5 text-gray-400" />
+              <h2 className="text-sm font-semibold text-gray-900">Team Status</h2>
+            </div>
+
+            <div className="px-2 py-2">
+              {dashLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-2 py-2">
+                    <div className="animate-pulse bg-gray-200 rounded-full w-2.5 h-2.5" />
+                    <div className="animate-pulse bg-gray-200 rounded h-3 flex-1" />
+                    <div className="animate-pulse bg-gray-200 rounded h-3 w-16" />
+                  </div>
+                ))
+              ) : !dashData || dashData.team_status.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-400">No crew data available</div>
+              ) : (
+                <>
+                  {dashData.team_status.slice(0, 8).map((member) => (
+                    <div key={member.id} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                          member.status === 'active'
+                            ? 'bg-green-500'
+                            : member.status === 'off'
+                            ? 'bg-blue-400'
+                            : 'bg-gray-300'
+                        }`}
+                      />
+                      <span className="text-sm font-medium text-gray-800 flex-1 truncate">{member.name}</span>
+                      <span className="text-xs text-gray-400 truncate max-w-[80px]">
+                        {member.current_job ?? (member.status === 'off' ? 'Time Off' : 'Idle')}
+                      </span>
+                    </div>
+                  ))}
+                  {dashData.team_status.length > 8 && (
+                    <p className="text-xs text-gray-400 text-center py-2">
+                      +{dashData.team_status.length - 8} more
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/dashboard/admin/schedule-form"
+                className="flex flex-col items-center gap-2 p-4 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-200 text-blue-700 transition-colors cursor-pointer"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="text-xs font-semibold">New Job</span>
+              </Link>
+              <Link
+                href="/dashboard/admin/schedule-form"
+                className="flex flex-col items-center gap-2 p-4 bg-green-50 hover:bg-green-100 rounded-xl border border-green-200 text-green-700 transition-colors cursor-pointer"
+              >
+                <FileText className="w-5 h-5" />
+                <span className="text-xs font-semibold">New Estimate</span>
+              </Link>
+              <Link
+                href="/dashboard/admin/timecards"
+                className="flex flex-col items-center gap-2 p-4 bg-purple-50 hover:bg-purple-100 rounded-xl border border-purple-200 text-purple-700 transition-colors cursor-pointer"
+              >
+                <Clock className="w-5 h-5" />
+                <span className="text-xs font-semibold">Timecards</span>
+              </Link>
+              <Link
+                href="/dashboard/admin/billing"
+                className="flex flex-col items-center gap-2 p-4 bg-amber-50 hover:bg-amber-100 rounded-xl border border-amber-200 text-amber-700 transition-colors cursor-pointer"
+              >
+                <CreditCard className="w-5 h-5" />
+                <span className="text-xs font-semibold">Billing</span>
+              </Link>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Analytics Dashboard View */}
-        {activeView === 'analytics' && (
-          <div className="max-w-7xl mx-auto -mt-2">
-            <EmbeddedAnalytics />
-          </div>
-        )}
+      {/* ── Recent Activity ──────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
+          <Clock className="w-5 h-5 text-gray-400" />
+          <h2 className="text-sm font-semibold text-gray-900">Recent Activity</h2>
+        </div>
 
-        {/* Admin Modules Grid — sorted by permission: full → view → none */}
-        {activeView === 'modules' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">
-          {sortedCards.map((card, index) => {
-            const perm = getPermission(card.key);
-
-            const cardInner = (
-              <>
-                <div className={`absolute inset-0 bg-gradient-to-br ${card.bgColor} opacity-0 ${perm !== 'none' ? 'group-hover:opacity-100' : ''} transition-opacity duration-500 rounded-3xl`}></div>
-                <div className={`relative bg-white rounded-[22px] p-6 ${perm !== 'none' ? 'group-hover:bg-transparent' : ''} transition-colors duration-500`}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`w-14 h-14 bg-gradient-to-br ${card.bgColor} rounded-2xl flex items-center justify-center shadow-lg ${perm !== 'none' ? 'group-hover:shadow-xl transform group-hover:rotate-6' : ''} transition-all duration-300`}>
-                      <span className="text-3xl">{card.icon}</span>
-                    </div>
-                    {perm === 'view' ? (
-                      <span className="px-3 py-1 bg-yellow-100 text-yellow-700 group-hover:bg-white/20 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 border border-yellow-200">
-                        VIEW ONLY
-                      </span>
-                    ) : perm === 'full' ? (
-                      <span className={`px-3 py-1 ${card.iconBg}/10 text-xs font-bold rounded-full group-hover:bg-white/20 group-hover:text-white transition-all duration-300`}>
-                        ACTIVE
-                      </span>
-                    ) : null}
-                  </div>
-                  <h3 className={`text-2xl font-bold text-gray-800 ${perm !== 'none' ? 'group-hover:text-white' : ''} mb-2 transition-colors duration-300`}>
-                    {card.title}
-                  </h3>
-                  <p className={`text-gray-600 ${perm !== 'none' ? 'group-hover:text-white/90' : ''} font-medium transition-colors duration-300 mb-4`}>
-                    {card.description}
-                  </p>
-                  {perm !== 'none' && (
-                    <div className="flex items-center text-gray-600 group-hover:text-white font-semibold transition-colors duration-300">
-                      <span>{perm === 'view' ? 'View Module' : 'Open Module'}</span>
-                      <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              </>
-            );
-
-            // Full or View: render as clickable link
-            if (perm === 'full' || perm === 'view') {
-              return (
-                <Link
-                  key={card.key}
-                  href={card.href}
-                  className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-gray-50 p-1 shadow-xl hover:shadow-2xl hover:scale-[1.02] cursor-pointer animate-fade-in-up transition-all duration-500 ${
-                    perm === 'view' ? 'ring-1 ring-yellow-200' : ''
-                  }`}
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  {cardInner}
-                </Link>
-              );
-            }
-
-            // None: render as blurred, non-clickable div
-            return (
-              <div
-                key={card.key}
-                className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-gray-50 p-1 shadow-xl blur-[2px] opacity-40 cursor-not-allowed animate-fade-in-up transition-all duration-500"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                {cardInner}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/5 backdrop-blur-sm rounded-3xl">
-                  <div className="bg-white/90 px-4 py-2 rounded-full shadow-lg">
-                    <p className="text-sm font-semibold text-gray-600">No Access</p>
-                  </div>
+        <div className="divide-y divide-gray-50">
+          {dashLoading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-6 py-3">
+                <div className="animate-pulse bg-gray-200 rounded-full w-8 h-8 flex-shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="animate-pulse bg-gray-200 rounded h-3 w-3/4" />
+                  <div className="animate-pulse bg-gray-200 rounded h-3 w-1/4" />
                 </div>
               </div>
-            );
-          })}
+            ))
+          ) : !dashData || dashData.recent_activity.length === 0 ? (
+            <div className="py-12 text-center text-sm text-gray-400">No recent activity</div>
+          ) : (
+            dashData.recent_activity.slice(0, 8).map((item) => (
+              <div key={item.id} className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 transition-colors">
+                <ActivityIcon type={item.type} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-700 truncate">{item.description}</p>
+                </div>
+                <span className="text-xs text-gray-400 flex-shrink-0">{relativeTime(item.created_at)}</span>
+              </div>
+            ))
+          )}
         </div>
-        )}
-
       </div>
 
       {/* Admin Onboarding Tour */}
       {showWalkthrough && isDemoAdmin && user && (
         <AdminOnboardingTour userId={user.id} onComplete={markWalkthroughComplete} />
       )}
-
-      {/* Add custom animations */}
-      <style jsx>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes fade-in-up {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out;
-        }
-
-        .animate-fade-in-up {
-          animation: fade-in-up 0.8s ease-out forwards;
-          opacity: 0;
-        }
-
-        .delay-100 {
-          animation-delay: 100ms;
-        }
-
-        .delay-200 {
-          animation-delay: 200ms;
-        }
-
-        .delay-300 {
-          animation-delay: 300ms;
-        }
-
-        .delay-1000 {
-          animation-delay: 1s;
-        }
-
-        .delay-2000 {
-          animation-delay: 2s;
-        }
-
-        @keyframes gradient {
-          0%, 100% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-        }
-
-        .animate-gradient {
-          background-size: 200% 200%;
-          animation: gradient 3s ease infinite;
-        }
-      `}</style>
     </div>
   );
 }
