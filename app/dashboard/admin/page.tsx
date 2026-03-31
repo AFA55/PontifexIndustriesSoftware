@@ -9,6 +9,7 @@ import { LogOut, LayoutGrid, BarChart3 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
 import AdminOnboardingTour from '@/components/AdminOnboardingTour';
+import NotificationBell from '@/components/NotificationBell';
 import {
   ADMIN_CARDS,
   ADMIN_DASHBOARD_ROLES,
@@ -307,6 +308,9 @@ export default function AdminDashboard() {
                   <p className="text-xs text-blue-200 capitalize font-medium">{user?.role?.replace('_', ' ') || 'Admin'}</p>
                 </div>
               </div>
+
+              {/* Notification Bell */}
+              <NotificationBell variant="dark" />
 
               {/* Operator View Button */}
               <Link

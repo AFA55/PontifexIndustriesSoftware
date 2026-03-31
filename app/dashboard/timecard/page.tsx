@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import {
@@ -51,7 +51,15 @@ function getWeekBounds(offset: number) {
   return { monday, sunday };
 }
 
-export default function TimecardPage() {
+export default function TimecardPageWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full" /></div>}>
+      <TimecardPage />
+    </Suspense>
+  );
+}
+
+function TimecardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [timecards, setTimecards] = useState<TimecardEntry[]>([]);
@@ -64,7 +72,9 @@ export default function TimecardPage() {
   const [nfcScanning, setNfcScanning] = useState(false);
   const [liveHours, setLiveHours] = useState('0.0');
   const [showTimeOffRequest, setShowTimeOffRequest] = useState(false);
+  const [bypassNfc, setBypassNfc] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isRedirecting = useRef(false);
 
   const redirectToLogin = useCallback(() => {
@@ -76,6 +86,14 @@ export default function TimecardPage() {
   }, []);
 
   const { monday, sunday } = useMemo(() => getWeekBounds(currentWeekOffset), [currentWeekOffset]);
+
+  // Check for bypass_nfc URL param
+  useEffect(() => {
+    if (searchParams.get('bypass_nfc') === 'true') {
+      setBypassNfc(true);
+      setClockMethod('gps');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -441,23 +459,46 @@ export default function TimecardPage() {
                 <span className="text-sm font-semibold">Not Clocked In</span>
               </div>
 
-              {/* Method selector */}
-              <div className="flex justify-center gap-2">
-                {([
-                  { key: 'nfc' as const, label: 'NFC Badge', icon: <Wifi size={13} /> },
-                  { key: 'gps' as const, label: 'GPS', icon: <MapPin size={13} /> },
-                  { key: 'remote' as const, label: 'Remote', icon: <Calendar size={13} /> },
-                ]).map(({ key, label, icon }) => (
-                  <button key={key} onClick={() => setClockMethod(key)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                      clockMethod === key ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}>
-                    {icon} {label}
-                  </button>
-                ))}
-              </div>
+              {/* Bypass NFC Banner */}
+              {bypassNfc && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left max-w-sm mx-auto">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-amber-800">Remote Clock-In</p>
+                      <p className="text-xs text-amber-600 mt-1">
+                        NFC requirement has been bypassed by your admin. GPS location will still be captured. Clock in using the button below.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              {clockMethod === 'nfc' && !nfcScanning ? (
+              {/* Method selector — hidden when bypass NFC is active */}
+              {!bypassNfc && (
+                <div className="flex justify-center gap-2">
+                  {([
+                    { key: 'nfc' as const, label: 'NFC Badge', icon: <Wifi size={13} /> },
+                    { key: 'gps' as const, label: 'GPS', icon: <MapPin size={13} /> },
+                    { key: 'remote' as const, label: 'Remote', icon: <Calendar size={13} /> },
+                  ]).map(({ key, label, icon }) => (
+                    <button key={key} onClick={() => setClockMethod(key)}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                        clockMethod === key ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}>
+                      {icon} {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {bypassNfc ? (
+                <button onClick={() => handleClockIn()} disabled={clockingAction}
+                  className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
+                  {clockingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
+                  Clock In (Remote - No NFC)
+                </button>
+              ) : clockMethod === 'nfc' && !nfcScanning ? (
                 <button onClick={() => setNfcScanning(true)} disabled={clockingAction}
                   className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
                   <Wifi className="w-5 h-5" />

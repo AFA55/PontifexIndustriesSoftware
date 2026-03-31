@@ -8,6 +8,7 @@ import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
 import OnboardingTour from '@/components/OnboardingTour';
 import NfcClockInModal from '@/components/NfcClockInModal';
+import NotificationBell from '@/components/NotificationBell';
 import { useBranding } from '@/lib/branding-context';
 
 // Dynamic Logo Component — uses branding if available
@@ -845,6 +846,9 @@ export default function Dashboard() {
                   <p className="text-xs text-blue-200 capitalize font-medium">{user?.role || 'Operator'}</p>
                 </div>
               </div>
+
+              {/* Notification Bell */}
+              <NotificationBell variant="dark" />
 
               {/* Premium Logout Button */}
               <button

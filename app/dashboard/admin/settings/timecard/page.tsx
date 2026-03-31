@@ -25,6 +25,7 @@ interface TimecardSettings {
   autoDeductBreaks: boolean;
   breakDuration: number; // minutes
   breakAfterHours: number;
+  breakIsPaid: boolean;
 
   // Requirements
   requireNfcClockIn: boolean;
@@ -50,9 +51,10 @@ const DEFAULT_SETTINGS: TimecardSettings = {
   otMultiplier: 1.5,
   doubleTimeMultiplier: 2.0,
   roundToNearest: 15,
-  autoDeductBreaks: false,
+  autoDeductBreaks: true,
   breakDuration: 30,
   breakAfterHours: 6,
+  breakIsPaid: false,
   requireNfcClockIn: false,
   requireGps: true,
   requireAdminApproval: true,
@@ -135,13 +137,39 @@ export default function TimecardSettingsPage() {
       router.push('/dashboard');
       return;
     }
-    // Load settings from localStorage (in production, from API/DB)
-    const stored = localStorage.getItem('timecard-settings');
-    if (stored) {
-      try { setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) }); }
-      catch { /* use defaults */ }
-    }
-    setLoading(false);
+    // Load settings from API, fall back to localStorage
+    const loadSettings = async () => {
+      try {
+        const res = await fetch('/api/admin/timecard-settings');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            const d = json.data;
+            setSettings(prev => ({
+              ...prev,
+              autoDeductBreaks: d.auto_deduct_break ?? prev.autoDeductBreaks,
+              breakDuration: d.break_duration_minutes ?? prev.breakDuration,
+              breakAfterHours: d.break_threshold_hours ?? prev.breakAfterHours,
+              breakIsPaid: d.break_is_paid ?? prev.breakIsPaid,
+              requireNfcClockIn: d.require_nfc ?? prev.requireNfcClockIn,
+              requireGps: d.require_gps ?? prev.requireGps,
+              allowRemoteClockIn: d.allow_remote ?? prev.allowRemoteClockIn,
+              weeklyOTThreshold: d.overtime_threshold ?? prev.weeklyOTThreshold,
+              autoClockOutAfter: d.auto_clock_out ?? prev.autoClockOutAfter,
+            }));
+          }
+        }
+      } catch {
+        // Fall back to localStorage
+        const stored = localStorage.getItem('timecard-settings');
+        if (stored) {
+          try { setSettings(s => ({ ...s, ...JSON.parse(stored) })); }
+          catch { /* use defaults */ }
+        }
+      }
+      setLoading(false);
+    };
+    loadSettings();
   }, [router]);
 
   const updateSetting = <K extends keyof TimecardSettings>(key: K, value: TimecardSettings[K]) => {
@@ -151,8 +179,30 @@ export default function TimecardSettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    // Simulate API call / save to localStorage
-    await new Promise(resolve => setTimeout(resolve, 600));
+    try {
+      // Save to API
+      const res = await fetch('/api/admin/timecard-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auto_deduct_break: settings.autoDeductBreaks,
+          break_duration_minutes: settings.breakDuration,
+          break_threshold_hours: settings.breakAfterHours,
+          break_is_paid: settings.breakIsPaid,
+          require_nfc: settings.requireNfcClockIn,
+          require_gps: settings.requireGps,
+          allow_remote: settings.allowRemoteClockIn,
+          overtime_threshold: settings.weeklyOTThreshold,
+          auto_clock_out: settings.autoClockOutAfter,
+        }),
+      });
+      if (!res.ok) {
+        console.error('Failed to save settings to API');
+      }
+    } catch {
+      console.error('Error saving settings');
+    }
+    // Also persist to localStorage as backup
     localStorage.setItem('timecard-settings', JSON.stringify(settings));
     setSaving(false);
     setSaved(true);
@@ -334,31 +384,41 @@ export default function TimecardSettingsPage() {
               <Toggle
                 enabled={settings.autoDeductBreaks}
                 onChange={(v) => updateSetting('autoDeductBreaks', v)}
-                label="Auto-Deduct Breaks"
-                description="Automatically subtract break time from total hours"
+                label="Auto-deduct lunch break"
+                description="Automatically deduct a lunch break from total hours when shift exceeds a threshold"
               />
             </div>
 
             {settings.autoDeductBreaks && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pl-4 border-l-2 border-blue-200 bg-blue-50/30 rounded-r-lg py-3 pr-4">
-                <NumberInput
-                  label="Break Duration"
-                  description="Length of auto-deducted break"
-                  value={settings.breakDuration}
-                  onChange={(v) => updateSetting('breakDuration', v)}
-                  unit="minutes"
-                  min={15}
-                  max={60}
-                />
-                <NumberInput
-                  label="Break After"
-                  description="Deduct break after this many hours"
-                  value={settings.breakAfterHours}
-                  onChange={(v) => updateSetting('breakAfterHours', v)}
-                  unit="hours"
-                  min={2}
-                  max={10}
-                />
+              <div className="space-y-4 pl-4 border-l-2 border-blue-200 bg-blue-50/30 rounded-r-lg py-3 pr-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <NumberInput
+                    label="Break duration (minutes)"
+                    description="Length of the auto-deducted lunch break"
+                    value={settings.breakDuration}
+                    onChange={(v) => updateSetting('breakDuration', v)}
+                    unit="minutes"
+                    min={15}
+                    max={60}
+                  />
+                  <NumberInput
+                    label="Deduct after working (hours)"
+                    description="Only deduct break if total shift exceeds this many hours"
+                    value={settings.breakAfterHours}
+                    onChange={(v) => updateSetting('breakAfterHours', v)}
+                    unit="hours"
+                    min={2}
+                    max={10}
+                  />
+                </div>
+                <div className="border-t border-blue-100 pt-3">
+                  <Toggle
+                    enabled={settings.breakIsPaid}
+                    onChange={(v) => updateSetting('breakIsPaid', v)}
+                    label="Paid break"
+                    description="If enabled, break time counts toward paid hours. If disabled, break time is subtracted from total hours."
+                  />
+                </div>
               </div>
             )}
           </div>

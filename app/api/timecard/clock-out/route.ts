@@ -171,7 +171,37 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const clockInTime = new Date(activeTimecard.clock_in_time);
     const milliseconds = now.getTime() - clockInTime.getTime();
-    const totalHours = milliseconds / (1000 * 60 * 60); // Convert to hours
+    let totalHours = milliseconds / (1000 * 60 * 60); // Convert to hours
+
+    // Fetch tenant timecard settings for break auto-deduction
+    let breakMinutesDeducted = 0;
+    try {
+      const tenantId = auth.tenantId;
+      let settingsQuery = supabaseAdmin
+        .from('timecard_settings')
+        .select('auto_deduct_break, break_duration_minutes, break_threshold_hours, break_is_paid');
+      if (tenantId) {
+        settingsQuery = settingsQuery.eq('tenant_id', tenantId);
+      }
+      const { data: tcSettings } = await settingsQuery.limit(1).maybeSingle();
+
+      const autoDeduct = tcSettings?.auto_deduct_break ?? true;
+      const breakDuration = tcSettings?.break_duration_minutes ?? 30;
+      const breakThreshold = tcSettings?.break_threshold_hours ?? 6;
+      const breakIsPaid = tcSettings?.break_is_paid ?? false;
+
+      if (autoDeduct && totalHours > breakThreshold) {
+        breakMinutesDeducted = breakDuration;
+        if (!breakIsPaid) {
+          // Subtract break time from total hours
+          totalHours -= breakDuration / 60;
+          if (totalHours < 0) totalHours = 0;
+        }
+      }
+    } catch {
+      // If settings table doesn't exist or query fails, skip break deduction
+      console.warn('Could not fetch timecard settings for break deduction');
+    }
 
     // Auto-close any open helper work logs (started but not completed)
     // This handles the case where a helper clocks out without pressing "Complete Day"
@@ -210,6 +240,7 @@ export async function POST(request: NextRequest) {
         clock_out_longitude: longitude,
         clock_out_accuracy: accuracy || null,
         total_hours: parseFloat(totalHours.toFixed(2)),
+        break_minutes: breakMinutesDeducted,
       })
       .eq('id', activeTimecard.id)
       .select()
@@ -251,6 +282,7 @@ export async function POST(request: NextRequest) {
             longitude: updatedTimecard.clock_out_longitude,
             accuracy: updatedTimecard.clock_out_accuracy,
           },
+          breakMinutesDeducted,
           distanceFromShop: locationCheck.distanceFormatted,
         },
       },
