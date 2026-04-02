@@ -286,7 +286,7 @@ export default function AdminJobDetailPage({
         return;
       }
       const json = await res.json();
-      setJob(json.data);
+      setJob(json.data.job);
     } catch {
       setPageError('Network error loading job.');
     }
@@ -297,7 +297,7 @@ export default function AdminJobDetailPage({
       const res = await apiFetch(`/api/admin/jobs/${jobId}/scope`);
       if (res.ok) {
         const json = await res.json();
-        setScopeItems(json.data || []);
+        setScopeItems(json.data?.scope_items || []);
       }
     } catch { /* ignore */ }
   }, [jobId]);
@@ -311,7 +311,7 @@ export default function AdminJobDetailPage({
       });
       if (res.ok) {
         const json = await res.json();
-        setActivityLog(json.data?.activityLog || []);
+        setActivityLog(json.data?.entries || []);
       }
     } catch { /* ignore */ }
   }, [jobId]);
@@ -332,7 +332,7 @@ export default function AdminJobDetailPage({
     setActionFeedback(null);
     try {
       const res = await apiFetch(`/api/admin/jobs/${job.id}/completion-request`, {
-        method: 'POST',
+        method: 'PUT',
         body: JSON.stringify({ action: 'approve', review_notes: reviewNotes }),
       });
       const json = await res.json();
@@ -353,7 +353,7 @@ export default function AdminJobDetailPage({
     setActionFeedback(null);
     try {
       const res = await apiFetch(`/api/admin/jobs/${job.id}/completion-request`, {
-        method: 'POST',
+        method: 'PUT',
         body: JSON.stringify({ action: 'reject', review_notes: reviewNotes }),
       });
       const json = await res.json();

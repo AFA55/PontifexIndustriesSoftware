@@ -1,11 +1,34 @@
 /**
- * API Route: DELETE /api/job-orders/[id]
- * Delete a job order (admin only)
+ * API Route: /api/job-orders/[id]
+ * GET    — authenticated; fetch a single job order
+ * DELETE — admin only; delete a job order
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { requireAuth } from '@/lib/api-auth';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
+    const { id } = await params;
+    const { data, error } = await supabaseAdmin
+      .from('job_orders')
+      .select('*, profiles!job_orders_assigned_to_fkey(full_name, role)')
+      .eq('id', id)
+      .eq('tenant_id', auth.tenantId)
+      .single();
+    if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ success: true, data });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
 
 export async function DELETE(
   request: NextRequest,

@@ -622,10 +622,10 @@ export default function DayCompletePage() {
                 consented={esignConsented}
               />
 
-              {/* Complete Button */}
+              {/* Complete Button — goes through approval workflow */}
               <button
-                onClick={handleJobComplete}
-                disabled={submitting || !esignConsented}
+                onClick={() => { setShowSignature(false); setShowCompletionModal(true); }}
+                disabled={submitting}
                 className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl py-4 font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {submitting ? (
@@ -633,16 +633,16 @@ export default function DayCompletePage() {
                 ) : (
                   <CheckCircle2 className="w-5 h-5" />
                 )}
-                {submitting ? 'Completing...' : 'Complete Job'}
+                {submitting ? 'Submitting...' : 'Submit for Approval'}
               </button>
 
-              {/* Skip signature option */}
+              {/* Skip signature — still goes through approval workflow */}
               <button
-                onClick={handleJobComplete}
-                disabled={submitting || !esignConsented}
+                onClick={() => { setShowSignature(false); setShowCompletionModal(true); }}
+                disabled={submitting}
                 className="w-full text-slate-500 text-sm hover:text-slate-700 py-2 disabled:opacity-40"
               >
-                Skip signature and complete
+                Skip signature and submit for approval
               </button>
             </div>
           </div>

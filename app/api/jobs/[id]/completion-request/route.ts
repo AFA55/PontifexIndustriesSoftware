@@ -93,7 +93,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           notification_type: 'completion_review',
           title: 'Job Completion Review Required',
           message: `Operator has submitted ${job.job_number} for completion approval. Please review and confirm.`,
-          action_url: `/dashboard/admin/completed-jobs/${jobId}`,
+          action_url: `/dashboard/admin/jobs/${jobId}`,
           related_entity_type: 'job_order',
           related_entity_id: jobId,
           is_read: false,

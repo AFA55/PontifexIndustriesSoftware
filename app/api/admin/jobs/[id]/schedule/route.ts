@@ -28,6 +28,7 @@ export async function PUT(
       .update({
         scheduled_date,
         end_date: end_date || null,
+        scheduled_end_date: end_date || null,
       })
       .eq('id', jobId)
       .eq('tenant_id', auth.tenantId);
