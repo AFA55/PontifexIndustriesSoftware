@@ -1,32 +1,32 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Plus, Calendar, User, Building2, Send, Clock, MapPin, Wrench, Phone, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Plus, Calendar, User, Building2, Send, MapPin, Wrench, Phone, AlertCircle, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-const SERVICE_TYPES = [
-  { code: 'ECD', label: 'Electric Core Drilling' },
-  { code: 'HFCD', label: 'High Freq Core Drilling' },
-  { code: 'HCD', label: 'Hydraulic Core Drilling' },
-  { code: 'DFS', label: 'Diesel Floor Sawing' },
-  { code: 'WS/TS', label: 'Wall/Track Sawing' },
-  { code: 'CS', label: 'Chain Sawing' },
-  { code: 'HHS/PS', label: 'Handheld / Push Sawing' },
-  { code: 'WireSaw', label: 'Wire Sawing' },
-  { code: 'GPR', label: 'GPR Scanning' },
-  { code: 'Demo', label: 'Selective Demo' },
-  { code: 'Brokk', label: 'Brokk' },
-  { code: 'Other', label: 'Other' },
+const JOB_TYPES = [
+  { code: 'wall_sawing', label: 'Wall Sawing' },
+  { code: 'core_drilling', label: 'Core Drilling' },
+  { code: 'wire_sawing', label: 'Wire Sawing' },
+  { code: 'flat_sawing', label: 'Flat Sawing' },
+  { code: 'hand_sawing', label: 'Hand Sawing' },
+  { code: 'road_sawing', label: 'Road Sawing' },
+  { code: 'ring_sawing', label: 'Ring Sawing' },
+  { code: 'chain_sawing', label: 'Chain Sawing' },
+  { code: 'demolition', label: 'Demolition' },
+  { code: 'cleanup', label: 'Cleanup' },
+  { code: 'mobilization', label: 'Mobilization' },
+  { code: 'other', label: 'Other' },
 ];
 
 export interface QuickAddData {
   salesmanName: string;
   salesmanId: string;
-  startDate: string;
+  start_date: string;
+  end_date: string;
   contractorName: string;
-  durationDays: number;
   scope: string;
-  jobType: string;
+  jobTypes: string[];
   address: string;
   contactName: string;
   contactPhone: string;
@@ -45,17 +45,18 @@ interface QuickAddModalProps {
 export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddModalProps) {
   const [salesmanName, setSalesmanName] = useState('');
   const [salesmanId, setSalesmanId] = useState('');
-  const [startDate, setStartDate] = useState('');
+  const [start_date, setStartDate] = useState('');
+  const [end_date, setEndDate] = useState('');
   const [contractorName, setContractorName] = useState('');
-  const [durationDays, setDurationDays] = useState(1);
   const [scope, setScope] = useState('');
-  const [jobType, setJobType] = useState('');
+  const [jobTypes, setJobTypes] = useState<string[]>([]);
   const [address, setAddress] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [priority, setPriority] = useState('medium');
   const [estimatedCost, setEstimatedCost] = useState('');
   const [salesmanOptions, setSalesmanOptions] = useState<SalesmanOption[]>([]);
+  const [dateError, setDateError] = useState('');
 
   useEffect(() => {
     const fetchSalesmen = async () => {
@@ -70,7 +71,7 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
     fetchSalesmen();
   }, []);
 
-  const isValid = salesmanName.trim() && startDate && contractorName.trim() && jobType;
+  const isValid = salesmanName.trim() && start_date && end_date && contractorName.trim() && jobTypes.length > 0 && !dateError;
 
   const handleSalesmanChange = (name: string) => {
     setSalesmanName(name);
@@ -79,12 +80,39 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
   };
 
   // Block weekends from date picker
-  const handleDateChange = (val: string) => {
-    if (!val) { setStartDate(''); return; }
+  const isWeekend = (val: string): boolean => {
+    if (!val) return false;
     const d = new Date(val + 'T00:00:00');
-    const day = d.getDay(); // 0=Sun 6=Sat
-    if (day === 0 || day === 6) return; // silently reject weekends
+    const day = d.getDay();
+    return day === 0 || day === 6;
+  };
+
+  const handleStartDateChange = (val: string) => {
+    if (!val) { setStartDate(''); setEndDate(''); setDateError(''); return; }
+    if (isWeekend(val)) return; // silently reject weekends
     setStartDate(val);
+    // Default end date to same as start if not set or end < start
+    if (!end_date || end_date < val) {
+      setEndDate(val);
+    }
+    setDateError('');
+  };
+
+  const handleEndDateChange = (val: string) => {
+    if (!val) { setEndDate(''); setDateError(''); return; }
+    if (isWeekend(val)) return; // silently reject weekends
+    if (start_date && val < start_date) {
+      setDateError('End date must be on or after start date');
+    } else {
+      setDateError('');
+    }
+    setEndDate(val);
+  };
+
+  const toggleJobType = (code: string) => {
+    setJobTypes(prev =>
+      prev.includes(code) ? prev.filter(t => t !== code) : [...prev, code]
+    );
   };
 
   return (
@@ -108,7 +136,7 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
           </div>
 
           <div className="p-4 space-y-3">
-            {/* Customer + Job Type */}
+            {/* Customer + Salesman */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Customer Name *</label>
@@ -119,22 +147,6 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
                     className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white placeholder:text-gray-400" />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Job Type *</label>
-                <div className="relative">
-                  <Wrench className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                  <select value={jobType} onChange={(e) => setJobType(e.target.value)}
-                    className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white appearance-none">
-                    <option value="">Select type...</option>
-                    {SERVICE_TYPES.map(st => <option key={st.code} value={st.code}>{st.label}</option>)}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-
-            {/* Salesman + Priority */}
-            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Salesman *</label>
                 <div className="relative">
@@ -150,6 +162,34 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                 </div>
               </div>
+            </div>
+
+            {/* Start Date + End Date */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date *</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input type="date" value={start_date} onChange={(e) => handleStartDateChange(e.target.value)}
+                    className="w-full pl-9 pr-2 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">End Date *</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input type="date" value={end_date} onChange={(e) => handleEndDateChange(e.target.value)}
+                    min={start_date || undefined}
+                    className={`w-full pl-9 pr-2 py-2 border rounded-lg focus:ring-1 text-sm text-gray-900 bg-white ${
+                      dateError ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
+                    }`} />
+                </div>
+                {dateError && <p className="text-xs text-red-500 mt-0.5">{dateError}</p>}
+              </div>
+            </div>
+
+            {/* Priority + Est Cost */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Priority</label>
                 <div className="flex gap-1.5">
@@ -166,37 +206,40 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
                   ))}
                 </div>
               </div>
-            </div>
-
-            {/* Date + Duration + Est Cost */}
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date *</label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                  <input type="date" value={startDate} onChange={(e) => handleDateChange(e.target.value)}
-                    className="w-full pl-9 pr-2 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Duration</label>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 5].map(d => (
-                    <button key={d} type="button" onClick={() => setDurationDays(d)}
-                      className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                        durationDays === d ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}>{d}</button>
-                  ))}
-                  <input type="number" min={1} max={60} value={durationDays}
-                    onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-12 h-8 px-1 border border-gray-300 rounded-lg text-xs text-center focus:border-blue-500 text-gray-900" />
-                </div>
-              </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Est. Quote $</label>
                 <input type="text" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value.replace(/[^0-9.]/g, ''))}
                   placeholder="0.00" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white placeholder:text-gray-400" />
               </div>
+            </div>
+
+            {/* Job Types — multi-select chips */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
+                <Wrench className="w-3 h-3" /> Job Types * <span className="text-gray-400 font-normal">(select all that apply)</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {JOB_TYPES.map(jt => {
+                  const selected = jobTypes.includes(jt.code);
+                  return (
+                    <button
+                      key={jt.code}
+                      type="button"
+                      onClick={() => toggleJobType(jt.code)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                        selected
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                      }`}
+                    >
+                      {selected && <span className="mr-1">✓</span>}{jt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {jobTypes.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">No types selected yet</p>
+              )}
             </div>
 
             {/* Address */}
@@ -251,7 +294,7 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
                 Cancel
               </button>
               <button
-                onClick={() => isValid && onSubmit({ salesmanName, salesmanId, startDate, contractorName, durationDays, scope, jobType, address, contactName, contactPhone, priority, estimatedCost })}
+                onClick={() => isValid && onSubmit({ salesmanName, salesmanId, start_date, end_date, contractorName, scope, jobTypes, address, contactName, contactPhone, priority, estimatedCost })}
                 disabled={!isValid}
                 className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-lg font-semibold text-sm transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
                 <Send className="w-3.5 h-3.5" /> Create & Notify

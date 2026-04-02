@@ -478,7 +478,11 @@ export default function ScheduleBoardPage() {
     setLoading(true);
     try {
       const res = await apiFetch(`/api/admin/schedule-board?date=${date}`);
-      if (!res.ok) throw new Error('Failed to fetch');
+      if (!res.ok) {
+        let errMsg = `HTTP ${res.status}`;
+        try { const j = await res.json(); errMsg = j.error || errMsg; } catch { /* ignore */ }
+        throw new Error(errMsg);
+      }
       const json = await res.json();
 
       const unassigned = (json.data?.unassigned || []).map(toJobCard);
@@ -540,9 +544,9 @@ export default function ScheduleBoardPage() {
       setUnassignedJobs(unassigned);
       setPendingJobs(pending);
       setWillCallJobs(willCall);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch schedule:', err);
-      addToast('error', 'Failed to Load', 'Could not fetch schedule data');
+      addToast('error', 'Failed to Load', err?.message || 'Could not fetch schedule data');
     } finally {
       setLoading(false);
     }
@@ -1465,12 +1469,12 @@ export default function ScheduleBoardPage() {
         method: 'POST',
         body: JSON.stringify({
           contractorName: data.contractorName,
-          startDate: data.startDate,
-          durationDays: data.durationDays,
+          start_date: data.start_date,
+          end_date: data.end_date,
           scope: data.scope,
           salesmanName: data.salesmanName,
           salesmanId: data.salesmanId,
-          jobType: data.jobType,
+          jobTypes: data.jobTypes,
           address: data.address,
           contactName: data.contactName,
           contactPhone: data.contactPhone,
@@ -1482,7 +1486,7 @@ export default function ScheduleBoardPage() {
         const err = await res.json();
         throw new Error(err.error || 'Failed to create quick-add job');
       }
-      addToast('success', `Quick Add: ${data.contractorName}`, `${data.jobType} job created — ${data.salesmanName} notified to complete Schedule Form`);
+      addToast('success', `Quick Add: ${data.contractorName}`, `${data.jobTypes.join(', ')} job created — ${data.salesmanName} notified to complete Schedule Form`);
       fetchScheduleData(selectedDate);
     } catch (err: any) {
       addToast('error', 'Quick Add Failed', err.message || 'Could not create job');

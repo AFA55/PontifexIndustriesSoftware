@@ -15,27 +15,25 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      contractorName, startDate, durationDays, scope, salesmanName,
-      salesmanId, jobType, address, contactName, contactPhone, priority, estimatedCost
+      contractorName, start_date, end_date, scope, salesmanName,
+      salesmanId, jobTypes, address, contactName, contactPhone, priority, estimatedCost
     } = body;
 
     if (!contractorName?.trim()) {
       return NextResponse.json({ error: 'Contractor name is required' }, { status: 400 });
     }
-    if (!startDate) {
+    if (!start_date) {
       return NextResponse.json({ error: 'Start date is required' }, { status: 400 });
     }
-    if (!jobType) {
-      return NextResponse.json({ error: 'Job type is required' }, { status: 400 });
+    if (!jobTypes || (Array.isArray(jobTypes) && jobTypes.length === 0)) {
+      return NextResponse.json({ error: 'At least one job type is required' }, { status: 400 });
+    }
+    if (end_date && end_date < start_date) {
+      return NextResponse.json({ error: 'End date must be on or after start date' }, { status: 400 });
     }
 
-    // Calculate end date from duration
-    let endDate: string | null = null;
-    if (durationDays && durationDays > 1) {
-      const start = new Date(startDate + 'T00:00:00');
-      start.setDate(start.getDate() + (durationDays - 1));
-      endDate = start.toISOString().split('T')[0];
-    }
+    const endDate: string | null = end_date || start_date;
+    const jobType = Array.isArray(jobTypes) ? jobTypes.join(', ') : (jobTypes as string);
 
     const jobNumber = `QA-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -46,7 +44,7 @@ export async function POST(request: NextRequest) {
       customer_contact: contactPhone || null,
       status: auth.role === 'super_admin' ? 'scheduled' : 'pending_approval',
       priority: priority || 'medium',
-      scheduled_date: startDate,
+      scheduled_date: start_date,
       end_date: endDate,
       description: scope || null,
       job_type: jobType,
@@ -91,7 +89,7 @@ export async function POST(request: NextRequest) {
             job_number: jobNumber,
             customer_name: contractorName.trim(),
             job_type: jobType,
-            scheduled_date: startDate,
+            scheduled_date: start_date,
             created_by: auth.userEmail,
             missing_items: ['equipment_needed', 'jobsite_conditions', 'permits', 'full_scope'],
           },

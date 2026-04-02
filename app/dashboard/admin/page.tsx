@@ -744,8 +744,8 @@ export default function AdminDashboard() {
                 href="/dashboard/admin/schedule-form"
                 className="flex flex-col items-center gap-2 p-4 bg-green-50 hover:bg-green-100 rounded-xl border border-green-200 text-green-700 transition-colors cursor-pointer"
               >
-                <FileText className="w-5 h-5" />
-                <span className="text-xs font-semibold">New Estimate</span>
+                <Calendar className="w-5 h-5" />
+                <span className="text-xs font-semibold">Schedule Form</span>
               </Link>
               <Link
                 href="/dashboard/admin/timecards"
