@@ -88,6 +88,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Settings', href: '/dashboard/admin/settings', icon: Settings },
       { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, badgeKey: 'notifications' },
       { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3 },
+      { label: 'Billing', href: '/dashboard/admin/subscription', icon: CreditCard },
     ],
   },
 ];
