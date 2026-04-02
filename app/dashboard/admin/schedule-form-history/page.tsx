@@ -144,7 +144,11 @@ export default function ScheduleFormHistoryPage() {
     setLoading(true);
     try {
       const res = await apiFetch(`/api/admin/schedule-forms?status=${activeTab}`);
-      if (!res.ok) throw new Error('Failed to fetch');
+      if (!res.ok) {
+        let errMsg = `HTTP ${res.status}`;
+        try { const j = await res.json(); errMsg = j.error || errMsg; } catch { /* ignore */ }
+        throw new Error(errMsg);
+      }
       const json = await res.json();
       setForms(json.data || []);
     } catch (err) {

@@ -18,6 +18,7 @@ import {
   type PermissionLevel,
 } from '@/lib/rbac';
 import PermissionEditorModal from './_components/PermissionEditorModal';
+import RolePermissionsPanel from './_components/RolePermissionsPanel';
 import {
   ArrowLeft, Users, UserPlus, Shield, Bell, CheckCircle2,
   ChevronDown, ChevronUp, Search, Trash2, UserCheck, UserX,
@@ -130,6 +131,9 @@ export default function TeamManagementPage() {
 
   // Processing
   const [processing, setProcessing] = useState(false);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'team' | 'permissions'>('team');
 
   // Create User modal
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
@@ -605,6 +609,49 @@ export default function TeamManagementPage() {
           </div>
         </div>
 
+        {/* ── Tab Switcher ─────────────────────────────────────── */}
+        <div className="flex gap-1.5 mb-5 bg-white rounded-xl border border-gray-200 shadow-sm p-1.5">
+          <button
+            onClick={() => setActiveTab('team')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all flex-1 sm:flex-none justify-center sm:justify-start ${
+              activeTab === 'team'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Team Members
+            {pendingRequests.length > 0 && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === 'team' ? 'bg-white/25 text-white' : 'bg-amber-500 text-white'}`}>
+                {pendingRequests.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('permissions')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all flex-1 sm:flex-none justify-center sm:justify-start ${
+              activeTab === 'permissions'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            Role Permissions
+          </button>
+        </div>
+
+        {/* ── Role Permissions Tab ──────────────────────────────── */}
+        {activeTab === 'permissions' && (
+          <RolePermissionsPanel
+            getAuthHeaders={getAuthHeaders}
+            editorRole={userRole}
+          />
+        )}
+
+        {/* ── Team Members Tab ─────────────────────────────────── */}
+        {activeTab === 'team' && (
+          <>
+
         {/* ── Access Requests Section ──────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
           <button
@@ -902,6 +949,9 @@ export default function TeamManagementPage() {
             </div>
           )}
         </div>
+
+          </>
+        )}
       </div>
 
       {/* ── Modals ───────────────────────────────────────────── */}
