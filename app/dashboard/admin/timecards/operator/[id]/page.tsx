@@ -162,6 +162,7 @@ function OperatorTimecardDetailPageInner() {
     return searchParams.get('weekStart') || getWeekStart(0);
   });
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
@@ -210,6 +211,7 @@ function OperatorTimecardDetailPageInner() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       const token = await getSessionToken();
       if (!token) return;
 
@@ -219,24 +221,37 @@ function OperatorTimecardDetailPageInner() {
       );
 
       if (response.status === 401) { redirectToLogin(); return; }
-      if (response.status === 404) { router.push('/dashboard/admin/timecards'); return; }
+      if (response.status === 403) {
+        setFetchError('You do not have permission to view this operator\'s timecards.');
+        return;
+      }
+      if (response.status === 404) {
+        setFetchError('Operator not found. The user may have been deactivated or does not exist.');
+        return;
+      }
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        setFetchError(errBody.error || `Server error (${response.status}). Please try again.`);
+        return;
+      }
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setOperator(result.data.operator);
-          setEntries(result.data.entries);
-          setStats(result.data.stats);
-          setWeekStatus(result.data.weekStatus);
-          setWeekNotes(result.data.weekSummary?.notes || '');
-        }
+      const result = await response.json();
+      if (result.success) {
+        setOperator(result.data.operator);
+        setEntries(result.data.entries);
+        setStats(result.data.stats);
+        setWeekStatus(result.data.weekStatus);
+        setWeekNotes(result.data.weekSummary?.notes || '');
+      } else {
+        setFetchError(result.error || 'Failed to load operator data.');
       }
     } catch (error) {
       console.error('Error fetching operator data:', error);
+      setFetchError('Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
-  }, [operatorId, weekStart, getSessionToken, redirectToLogin, router]);
+  }, [operatorId, weekStart, getSessionToken, redirectToLogin]);
 
   useEffect(() => {
     if (user) fetchData();
@@ -488,7 +503,7 @@ function OperatorTimecardDetailPageInner() {
     );
   };
 
-  // ── Loading state ───────────────────────────────────────────
+  // ── Auth loading state ──────────────────────────────────────
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
@@ -498,6 +513,48 @@ function OperatorTimecardDetailPageInner() {
             <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"></div>
           </div>
           <p className="text-gray-500 text-sm font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error state ─────────────────────────────────────────────
+  if (!loading && fetchError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
+            <Link
+              href="/dashboard/admin/timecards"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all text-sm font-medium"
+            >
+              <ArrowLeft size={16} />
+              <span className="hidden sm:inline">Timecards</span>
+            </Link>
+            <div className="h-6 w-px bg-gray-200" />
+            <h1 className="text-sm font-bold text-gray-900">Operator Detail</h1>
+          </div>
+        </header>
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-16 text-center">
+          <div className="inline-flex w-16 h-16 rounded-2xl bg-red-50 items-center justify-center mb-4">
+            <XCircle size={28} className="text-red-400" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Could not load operator</h2>
+          <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">{fetchError}</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => fetchData()}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              Try Again
+            </button>
+            <Link
+              href="/dashboard/admin/timecards"
+              className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-semibold border border-gray-200 transition-colors"
+            >
+              Back to Timecards
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -590,6 +647,19 @@ function OperatorTimecardDetailPageInner() {
       </header>
 
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5">
+        {/* ── Data loading spinner ─────────────────────────── */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div className="w-12 h-12 relative mb-4">
+              <div className="absolute inset-0 rounded-full border-4 border-gray-200" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-600 animate-spin" />
+            </div>
+            <p className="text-sm text-gray-500 font-medium">Loading timecard data...</p>
+          </div>
+        )}
+
+        {!loading && (
+        <>
         {/* ── Week Navigation ──────────────────────────────── */}
         <div className="mb-5 flex items-center justify-between">
           <button
@@ -1113,6 +1183,8 @@ function OperatorTimecardDetailPageInner() {
             </div>
           ))}
         </div>
+        </>
+        )}
       </div>
 
       {/* ── Edit Modal ─────────────────────────────────────── */}
