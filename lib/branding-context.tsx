@@ -170,12 +170,57 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     fetchBranding();
   }, [fetchBranding]);
 
-  // Update document title when branding loads
+  // Apply branding to document: CSS custom properties, favicon, and title
   useEffect(() => {
-    if (!loading && branding.company_name) {
+    if (loading) return;
+
+    // CSS custom properties for dynamic theming
+    if (branding.primary_color) {
+      document.documentElement.style.setProperty('--color-primary', branding.primary_color);
+    }
+    if (branding.primary_color_dark) {
+      document.documentElement.style.setProperty('--color-primary-dark', branding.primary_color_dark);
+    }
+    if (branding.secondary_color) {
+      document.documentElement.style.setProperty('--color-secondary', branding.secondary_color);
+    }
+    if (branding.accent_color) {
+      document.documentElement.style.setProperty('--color-accent', branding.accent_color);
+    }
+    if (branding.header_bg_color) {
+      document.documentElement.style.setProperty('--color-header-bg', branding.header_bg_color);
+    }
+    if (branding.sidebar_bg_color) {
+      document.documentElement.style.setProperty('--color-sidebar-bg', branding.sidebar_bg_color);
+    }
+
+    // Document title
+    if (branding.company_name) {
       document.title = `${branding.company_name} - ${branding.tagline}`;
     }
-  }, [branding.company_name, branding.tagline, loading]);
+
+    // Favicon
+    if (branding.favicon_url) {
+      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = branding.favicon_url;
+    }
+  }, [
+    branding.primary_color,
+    branding.primary_color_dark,
+    branding.secondary_color,
+    branding.accent_color,
+    branding.header_bg_color,
+    branding.sidebar_bg_color,
+    branding.company_name,
+    branding.tagline,
+    branding.favicon_url,
+    loading,
+  ]);
 
   return (
     <BrandingContext.Provider value={{ branding, loading, refreshBranding }}>

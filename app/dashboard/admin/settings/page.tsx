@@ -11,6 +11,7 @@ import {
   Hash, Bell, Minus, Plus, Users, Palette, ChevronRight
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { useBranding } from '@/lib/branding-context';
 
 interface ScheduleSettings {
   max_slots: number;
@@ -21,6 +22,7 @@ interface ScheduleSettings {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { branding } = useBranding();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -260,15 +262,30 @@ export default function SettingsPage() {
               href="/dashboard/admin/settings/branding"
               className="block bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden hover:shadow-2xl transition-all hover:scale-[1.01]"
             >
-              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold flex items-center gap-2">
-                    <Palette className="w-5 h-5" />
-                    Company Branding
-                  </h2>
-                  <p className="text-purple-200 text-sm mt-0.5">Customize your company name, logo, colors, and feature modules</p>
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  {branding.logo_url ? (
+                    <img
+                      src={branding.logo_url}
+                      alt="Company logo"
+                      className="h-10 w-auto max-w-[80px] object-contain rounded-lg bg-white/10 p-1 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                      <Palette className="w-5 h-5 text-white" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-bold flex items-center gap-2 flex-wrap">
+                      Branding &amp; White-Label
+                      <span className="text-xs font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">
+                        Super Admin Only
+                      </span>
+                    </h2>
+                    <p className="text-purple-200 text-sm mt-0.5">Logo, colors, company name and tagline</p>
+                  </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-white/70" />
+                <ChevronRight className="w-5 h-5 text-white/70 flex-shrink-0" />
               </div>
             </Link>
           )}
