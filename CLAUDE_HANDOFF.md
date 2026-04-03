@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 3, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (189 pages)
+**Date:** March 31, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅
 
 ---
 
@@ -7,274 +7,179 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `87decf59` — "security: comprehensive audit — auth guards, tenant isolation, input validation"
+- **Last commit:** `c4e5d2d6` — "feat: job scope panel, progress chart, and admin job detail page integration"
 - **Pushed to origin** ✅
-- **Build:** PASSING (0 errors, 189 pages)
+- **Build:** PASSING (0 errors)
 
-### Recent Commits (this session)
+### Recent Commits (This Session)
 ```
-87decf59 security: comprehensive audit — auth guards, tenant isolation, input validation
-fe357e6e feat: personalized Patriot Concrete Cutting sales page
-94cef093 feat: replace homepage with personalized Doug sales page (initial)
-1e09733a chore: update handoff — Vercel deployment live ✅
-c16a7ee1 chore: update handoff — worktree merged, Vercel action items documented
-8e7eb3d6 merge: bring nifty-mcclintock worktree changes into feature/schedule-board-v2
+c4e5d2d6 feat: job scope panel, progress chart, and admin job detail page integration
+da815f52 feat: operator progress tracking, smart day-complete logic, and completion approval flow
+b6f07286 feat: job scope tracking, daily progress logging, and completion approval workflow
+bbe10595 fix: timecards pending badge — use approval_status='pending' not is_approved=false
+074d3650 feat: personalized admin dashboards — personal/team scope per role
+b2c0b0c5 feat: smart schedule form, light theme audit, error boundaries, loading states
 ```
 
 ---
 
 ## WHAT WAS DONE (This Session)
 
-### 1. Database Cleanup — Fresh Slate
-- Deleted all 22 test jobs, 11 test customers, 5 timecards, 6 daily logs, 2 invoices, all notifications
-- Removed 18 fake demo operator profiles (auth records remain but 403 on login)
-- **Kept 4 accounts:** Super Admin, Demo Admin, Demo Operator, Demo Team Member
-- Preserved all tenant config, NFC tags, RLS policies, settings
+### 1. Personalized Dashboards (Personal/Team Scope)
+- `app/api/admin/dashboard-summary/route.ts` — upgraded with `?scope=personal|team` param
+  - Personal: filters by `assigned_to`, `created_by`, `user_id` — shows MY metrics only
+  - Team: shows full tenant-wide metrics (non-super_admin forced to personal server-side)
+  - Returns `scope` and `viewed_user: { id, name, role }` in response
+- `app/dashboard/admin/page.tsx` — rebuilt with scope toggle
+  - super_admin / ops_manager default to team; others default to personal
+  - Toggle visible only to senior roles
+  - Personal identity banner: "Showing your personal metrics"
+  - Scope-aware KPI labels and section titles
 
-### 2. User Feature Flags System (FORGE)
-**New DB tables:**
-- `user_feature_flags` — 19 boolean toggles per user (schedule, jobs, people, tools, admin)
-- `user_invitations` — email invite tokens with pre-set flags, 7-day expiry
-- Extended `profiles` with: `setup_completed`, `waiver_signed_at`, `waiver_ip`, `notification_consent`
-- Extended `schedule_change_requests` with: `current_value`, `requested_value`, `reason`
+### 2. Job Progress Tracking & Completion Workflow (3-agent parallel)
 
-**New API routes:**
-- `GET/PUT /api/admin/user-flags/[userId]` — read/write feature flags per user
-- `POST /api/admin/grant-super-admin` — elevate user to super_admin (super_admin only)
-- `GET/POST /api/admin/job-change-requests` — list/create schedule change requests
-- `PUT /api/admin/job-change-requests/[id]` — approve/reject (super_admin only, auto-applies date extensions)
+**Database (migration: 20260331_job_progress_tracking.sql → applied to Supabase):**
+- `job_scope_items` — admin-defined scope (work type, unit, target qty per job)
+- `job_progress_entries` — operator daily logs (quantity completed per scope item per day)
+- `job_completion_requests` — operator submits → salesperson/admin reviews → officially complete
+- `job_orders` ALTER: `scheduled_end_date`, `actual_end_date`, `completion_submitted_at`
+- RLS policies (JWT tenant isolation) + 6 indexes
 
-**`lib/feature-flags.ts`** — `useFeatureFlags(userId, role)` hook, short-circuits for super_admin
+**API Routes:**
+- `GET/POST/PUT/DELETE /api/admin/jobs/[id]/scope` — admin CRUD on scope items + progress totals
+- `GET/POST /api/jobs/[id]/progress` — operator logs daily quantities per scope item
+- `POST /api/jobs/[id]/completion-request` — operator submits for review (fires notification to job creator)
+- `GET/PUT /api/admin/jobs/[id]/completion-request` — admin approve/reject with operator notifications
+- `GET /api/admin/jobs/[id]/summary` — full rollup: scope %, daily progress, completion status
+- `GET /api/jobs/[id]/schedule-info` — returns scheduled_date, scheduled_end_date, status
+- `PUT /api/admin/jobs/[id]/schedule` — admin updates scheduled_date/end_date with audit log
 
-### 3. Account Invitation + Setup Flow (ONBOARD)
-**New API routes:**
-- `POST /api/admin/invite` — sends branded Resend invitation email with 7-day token
-- `GET /api/setup-account/validate` — validates token (public)
-- `POST /api/setup-account/complete` — creates/updates user, applies flags, marks waiver (public)
-- `POST /api/upload/avatar` — upserts to Supabase Storage `avatars` bucket (public, used during setup)
-- `POST /api/profile/avatar` — authenticated avatar upload for profile settings
+**UI Components:**
+- `components/JobScopePanel.tsx` (568 lines)
+  - Admin-editable scope items: add/edit/delete, per-item progress bars
+  - Overall completion % bar, unit types: linear_ft, sq_ft, holes, hours, items
+- `components/JobProgressChart.tsx` (182 lines)
+  - Recharts bar chart: daily progress grouped by scope item / work type
+- `app/dashboard/admin/jobs/[id]/page.tsx` (485 lines)
+  - Tabs: Overview, Scope & Progress, Activity
+  - JobScopePanel + JobProgressChart fully integrated
+  - Completion request panel: approve/reject with review notes
+  - Schedule date editor inline
+  - Operator activity timeline
 
-**New page `/setup-account`** — 3-step onboarding for invited users:
-1. Profile photo upload + password creation
-2. Liability waiver scroll + checkbox (records IP + timestamp)
-3. Email/SMS notification consent
+**Operator Workflow:**
+- `work-performed/page.tsx` — scope items checklist with per-item quantity inputs; progress submitted fire-and-forget
+- `day-complete/page.tsx` — fetches schedule-info; last-day detection hides "Done for Today"; completion modal with notes → POST completion-request → "Submitted for Review" state
+- `my-jobs/JobTicketCard.tsx` — colored % dot next to status (green ≥75%, amber 25-74%, red <25%)
 
-**Avatar display** added to:
-- Admin layout header (top-right user bubble)
-- Dashboard sidebar user chip
-- Operator dashboard nav
-- My Profile page (camera button → immediate upload)
-
-### 4. Active Jobs Page (ACTIVE)
-**New page `/dashboard/admin/active-jobs`:**
-- Stats: Total Active, Today, In Progress, Needs Attention (each clickable filter)
-- Filter tabs: All / Today / In Progress / Needs Attention
-- Job cards: number, status, change request warnings, completion approval flags
-- Super admins: toggle between "My Jobs Only" / "All Company Jobs"
-- Added to admin sidebar under OPERATIONS
-
-**New API route `GET /api/admin/active-jobs`:**
-- `?mine=true` scopes to jobs where user is creator/assignee/salesperson
-- Returns pending change request count and completion approval flag per job
-
-### 5. Team Profiles — Permission Management (PIXEL)
-**New components:**
-- `components/FeatureFlagsPanel.tsx` — 19 toggle switches in 6 groups, 4 one-click presets:
-  - Sales Admin (schedule + customers)
-  - Ops Admin (full ops access)
-  - Finance Admin (billing + timecards)
-  - Field Admin (jobs + schedule only)
-- `components/InviteMemberModal.tsx` — name/email/role/type → sends invite email
-
-**Redesigned `app/dashboard/admin/team-profiles/page.tsx`:**
-- Stats row: total staff, active, super admins, roles in use
-- Searchable + role-filtered member list with avatars
-- Sliding detail panel: "Profile Info" tab + "Feature Permissions" tab
-- Grant Super Admin button with confirmation (super_admin only)
-- Invite Member button in header (super_admin only)
-
-### 6. Feature Flags Wired to Admin Sidebar
-- `ad5833ae` — Admin sidebar nav items now hide/show based on user's feature flags
-- `can_view_schedule`, `can_view_billing`, `can_view_analytics`, etc. gate nav sections
-- Super admins and ops_managers always see everything (bypass flag check)
-
-### 7. Operator Experience Simplification
-- Removed progress dots (green/amber/red) from all operator job cards
-- Removed scope checklist from work-performed page
-- Lock submitted day entries — banner shown if day already submitted
-- Simplified onboarding tour to remove all progress/scope language
-
-### 8. Mobile Responsive Audit — Operator Pages
-- `200be806` — Full audit and fix pass on operator-facing pages:
-  - Timecard page (weekly grid, day breakdown)
-  - Operator dashboard (stat cards, job list)
-  - Work-performed page (form inputs, buttons)
-  - Day-complete page (signature area, submit flow)
-  - En-route page (map embed, status buttons)
-- All pages verified mobile-first with proper breakpoints and touch targets
-
-### 9. Branding System (pre-existing + enhanced)
-- BrandingProvider (`components/BrandingProvider.tsx`) already existed with 7-section config page
-- Injects CSS custom properties: `--color-primary`, `--color-secondary`, `--color-accent`
-- Also sets favicon and page `<title>` dynamically from tenant config
-- Super admin can configure in Settings → Branding (no code changes needed for Patriot branding)
+### 3. Bug Fixes
+- `app/api/admin/timecards/route.ts` — fixed `.eq('approval_status', 'pending')` (was `is_approved=false`), ending 500 errors on sidebar badge polling
 
 ---
 
 ## FEATURE STATUS
 
 ### Complete ✅
-| Feature | Notes |
-|---------|-------|
-| Multi-tenant architecture | Company code login, tenant_id on all tables |
-| White-label branding | CSS vars, favicon, title — super admin configures |
-| Schedule Board | View, time-off, editing, crew grid, notifications |
-| Schedule Form | Customer-first flow, facility compliance |
-| Quick Add Job | Start/end date pickers, 12-type multi-select |
-| Personalized Dashboards | Personal/team scope per role |
-| Job Scope Tracking | Admin defines, operators log (admin-side only) |
-| Job Completion Workflow | Submit → notify → approve/reject |
-| Progress Visibility | Admin-only, hidden from operators |
-| Timecard System | Clock in/out, NFC, GPS, segments, approval |
-| Notification System | In-app + email, completion requests working |
-| Billing & Invoicing | Create, send, remind, QuickBooks CSV |
-| Stripe Billing Pages | Pricing page, subscription dashboard |
-| Customer Management | COD, contacts, billing dashboard |
-| Operator Workflow | My jobs → work → complete (simplified, mobile-ready) |
-| Facilities & Badges | CRUD, badge tracking, auto-expiration |
-| Analytics Dashboard | 20 widgets, drag-and-drop |
-| User Feature Flags | Per-user feature toggles, 4 presets |
-| Account Invitation Flow | Email invite, waiver signing, avatar |
-| Setup Account Page | /setup-account onboarding flow |
-| Avatar Uploads | All users, Supabase Storage |
-| Active Jobs Page | Personal job view, change request flags |
-| Team Profiles Overhaul | Toggle panel, invite modal, grant super admin |
-| Job Change Requests | Restricted admins request changes, super admin approves |
-| Database Cleanup | Fresh slate, 4 accounts retained |
-| Feature Flags → Sidebar | Nav items hide/show per user permissions |
-| Mobile Responsive Audit | All operator pages audited and fixed |
-| Branding Settings | Super admin CSS vars + favicon + title |
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Multi-tenant architecture | ✅ | Company code login, tenant_id on all tables |
+| White-label branding | ✅ | Tenant branding context, debranded defaults |
+| Schedule Board | ✅ | All operators view, time-off, editing, crew grid, notifications |
+| Schedule Form | ✅ | Customer-first flow, smart PO/contact dropdowns, facility compliance |
+| Personalized Dashboards | ✅ | Personal/team scope per role, super_admin toggle |
+| Job Scope Tracking | ✅ | Admin defines scope, operators log progress, % complete |
+| Job Completion Workflow | ✅ | Operator submits → salesperson notified → approve/reject |
+| Smart Complete Logic | ✅ | Last-day detection, Complete vs Continue, modal with notes |
+| Progress Visibility | ✅ | Colored % dots on my-jobs, progress bars in admin job detail |
+| Timecard System | ✅ | Full clock in/out, NFC, GPS, segments, approval workflow |
+| Timecard Settings | ✅ | OT thresholds, break deduction, NFC/GPS requirements |
+| NFC Management | ✅ | Program, assign, deactivate, verify tags |
+| Notification System | ✅ | In-app + email, auto-reminders, NFC bypass, bell component |
+| Analytics Dashboard | ✅ | 20 widgets, drag-and-drop, charts, commission tracking |
+| Billing & Invoicing | ✅ | Create, send, remind, payment tracking, QuickBooks CSV |
+| Customer Management | ✅ | COD payment, contacts, billing dashboard |
+| Operator Workflow | ✅ | My jobs → jobsite → work-performed → complete |
+| Facilities & Badges | ✅ | Facility CRUD, badge tracking, auto-expiration |
+| Approval Workflow | ✅ | Reject/approve/resubmit, form history |
+| Customer Portal | ✅ | Public signature page, form builder |
+| Legal Compliance | ✅ | Privacy policy, terms, e-sign consent, GPS consent |
+| Landing Page | ✅ | Product showcase with comparison table |
+| Request Demo Funnel | ✅ | 3-step funnel with API |
+| Security Audit | ✅ | NFC bypass, XSS, tenant isolation, data exposure fixes |
+| Error Boundaries | ✅ | Global + dashboard error.tsx, 404 page, loading skeletons |
 
 ### Remaining — Final Sprint
-- [x] **Schedule board "Request Change" button** — DONE: ChangeRequestModal merged from worktree, read-only banner + 5 change types
-- [ ] **E2E live browser walkthrough** — create job → assign → complete → approve
-- [ ] **Connect Stripe live keys** — add STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET to Vercel
-- [ ] **Patriot logo and custom colors** — super admin does this in Settings → Branding (upload logo, pick colors)
-- [x] **Vercel deployment** — LIVE ✅ https://pontifex-industries-software-awja.vercel.app
-- [ ] **Merge feature/schedule-board-v2 to main** — after Vercel confirms working build
+- [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
+- [ ] Mobile responsive audit on all operator pages
+- [ ] Patriot-specific visual assets (logos, custom colors)
+- [ ] Production deployment prep (env vars, custom domain, SSL)
+- [ ] Final build verification & merge to main
 
 ---
 
 ## KEY ARCHITECTURE
 
-### Feature Flag System
-- Table: `user_feature_flags` (user_id, tenant_id, 19 boolean flags)
-- Super admins / ops_managers bypass all flags — always get full access
-- Hook: `useFeatureFlags(userId, role)` in `lib/feature-flags.ts`
-- UI: `FeatureFlagsPanel` in Team Profiles → "Feature Permissions" tab
-- 4 presets: sales_admin, ops_admin, finance_admin, field_admin
-- Admin sidebar reads flags and hides/shows nav sections accordingly
+### Job Progress Flow
+1. Admin opens `/dashboard/admin/jobs/[id]` → "Scope & Progress" tab
+2. Admin adds scope items: "150 linear ft wall sawing", "cleanup - 4 hours"
+3. Operator on `work-performed` page sees scope checklist → inputs qty completed
+4. `my-jobs` cards show colored % dot next to job status
+5. On last scheduled day, "Done for Today" hidden — only "Complete Job" shown
+6. Operator submits completion request with notes
+7. Admin/salesperson notified → reviews on admin job detail page
+8. Approve → job status = completed; Reject → operator notified with reason
 
-### Account Creation Flow
-1. Super admin → Team Profiles → "Invite Member"
-2. Fill name, email, role, admin type (sets default flags)
-3. System sends Resend email with 7-day setup link
-4. New user → `/setup-account?token=xxx`
-5. Step 1: photo + password | Step 2: waiver signing | Step 3: email/SMS consent
-6. Account created, flags applied, ready to log in
+### Dashboard Scope
+- `GET /api/admin/dashboard-summary?scope=personal|team`
+- Personal: my assigned jobs, my created invoices, my timecard hours, my activity
+- Team: all tenant-wide metrics
+- Non-super_admin: always forced to personal (server-side enforcement)
 
-### Branding Flow
-1. Super admin → Settings → Branding (7 sections)
-2. Set primary/secondary/accent colors, logo URL, company name
-3. BrandingProvider injects CSS custom properties site-wide
-4. Favicon and page title update automatically
-5. No code changes needed — all runtime via tenant_branding table
-
-### Notification Flow
-- Completion requests → `notifications` table → admin bell ✅
-- Change requests → `notifications` table → super admin bell
-- Invite emails → Resend → `/setup-account`
-
-### Force-Dynamic Note
-- 14 API routes explicitly have `export const dynamic = 'force-dynamic'`
-- 192 routes rely on Next.js runtime detection (all use `requireAuth()` or `request.json()`)
-- Build passes cleanly — no static caching issues in production
-- If Vercel shows stale data, add `force-dynamic` to the specific offending route
-
-### Database Tables (95+)
-New: `user_feature_flags`, `user_invitations`
-Extended: `profiles` (avatar, setup, waiver), `schedule_change_requests` (reason, values)
+### Database Tables (93+)
+New: `job_scope_items`, `job_progress_entries`, `job_completion_requests`
+New columns: `job_orders.scheduled_end_date`, `actual_end_date`, `completion_submitted_at`
 
 ---
-
-## ACCOUNTS (Fresh DB)
-| Account | Role | Email |
-|---------|------|-------|
-| Super Admin | super_admin | andres.altamirano1280@gmail.com |
-| Demo Admin | admin | admin@pontifex.com |
-| Demo Operator | operator | demo@pontifex.com |
-| Demo Team Member | apprentice | team@pontifex.com |
-
----
-
-## VERCEL DEPLOYMENT — ✅ LIVE
-
-**Deployment:** `dpl_2VMWb49UwgF17GMNcpDnjdFxAdnt` — READY
-**Live URL:** https://pontifex-industries-software-awja.vercel.app (200 OK ✅)
-**Preview URL:** https://pontifex-industries-software-awja-1pcy9xcwr.vercel.app
-**Commit:** `c16a7ee1` — all worktree features merged
-**Env vars:** All 9 confirmed set (Supabase, Resend, NextAuth, App URL)
-
-**How it was deployed:**
-- Vercel CLI authenticated via device OAuth flow (`vca_` token)
-- Created deployment via REST API from `feature/schedule-board-v2` commit `c16a7ee1`
-- Assigned `pontifex-industries-software-awja.vercel.app` alias directly
-- GitHub webhook is unblocked — future pushes to `feature/schedule-board-v2` will auto-deploy
-
-**Note:** For future deployments, Claude can use the `vca_` auth token at:
-`/Users/afa55/Library/Application Support/com.vercel.cli/auth.json`
-
----
-
-## VERCEL STATUS
-- **Live URL:** https://pontifex-industries-software-awja.vercel.app
-- **Deployed commit:** `1e09733a` (pre-sales-page — from previous session)
-- **Pending deploy:** `87decf59` (Patriot sales page + security fixes) — blocked by free tier 100/day limit
-- **Limit resets:** ~5:47 AM UTC April 4, 2026
-- **To deploy immediately:** Upgrade Vercel to Pro ($20/mo) at https://vercel.com/andres-altamiranos-projects/pontifex-industries-software-awja/settings/billing
-- **Auth token for CLI deploy:** `/Users/afa55/Library/Application Support/com.vercel.cli/auth.json`
-
-## SALES PAGE (Doug / Patriot)
-- **File:** `app/page.tsx` — fully self-contained, 1100+ lines
-- **Client:** Patriot Concrete Cutting (Doug)
-- **Sections:** Hero → Before/After → Payroll Savings → Smart Scheduling → Operator UX → Custom Dev Partnership → Features Grid → Security → CTA
-- **COMPANY_NAME constant** at line 42 — easy to update if needed
-- **Security section** added with 6 pillars + SOC 2 / Supabase infrastructure banner
-- **Nav:** Overview, Scheduling, Payroll, Features, Security, Let's Talk
-
-## SECURITY AUDIT (COMPLETED)
-Full audit by dedicated agent — 15 files fixed, 0 build errors. Key findings:
-
-### CRITICAL fixed:
-- `/api/upload/avatar` — was completely unauthenticated; now requires Bearer token OR valid invite token; file type restricted to explicit allowlist (jpg/png/gif/webp only)
-
-### HIGH fixed (tenant isolation):
-- `/api/admin/job-orders` POST+GET — no tenant scoping added
-- `/api/admin/job-orders/[id]` PATCH+DELETE — unscoped queries fixed
-- `/api/job-orders/[id]/status` — all three code paths now tenant-scoped
-- `/api/job-hazard-analysis/save` — job ownership check before PDF generation
-- `/api/service-completion-agreement/save` — same fix
-
-### MEDIUM fixed (RBAC normalization):
-9 routes used `role === 'admin'` only, locking out super_admin and operations_manager:
-- send-schedule, job-workflow, sync-job-statuses, operator-profiles (x2), suggestions, operators/active, users (GET+PATCH)
-
-### Verified safe (intentionally public):
-- signature/[token], setup-account/complete, setup-account/validate, access-requests, demo-request, health, log-error, webhooks/stripe
 
 ## NEXT SESSION PRIORITIES
-1. **Deploy to Vercel** — run deploy command once limit resets OR upgrade to Pro
-2. **E2E browser walkthrough** — full job creation → operator completion → admin approval at https://pontifex-industries-software-awja.vercel.app
-3. **Patriot branding** — log in as super admin → Settings → Branding → upload Patriot logo + Patriot colors
-4. **Connect Stripe live keys** — STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET in Vercel env vars
-5. **Merge to main** — merge feature/schedule-board-v2 → main for permanent production URL
+1. **E2E workflow test**: schedule → dispatch → execute → complete → invoice
+2. **Mobile responsive audit**: `/dashboard/my-jobs`, `/dashboard/timecard`, operator pages
+3. **Patriot visual branding**: logo upload, custom colors in tenant_branding
+4. **Production deployment**: Vercel env vars, custom domain, SSL
+5. **Merge to main** and final release
+
+---
+
+## INFRASTRUCTURE
+
+### Vercel
+- **Plan**: Pro tier (unlimited deploys, cron jobs, edge functions)
+- **Auto-deploy**: pushes to `feature/schedule-board-v2` trigger preview deploys; merges to `main` trigger production
+- **Env vars required**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- **Cron jobs**: defined in `vercel.json` — daily health check at 06:00 UTC
+- **Domain**: pontifexindustries.com → www.pontifexindustries.com (Vercel DNS managed)
+
+### Supabase
+- **Project ID**: `klatddoyncxidgqtcjnu`
+- **Plan**: Pro (required for daily backups + PITR)
+- **Automated backups**: daily, 7-day retention (Supabase managed)
+- **Point-in-Time Recovery (PITR)**: available on Pro — enable via Supabase Dashboard → Project Settings → Backups
+- **Manual backup**: Supabase Dashboard → Database → Backups → Download pg_dump
+- **Connection pooling**: PgBouncer (built-in) — transaction mode for Vercel serverless
+- **95+ tables**, all with RLS enabled, JWT metadata for tenant isolation
+
+### Health Monitoring
+- **Public health check**: `GET /api/health` — checks DB, auth, storage; returns latency + status
+  - Response: `{ status: 'ok'|'degraded'|'down', checks, timestamp, version, environment }`
+  - Returns HTTP 503 if any check is `down`
+- **Cron health check**: `GET /api/cron/health-check` — runs daily at 06:00 UTC via Vercel Cron
+  - Protected by `Authorization: Bearer $CRON_SECRET` header
+  - Writes snapshot to `system_health_log` table (DB size, table counts, check results)
+  - Returns HTTP 500 if platform is down
+- **Uptime monitoring**: point UptimeRobot / Better Uptime at `https://pontifexindustries.com/api/health`
+
+### Error Monitoring
+- **`app/global-error.tsx`**: root-level error boundary — catches crashes in root layout; shows purple/dark "Something went wrong" page with Try Again + Dashboard buttons
+- **`app/error.tsx`**: route-level error boundary — catches page-segment errors; same purple/dark theme
+- **Vercel Function Logs**: all errors logged via `console.error('[GlobalError]', error)` — visible in Vercel dashboard
+- **Error IDs**: Next.js `error.digest` shown in UI for support reference
