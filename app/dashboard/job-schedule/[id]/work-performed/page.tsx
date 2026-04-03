@@ -215,25 +215,8 @@ export default function WorkPerformed() {
   const [jobPhotos, setJobPhotos] = useState<string[]>([]);
   const [voiceNotes, setVoiceNotes] = useState<string>('');
 
-  // ─── Scope Progress State ─────────────────────────────────────────────────
-  interface ScopeItem {
-    id: string;
-    work_type: string;
-    description: string;
-    unit: string;
-    target_quantity: number;
-    completed_quantity: number;
-    pct_complete: number;
-  }
-  interface ScopeData {
-    scope_items: ScopeItem[];
-    overall_pct: number;
-    total_target: number;
-    total_completed: number;
-  }
-  const [scopeData, setScopeData] = useState<ScopeData | null>(null);
-  const [progressInputs, setProgressInputs] = useState<Record<string, number>>({});
-  const [scopeLoading, setScopeLoading] = useState(false);
+  // ─── Day lock state (read-only if today's daily log already submitted) ──────
+  const [dayAlreadySubmitted, setDayAlreadySubmitted] = useState(false);
 
   // Fetch job type and day number for smart recommendations + correct work item tracking
   useEffect(() => {
@@ -260,59 +243,28 @@ export default function WorkPerformed() {
     fetchJobInfo();
   }, [params.id]);
 
-  // Fetch scope items for this job (fire on mount)
+  // Check if today's daily log is already submitted (lock the page if so)
   useEffect(() => {
-    const fetchScope = async () => {
-      setScopeLoading(true);
+    const checkDaySubmitted = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const res = await fetch(`/api/admin/jobs/${params.id}/scope`, {
+        const today = new Date().toISOString().split('T')[0];
+        const res = await fetch(`/api/job-orders/${params.id}/daily-log`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (res.ok) {
           const json = await res.json();
-          if (json.success && json.data?.scope_items?.length > 0) {
-            setScopeData(json.data);
+          // Check if any log for today already has day_completed_at set
+          const todayLog = (json.logs || []).find((l: any) => l.log_date === today && l.day_completed_at);
+          if (todayLog) {
+            setDayAlreadySubmitted(true);
           }
         }
-      } catch (err) {
-        console.error('Error fetching scope:', err);
-      } finally {
-        setScopeLoading(false);
-      }
+      } catch { /* non-critical — default to editable */ }
     };
-    fetchScope();
+    checkDaySubmitted();
   }, [params.id]);
-
-  // Submit scope progress entries in parallel with the main work-items save
-  const submitProgressInputs = async (session: { access_token: string }) => {
-    const today = new Date().toISOString().split('T')[0];
-    const entries = Object.entries(progressInputs).filter(([, qty]) => qty > 0);
-    if (entries.length === 0) return;
-    await Promise.all(
-      entries.map(([scope_item_id, quantity_completed]) =>
-        fetch(`/api/jobs/${params.id}/progress`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ scope_item_id, quantity_completed, date: today }),
-        }).catch(() => {}) // fire-and-forget, don't block main save
-      )
-    );
-    // Refresh scope data after submitting
-    try {
-      const res = await fetch(`/api/admin/jobs/${params.id}/scope`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success) setScopeData(json.data);
-      }
-    } catch { /* non-critical */ }
-  };
 
   const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
   const [totalStandbyMinutes, setTotalStandbyMinutes] = useState(0);
@@ -1242,9 +1194,6 @@ export default function WorkPerformed() {
           console.error('Failed to save work items to DB, falling back to localStorage');
         }
 
-        // Submit scope progress inputs (fire-and-forget — don't block main save)
-        submitProgressInputs(session).catch(() => {});
-
         // Track blade usage for sawing work (fire and forget)
         fetch('/api/equipment/track-usage', {
           method: 'POST',
@@ -1358,72 +1307,17 @@ export default function WorkPerformed() {
         {/* Quick Access Buttons */}
         <QuickAccessButtons jobId={params.id as string} />
 
-        {/* ─── Scope Progress Section ─────────────────────────────────── */}
-        {scopeData && scopeData.scope_items.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-blue-200/60 p-4 mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-gray-800">Today&apos;s Progress</h3>
-              {/* Overall progress bar */}
-              <span className="text-xs font-semibold text-blue-600">
-                {scopeData.overall_pct.toFixed(0)}% overall
-              </span>
-            </div>
-
-            {/* Overall progress bar */}
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, scopeData.overall_pct)}%` }}
-              />
-            </div>
-
-            <p className="text-xs text-gray-500 mb-3">
-              How much did you complete today for each item?
-            </p>
-
-            <div className="space-y-3">
-              {scopeData.scope_items.map((item) => (
-                <div key={item.id} className="border border-gray-100 rounded-xl p-3 bg-gray-50">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-semibold text-gray-700 truncate flex-1 mr-2">
-                      {item.description || item.work_type}
-                    </span>
-                    <span className="text-xs text-gray-400 flex-shrink-0">
-                      {item.completed_quantity}/{item.target_quantity} {item.unit}
-                    </span>
-                  </div>
-                  {/* Per-item mini progress bar */}
-                  <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
-                    <div
-                      className={`h-1.5 rounded-full transition-all duration-300 ${
-                        item.pct_complete >= 100 ? 'bg-green-500' :
-                        item.pct_complete >= 50 ? 'bg-blue-500' : 'bg-amber-400'
-                      }`}
-                      style={{ width: `${Math.min(100, item.pct_complete)}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      value={progressInputs[item.id] ?? ''}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setProgressInputs(prev => ({ ...prev, [item.id]: val }));
-                      }}
-                      placeholder="0"
-                      className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white font-medium text-gray-900"
-                    />
-                    <span className="text-xs text-gray-500">{item.unit} today</span>
-                  </div>
-                </div>
-              ))}
+        {/* ─── Day Already Submitted Banner ───────────────────────────── */}
+        {dayAlreadySubmitted && (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0-6v2m-6 4h12a2 2 0 002-2V9a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <div>
+              <p className="text-sm font-bold text-amber-800">Day already submitted</p>
+              <p className="text-xs text-amber-700 mt-0.5">You have already tapped &quot;Done for Today&quot; for this job. Your work log is saved and cannot be edited.</p>
             </div>
           </div>
-        )}
-        {scopeLoading && (
-          <div className="text-center text-xs text-gray-400 mb-3">Loading scope items…</div>
         )}
 
         {view === 'search' ? (
@@ -1975,7 +1869,7 @@ export default function WorkPerformed() {
         </div>
 
         {/* Submit Button */}
-        {selectedItems.length > 0 && (
+        {selectedItems.length > 0 && !dayAlreadySubmitted && (
           <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 p-4 z-50">
             <div className="container mx-auto max-w-lg flex gap-3">
               <button

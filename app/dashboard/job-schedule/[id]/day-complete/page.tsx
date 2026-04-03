@@ -39,9 +39,6 @@ export default function DayCompletePage() {
   // ─── Smart last-day detection ────────────────────────────────────────────
   const [isLastScheduledDay, setIsLastScheduledDay] = useState<boolean | null>(null);
 
-  // ─── Scope progress summary for the completion modal ─────────────────────
-  const [progressSummary, setProgressSummary] = useState<{ overall_pct: number; total_completed: number; total_target: number } | null>(null);
-
   // ─── Completion request modal state ──────────────────────────────────────
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionNotes, setCompletionNotes] = useState('');
@@ -54,7 +51,6 @@ export default function DayCompletePage() {
   useEffect(() => {
     fetchJob();
     fetchScheduleInfo();
-    fetchScopeProgress();
   }, []);
 
   const fetchJob = async () => {
@@ -107,26 +103,6 @@ export default function DayCompletePage() {
     } catch {
       setIsLastScheduledDay(null);
     }
-  };
-
-  const fetchScopeProgress = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const res = await fetch(`/api/admin/jobs/${jobId}/scope`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data?.scope_items?.length > 0) {
-          setProgressSummary({
-            overall_pct: json.data.overall_pct,
-            total_completed: json.data.total_completed,
-            total_target: json.data.total_target,
-          });
-        }
-      }
-    } catch { /* non-critical */ }
   };
 
   const handleSubmitCompletion = async () => {
@@ -668,23 +644,6 @@ export default function DayCompletePage() {
             <p className="text-gray-600 text-sm mb-4">
               This will send the job to your supervisor for final approval.
             </p>
-
-            {/* Progress summary if available */}
-            {progressSummary && progressSummary.total_target > 0 && (
-              <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-1">Progress Summary</p>
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
-                  <div
-                    className="bg-blue-500 h-2 rounded-full"
-                    style={{ width: `${Math.min(100, progressSummary.overall_pct)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500">
-                  {progressSummary.overall_pct.toFixed(0)}% of scope complete
-                  ({progressSummary.total_completed} / {progressSummary.total_target} units)
-                </p>
-              </div>
-            )}
 
             <textarea
               placeholder="Any final notes for the supervisor? (optional)"

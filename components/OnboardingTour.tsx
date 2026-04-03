@@ -26,7 +26,7 @@ const OPERATOR_STEPS: OnboardingStep[] = [
     id: 'my-jobs',
     title: '📋 My Jobs — Your Daily View',
     description:
-      'My Jobs is your home base. Every job assigned to you shows up here with a status badge so you can see at a glance what still needs attention today.',
+      'My Jobs is your home base. See your assigned jobs for today. Tap a job to get started. Use the date bar to look ahead or back.',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -34,10 +34,9 @@ const OPERATOR_STEPS: OnboardingStep[] = [
     ),
     features: [
       '📅 Swipe the date bar to look ahead or back',
-      '🟢 Green dot = job is ≥ 75% complete',
-      '🟡 Amber dot = job is 25–74% complete',
-      '🔴 Red dot = job is under 25% complete',
-      '💡 Dots only appear when scope targets have been set',
+      '🏷️ Status badge shows where each job is in the workflow',
+      '📍 Tap any job card to open its details and get started',
+      '🔄 Multi-day jobs carry over automatically day to day',
     ],
   },
   {
@@ -59,39 +58,37 @@ const OPERATOR_STEPS: OnboardingStep[] = [
     ],
   },
   {
-    id: 'scope-progress',
-    title: '🎯 Scope Progress — New!',
+    id: 'log-work',
+    title: '📝 Logging Your Work',
     description:
-      'When your supervisor sets work targets (e.g., "150 linear ft wall sawing"), a progress checklist appears at the top of the Work Performed page. Log how much you completed today and the system tracks cumulative progress across all days automatically.',
+      'The Work Performed page is where you record everything you did on site. Search for work items, tap to add them, attach photos, and leave notes.',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
     features: [
-      '📊 Overall progress bar shows combined % across all scope items',
-      '📝 Each scope item shows target qty, completed so far, and % bar',
-      '✏️ Enter "qty today" for each item (e.g., 50 of 150 linear ft)',
-      '🔄 Your input saves automatically alongside your work items',
-      '📈 Progress dot on the My Jobs card updates after each save',
+      '🔍 Search by work type (e.g., "core drill", "wall saw")',
+      '📸 Attach job-site photos directly from this page',
+      '🎙️ Use voice notes to quickly describe what you did',
+      '✅ Tap "Done — Proceed to Wrap Up" when you\'re finished logging',
     ],
   },
   {
     id: 'complete-job',
-    title: '✅ Completing a Job — New!',
+    title: '✅ Completing a Job',
     description:
-      'On your final scheduled day the system detects that it\'s the last day and hides the "Done for Today" button — only "Complete Job" appears. Tapping it opens a summary before anything is submitted.',
+      'On your final scheduled day, tap "Complete Job" instead of "Done for Today". Add any closing notes for your supervisor — that\'s it. Your supervisor will review and approve.',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
     features: [
-      '🗓️ Last scheduled day — only "Complete Job" is shown',
-      '📋 Multi-day jobs still show "Done for Today" on earlier days',
-      '📝 Completion modal shows scope progress summary',
+      '🗓️ On earlier days of multi-day jobs, tap "Done for Today"',
+      '🏁 On the last day, tap "Complete Job" to send for approval',
       '💬 Add closing notes for your supervisor before submitting',
-      '🔔 Supervisor is notified automatically once you submit',
+      '🔔 Your supervisor is notified automatically once you submit',
     ],
   },
   {
@@ -134,7 +131,7 @@ const OPERATOR_STEPS: OnboardingStep[] = [
     id: 'complete',
     title: "🚀 You're All Set!",
     description:
-      "You now know everything you need to manage your workday. Start with My Jobs, follow the 5-step workflow, and log your scope progress as you go. Have questions? Your supervisor is a tap away.",
+      "You now know everything you need to manage your workday. Start with My Jobs, follow the 5-step workflow, and log your work as you go. Have questions? Your supervisor is a tap away.",
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
