@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/invoices/[id]
  * GET - Get invoice with line items

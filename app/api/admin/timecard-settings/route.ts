@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET  /api/admin/timecard-settings — Get timecard settings for the tenant
  * PUT  /api/admin/timecard-settings — Update timecard settings (admin+)

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/admin/job-orders/[id]/forms
  * List and assign form templates to a job (admin only)

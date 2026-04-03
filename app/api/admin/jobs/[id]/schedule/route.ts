@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * PUT /api/admin/jobs/[id]/schedule
  * Update scheduled_date and end_date for a job.

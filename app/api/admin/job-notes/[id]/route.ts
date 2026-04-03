@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: PATCH/DELETE /api/admin/job-notes/[id]
  * Edit or delete a job note (admin only, author-restricted for edits)

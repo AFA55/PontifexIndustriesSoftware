@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/job-orders/[id]/request-signature
  * Generate a unique signature request link for a job

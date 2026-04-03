@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/admin/invoices/[id]/send
  * Send invoice via email to the customer using Resend

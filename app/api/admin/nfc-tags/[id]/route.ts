@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * PATCH /api/admin/nfc-tags/[id] — Update a specific NFC tag (label, is_active, tag_type, etc.)
  * DELETE /api/admin/nfc-tags/[id] — Delete a specific NFC tag

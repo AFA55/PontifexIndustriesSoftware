@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/customers/[id]/sync
  * POST: Propagate customer info (name, contact, address) to all linked job_orders

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/badges — List all badges (with optional filters)
  * API Route: POST /api/admin/badges — Create a new badge

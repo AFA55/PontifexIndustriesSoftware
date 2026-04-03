@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/admin/invoices/create
  * Create a standalone invoice (not tied to a specific job order)

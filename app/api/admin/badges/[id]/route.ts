@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: PATCH /api/admin/badges/[id] — Update a badge
  * API Route: DELETE /api/admin/badges/[id] — Remove a badge

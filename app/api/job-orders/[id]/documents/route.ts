@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/job-orders/[id]/documents
  * Manage documents attached to a job order

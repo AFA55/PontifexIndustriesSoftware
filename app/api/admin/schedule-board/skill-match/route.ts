@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/schedule-board/skill-match?jobId=X
  * Fetches the job's difficulty_rating, then returns all operators sorted by match quality.

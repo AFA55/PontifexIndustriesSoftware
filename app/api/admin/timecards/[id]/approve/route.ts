@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/admin/timecards/[id]/approve
  * Approve a timecard entry (admin+ only).

@@ -8,8 +8,18 @@ const nextConfig = {
         hostname: 'klatddoyncxidgqtcjnu.supabase.co',
         pathname: '/storage/v1/object/public/**',
       },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.in',
+      },
     ],
   },
+  // Ensure these packages run server-side only
+  serverExternalPackages: ['@supabase/supabase-js', 'pg'],
 
   // Security headers for production
   async headers() {

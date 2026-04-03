@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/job-orders/[id]/work-history
  * Fetch all daily_job_logs and work_items for a job order.

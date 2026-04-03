@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/timecards/[id]
  * Get a specific timecard entry with all details including segments and GPS data.

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: DELETE /api/access-requests/[id]/delete
  * Permanently deletes an access request from the database

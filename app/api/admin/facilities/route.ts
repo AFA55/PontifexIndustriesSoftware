@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/facilities — List all facilities
  * API Route: POST /api/admin/facilities — Create a new facility

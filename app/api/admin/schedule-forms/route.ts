@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/schedule-forms
  * List job orders with their schedule form submission history.

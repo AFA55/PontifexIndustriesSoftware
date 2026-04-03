@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/dashboard-notes
  * CRUD for personal/shared dashboard sticky notes.

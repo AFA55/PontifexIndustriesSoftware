@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/shop/dashboard-stats
  * Returns summary statistics for the shop dashboard.

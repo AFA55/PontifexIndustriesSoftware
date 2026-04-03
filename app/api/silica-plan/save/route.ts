@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/silica-plan/save
  * Save silica exposure control plan PDF to job ticket (without emailing customer)

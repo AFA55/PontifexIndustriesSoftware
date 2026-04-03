@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/auth/login
  * Custom login endpoint that bypasses RLS issues

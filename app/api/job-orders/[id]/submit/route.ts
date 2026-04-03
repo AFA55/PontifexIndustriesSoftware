@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: PUT /api/job-orders/[id]/submit
  * Submit job completion data from operator

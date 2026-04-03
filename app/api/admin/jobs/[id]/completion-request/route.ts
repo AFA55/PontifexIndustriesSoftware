@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/jobs/[id]/completion-request
  * Admin reviews and approves or rejects a job completion request.

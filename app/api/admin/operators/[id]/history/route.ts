@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/operators/[id]/history
  * Returns comprehensive operator history for the profile detail page.

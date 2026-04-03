@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/admin/daily-notes
  * Fetch and create daily notes for the schedule board (per-date scratchpad)

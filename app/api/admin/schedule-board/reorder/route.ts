@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * PATCH /api/admin/schedule-board/reorder
  * Move a job from one operator to another (reassign) and/or update board_sort_position.

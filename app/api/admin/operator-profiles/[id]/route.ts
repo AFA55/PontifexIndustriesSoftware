@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/operator-profiles/[id]
  * Get a single operator profile with detailed analytics

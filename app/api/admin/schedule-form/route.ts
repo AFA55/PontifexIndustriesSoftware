@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/admin/schedule-form
  * Create a job order via the 8-step Schedule Form wizard (admin only)

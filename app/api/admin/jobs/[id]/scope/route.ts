@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/jobs/[id]/scope
  * Manage planned scope items for a job order.

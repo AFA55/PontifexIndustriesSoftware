@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/jobs/[id]/progress
  * Operators log daily progress against job scope items.

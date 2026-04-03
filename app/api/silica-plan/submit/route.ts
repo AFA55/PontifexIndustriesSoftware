@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/silica-plan/submit
  * Save silica exposure control plan and send to customer

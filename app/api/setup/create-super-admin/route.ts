@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/setup/create-super-admin
  * Creates the initial super admin account

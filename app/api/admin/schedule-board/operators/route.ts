@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/schedule-board/operators
  * Fetch all operators and helpers (apprentices) for the schedule board dropdowns.

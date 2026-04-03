@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/timecard/log-segment
  * Log a work segment (in_route, on_site, working, complete) to the

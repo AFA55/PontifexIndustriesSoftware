@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/schedule-board/settings
  * Fetch schedule settings (capacity, etc.)

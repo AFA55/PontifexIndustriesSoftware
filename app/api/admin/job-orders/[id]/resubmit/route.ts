@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/admin/job-orders/[id]/resubmit
  * Admin resubmits a rejected schedule form with updated data.

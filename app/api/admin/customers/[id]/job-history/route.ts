@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/customers/[id]/job-history
  * Returns recent job history for a customer.

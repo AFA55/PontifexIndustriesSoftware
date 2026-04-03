@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST/GET /api/admin/job-orders
  * Create new job orders and retrieve all job orders (admin only)

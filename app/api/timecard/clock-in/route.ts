@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/timecard/clock-in
  * Clock in with NFC verification, GPS fallback, or remote mode

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/nfc-tags/[id]/assign
  * Assign an NFC tag to a specific operator.

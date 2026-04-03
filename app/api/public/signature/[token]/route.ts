@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/public/signature/[token]
  * PUBLIC — No auth required

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST/PUT /api/job-orders/[id]/status
  * Update job order status with automatic timestamp tracking

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/PATCH /api/my-profile
  * Operator self-service: view and update own profile.

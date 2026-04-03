@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/timecard/clock-out
  * Clock out and calculate total hours

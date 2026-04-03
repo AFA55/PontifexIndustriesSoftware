@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/schedule-board/quick-add
  * Quick-add a pending job with minimal info (contractor, date, duration, scope).

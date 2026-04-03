@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/liability-release/pdf
  * Generate PDF of liability release and send via email

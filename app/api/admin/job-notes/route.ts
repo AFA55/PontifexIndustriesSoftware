@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/admin/job-notes
  * Fetch and create notes for job orders (admin only)

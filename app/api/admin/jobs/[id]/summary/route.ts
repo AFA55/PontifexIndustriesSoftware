@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/jobs/[id]/summary
  * Full job summary for admin view: job info, scope, progress, completion request.

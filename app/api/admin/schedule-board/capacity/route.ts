@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/schedule-board/capacity
  * Check schedule capacity for a date or date range.

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/PATCH /api/admin/profiles/[id]
  * Get or update a single operator/helper profile. Includes project history.

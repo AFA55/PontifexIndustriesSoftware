@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/PATCH /api/shop/work-orders/[id]
  * Get details or update a maintenance work order.

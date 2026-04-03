@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/timecard/verify-nfc
  * Verify an NFC tag scan for clock-in purposes.

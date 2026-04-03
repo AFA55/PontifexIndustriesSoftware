@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/card-permissions/me
  * Get the current authenticated user's dashboard card permissions.

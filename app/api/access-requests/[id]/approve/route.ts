@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/access-requests/[id]/approve
  * Approve an access request and create user account.

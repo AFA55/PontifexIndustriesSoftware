@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/customers/[id]/contacts/[contactId]
  * PATCH: Update a contact

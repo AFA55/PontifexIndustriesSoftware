@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/admin/job-orders/[id]/duplicate
  * Duplicate a job order to a new date while maintaining project connection.

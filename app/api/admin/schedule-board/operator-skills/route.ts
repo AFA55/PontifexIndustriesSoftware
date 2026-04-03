@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET  /api/admin/schedule-board/operator-skills
  * Returns all operators with id, full_name, skill_level_numeric.

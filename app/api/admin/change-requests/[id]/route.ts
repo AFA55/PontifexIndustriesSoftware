@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * PATCH /api/admin/change-requests/[id]
  * Approve or reject a change request.

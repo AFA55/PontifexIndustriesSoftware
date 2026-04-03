@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/timecard/history
  * Get user's timecard history with optional date range filtering

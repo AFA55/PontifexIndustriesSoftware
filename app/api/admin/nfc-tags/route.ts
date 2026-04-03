@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET  /api/admin/nfc-tags — List all NFC tags
  * POST /api/admin/nfc-tags — Register a new NFC tag

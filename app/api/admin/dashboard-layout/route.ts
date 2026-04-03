@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/PUT /api/admin/dashboard-layout
  * Persists per-user dashboard widget layout preferences.

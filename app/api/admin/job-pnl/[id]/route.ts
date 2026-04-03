@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/job-pnl/[id]
  * Returns detailed P&L breakdown for a single job:

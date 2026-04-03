@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/job-orders/[id]/work-items
  * Save and retrieve work performed items for a job

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/helper-work-log
  * POST: Create/update a helper work log entry with time tracking

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/schedule-board/notify
  * Create a notification for the job submitter.

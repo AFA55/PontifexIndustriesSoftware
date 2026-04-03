@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/work-order-agreement/pdf
  * Generate PDF of work order agreement and save to job ticket

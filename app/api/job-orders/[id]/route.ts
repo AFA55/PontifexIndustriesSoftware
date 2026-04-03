@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/job-orders/[id]
  * GET    — authenticated; fetch a single job order

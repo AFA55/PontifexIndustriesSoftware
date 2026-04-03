@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/schedule-board/missing-info
  * Request missing info on a pending job — updates job status and creates notification

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/PATCH/DELETE /api/admin/form-templates/[id]
  * Single form template CRUD (admin only)

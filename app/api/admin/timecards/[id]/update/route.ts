@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: PUT /api/admin/timecards/[id]/update
  * Update a timecard entry (admin/operations_manager/super_admin only).

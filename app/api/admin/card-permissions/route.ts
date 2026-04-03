@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/admin/card-permissions
  * Admin-only CRUD for dashboard card permissions per user.

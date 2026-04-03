@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/access-requests/[id]/update-user
  * Update user profile (role, active status, and card permissions)

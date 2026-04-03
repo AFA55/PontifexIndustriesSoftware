@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/notifications
  * Fetch unread notifications for the current user (admin/salesman/supervisor).

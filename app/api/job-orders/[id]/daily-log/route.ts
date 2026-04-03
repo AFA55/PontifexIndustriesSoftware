@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/job-orders/[id]/daily-log
  * Submit daily completion log for multi-day jobs

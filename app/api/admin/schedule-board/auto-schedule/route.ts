@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/schedule-board/auto-schedule
  * AI Auto-Scheduling Engine

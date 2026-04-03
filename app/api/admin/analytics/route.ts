@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/analytics
  * Business analytics overview: revenue, jobs, operators, AR, trends.

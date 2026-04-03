@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/jobs/[id]/schedule-info
  * Returns schedule date info for a job — used by the day-complete page to

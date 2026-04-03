@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/notifications/send
  * Admin sends notification to one or more users.

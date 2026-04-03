@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/timecards/export
  * Batch export timecards for all operators in a given week.

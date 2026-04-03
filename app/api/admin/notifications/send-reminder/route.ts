@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/notifications/send-reminder
  * Send clock-in reminder to operators who haven't clocked in.

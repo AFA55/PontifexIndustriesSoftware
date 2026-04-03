@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/access-requests/[id]/deny
  * Deny an access request with a reason

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST/DELETE /api/admin/operators/[id]/notes
  * Manage operator notes (general, performance reviews, incidents, commendations, warnings, training).

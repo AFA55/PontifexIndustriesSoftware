@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/job-orders/[id]/full-detail
  * Fetch complete job order record with resolved operator and helper names.

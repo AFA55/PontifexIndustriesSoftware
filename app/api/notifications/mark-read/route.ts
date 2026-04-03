@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/notifications/mark-read
  * Mark notifications as read.

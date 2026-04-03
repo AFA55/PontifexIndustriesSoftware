@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/timecards/[id]/pdf
  * Generate a weekly timecard PDF for a specific employee.

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/facilities/[id]/badges — Get all badges for a facility
  */

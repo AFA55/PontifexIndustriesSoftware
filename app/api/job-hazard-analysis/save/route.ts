@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/job-hazard-analysis/save
  * Save Job Hazard Analysis PDF to job documents

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/schedule-board/assign
  * Assign an operator and/or helper to a job order.

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/notifications
  * Fetch notifications for the authenticated user.

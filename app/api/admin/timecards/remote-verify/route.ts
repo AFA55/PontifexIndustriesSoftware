@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/timecards/remote-verify
  * Approve or reject a remote clock-in

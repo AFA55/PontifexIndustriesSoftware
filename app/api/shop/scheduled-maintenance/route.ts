@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/shop/scheduled-maintenance
  * List and create scheduled maintenance entries.

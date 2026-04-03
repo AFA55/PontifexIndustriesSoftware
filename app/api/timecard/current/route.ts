@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/timecard/current
  * Get user's current active timecard (if clocked in)

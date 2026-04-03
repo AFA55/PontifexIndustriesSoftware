@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/timecard/my-entries?weekStart=YYYY-MM-DD
  * Get the authenticated operator's timecard entries for a given week.

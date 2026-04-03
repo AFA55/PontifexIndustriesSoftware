@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/customers/search
  * GET: Lightweight autocomplete search for customers

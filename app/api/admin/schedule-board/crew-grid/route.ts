@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/schedule-board/crew-grid
  * Returns operator × date matrix for the crew schedule grid view.

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/job-orders/[id]/history
  * Get change history for a specific job order

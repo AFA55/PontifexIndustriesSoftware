@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/silica-plan/check?jobId=xxx
  * Check if a silica plan exists for a given job order

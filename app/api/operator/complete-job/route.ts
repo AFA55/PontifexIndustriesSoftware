@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/operator/complete-job
  * Records operator performance when a job is completed

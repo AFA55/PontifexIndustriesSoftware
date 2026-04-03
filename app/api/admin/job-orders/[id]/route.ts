@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: PATCH /api/admin/job-orders/[id]
  * Update a job order (admin only)

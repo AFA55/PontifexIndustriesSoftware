@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/access-requests/list
  * Fetch all access requests (admin only)

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/invoices/[id]/payment
  * POST - Record a payment against an invoice

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/po-lookup?po=12345
  * Look up a PO number in job_orders and return matching customer/location data.

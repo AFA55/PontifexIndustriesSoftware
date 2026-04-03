@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/send-email
  * Sends emails with optional PDF attachments using Resend

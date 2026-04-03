@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/ops-hub
  * Operations Hub diagnostics endpoint.

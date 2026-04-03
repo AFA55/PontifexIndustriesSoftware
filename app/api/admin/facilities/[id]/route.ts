@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/facilities/[id] — Get single facility
  * API Route: PATCH /api/admin/facilities/[id] — Update facility

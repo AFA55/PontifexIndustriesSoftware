@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/timecards/team-summary?weekStart=YYYY-MM-DD
  * Returns a team payroll overview for a given week.

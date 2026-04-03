@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/admin/schedule-contacts
  * Manages the schedule_contacts table for customer/contact autocomplete

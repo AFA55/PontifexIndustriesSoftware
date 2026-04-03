@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';

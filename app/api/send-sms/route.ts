@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/send-sms
  * Send SMS notification (can integrate with Twilio, AWS SNS, etc.)

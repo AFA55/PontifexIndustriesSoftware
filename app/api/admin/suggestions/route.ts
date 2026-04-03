@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/admin/suggestions
  * Manage autocomplete suggestions for job titles, company names, and general contractors

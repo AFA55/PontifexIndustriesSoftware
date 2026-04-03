@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/timecard/request-time-off
  * Submit a time-off request for the authenticated operator.

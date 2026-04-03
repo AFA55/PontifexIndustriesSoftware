@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/schedule-board
  * Fetch schedule board data for a given date range.

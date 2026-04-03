@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/facilities/[id]/badged-operators
  * Returns list of operators who have active, non-expired badges at this facility.

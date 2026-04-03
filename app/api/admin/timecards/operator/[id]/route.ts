@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/timecards/operator/[id]?weekStart=YYYY-MM-DD
  * Returns full weekly timecard data for a specific operator, including:

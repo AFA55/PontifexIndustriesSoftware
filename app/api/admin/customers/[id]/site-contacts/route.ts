@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/customers/[id]/site-contacts
  * Returns all unique site contacts used in previous jobs for a customer,

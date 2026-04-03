@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/admin/invoices/[id]/remind
  * Send a payment reminder email for an outstanding invoice

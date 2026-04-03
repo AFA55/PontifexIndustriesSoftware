@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: PATCH /api/admin/users/[id]
  * Update a user (admin only)

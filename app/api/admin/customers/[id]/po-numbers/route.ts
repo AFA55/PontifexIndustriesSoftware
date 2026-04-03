@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/customers/[id]/po-numbers
  * Returns all unique PO numbers used by a customer across their job history.

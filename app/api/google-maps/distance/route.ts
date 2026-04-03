@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/google-maps/distance
  * Calculate drive time and distance between two addresses

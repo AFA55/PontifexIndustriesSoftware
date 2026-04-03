@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/timecards
  * Get all timecards for admin viewing (requires admin role)

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * GET/POST /api/admin/change-requests
  * Manage schedule change requests.

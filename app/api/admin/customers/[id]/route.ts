@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/customers/[id]
  * GET: Full customer detail with contacts, job history, revenue stats

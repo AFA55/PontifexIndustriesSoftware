@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/schedule-board/time-off
  * GET: fetch time-off entries for a date or date range

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/team-messages
  * Internal team chat feed — read, post, delete messages.

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/admin/dashboard-tasks
  * CRUD for personal dashboard todo items.

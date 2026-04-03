@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/job-pnl
  * Returns P&L summary for all jobs (or filtered by date range / status).

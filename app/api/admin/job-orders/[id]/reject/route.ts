@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/admin/job-orders/[id]/reject
  * Super admin rejects a pending schedule form submission.

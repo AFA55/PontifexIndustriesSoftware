@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/PATCH /api/admin/commission
  * GET  - Retrieve commission rate and monthly earnings breakdown.

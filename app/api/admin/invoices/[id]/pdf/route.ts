@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/invoices/[id]/pdf
  * Generate and return Invoice PDF

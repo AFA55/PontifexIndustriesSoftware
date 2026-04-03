@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/dashboard-stats
  * Returns analytics data for the admin dashboard widgets.

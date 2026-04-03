@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/admin/job-orders/[id]/approve
  * Super admin approves a pending schedule form submission.

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: DELETE /api/job-orders/[id]/documents/[docId]
  * Delete a document attachment from a job order

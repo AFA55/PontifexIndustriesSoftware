@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/service-completion-agreement/save
  * Generates PDF of signed Service Completion Agreement and saves to storage

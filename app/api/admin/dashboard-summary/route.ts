@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/dashboard-summary
  * Main data feed for the admin dashboard KPI row, schedule view, and team status.
