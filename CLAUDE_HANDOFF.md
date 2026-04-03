@@ -7,22 +7,18 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `8e7eb3d6` — "merge: bring nifty-mcclintock worktree changes into feature/schedule-board-v2"
+- **Last commit:** `87decf59` — "security: comprehensive audit — auth guards, tenant isolation, input validation"
 - **Pushed to origin** ✅
-- **Build:** PASSING (0 errors, 189 static pages, compiled successfully in ~6.6s)
+- **Build:** PASSING (0 errors, 189 pages)
 
 ### Recent Commits (this session)
 ```
+87decf59 security: comprehensive audit — auth guards, tenant isolation, input validation
+fe357e6e feat: personalized Patriot Concrete Cutting sales page
+94cef093 feat: replace homepage with personalized Doug sales page (initial)
+1e09733a chore: update handoff — Vercel deployment live ✅
+c16a7ee1 chore: update handoff — worktree merged, Vercel action items documented
 8e7eb3d6 merge: bring nifty-mcclintock worktree changes into feature/schedule-board-v2
-4ad05202 chore: trigger Vercel redeploy with vercel.json + env config
-29d2d2be fix: Vercel deployment config — vercel.json, next.config, force-dynamic audit
-200be806 fix: mobile responsive audit — operator workflow pages
-c4c38a38 fix: onboarding tour skip button, setup-account 404, missing API routes
-fc73fd33 fix: feature-flags module ensure exists, fix job-orders auth for operator role
-ad5833ae feat: wire feature flags to admin sidebar — nav items hide/show per user permissions
-8953956f chore: update handoff doc — major session complete
-6398ad3f feat: account invitation + onboarding setup flow + avatar uploads
-98580d7d feat: Team Profiles page with feature toggle panels and invite flow
 ```
 
 ---
@@ -240,8 +236,45 @@ Extended: `profiles` (avatar, setup, waiver), `schedule_change_requests` (reason
 
 ---
 
+## VERCEL STATUS
+- **Live URL:** https://pontifex-industries-software-awja.vercel.app
+- **Deployed commit:** `1e09733a` (pre-sales-page — from previous session)
+- **Pending deploy:** `87decf59` (Patriot sales page + security fixes) — blocked by free tier 100/day limit
+- **Limit resets:** ~5:47 AM UTC April 4, 2026
+- **To deploy immediately:** Upgrade Vercel to Pro ($20/mo) at https://vercel.com/andres-altamiranos-projects/pontifex-industries-software-awja/settings/billing
+- **Auth token for CLI deploy:** `/Users/afa55/Library/Application Support/com.vercel.cli/auth.json`
+
+## SALES PAGE (Doug / Patriot)
+- **File:** `app/page.tsx` — fully self-contained, 1100+ lines
+- **Client:** Patriot Concrete Cutting (Doug)
+- **Sections:** Hero → Before/After → Payroll Savings → Smart Scheduling → Operator UX → Custom Dev Partnership → Features Grid → Security → CTA
+- **COMPANY_NAME constant** at line 42 — easy to update if needed
+- **Security section** added with 6 pillars + SOC 2 / Supabase infrastructure banner
+- **Nav:** Overview, Scheduling, Payroll, Features, Security, Let's Talk
+
+## SECURITY AUDIT (COMPLETED)
+Full audit by dedicated agent — 15 files fixed, 0 build errors. Key findings:
+
+### CRITICAL fixed:
+- `/api/upload/avatar` — was completely unauthenticated; now requires Bearer token OR valid invite token; file type restricted to explicit allowlist (jpg/png/gif/webp only)
+
+### HIGH fixed (tenant isolation):
+- `/api/admin/job-orders` POST+GET — no tenant scoping added
+- `/api/admin/job-orders/[id]` PATCH+DELETE — unscoped queries fixed
+- `/api/job-orders/[id]/status` — all three code paths now tenant-scoped
+- `/api/job-hazard-analysis/save` — job ownership check before PDF generation
+- `/api/service-completion-agreement/save` — same fix
+
+### MEDIUM fixed (RBAC normalization):
+9 routes used `role === 'admin'` only, locking out super_admin and operations_manager:
+- send-schedule, job-workflow, sync-job-statuses, operator-profiles (x2), suggestions, operators/active, users (GET+PATCH)
+
+### Verified safe (intentionally public):
+- signature/[token], setup-account/complete, setup-account/validate, access-requests, demo-request, health, log-error, webhooks/stripe
+
 ## NEXT SESSION PRIORITIES
-1. **E2E browser walkthrough** — full job creation → operator completion → admin approval at https://pontifex-industries-software-awja.vercel.app
-2. **Patriot branding** — log in as super admin → Settings → Branding → upload Patriot logo, set colors
-3. **Connect Stripe live keys** — STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET in Vercel env vars (once Stripe account ready)
-4. **Merge to main** — merge feature/schedule-board-v2 → main for permanent production URL
+1. **Deploy to Vercel** — run deploy command once limit resets OR upgrade to Pro
+2. **E2E browser walkthrough** — full job creation → operator completion → admin approval at https://pontifex-industries-software-awja.vercel.app
+3. **Patriot branding** — log in as super admin → Settings → Branding → upload Patriot logo + Patriot colors
+4. **Connect Stripe live keys** — STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET in Vercel env vars
+5. **Merge to main** — merge feature/schedule-board-v2 → main for permanent production URL
