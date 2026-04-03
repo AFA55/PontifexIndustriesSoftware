@@ -68,7 +68,7 @@ const NAV_SECTIONS: NavSection[] = [
     accent: 'text-purple-400',
     items: [
       { label: 'Timecards', href: '/dashboard/admin/timecards', icon: Clock, badgeKey: 'timecards' },
-      { label: 'Team Profiles', href: '/dashboard/admin/operator-profiles', icon: Users },
+      { label: 'Team Profiles', href: '/dashboard/admin/team-profiles', icon: Users },
       { label: 'Customers', href: '/dashboard/admin/customers', icon: UserCircle2 },
       { label: 'Invoicing', href: '/dashboard/admin/billing', icon: CreditCard },
       { label: 'Completed Jobs', href: '/dashboard/admin/completed-jobs', icon: CheckCircle2 },
@@ -169,8 +169,17 @@ function Badge({ count }: { count: number }) {
 // Avatar helper
 // ---------------------------------------------------------------------------
 
-function UserAvatar({ name }: { name: string }) {
+function UserAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
   const initial = name.trim().charAt(0).toUpperCase() || '?';
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="flex-shrink-0 w-8 h-8 rounded-lg object-cover ring-1 ring-purple-500/40 select-none"
+      />
+    );
+  }
   return (
     <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold select-none">
       {initial}
@@ -258,6 +267,23 @@ function SidebarContent({
   onNavClick,
   onSignOut,
 }: SidebarContentProps) {
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    // Fetch avatar non-blocking
+    import('@/lib/supabase').then(({ supabase }) => {
+      supabase.auth.getSession().then(({ data }) => {
+        const token = data.session?.access_token;
+        if (!token) return;
+        fetch('/api/my-profile', { headers: { Authorization: `Bearer ${token}` } })
+          .then(r => r.ok ? r.json() : null)
+          .then(json => { if (json?.data?.profile_picture_url) setAvatarUrl(json.data.profile_picture_url); })
+          .catch(() => {});
+      });
+    });
+  }, [user?.id]);
+
   return (
     <div className="flex flex-col h-full">
       {/* ------------------------------------------------------------------ */}
@@ -373,7 +399,7 @@ function SidebarContent({
               collapsed ? 'justify-center flex-col' : ''
             }`}
           >
-            <UserAvatar name={user.name} />
+            <UserAvatar name={user.name} avatarUrl={avatarUrl} />
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-white text-xs font-semibold truncate leading-tight">
