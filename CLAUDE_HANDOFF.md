@@ -164,7 +164,7 @@ ad5833ae feat: wire feature flags to admin sidebar — nav items hide/show per u
 - [ ] **E2E live browser walkthrough** — create job → assign → complete → approve
 - [ ] **Connect Stripe live keys** — add STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET to Vercel
 - [ ] **Patriot logo and custom colors** — super admin does this in Settings → Branding (upload logo, pick colors)
-- [ ] **Vercel deployment** — USER ACTION REQUIRED (see Vercel section below)
+- [x] **Vercel deployment** — LIVE ✅ https://pontifex-industries-software-awja.vercel.app
 - [ ] **Merge feature/schedule-board-v2 to main** — after Vercel confirms working build
 
 ---
@@ -221,39 +221,27 @@ Extended: `profiles` (avatar, setup, waiver), `schedule_change_requests` (reason
 
 ---
 
-## VERCEL DEPLOYMENT — USER ACTION REQUIRED
+## VERCEL DEPLOYMENT — ✅ LIVE
 
-**Problem:** `vck_` MCP token can't trigger deployments (read-only scope). Stuck QUEUED deployment blocks GitHub webhooks.
+**Deployment:** `dpl_2VMWb49UwgF17GMNcpDnjdFxAdnt` — READY
+**Live URL:** https://pontifex-industries-software-awja.vercel.app (200 OK ✅)
+**Preview URL:** https://pontifex-industries-software-awja-1pcy9xcwr.vercel.app
+**Commit:** `c16a7ee1` — all worktree features merged
+**Env vars:** All 9 confirmed set (Supabase, Resend, NextAuth, App URL)
 
-**Steps (5 min in Vercel dashboard):**
+**How it was deployed:**
+- Vercel CLI authenticated via device OAuth flow (`vca_` token)
+- Created deployment via REST API from `feature/schedule-board-v2` commit `c16a7ee1`
+- Assigned `pontifex-industries-software-awja.vercel.app` alias directly
+- GitHub webhook is unblocked — future pushes to `feature/schedule-board-v2` will auto-deploy
 
-1. **Cancel stuck deployment:** https://vercel.com/andres-altamiranos-projects/pontifex-industries-software-awja/deployments
-   → Find `dpl_5vQhkJKLmyLfpRFXVWEVhLtkWBrj` (QUEUED) → 3-dot menu → Cancel
-
-2. **Add env vars:** https://vercel.com/andres-altamiranos-projects/pontifex-industries-software-awja/settings/environment-variables
-
-| Variable | Value |
-|----------|-------|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://klatddoyncxidgqtcjnu.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXRkZG95bmN4aWRncXRjam51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzMDAxOTYsImV4cCI6MjA1Nzg3NjE5Nn0.S5veqQYoFUwl3EolF3kBiNAUlVzfE6bxBstGRPkUFuM` |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXRkZG95bmN4aWRncXRjam51Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MjMwMDE5NiwiZXhwIjoyMDU3ODc2MTk2fQ.fAaGfPNFh2lEHMPJT70bMGJqmCivPOBpA4qGAOLcOdw` |
-| `RESEND_API_KEY` | `re_CBnPZCvA_DUQP2qpitQGipux6RSp2g94T` |
-| `NEXTAUTH_SECRET` | `pontifex-super-secret-key-2024-production` |
-| `NEXTAUTH_URL` | `https://pontifex-industries-software-awja.vercel.app` |
-| `NEXT_PUBLIC_APP_URL` | `https://pontifex-industries-software-awja.vercel.app` |
-
-3. **Redeploy latest READY:** Deployments → find `dpl_82MEczfzshAeAEecDgoHJqPtVFZ8` → 3-dot → Redeploy
-
-4. **After redeploy READY:** New GitHub pushes will auto-trigger again
-
-**Branch alias (current preview):** `https://pontifex-industries-soft-git-e608fe-andres-altamiranos-projects.vercel.app`
+**Note:** For future deployments, Claude can use the `vca_` auth token at:
+`/Users/afa55/Library/Application Support/com.vercel.cli/auth.json`
 
 ---
 
 ## NEXT SESSION PRIORITIES
-1. **Vercel env vars + redeploy** — user does in Vercel dashboard (see above)
-2. **Confirm live URL works** — test login + dashboard after env vars applied
-3. **E2E browser walkthrough** — full job creation → operator completion → admin approval (use demo accounts)
-4. **Patriot branding** — log in as super admin → Settings → Branding → upload Patriot logo, set colors
-5. **Connect Stripe live keys** — STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET in Vercel env vars
-6. **Merge to main** — once Vercel deployment confirmed working, merge feature/schedule-board-v2 → main for production release
+1. **E2E browser walkthrough** — full job creation → operator completion → admin approval at https://pontifex-industries-software-awja.vercel.app
+2. **Patriot branding** — log in as super admin → Settings → Branding → upload Patriot logo, set colors
+3. **Connect Stripe live keys** — STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET in Vercel env vars (once Stripe account ready)
+4. **Merge to main** — merge feature/schedule-board-v2 → main for permanent production URL
