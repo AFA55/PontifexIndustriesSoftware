@@ -18,6 +18,7 @@ import {
   Settings,
   Bell,
   BarChart3,
+  Briefcase,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -58,6 +59,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
       { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar },
+      { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase },
       { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit },
     ],
   },
