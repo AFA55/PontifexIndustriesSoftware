@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
+// No auth required — public endpoint for uptime monitoring (UptimeRobot, Vercel, etc.)
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/health — System health check endpoint.
  * Returns status of core services. No auth required.
+ * Response: { status: 'ok'|'degraded'|'down', checks, timestamp, version, environment }
  */
 export async function GET() {
   const start = Date.now();
@@ -56,7 +60,11 @@ export async function GET() {
     status: overallStatus,
     timestamp: new Date().toISOString(),
     total_latency_ms: totalLatency,
-    version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
+    version: process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0',
+    environment: process.env.NODE_ENV || 'production',
+    uptime_since: process.env.VERCEL_DEPLOYMENT_ID
+      ? `Vercel deployment: ${process.env.VERCEL_DEPLOYMENT_ID}`
+      : 'local/unknown',
     checks,
   }, {
     status: anyDown ? 503 : 200,

@@ -147,3 +147,39 @@ New columns: `job_orders.scheduled_end_date`, `actual_end_date`, `completion_sub
 3. **Patriot visual branding**: logo upload, custom colors in tenant_branding
 4. **Production deployment**: Vercel env vars, custom domain, SSL
 5. **Merge to main** and final release
+
+---
+
+## INFRASTRUCTURE
+
+### Vercel
+- **Plan**: Pro tier (unlimited deploys, cron jobs, edge functions)
+- **Auto-deploy**: pushes to `feature/schedule-board-v2` trigger preview deploys; merges to `main` trigger production
+- **Env vars required**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- **Cron jobs**: defined in `vercel.json` — daily health check at 06:00 UTC
+- **Domain**: pontifexindustries.com → www.pontifexindustries.com (Vercel DNS managed)
+
+### Supabase
+- **Project ID**: `klatddoyncxidgqtcjnu`
+- **Plan**: Pro (required for daily backups + PITR)
+- **Automated backups**: daily, 7-day retention (Supabase managed)
+- **Point-in-Time Recovery (PITR)**: available on Pro — enable via Supabase Dashboard → Project Settings → Backups
+- **Manual backup**: Supabase Dashboard → Database → Backups → Download pg_dump
+- **Connection pooling**: PgBouncer (built-in) — transaction mode for Vercel serverless
+- **95+ tables**, all with RLS enabled, JWT metadata for tenant isolation
+
+### Health Monitoring
+- **Public health check**: `GET /api/health` — checks DB, auth, storage; returns latency + status
+  - Response: `{ status: 'ok'|'degraded'|'down', checks, timestamp, version, environment }`
+  - Returns HTTP 503 if any check is `down`
+- **Cron health check**: `GET /api/cron/health-check` — runs daily at 06:00 UTC via Vercel Cron
+  - Protected by `Authorization: Bearer $CRON_SECRET` header
+  - Writes snapshot to `system_health_log` table (DB size, table counts, check results)
+  - Returns HTTP 500 if platform is down
+- **Uptime monitoring**: point UptimeRobot / Better Uptime at `https://pontifexindustries.com/api/health`
+
+### Error Monitoring
+- **`app/global-error.tsx`**: root-level error boundary — catches crashes in root layout; shows purple/dark "Something went wrong" page with Try Again + Dashboard buttons
+- **`app/error.tsx`**: route-level error boundary — catches page-segment errors; same purple/dark theme
+- **Vercel Function Logs**: all errors logged via `console.error('[GlobalError]', error)` — visible in Vercel dashboard
+- **Error IDs**: Next.js `error.digest` shown in UI for support reference
