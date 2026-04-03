@@ -9,34 +9,44 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  * Returns tenant info and branding for the given company code.
  */
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get('code')?.toUpperCase();
+  try {
+    const code = request.nextUrl.searchParams.get('code')?.toUpperCase();
 
-  if (!code || code.length < 2) {
-    return NextResponse.json({ error: 'Company code required' }, { status: 400 });
+    if (!code || code.length < 2) {
+      return NextResponse.json({ error: 'Company code required' }, { status: 400 });
+    }
+
+    const { data: tenant, error: tenantError } = await supabaseAdmin
+      .from('tenants')
+      .select('id, name, slug, company_code, logo_url, primary_color, status')
+      .eq('company_code', code)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (tenantError) {
+      console.error('Error looking up company:', tenantError);
+      return NextResponse.json({ error: 'Company lookup failed' }, { status: 500 });
+    }
+
+    if (!tenant) {
+      return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+    }
+
+    // Also fetch branding for this tenant
+    const { data: branding } = await supabaseAdmin
+      .from('tenant_branding')
+      .select('*')
+      .eq('tenant_id', tenant.id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    return NextResponse.json({
+      success: true,
+      tenant,
+      branding: branding || null,
+    });
+  } catch (err) {
+    console.error('Unexpected error in lookup-company:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-
-  const { data: tenant } = await supabaseAdmin
-    .from('tenants')
-    .select('id, name, slug, company_code, logo_url, primary_color, status')
-    .eq('company_code', code)
-    .eq('status', 'active')
-    .single();
-
-  if (!tenant) {
-    return NextResponse.json({ error: 'Company not found' }, { status: 404 });
-  }
-
-  // Also fetch branding for this tenant
-  const { data: branding } = await supabaseAdmin
-    .from('tenant_branding')
-    .select('*')
-    .eq('tenant_id', tenant.id)
-    .eq('is_active', true)
-    .single();
-
-  return NextResponse.json({
-    success: true,
-    tenant,
-    branding: branding || null,
-  });
 }

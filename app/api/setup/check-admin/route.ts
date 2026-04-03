@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       return NextResponse.json(
-        { error: `Database error: ${error.message}` },
+        { error: "Database error checking admin accounts" },
         { status: 500 }
       );
     }

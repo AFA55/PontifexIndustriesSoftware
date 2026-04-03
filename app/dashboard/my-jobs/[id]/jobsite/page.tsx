@@ -31,15 +31,15 @@ export default function JobsitePage() {
       }
 
       const res = await fetch(
-        `/api/job-orders?include_helper_jobs=true&includeCompleted=true`,
+        `/api/job-orders?id=${jobId}&include_helper_jobs=true&includeCompleted=true`,
         { headers: { Authorization: `Bearer ${session.access_token}` } }
       );
 
       if (res.ok) {
         const json = await res.json();
         if (json.success) {
-          const found = (json.data || []).find((j: any) => j.id === jobId);
-          if (found) {
+          const found = (json.data || [])[0];
+          if (found && found.id === jobId) {
             setJob(found);
             // If status is still in_route, update to in_progress (arrived at site)
             if (found.status === 'in_route') {

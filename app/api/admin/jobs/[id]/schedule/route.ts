@@ -36,7 +36,7 @@ export async function PUT(
       .eq('tenant_id', auth.tenantId);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Failed to update schedule" }, { status: 500 });
     }
 
     // Fire-and-forget audit log

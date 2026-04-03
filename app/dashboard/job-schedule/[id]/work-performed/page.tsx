@@ -217,6 +217,7 @@ export default function WorkPerformed() {
 
   // ─── Day lock state (read-only if today's daily log already submitted) ──────
   const [dayAlreadySubmitted, setDayAlreadySubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch job type and day number for smart recommendations + correct work item tracking
   useEffect(() => {
@@ -1172,6 +1173,9 @@ export default function WorkPerformed() {
       return;
     }
 
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -1262,6 +1266,8 @@ export default function WorkPerformed() {
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
       router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1880,12 +1886,13 @@ export default function WorkPerformed() {
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2"
+                disabled={isSubmitting}
+                className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
-                Next: Job Survey
+                {isSubmitting ? 'Saving...' : 'Next: Job Survey'}
               </button>
             </div>
           </div>

@@ -66,13 +66,8 @@ export default function DayCompletePage() {
         const data = await res.json();
         setJob(data.data || data);
       } else {
-        // Fallback: fetch directly from supabase
-        const { data } = await supabase
-          .from('job_orders')
-          .select('*, profiles!job_orders_assigned_to_fkey(full_name)')
-          .eq('id', jobId)
-          .single();
-        setJob(data);
+        console.error('Failed to fetch job details:', res.status);
+        // Don't fallback to direct Supabase — the API handles auth/tenant scoping
       }
     } catch (err) {
       console.error('Error fetching job:', err);
@@ -368,6 +363,27 @@ export default function DayCompletePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // ─── Job not found ────────────────────────────────────────────────────────
+  if (!loading && !job) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl border border-red-100 p-8 max-w-sm w-full text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Job Not Found</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            Could not load job details. Please go back and try again.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard/my-jobs')}
+            className="w-full bg-gradient-to-r from-slate-600 to-slate-700 text-white py-3 rounded-xl font-semibold"
+          >
+            Back to My Jobs
+          </button>
+        </div>
       </div>
     );
   }

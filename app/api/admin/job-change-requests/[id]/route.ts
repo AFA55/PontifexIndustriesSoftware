@@ -49,7 +49,8 @@ export async function PUT(
     .eq('id', id);
 
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+    console.error('Error updating change request status:', updateError);
+    return NextResponse.json({ error: 'Failed to update change request' }, { status: 500 });
   }
 
   // If approved and it's a date_extension, apply the change

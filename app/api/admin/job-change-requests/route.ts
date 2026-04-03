@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('Error fetching change requests:', error);
+    return NextResponse.json({ error: 'Failed to fetch change requests' }, { status: 500 });
+  }
   return NextResponse.json({ success: true, data });
 }
 
@@ -60,7 +63,10 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('Error creating change request:', error);
+    return NextResponse.json({ error: 'Failed to create change request' }, { status: 500 });
+  }
 
   // Notify all super_admins and operations_managers in tenant — fire-and-forget
   Promise.resolve(

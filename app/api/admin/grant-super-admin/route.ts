@@ -20,12 +20,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'userId is required' }, { status: 400 });
   }
 
+  // Verify the target user belongs to the same tenant (prevent cross-tenant privilege escalation)
+  const { data: targetProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('tenant_id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!targetProfile || targetProfile.tenant_id !== auth.tenantId) {
+    return NextResponse.json({ error: 'User not found in your organization' }, { status: 404 });
+  }
+
   // Update user_metadata role in auth.users
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
     user_metadata: { role: 'super_admin' },
   });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('Error granting super admin:', error);
+    return NextResponse.json({ error: 'Failed to update user role' }, { status: 500 });
+  }
 
   // Also update profiles table
   await supabaseAdmin

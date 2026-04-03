@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating customer:', error);
-      return NextResponse.json({ error: 'Failed to create customer', details: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Failed to create customer" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data: customer }, { status: 201 });

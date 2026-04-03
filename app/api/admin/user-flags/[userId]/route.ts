@@ -20,7 +20,8 @@ export async function GET(
     .single();
 
   if (error && error.code !== 'PGRST116') {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Error fetching user feature flags:', error);
+    return NextResponse.json({ error: 'Failed to fetch feature flags' }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, data: data || null });
@@ -55,6 +56,9 @@ export async function PUT(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('Error upserting user feature flags:', error);
+    return NextResponse.json({ error: 'Failed to update feature flags' }, { status: 500 });
+  }
   return NextResponse.json({ success: true, data });
 }
