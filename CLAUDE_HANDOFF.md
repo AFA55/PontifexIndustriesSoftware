@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 2, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (189 pages)
+**Date:** April 3, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (189 pages)
 
 ---
 
@@ -7,12 +7,15 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `200be806` — "fix: mobile responsive audit — operator workflow pages"
+- **Last commit:** `8e7eb3d6` — "merge: bring nifty-mcclintock worktree changes into feature/schedule-board-v2"
 - **Pushed to origin** ✅
 - **Build:** PASSING (0 errors, 189 static pages, compiled successfully in ~6.6s)
 
 ### Recent Commits (this session)
 ```
+8e7eb3d6 merge: bring nifty-mcclintock worktree changes into feature/schedule-board-v2
+4ad05202 chore: trigger Vercel redeploy with vercel.json + env config
+29d2d2be fix: Vercel deployment config — vercel.json, next.config, force-dynamic audit
 200be806 fix: mobile responsive audit — operator workflow pages
 c4c38a38 fix: onboarding tour skip button, setup-account 404, missing API routes
 fc73fd33 fix: feature-flags module ensure exists, fix job-orders auth for operator role
@@ -20,9 +23,6 @@ ad5833ae feat: wire feature flags to admin sidebar — nav items hide/show per u
 8953956f chore: update handoff doc — major session complete
 6398ad3f feat: account invitation + onboarding setup flow + avatar uploads
 98580d7d feat: Team Profiles page with feature toggle panels and invite flow
-f42c19f7 feat: Active Jobs page — personal job metrics, pending requests, attention flags
-9235c996 feat: user feature flags system, job change requests, super admin grant flow
-42b2a622 feat: hide scope/progress from operators, lock submitted day entries, simplify tour
 ```
 
 ---
@@ -160,11 +160,11 @@ f42c19f7 feat: Active Jobs page — personal job metrics, pending requests, atte
 | Branding Settings | Super admin CSS vars + favicon + title |
 
 ### Remaining — Final Sprint
-- [ ] **Schedule board "Request Change" button** — restricted admins see button instead of edit controls
+- [x] **Schedule board "Request Change" button** — DONE: ChangeRequestModal merged from worktree, read-only banner + 5 change types
 - [ ] **E2E live browser walkthrough** — create job → assign → complete → approve
 - [ ] **Connect Stripe live keys** — add STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET to Vercel
 - [ ] **Patriot logo and custom colors** — super admin does this in Settings → Branding (upload logo, pick colors)
-- [ ] **Vercel deployment** — IN PROGRESS (deploy agent handling env vars, domain, SSL)
+- [ ] **Vercel deployment** — USER ACTION REQUIRED (see Vercel section below)
 - [ ] **Merge feature/schedule-board-v2 to main** — after Vercel confirms working build
 
 ---
@@ -221,10 +221,39 @@ Extended: `profiles` (avatar, setup, waiver), `schedule_change_requests` (reason
 
 ---
 
+## VERCEL DEPLOYMENT — USER ACTION REQUIRED
+
+**Problem:** `vck_` MCP token can't trigger deployments (read-only scope). Stuck QUEUED deployment blocks GitHub webhooks.
+
+**Steps (5 min in Vercel dashboard):**
+
+1. **Cancel stuck deployment:** https://vercel.com/andres-altamiranos-projects/pontifex-industries-software-awja/deployments
+   → Find `dpl_5vQhkJKLmyLfpRFXVWEVhLtkWBrj` (QUEUED) → 3-dot menu → Cancel
+
+2. **Add env vars:** https://vercel.com/andres-altamiranos-projects/pontifex-industries-software-awja/settings/environment-variables
+
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://klatddoyncxidgqtcjnu.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXRkZG95bmN4aWRncXRjam51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzMDAxOTYsImV4cCI6MjA1Nzg3NjE5Nn0.S5veqQYoFUwl3EolF3kBiNAUlVzfE6bxBstGRPkUFuM` |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXRkZG95bmN4aWRncXRjam51Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MjMwMDE5NiwiZXhwIjoyMDU3ODc2MTk2fQ.fAaGfPNFh2lEHMPJT70bMGJqmCivPOBpA4qGAOLcOdw` |
+| `RESEND_API_KEY` | `re_CBnPZCvA_DUQP2qpitQGipux6RSp2g94T` |
+| `NEXTAUTH_SECRET` | `pontifex-super-secret-key-2024-production` |
+| `NEXTAUTH_URL` | `https://pontifex-industries-software-awja.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | `https://pontifex-industries-software-awja.vercel.app` |
+
+3. **Redeploy latest READY:** Deployments → find `dpl_82MEczfzshAeAEecDgoHJqPtVFZ8` → 3-dot → Redeploy
+
+4. **After redeploy READY:** New GitHub pushes will auto-trigger again
+
+**Branch alias (current preview):** `https://pontifex-industries-soft-git-e608fe-andres-altamiranos-projects.vercel.app`
+
+---
+
 ## NEXT SESSION PRIORITIES
-1. **Vercel deployment confirmation** — verify deploy agent's work, check Vercel build logs, confirm live URL works
-2. **Connect Stripe live keys** — STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET in Vercel env vars
-3. **Schedule board "Request Change" button** — restricted admins (has flags but not super_admin) see request button instead of edit controls
-4. **E2E browser walkthrough** — full job creation → operator completion → admin approval (use demo accounts)
-5. **Patriot branding** — log in as super admin → Settings → Branding → upload Patriot logo, set colors
+1. **Vercel env vars + redeploy** — user does in Vercel dashboard (see above)
+2. **Confirm live URL works** — test login + dashboard after env vars applied
+3. **E2E browser walkthrough** — full job creation → operator completion → admin approval (use demo accounts)
+4. **Patriot branding** — log in as super admin → Settings → Branding → upload Patriot logo, set colors
+5. **Connect Stripe live keys** — STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET in Vercel env vars
 6. **Merge to main** — once Vercel deployment confirmed working, merge feature/schedule-board-v2 → main for production release
