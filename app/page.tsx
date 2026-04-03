@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { motion, useInView, useAnimation, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock,
   Calendar,
@@ -47,7 +47,7 @@ const DEVELOPER_EMAIL = 'andres.altamirano1280@gmail.com';
 const DEVELOPER_PHONE = '';
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Animation helpers
+// Animation helpers — uses native IntersectionObserver (React 19 compatible)
 function FadeIn({
   children,
   delay = 0,
@@ -59,25 +59,40 @@ function FadeIn({
   direction?: 'up' | 'down' | 'left' | 'right' | 'none';
   className?: string;
 }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: '-60px' });
-  const dirMap = {
-    up: { y: 32 },
-    down: { y: -32 },
-    left: { x: 32 },
-    right: { x: -32 },
-    none: {},
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect(); } },
+      { rootMargin: '-60px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const dirMap: Record<string, string> = {
+    up: 'translateY(32px)',
+    down: 'translateY(-32px)',
+    left: 'translateX(32px)',
+    right: 'translateX(-32px)',
+    none: 'translateY(0)',
   };
+
   return (
-    <motion.div
+    <div
       ref={ref}
-      initial={{ opacity: 0, ...dirMap[direction] }}
-      animate={isInView ? { opacity: 1, x: 0, y: 0 } : {}}
-      transition={{ duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] }}
       className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translate(0,0)' : dirMap[direction],
+        transition: `opacity 0.65s cubic-bezier(0.22,1,0.36,1) ${delay}s, transform 0.65s cubic-bezier(0.22,1,0.36,1) ${delay}s`,
+      }}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -281,11 +296,9 @@ function TimecardMockup() {
         <div className="flex items-end gap-2 h-24">
           {days.map((d, i) => (
             <div key={d} className="flex-1 flex flex-col items-center gap-1">
-              <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: `${(hours[i] / maxH) * 80}px` }}
-                transition={{ delay: i * 0.08, duration: 0.5, ease: 'easeOut' }}
-                className="w-full rounded-t-md bg-gradient-to-t from-violet-600 to-indigo-500"
+              <div
+                className="w-full rounded-t-md bg-gradient-to-t from-violet-600 to-indigo-500 transition-all duration-500"
+                style={{ height: `${(hours[i] / maxH) * 80}px`, transitionDelay: `${i * 80}ms` }}
               />
               <span className="text-zinc-500 text-xs">{d}</span>
             </div>
@@ -540,13 +553,9 @@ export default function DougSalesPage() {
         </div>
 
         {/* Scroll indicator */}
-        <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 text-zinc-600"
-        >
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-zinc-600 animate-bounce">
           <ChevronDown className="w-6 h-6" />
-        </motion.div>
+        </div>
       </section>
 
       {/* ── BEFORE vs. AFTER ────────────────────────────────────────────────── */}
