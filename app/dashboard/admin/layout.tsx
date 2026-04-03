@@ -6,12 +6,30 @@ import { Search, Plus } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import NotificationBell from '@/components/NotificationBell';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 
 // ---------------------------------------------------------------------------
 // User avatar — shown in header right side
 // ---------------------------------------------------------------------------
 
 function HeaderAvatar({ user }: { user: User | null }) {
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    // Fetch the profile picture URL from the API (non-blocking)
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      fetch('/api/my-profile', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(json => {
+          if (json?.data?.profile_picture_url) setAvatarUrl(json.data.profile_picture_url);
+        })
+        .catch(() => {});
+    });
+  }, [user?.id]);
+
   if (!user) {
     return (
       <div className="flex items-center gap-2">
@@ -24,9 +42,17 @@ function HeaderAvatar({ user }: { user: User | null }) {
 
   return (
     <div className="flex items-center gap-2.5 cursor-default select-none">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-        {initial}
-      </div>
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt={user.name}
+          className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-2 ring-purple-500/30"
+        />
+      ) : (
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+          {initial}
+        </div>
+      )}
       <span className="hidden sm:block text-sm font-medium text-gray-700 truncate max-w-[120px]">
         {user.name}
       </span>

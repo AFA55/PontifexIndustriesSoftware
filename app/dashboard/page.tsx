@@ -74,6 +74,7 @@ export default function Dashboard() {
   const [statusLoading, setStatusLoading] = useState(false);
   const [activeJobsCount, setActiveJobsCount] = useState(0);
   const [weeklyHours, setWeeklyHours] = useState(0);
+  const [operatorAvatarUrl, setOperatorAvatarUrl] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isDemoOperator, setIsDemoOperator] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
@@ -122,6 +123,16 @@ export default function Dashboard() {
 
     // For operator or default, stay on this dashboard
     setUser(currentUser);
+
+    // Fetch avatar non-blocking
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      fetch('/api/my-profile', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(json => { if (json?.data?.profile_picture_url) setOperatorAvatarUrl(json.data.profile_picture_url); })
+        .catch(() => {});
+    });
 
     // Check if this is demo operator account
     const isDemo = currentUser.email?.toLowerCase().includes('demo') ||
@@ -838,8 +849,12 @@ export default function Dashboard() {
             {/* Modern Profile Section */}
             <div className="flex items-center gap-4">
               <div className="hidden sm:flex items-center gap-3 bg-white/10 backdrop-blur-lg px-4 py-2 rounded-xl border border-white/20">
-                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white/30">
-                  {user?.name?.charAt(0) || 'D'}
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white/30 overflow-hidden flex-shrink-0">
+                  {operatorAvatarUrl ? (
+                    <img src={operatorAvatarUrl} alt={user?.name || ''} className="w-full h-full object-cover" />
+                  ) : (
+                    user?.name?.charAt(0) || 'D'
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-white">{user?.name || 'Demo Operator'}</p>

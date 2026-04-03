@@ -2,12 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ChevronLeft, User, Mail, Phone, Calendar, Shield, Save,
-  Loader2, CheckCircle, Camera
+  ChevronLeft, User, Phone, Calendar, Shield, Save,
+  Loader2, CheckCircle, Camera, Upload
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -56,6 +56,13 @@ export default function MyProfilePage() {
   const [ecPhone, setEcPhone] = useState('');
   const [ecRelationship, setEcRelationship] = useState('');
 
+  // Avatar upload state
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) { router.push('/login'); return; }
@@ -85,6 +92,45 @@ export default function MyProfilePage() {
     }
     fetchProfile();
   }, []);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { setAvatarError('Image must be under 5 MB'); return; }
+    if (!file.type.startsWith('image/')) { setAvatarError('Only image files are supported'); return; }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setAvatarError('');
+
+    // Immediately upload
+    setUploadingAvatar(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) { setAvatarError('Not authenticated'); return; }
+
+      const form = new FormData();
+      form.append('avatar', file);
+
+      const res = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const json = await res.json();
+      if (json.success && json.data?.url) {
+        setProfilePicUrl(json.data.url);
+        setProfile(prev => prev ? { ...prev, profile_picture_url: json.data.url } : prev);
+      } else {
+        setAvatarError(json.error || 'Failed to upload photo');
+      }
+    } catch {
+      setAvatarError('Failed to upload photo. Please try again.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -140,19 +186,42 @@ export default function MyProfilePage() {
           <div className="space-y-6">
             {/* Profile Header Card */}
             <div className="bg-white rounded-2xl border border-gray-200 p-6 flex items-center gap-5 shadow-sm">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 relative">
-                {profile.profile_picture_url ? (
-                  <img src={profile.profile_picture_url} alt="" className="w-full h-full rounded-2xl object-cover" />
-                ) : (
-                  <span className="text-white font-bold text-2xl">
-                    {profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                  </span>
-                )}
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center border-2 border-white">
-                  <Camera className="w-3 h-3 text-white" />
+              <div className="relative flex-shrink-0">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center overflow-hidden">
+                  {(avatarPreview || profile.profile_picture_url) ? (
+                    <img
+                      src={avatarPreview || profile.profile_picture_url!}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-white font-bold text-2xl">
+                      {profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
                 </div>
+                {/* Clickable camera overlay */}
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-purple-600 hover:bg-purple-700 rounded-full flex items-center justify-center border-2 border-white transition-colors disabled:opacity-60"
+                  title="Change profile photo"
+                >
+                  {uploadingAvatar ? (
+                    <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-3.5 h-3.5 text-white" />
+                  )}
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-xl font-bold text-gray-900">{profile.full_name}</h2>
                 <span className={`inline-flex px-3 py-0.5 rounded-full text-xs font-bold mt-1 ${
                   profile.role === 'operator' ? 'bg-purple-100 text-purple-700' : 'bg-cyan-100 text-cyan-700'
@@ -160,6 +229,8 @@ export default function MyProfilePage() {
                   {roleName}
                 </span>
                 <p className="text-sm text-gray-500 mt-1">{profile.email}</p>
+                {avatarError && <p className="text-xs text-red-500 mt-1">{avatarError}</p>}
+                {uploadingAvatar && <p className="text-xs text-purple-600 mt-1">Uploading photo...</p>}
               </div>
             </div>
 
@@ -216,14 +287,23 @@ export default function MyProfilePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">Profile Picture URL</label>
-                <input
-                  type="url"
-                  value={profilePicUrl}
-                  onChange={(e) => setProfilePicUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
-                />
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Profile Photo</label>
+                <label className="flex items-center gap-3 cursor-pointer w-fit">
+                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 hover:border-purple-400 rounded-xl px-4 py-2.5 text-sm text-gray-700 transition-colors">
+                    <Upload className="w-4 h-4 text-gray-400" />
+                    {uploadingAvatar ? 'Uploading...' : profilePicUrl ? 'Change Photo' : 'Upload Photo'}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                    disabled={uploadingAvatar}
+                  />
+                </label>
+                {profilePicUrl && !avatarPreview && (
+                  <p className="text-xs text-green-600 mt-1">Photo uploaded</p>
+                )}
               </div>
             </div>
 
