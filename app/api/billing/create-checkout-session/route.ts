@@ -1,7 +1,9 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { PLANS, type PlanId } from '@/lib/billing-plans';
 
 export async function POST(request: NextRequest) {
@@ -18,7 +20,6 @@ export async function POST(request: NextRequest) {
 
     const plan = PLANS[planId as PlanId];
 
-    // Look up tenant
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
       .select('id, name, billing_email, stripe_customer_id')
@@ -29,9 +30,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
     }
 
+    const stripe = getStripe();
     let stripeCustomerId = tenant.stripe_customer_id as string | null;
 
-    // Create Stripe customer if not yet linked
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         name: tenant.name,
@@ -39,7 +40,6 @@ export async function POST(request: NextRequest) {
         metadata: { tenant_id: auth.tenantId },
       });
       stripeCustomerId = customer.id;
-
       await supabaseAdmin
         .from('tenants')
         .update({ stripe_customer_id: stripeCustomerId })

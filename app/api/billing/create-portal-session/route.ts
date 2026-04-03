@@ -1,7 +1,9 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin(request);
@@ -28,6 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = request.headers.get('origin') || 'http://localhost:3000';
+    const stripe = getStripe();
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
