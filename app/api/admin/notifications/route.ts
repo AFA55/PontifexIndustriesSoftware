@@ -22,14 +22,14 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
 
     let query = supabaseAdmin
-      .from('schedule_notifications')
+      .from('notifications')
       .select('*')
-      .eq('recipient_id', auth.userId)
+      .eq('user_id', auth.userId)
       .order('created_at', { ascending: false })
       .limit(limit);
 
     if (unreadOnly) {
-      query = query.eq('read', false);
+      query = query.eq('is_read', false);
     }
 
     const { data, error } = await query;
@@ -56,10 +56,10 @@ export async function PATCH(request: NextRequest) {
 
     if (markAllRead) {
       const { error } = await supabaseAdmin
-        .from('schedule_notifications')
-        .update({ read: true, read_at: new Date().toISOString() })
-        .eq('recipient_id', auth.userId)
-        .eq('read', false);
+        .from('notifications')
+        .update({ is_read: true, read: true, updated_at: new Date().toISOString() })
+        .eq('user_id', auth.userId)
+        .eq('is_read', false);
 
       if (error) {
         console.error('Error marking all notifications read:', error);
@@ -67,9 +67,9 @@ export async function PATCH(request: NextRequest) {
       }
     } else if (notificationIds && Array.isArray(notificationIds)) {
       const { error } = await supabaseAdmin
-        .from('schedule_notifications')
-        .update({ read: true, read_at: new Date().toISOString() })
-        .eq('recipient_id', auth.userId)
+        .from('notifications')
+        .update({ is_read: true, read: true, updated_at: new Date().toISOString() })
+        .eq('user_id', auth.userId)
         .in('id', notificationIds);
 
       if (error) {

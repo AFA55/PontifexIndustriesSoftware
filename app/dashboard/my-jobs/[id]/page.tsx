@@ -85,8 +85,9 @@ export default function JobDetailPage() {
       const uid = session.user.id;
       setUserId(uid);
 
+      // Fetch only this specific job by ID for efficiency
       const res = await fetch(
-        `/api/job-orders?include_helper_jobs=true&includeCompleted=true`,
+        `/api/job-orders?id=${jobId}&include_helper_jobs=true&includeCompleted=true`,
         { headers: { Authorization: `Bearer ${session.access_token}` } }
       );
 
@@ -94,8 +95,8 @@ export default function JobDetailPage() {
         const json = await res.json();
         if (json.success) {
           if (json.user_role) setUserRole(json.user_role);
-          const found = (json.data || []).find((j: any) => j.id === jobId);
-          if (found) {
+          const found = (json.data || [])[0];
+          if (found && found.id === jobId) {
             setJob({
               ...found,
               isHelper: found.helper_assigned_to === uid && found.assigned_to !== uid,
