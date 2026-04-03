@@ -43,14 +43,15 @@ const ROLE_GRADIENT: Record<string, string> = {
 };
 
 const ROLE_BADGE: Record<string, string> = {
-  super_admin: 'bg-purple-100 text-purple-700 border-purple-200',
-  operations_manager: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  admin: 'bg-blue-100 text-blue-700 border-blue-200',
-  supervisor: 'bg-teal-100 text-teal-700 border-teal-200',
-  salesman: 'bg-orange-100 text-orange-700 border-orange-200',
-  shop_manager: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-  operator: 'bg-green-100 text-green-700 border-green-200',
-  apprentice: 'bg-slate-100 text-slate-600 border-slate-200',
+  super_admin: 'bg-violet-500/20 text-violet-300 border-violet-500/40',
+  operations_manager: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
+  admin: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+  supervisor: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
+  shop_manager: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+  inventory_manager: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+  salesman: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+  operator: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+  apprentice: 'bg-slate-500/20 text-slate-300 border-slate-500/40',
 };
 
 const ROLE_ICON: Record<string, React.ElementType> = {
@@ -520,7 +521,7 @@ export default function TeamProfilesPage() {
             { label: 'Super Admins', value: members.filter(m => m.role === 'super_admin').length, icon: Crown, color: 'text-purple-400', bg: 'bg-purple-500/10' },
             { label: 'Roles In Use', value: Object.values(roleBreakdown).filter(v => v > 0).length, icon: Shield, color: 'text-orange-400', bg: 'bg-orange-500/10' },
           ].map(stat => (
-            <div key={stat.label} className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <div key={stat.label} className="bg-white/[0.03] rounded-xl border border-white/[0.06] p-4 backdrop-blur-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{stat.label}</p>
@@ -594,8 +595,10 @@ export default function TeamProfilesPage() {
                     <button
                       key={member.id}
                       onClick={() => setSelectedMember(isSelected ? null : member)}
-                      className={`w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-800/60 transition-colors ${
-                        isSelected ? 'bg-purple-500/10 border-l-2 border-purple-500' : ''
+                      className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors border-l-2 ${
+                        isSelected
+                          ? 'bg-violet-900/30 border-violet-600'
+                          : 'border-transparent hover:bg-white/5 hover:border-violet-500/40'
                       }`}
                     >
                       <MemberAvatar member={member} size="md" />
