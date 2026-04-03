@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(request.url);
-    const jobOrderId = searchParams.get('jobOrderId');
+    const jobOrderId = searchParams.get('jobOrderId') || searchParams.get('jobId');
     const status = searchParams.get('status');
 
     let query = supabaseAdmin
