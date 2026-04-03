@@ -348,7 +348,7 @@ function TimecardPage() {
     <div className="min-h-screen bg-[#f8fafc]">
       {/* ── Header ─────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
-        <div className="max-w-[1024px] mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-[1024px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/dashboard"
@@ -369,7 +369,7 @@ function TimecardPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/request-time-off"
-              className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold border border-slate-200 shadow-sm transition-all"
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-white hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold border border-slate-200 shadow-sm transition-all min-h-[40px]"
             >
               <CalendarOff size={14} />
               <span className="hidden sm:inline">Request Time Off</span>
@@ -387,7 +387,7 @@ function TimecardPage() {
         </div>
       </header>
 
-      <div className="max-w-[1024px] mx-auto px-6 py-6">
+      <div className="max-w-[1024px] mx-auto px-4 sm:px-6 py-6">
         {/* ── Clock-In/Out Section ─────────────────────── */}
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 mb-6">
           {clockLoading ? (
@@ -555,11 +555,11 @@ function TimecardPage() {
         </div>
 
         {/* ── Week Day Grid (visual) ───────────────────── */}
-        <div className="grid grid-cols-7 gap-2 mb-5">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-5">
           {weekDays.map((day) => (
             <div
               key={day.dateStr}
-              className={`bg-white rounded-xl p-3 border text-center transition-all ${
+              className={`bg-white rounded-xl p-1.5 sm:p-3 border text-center transition-all ${
                 day.isToday
                   ? 'border-blue-300 shadow-md ring-2 ring-blue-100'
                   : day.hasEntries
@@ -567,21 +567,21 @@ function TimecardPage() {
                     : 'border-slate-100 opacity-60'
               }`}
             >
-              <p className={`text-[10px] font-bold uppercase tracking-wider ${day.isToday ? 'text-blue-600' : 'text-slate-400'}`}>
+              <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${day.isToday ? 'text-blue-600' : 'text-slate-400'}`}>
                 {day.dayName}
               </p>
-              <p className={`text-lg font-bold ${day.isToday ? 'text-blue-700' : 'text-slate-800'}`}>
+              <p className={`text-sm sm:text-lg font-bold ${day.isToday ? 'text-blue-700' : 'text-slate-800'}`}>
                 {day.dayNum}
               </p>
               {day.hasEntries ? (
-                <p className={`text-xs font-bold mt-1 ${day.totalHrs > 8 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                <p className={`text-[9px] sm:text-xs font-bold mt-0.5 sm:mt-1 ${day.totalHrs > 8 ? 'text-orange-600' : 'text-emerald-600'}`}>
                   {day.totalHrs.toFixed(1)}h
                 </p>
               ) : (
-                <p className="text-[10px] text-slate-300 mt-1">&mdash;</p>
+                <p className="text-[9px] text-slate-300 mt-0.5 sm:mt-1">&mdash;</p>
               )}
               {/* Tiny bar */}
-              <div className="h-1 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+              <div className="h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
                     day.totalHrs > 8 ? 'bg-orange-400' : 'bg-emerald-400'
@@ -662,7 +662,7 @@ function TimecardPage() {
         </div>
 
         {/* ── Hour Category Breakdown ────────────────────── */}
-        <div className="grid grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
           {[
             { label: 'Regular', value: (weekData?.regularHours || 0).toFixed(1), icon: <CheckCircle size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
             { label: 'Weekly OT', value: (weekData?.weeklyOvertimeHours || 0).toFixed(1), icon: <TrendingUp size={14} />, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },

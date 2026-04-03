@@ -575,9 +575,10 @@ export default function DayCompletePage() {
                 <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50">
                   <canvas
                     ref={canvasRef}
-                    width={350}
-                    height={150}
+                    width={600}
+                    height={160}
                     className="w-full touch-none cursor-crosshair"
+                    style={{ height: '160px' }}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}

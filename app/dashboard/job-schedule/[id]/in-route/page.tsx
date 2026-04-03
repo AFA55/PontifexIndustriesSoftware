@@ -302,9 +302,9 @@ export default function InRoutePage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-5 pb-24 max-w-lg sm:max-w-4xl">
+      <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
         {/* Job Information */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 sm:p-8 mb-5">
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 mb-5">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Job Details</h2>
           <div className="space-y-4">
             <div>
@@ -322,7 +322,7 @@ export default function InRoutePage() {
 
         {/* Work Description */}
         {job.description && (
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-blue-200 p-5 sm:p-8 mb-5">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-blue-200 p-5 mb-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
                 <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -373,7 +373,7 @@ export default function InRoutePage() {
         )}
 
         {/* Location Information - NOW VISIBLE */}
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-green-300 p-5 sm:p-8 mb-5">
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-green-300 p-5 mb-5">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-600 rounded-2xl flex items-center justify-center flex-shrink-0">
               <MapPin className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
@@ -397,7 +397,7 @@ export default function InRoutePage() {
                 href={getDirectionsUrl(job.address)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all shadow-lg"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all shadow-lg"
               >
                 <MapPin className="w-5 h-5" />
                 Get Directions

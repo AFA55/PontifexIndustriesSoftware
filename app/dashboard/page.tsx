@@ -859,38 +859,38 @@ export default function Dashboard() {
               {/* Premium Logout Button */}
               <button
                 onClick={handleLogout}
-                className="group flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-red-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
+                className="group flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:via-red-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
               >
                 <svg className="w-4 h-4 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                <span>Logout</span>
+                <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 relative">
+      <div className="container mx-auto px-4 py-6 sm:py-8 relative">
         {/* Modern Animated Greeting */}
-        <div className="text-center mb-10 animate-fade-in">
-          <div className="inline-block">
-            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
+        <div className="text-center mb-8 sm:mb-10 animate-fade-in">
+          <div className="w-full">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
               Welcome back, {user?.name?.split(' ')[0] || 'Demo'}!
             </h1>
-            <p className="text-gray-700 text-lg font-medium">
+            <p className="text-gray-700 text-base sm:text-lg font-medium">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
           </div>
 
           {/* Quick Stats Bar with Professional Gradients */}
-          <div className="flex justify-center gap-6 mt-8">
-            <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
-              <p className="text-4xl font-bold text-white drop-shadow-lg">{activeJobsCount}</p>
+          <div className="flex justify-center gap-4 mt-8">
+            <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl p-5 sm:p-6 shadow-xl flex-1 max-w-[160px] transform hover:scale-105 transition-all">
+              <p className="text-3xl sm:text-4xl font-bold text-white drop-shadow-lg">{activeJobsCount}</p>
               <p className="text-sm text-white/90 font-semibold mt-1">Active Jobs</p>
             </div>
-            <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl p-6 shadow-xl min-w-[140px] transform hover:scale-105 transition-all">
-              <p className="text-4xl font-bold text-white drop-shadow-lg">{currentHours.toFixed(1)}</p>
+            <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl p-5 sm:p-6 shadow-xl flex-1 max-w-[160px] transform hover:scale-105 transition-all">
+              <p className="text-3xl sm:text-4xl font-bold text-white drop-shadow-lg">{currentHours.toFixed(1)}</p>
               <p className="text-sm text-white/90 font-semibold mt-1">Hours Today</p>
             </div>
           </div>
