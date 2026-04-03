@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     let profilesQuery = supabaseAdmin
       .from('profiles')
       .select('id, full_name, email, role, active')
-      .in('role', ['operator', 'apprentice', 'shop_manager', 'admin', 'operations_manager'])
+      .in('role', ['operator', 'apprentice', 'shop_manager', 'inventory_manager', 'salesman'])
       .order('full_name', { ascending: true });
 
     if (tenantId) {

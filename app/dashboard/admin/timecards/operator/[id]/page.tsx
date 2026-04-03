@@ -169,7 +169,13 @@ function OperatorTimecardDetailPageInner() {
   // Edit modal
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<TimecardEntry | null>(null);
-  const [editFormData, setEditFormData] = useState({ clock_in_time: '', clock_out_time: '', notes: '' });
+  const [editFormData, setEditFormData] = useState({
+    clock_in_time: '',
+    clock_out_time: '',
+    notes: '',
+    hour_type: 'regular',
+    is_shop_hours: false
+  });
 
   // Notes
   const [weekNotes, setWeekNotes] = useState('');
@@ -351,7 +357,9 @@ function OperatorTimecardDetailPageInner() {
     setEditFormData({
       clock_in_time: entry.clock_in_time,
       clock_out_time: entry.clock_out_time || '',
-      notes: entry.admin_notes || entry.notes || ''
+      notes: entry.admin_notes || entry.notes || '',
+      hour_type: entry.hour_type || 'regular',
+      is_shop_hours: entry.is_shop_hours || false
     });
     setShowEditModal(true);
   };
@@ -519,7 +527,7 @@ function OperatorTimecardDetailPageInner() {
   }
 
   // ── Error state ─────────────────────────────────────────────
-  if (!loading && fetchError) {
+  if (!loading && !operator && fetchError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
         <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
@@ -789,6 +797,42 @@ function OperatorTimecardDetailPageInner() {
                   {stats.pendingCount} pending
                 </span>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Empty Week State ─────────────────────────────── */}
+        {!loading && operator && entries.length === 0 && (
+          <div className="mb-5 bg-white rounded-xl border border-violet-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-10 text-center">
+              <div className="inline-flex w-16 h-16 rounded-2xl bg-violet-500/10 items-center justify-center mb-4">
+                <Calendar size={28} className="text-violet-400" />
+              </div>
+              <h3 className="text-base font-bold text-gray-900 mb-1">No entries this week</h3>
+              <p className="text-sm text-gray-500 mb-5">
+                {operator.full_name} has no timecard entries for {formatWeekRange(weekStart)}.
+              </p>
+              {/* Zero stats summary */}
+              <div className="grid grid-cols-4 gap-3 max-w-sm mx-auto mb-6">
+                {[
+                  { label: 'Total Hours', value: '0.0' },
+                  { label: 'Regular', value: '0.0' },
+                  { label: 'Overtime', value: '0.0' },
+                  { label: 'Days', value: '0' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-gray-50 rounded-lg p-2 border border-gray-100">
+                    <p className="text-lg font-bold text-gray-300">{value}</p>
+                    <p className="text-[10px] text-gray-400">{label}</p>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => navigateWeek(-1)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-sm font-semibold transition-colors"
+              >
+                <ChevronLeft size={16} />
+                Previous Week
+              </button>
             </div>
           </div>
         )}
@@ -1230,6 +1274,53 @@ function OperatorTimecardDetailPageInner() {
                   onChange={(e) => setEditFormData({ ...editFormData, clock_out_time: e.target.value ? new Date(e.target.value).toISOString() : '' })}
                   className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-sm text-gray-900 transition-all"
                 />
+              </div>
+
+              {/* Time Classification */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Time Classification</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'regular', label: 'Regular', color: 'bg-emerald-50 border-emerald-300 text-emerald-700' },
+                    { value: 'overtime', label: 'Overtime (1.5×)', color: 'bg-orange-50 border-orange-300 text-orange-700' },
+                    { value: 'double_time', label: 'Double Time (2×)', color: 'bg-red-50 border-red-300 text-red-700' },
+                    { value: 'mandatory_overtime', label: 'Mandatory OT', color: 'bg-purple-50 border-purple-300 text-purple-700' },
+                    { value: 'premium', label: 'Premium Shift', color: 'bg-blue-50 border-blue-300 text-blue-700' },
+                    { value: 'holiday', label: 'Holiday Pay', color: 'bg-cyan-50 border-cyan-300 text-cyan-700' },
+                  ].map(({ value, label, color }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setEditFormData(prev => ({ ...prev, hour_type: value }))}
+                      className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${
+                        editFormData.hour_type === value
+                          ? color + ' ring-2 ring-offset-1 ring-current'
+                          : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Shop Hours toggle */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div>
+                  <p className="text-sm font-semibold text-gray-700">Shop Hours</p>
+                  <p className="text-xs text-gray-500">Mark as shop/yard work instead of field hours</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditFormData(prev => ({ ...prev, is_shop_hours: !prev.is_shop_hours }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    editFormData.is_shop_hours ? 'bg-violet-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    editFormData.is_shop_hours ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
               </div>
 
               <div>

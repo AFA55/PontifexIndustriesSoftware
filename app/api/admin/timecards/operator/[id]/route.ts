@@ -55,9 +55,13 @@ export async function GET(
       .from('profiles')
       .select('id, full_name, email, role, phone, avatar_url')
       .eq('id', operatorId)
-      .single();
+      .maybeSingle();
 
-    if (profileError || !profile) {
+    if (profileError) {
+      console.error('Error fetching operator profile:', profileError);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+    if (!profile) {
       return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
     }
 

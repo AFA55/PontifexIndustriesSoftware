@@ -70,13 +70,15 @@ const ROLE_GRADIENT: Record<string, string> = {
 };
 
 const ROLE_LIGHT: Record<string, string> = {
-  super_admin: 'bg-purple-50 text-purple-700 border-purple-200',
-  operations_manager: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  admin: 'bg-blue-50 text-blue-700 border-blue-200',
-  supervisor: 'bg-teal-50 text-teal-700 border-teal-200',
-  salesman: 'bg-orange-50 text-orange-700 border-orange-200',
-  operator: 'bg-green-50 text-green-700 border-green-200',
-  apprentice: 'bg-slate-50 text-slate-600 border-slate-200',
+  super_admin: 'bg-violet-600/10 text-violet-600 border-violet-500/30',
+  operations_manager: 'bg-indigo-600/10 text-indigo-600 border-indigo-500/30',
+  admin: 'bg-blue-600/10 text-blue-600 border-blue-500/30',
+  supervisor: 'bg-teal-600/10 text-teal-600 border-teal-500/30',
+  shop_manager: 'bg-amber-600/10 text-amber-700 border-amber-500/30',
+  inventory_manager: 'bg-cyan-600/10 text-cyan-700 border-cyan-500/30',
+  salesman: 'bg-orange-500/10 text-orange-600 border-orange-400/30',
+  operator: 'bg-emerald-500/10 text-emerald-600 border-emerald-400/30',
+  apprentice: 'bg-slate-500/10 text-slate-600 border-slate-400/30',
 };
 
 const ROLE_ICON: Record<string, typeof Crown> = {
@@ -531,7 +533,7 @@ export default function TeamManagementPage() {
               {BYPASS_ROLES.includes(userRole) && (
                 <button
                   onClick={() => { setShowCreateUserModal(true); setCreateUserError(''); setNewUser({ email: '', password: '', full_name: '', role: 'operator', card_permissions: getDefaultPermissions('operator'), showPermissions: false }); }}
-                  className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-lg font-semibold text-sm transition-all"
+                  className="flex items-center gap-2 px-3.5 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg font-semibold text-sm transition-all"
                 >
                   <UserPlus className="w-4 h-4" />
                   <span className="hidden sm:inline">Create User</span>
@@ -556,19 +558,19 @@ export default function TeamManagementPage() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <div className="bg-white/[0.03] rounded-xl border border-white/[0.06] shadow-sm p-4 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Staff</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{teamMembers.length}</p>
               </div>
-              <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center">
-                <Users className="w-4 h-4 text-blue-600" />
+              <div className="w-9 h-9 bg-violet-500/10 rounded-lg flex items-center justify-center">
+                <Users className="w-4 h-4 text-violet-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <div className="bg-white/[0.03] rounded-xl border border-white/[0.06] shadow-sm p-4 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending</p>
@@ -580,7 +582,7 @@ export default function TeamManagementPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <div className="bg-white/[0.03] rounded-xl border border-white/[0.06] shadow-sm p-4 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active</p>
@@ -588,13 +590,13 @@ export default function TeamManagementPage() {
                   {teamMembers.filter(m => m.active).length}
                 </p>
               </div>
-              <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center">
-                <Activity className="w-4 h-4 text-green-600" />
+              <div className="w-9 h-9 bg-emerald-500/10 rounded-lg flex items-center justify-center">
+                <Activity className="w-4 h-4 text-emerald-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <div className="bg-white/[0.03] rounded-xl border border-white/[0.06] shadow-sm p-4 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Roles</p>
@@ -602,8 +604,8 @@ export default function TeamManagementPage() {
                   {Object.values(roleBreakdown).filter(v => v > 0).length}
                 </p>
               </div>
-              <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center">
-                <Shield className="w-4 h-4 text-purple-600" />
+              <div className="w-9 h-9 bg-violet-500/10 rounded-lg flex items-center justify-center">
+                <Shield className="w-4 h-4 text-violet-600" />
               </div>
             </div>
           </div>
@@ -886,7 +888,7 @@ export default function TeamManagementPage() {
                 return (
                   <div
                     key={member.id}
-                    className="px-4 sm:px-5 py-3 hover:bg-gray-50 transition-colors"
+                    className="px-4 sm:px-5 py-3 hover:bg-white/5 transition-colors group border-l-2 border-transparent hover:border-violet-500/60"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
