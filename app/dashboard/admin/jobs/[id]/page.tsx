@@ -22,6 +22,9 @@ import {
   ChevronRight,
   Wrench,
   ClipboardList,
+  MessageSquare,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -74,6 +77,18 @@ interface ActivityEntry {
   notes: string | null;
   day_number: number | null;
   is_scope_entry?: boolean;
+}
+
+interface ChangeRequest {
+  id: string;
+  request_type: string;
+  description: string;
+  status: string;
+  created_at: string;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  requester: { full_name: string } | null;
+  reviewer: { full_name: string } | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -267,6 +282,12 @@ export default function AdminJobDetailPage({
   const [rejecting, setRejecting] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
+  // Change requests
+  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
+  const [crLoading, setCrLoading] = useState(false);
+  const [crReviewing, setCrReviewing] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>('admin');
+
   // Auth guard
   useEffect(() => {
     const user = getCurrentUser();
@@ -274,6 +295,7 @@ export default function AdminJobDetailPage({
     if (!['admin', 'super_admin', 'operations_manager', 'salesman', 'supervisor'].includes(user.role)) {
       router.push('/dashboard');
     }
+    setUserRole(user.role || 'admin');
   }, [router]);
 
   const fetchJob = useCallback(async () => {
@@ -316,15 +338,43 @@ export default function AdminJobDetailPage({
     } catch { /* ignore */ }
   }, [jobId]);
 
+  const fetchChangeRequests = useCallback(async () => {
+    setCrLoading(true);
+    try {
+      const res = await apiFetch(`/api/admin/change-requests?jobId=${jobId}`);
+      if (res.ok) {
+        const json = await res.json();
+        setChangeRequests(json.data || []);
+      }
+    } catch { /* ignore */ } finally {
+      setCrLoading(false);
+    }
+  }, [jobId]);
+
+  const handleReviewChangeRequest = async (crId: string, status: 'approved' | 'rejected') => {
+    setCrReviewing(crId);
+    try {
+      const res = await apiFetch(`/api/admin/change-requests/${crId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        await fetchChangeRequests();
+      }
+    } catch { /* ignore */ } finally {
+      setCrReviewing(null);
+    }
+  };
+
   // Initial load
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchJob(), fetchScope(), fetchActivity()]);
+      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests()]);
       setLoading(false);
     };
     load();
-  }, [fetchJob, fetchScope, fetchActivity]);
+  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests]);
 
   const handleApprove = async () => {
     if (!job) return;
@@ -769,6 +819,83 @@ export default function AdminJobDetailPage({
                   </div>
                 )}
               </dl>
+            </div>
+
+            {/* Change Requests */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <MessageSquare className="w-4 h-4 text-purple-600" />
+                <h2 className="text-base font-semibold text-gray-900">Change Requests</h2>
+                {changeRequests.filter(cr => cr.status === 'pending').length > 0 && (
+                  <span className="ml-auto px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
+                    {changeRequests.filter(cr => cr.status === 'pending').length} pending
+                  </span>
+                )}
+              </div>
+
+              {crLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+                </div>
+              ) : changeRequests.length === 0 ? (
+                <div className="text-center py-6">
+                  <MessageSquare className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400">No change requests for this job.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {changeRequests.map((cr) => (
+                    <div key={cr.id} className={`rounded-xl border p-3 text-sm ${
+                      cr.status === 'pending' ? 'border-amber-200 bg-amber-50' :
+                      cr.status === 'approved' ? 'border-green-200 bg-green-50' :
+                      'border-gray-200 bg-gray-50'
+                    }`}>
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className="font-semibold text-gray-800 capitalize">
+                          {cr.request_type.replace(/_/g, ' ')}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
+                          cr.status === 'pending' ? 'bg-amber-200 text-amber-800' :
+                          cr.status === 'approved' ? 'bg-green-200 text-green-800' :
+                          'bg-gray-200 text-gray-700'
+                        }`}>
+                          {cr.status}
+                        </span>
+                      </div>
+                      <p className="text-gray-600 text-xs leading-relaxed mb-1">{cr.description}</p>
+                      <p className="text-gray-400 text-xs">
+                        By {cr.requester?.full_name || 'Unknown'} &middot; {new Date(cr.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                      {cr.status === 'pending' && (userRole === 'super_admin' || userRole === 'operations_manager') && (
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => handleReviewChangeRequest(cr.id, 'approved')}
+                            disabled={crReviewing === cr.id}
+                            className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          >
+                            {crReviewing === cr.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ThumbsUp className="w-3 h-3" />}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReviewChangeRequest(cr.id, 'rejected')}
+                            disabled={crReviewing === cr.id}
+                            className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 text-xs font-medium rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors"
+                          >
+                            {crReviewing === cr.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ThumbsDown className="w-3 h-3" />}
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {cr.status !== 'pending' && cr.reviewer && (
+                        <p className="text-xs text-gray-400 mt-1 italic">
+                          {cr.status === 'approved' ? 'Approved' : 'Rejected'} by {cr.reviewer.full_name}
+                          {cr.review_notes && ` — "${cr.review_notes}"`}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Quick links */}

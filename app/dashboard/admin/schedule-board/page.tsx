@@ -10,6 +10,7 @@ import {
   Megaphone, CheckCircle2, Sparkles, Zap, Brain
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { useFeatureFlags } from '@/lib/feature-flags';
 import { supabase } from '@/lib/supabase';
 import OperatorRow from './_components/OperatorRow';
 import PendingQueueSidebar from './_components/PendingQueueSidebar';
@@ -158,10 +159,14 @@ export default function ScheduleBoardPage() {
   const [weekData, setWeekData] = useState<Record<string, JobCardData[]>>({});
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('admin');
+  const [userId, setUserId] = useState<string | null>(null);
   const [operatorSkillMap, setOperatorSkillMap] = useState<Record<string, number | null>>({});
 
-  // canEdit is determined by role — only super_admin can edit
-  const canEdit = userRole === 'super_admin';
+  // Feature flags — determines read-only vs edit access for non-super-admins
+  const { flags: featureFlags } = useFeatureFlags(userId, userRole);
+
+  // canEdit: super_admin always can; operations_manager always can; others need the flag
+  const canEdit = userRole === 'super_admin' || userRole === 'operations_manager' || featureFlags.can_edit_schedule_board;
 
   // ═══ DATA STATE (from API) ═══
   const [operatorJobs, setOperatorJobs] = useState<Record<number, JobCardData[]>>({});
@@ -283,6 +288,7 @@ export default function ScheduleBoardPage() {
       return;
     }
     setUserRole(role);
+    setUserId(currentUser.id || null);
   }, [router]);
 
   // ═══ FETCH OPERATORS/HELPERS ═══
@@ -1216,24 +1222,9 @@ export default function ScheduleBoardPage() {
     setEditTarget(null);
   };
 
-  // --- Change Request ---
-  const handleChangeRequest = async (data: { type: string; description: string }) => {
+  // --- Change Request (success callback — modal handles the API call) ---
+  const handleChangeRequestSuccess = () => {
     if (!changeRequestTarget) return;
-
-    try {
-      const res = await apiFetch('/api/admin/change-requests', {
-        method: 'POST',
-        body: JSON.stringify({
-          jobOrderId: changeRequestTarget.id,
-          requestType: data.type,
-          description: data.description,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed');
-    } catch {
-      addToast('error', 'Request Failed', 'Could not submit change request');
-      return;
-    }
 
     const jobId = changeRequestTarget.id;
     const updateJobInPlace = (jobs: JobCardData[]) =>
@@ -1246,7 +1237,7 @@ export default function ScheduleBoardPage() {
       }
     }
 
-    addToast('success', 'Change Request Submitted', `${changeRequestTarget.customer_name} — Ops Manager will review`);
+    addToast('success', 'Change Request Submitted', `${changeRequestTarget.customer_name} — Supervisor will review`);
     setChangeRequestTarget(null);
   };
 
@@ -1842,6 +1833,16 @@ export default function ScheduleBoardPage() {
         </div>
       )}
 
+      {/* ═══ READ-ONLY BANNER (view-only admins) ════════════════════════ */}
+      {!canEdit && (
+        <div className="container mx-auto px-4 md:px-6 pb-2">
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-sm text-amber-300 flex items-center gap-2">
+            <span>👁️</span>
+            <span>You have view-only access. Click any job to request a change.</span>
+          </div>
+        </div>
+      )}
+
       {/* ═══ DAY VIEW — OPERATOR ROWS ════════════════════════════════════ */}
       {viewMode === 'day' && boardViewMode !== 'crew-grid' && <DndBoardWrapper canDrag={canEdit} onReorder={handleDndReorder}>
       <div className="container mx-auto px-4 md:px-6 pb-6 space-y-4">
@@ -2016,7 +2017,7 @@ export default function ScheduleBoardPage() {
           onRemoveFromSchedule={handleRemoveFromSchedule}
         />
       )}
-      {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSubmit={handleChangeRequest} onClose={() => setChangeRequestTarget(null)} />}
+      {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSuccess={handleChangeRequestSuccess} onClose={() => setChangeRequestTarget(null)} />}
       {notesTarget && <NotesDrawer job={notesTarget} notes={jobNotes[notesTarget.id] || []} onAddNote={handleAddNote} onClose={() => setNotesTarget(null)} />}
       {showQuickAdd && <QuickAddModal salesmen={SALESMEN} onSubmit={handleQuickAdd} onClose={() => setShowQuickAdd(false)} />}
 
