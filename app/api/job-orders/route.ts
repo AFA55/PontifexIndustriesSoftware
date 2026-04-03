@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const isAdmin = profile?.role === 'admin';
+    const isAdmin = ['super_admin', 'operations_manager', 'admin', 'salesman', 'shop_manager', 'inventory_manager'].includes(profile?.role || '');
     const tenantId = await getTenantId(user.id);
 
     // If ID is provided, fetch that specific job
