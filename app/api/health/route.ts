@@ -1,10 +1,8 @@
+// No auth required — public endpoint for uptime monitoring (UptimeRobot, Vercel, etc.)
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-
-// No auth required — public endpoint for uptime monitoring (UptimeRobot, Vercel, etc.)
-export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/health — System health check endpoint.

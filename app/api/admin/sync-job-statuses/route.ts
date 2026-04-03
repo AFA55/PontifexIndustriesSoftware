@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
     const { data: jobs, error: jobsError } = await jobsQuery;
 
     if (jobsError) {
-      return NextResponse.json({ error: jobsError.message }, { status: 500 });
+      console.error('Error fetching jobs for sync:', jobsError);
+      return NextResponse.json({ error: 'Failed to fetch jobs for status sync' }, { status: 500 });
     }
 
     const updates: any = {
