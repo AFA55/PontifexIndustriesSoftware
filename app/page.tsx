@@ -442,12 +442,12 @@ export default function DougSalesPage() {
               Security
             </button>
           </nav>
-          <button
-            onClick={() => scrollTo('contact')}
+          <a
+            href="/company"
             className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-colors"
           >
-            Let's Talk
-          </button>
+            Login
+          </a>
         </div>
       </motion.header>
 
@@ -511,13 +511,13 @@ export default function DougSalesPage() {
           {/* CTAs */}
           <FadeIn delay={0.4}>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button
-                onClick={() => scrollTo('contact')}
+              <a
+                href="/company"
                 className="group flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-lg transition-all shadow-lg shadow-violet-900/40"
               >
-                Let's Talk
+                Login to the Platform
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
+              </a>
               <button
                 onClick={() => scrollTo('comparison')}
                 className="flex items-center gap-2 px-8 py-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-semibold text-lg transition-all"
@@ -1056,66 +1056,46 @@ export default function DougSalesPage() {
         <div className="relative z-10 max-w-2xl mx-auto text-center space-y-10">
           <FadeIn>
             <SectionLabel>
-              <Phone className="w-3 h-3" /> Let's Talk
+              <ArrowRight className="w-3 h-3" /> Ready to see it live
             </SectionLabel>
             <h2 className="text-4xl md:text-5xl font-black mt-3">
-              Ready to see it{' '}
+              Log in and{' '}
               <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent">
-                in action?
+                take a look around
               </span>
             </h2>
           </FadeIn>
 
           <FadeIn delay={0.1}>
             <p className="text-zinc-400 text-xl leading-relaxed">
-              I'd love to walk you through a live demo. No pitch deck, no sales slides. Just a real look at
-              the platform and how it fits Patriot's operation. Low-pressure, 30 minutes, your call.
+              Log in and take a look around. Everything you've read about on this page is live and working
+              right now — the schedule board, payroll, operator app, all of it.
             </p>
           </FadeIn>
 
           <FadeIn delay={0.2}>
-            <div className="grid sm:grid-cols-2 gap-6">
-              {/* Request demo */}
-              <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-6 space-y-4 hover:border-violet-500/30 transition-all">
-                <div className="w-12 h-12 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center mx-auto">
-                  <Calendar className="w-6 h-6 text-violet-400" />
-                </div>
-                <h3 className="font-bold text-white text-lg">Request a Demo</h3>
-                <p className="text-zinc-500 text-sm">
-                  Fill out a quick form and we'll set up a time that works for you.
-                </p>
-                <a
-                  href="/request-demo"
-                  className="block w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-sm text-center transition-all"
-                >
-                  Request Demo →
-                </a>
-              </div>
+            <div className="flex flex-col items-center gap-4">
+              <a
+                href="/company"
+                className="group flex items-center gap-3 px-10 py-5 rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xl transition-all shadow-2xl shadow-violet-900/50"
+              >
+                Login to the Platform
+                <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+              </a>
+              <p className="text-zinc-600 text-sm">Enter your company code on the next screen</p>
+            </div>
+          </FadeIn>
 
-              {/* Direct contact */}
-              <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-6 space-y-4 hover:border-violet-500/30 transition-all">
-                <div className="w-12 h-12 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center mx-auto">
-                  <Mail className="w-6 h-6 text-violet-400" />
-                </div>
-                <h3 className="font-bold text-white text-lg">Reach Out Directly</h3>
-                <p className="text-zinc-500 text-sm">
-                  Email or call {DEVELOPER_NAME} directly. No assistant, no intake form.
-                </p>
-                <a
-                  href={`mailto:${DEVELOPER_EMAIL}`}
-                  className="block w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-white font-semibold text-sm text-center transition-all truncate"
-                >
-                  {DEVELOPER_EMAIL}
-                </a>
-                {DEVELOPER_PHONE && (
-                  <a
-                    href={`tel:${DEVELOPER_PHONE}`}
-                    className="block w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-white font-semibold text-sm text-center transition-all"
-                  >
-                    {DEVELOPER_PHONE}
-                  </a>
-                )}
-              </div>
+          {/* Direct contact */}
+          <FadeIn delay={0.3}>
+            <div className="pt-4 border-t border-white/[0.06]">
+              <p className="text-zinc-500 text-sm mb-3">Questions? Reach {DEVELOPER_NAME} directly:</p>
+              <a
+                href={`mailto:${DEVELOPER_EMAIL}`}
+                className="text-violet-400 hover:text-violet-300 text-sm font-medium transition-colors"
+              >
+                {DEVELOPER_EMAIL}
+              </a>
             </div>
           </FadeIn>
 
