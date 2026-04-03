@@ -7,21 +7,22 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `6398ad3f` — "feat: account invitation + onboarding setup flow + avatar uploads"
+- **Last commit:** `200be806` — "fix: mobile responsive audit — operator workflow pages"
 - **Pushed to origin** ✅
-- **Build:** PASSING (0 errors, 189 static pages)
+- **Build:** PASSING (0 errors, 189 static pages, compiled successfully in ~6.6s)
 
-### Recent Commits
+### Recent Commits (this session)
 ```
+200be806 fix: mobile responsive audit — operator workflow pages
+c4c38a38 fix: onboarding tour skip button, setup-account 404, missing API routes
+fc73fd33 fix: feature-flags module ensure exists, fix job-orders auth for operator role
+ad5833ae feat: wire feature flags to admin sidebar — nav items hide/show per user permissions
+8953956f chore: update handoff doc — major session complete
 6398ad3f feat: account invitation + onboarding setup flow + avatar uploads
 98580d7d feat: Team Profiles page with feature toggle panels and invite flow
 f42c19f7 feat: Active Jobs page — personal job metrics, pending requests, attention flags
 9235c996 feat: user feature flags system, job change requests, super admin grant flow
 42b2a622 feat: hide scope/progress from operators, lock submitted day entries, simplify tour
-63f0e9c0 chore: update handoff doc — session complete, all critical bugs fixed
-8d44898a fix: resolve notification table mismatch and my-jobs job fetch bug
-fd19133e fix: eliminate stacking server-issues toasts and false-positive banner
-f52be035 fix: lazy Stripe init + force-dynamic on billing routes
 ```
 
 ---
@@ -83,10 +84,10 @@ f52be035 fix: lazy Stripe init + force-dynamic on billing routes
 ### 5. Team Profiles — Permission Management (PIXEL)
 **New components:**
 - `components/FeatureFlagsPanel.tsx` — 19 toggle switches in 6 groups, 4 one-click presets:
-  - 💼 Sales Admin (schedule + customers)
-  - ⚙️ Ops Admin (full ops access)
-  - 💰 Finance Admin (billing + timecards)
-  - 🏗️ Field Admin (jobs + schedule only)
+  - Sales Admin (schedule + customers)
+  - Ops Admin (full ops access)
+  - Finance Admin (billing + timecards)
+  - Field Admin (jobs + schedule only)
 - `components/InviteMemberModal.tsx` — name/email/role/type → sends invite email
 
 **Redesigned `app/dashboard/admin/team-profiles/page.tsx`:**
@@ -96,11 +97,31 @@ f52be035 fix: lazy Stripe init + force-dynamic on billing routes
 - Grant Super Admin button with confirmation (super_admin only)
 - Invite Member button in header (super_admin only)
 
-### 6. Operator Experience Simplification
+### 6. Feature Flags Wired to Admin Sidebar
+- `ad5833ae` — Admin sidebar nav items now hide/show based on user's feature flags
+- `can_view_schedule`, `can_view_billing`, `can_view_analytics`, etc. gate nav sections
+- Super admins and ops_managers always see everything (bypass flag check)
+
+### 7. Operator Experience Simplification
 - Removed progress dots (green/amber/red) from all operator job cards
 - Removed scope checklist from work-performed page
 - Lock submitted day entries — banner shown if day already submitted
 - Simplified onboarding tour to remove all progress/scope language
+
+### 8. Mobile Responsive Audit — Operator Pages
+- `200be806` — Full audit and fix pass on operator-facing pages:
+  - Timecard page (weekly grid, day breakdown)
+  - Operator dashboard (stat cards, job list)
+  - Work-performed page (form inputs, buttons)
+  - Day-complete page (signature area, submit flow)
+  - En-route page (map embed, status buttons)
+- All pages verified mobile-first with proper breakpoints and touch targets
+
+### 9. Branding System (pre-existing + enhanced)
+- BrandingProvider (`components/BrandingProvider.tsx`) already existed with 7-section config page
+- Injects CSS custom properties: `--color-primary`, `--color-secondary`, `--color-accent`
+- Also sets favicon and page `<title>` dynamically from tenant config
+- Super admin can configure in Settings → Branding (no code changes needed for Patriot branding)
 
 ---
 
@@ -110,7 +131,7 @@ f52be035 fix: lazy Stripe init + force-dynamic on billing routes
 | Feature | Notes |
 |---------|-------|
 | Multi-tenant architecture | Company code login, tenant_id on all tables |
-| White-label branding | Tenant branding context, debranded defaults |
+| White-label branding | CSS vars, favicon, title — super admin configures |
 | Schedule Board | View, time-off, editing, crew grid, notifications |
 | Schedule Form | Customer-first flow, facility compliance |
 | Quick Add Job | Start/end date pickers, 12-type multi-select |
@@ -123,27 +144,28 @@ f52be035 fix: lazy Stripe init + force-dynamic on billing routes
 | Billing & Invoicing | Create, send, remind, QuickBooks CSV |
 | Stripe Billing Pages | Pricing page, subscription dashboard |
 | Customer Management | COD, contacts, billing dashboard |
-| Operator Workflow | My jobs → work → complete (simplified) |
+| Operator Workflow | My jobs → work → complete (simplified, mobile-ready) |
 | Facilities & Badges | CRUD, badge tracking, auto-expiration |
 | Analytics Dashboard | 20 widgets, drag-and-drop |
-| **User Feature Flags** | ✅ NEW — per-user feature toggles, 4 presets |
-| **Account Invitation Flow** | ✅ NEW — email invite, waiver signing, avatar |
-| **Setup Account Page** | ✅ NEW — /setup-account onboarding flow |
-| **Avatar Uploads** | ✅ NEW — all users, Supabase Storage |
-| **Active Jobs Page** | ✅ NEW — personal job view, change request flags |
-| **Team Profiles Overhaul** | ✅ NEW — toggle panel, invite modal, grant super admin |
-| **Job Change Requests** | ✅ NEW — restricted admins request changes, super admin approves |
-| **Database Cleanup** | ✅ NEW — fresh slate, 4 accounts retained |
+| User Feature Flags | Per-user feature toggles, 4 presets |
+| Account Invitation Flow | Email invite, waiver signing, avatar |
+| Setup Account Page | /setup-account onboarding flow |
+| Avatar Uploads | All users, Supabase Storage |
+| Active Jobs Page | Personal job view, change request flags |
+| Team Profiles Overhaul | Toggle panel, invite modal, grant super admin |
+| Job Change Requests | Restricted admins request changes, super admin approves |
+| Database Cleanup | Fresh slate, 4 accounts retained |
+| Feature Flags → Sidebar | Nav items hide/show per user permissions |
+| Mobile Responsive Audit | All operator pages audited and fixed |
+| Branding Settings | Super admin CSS vars + favicon + title |
 
 ### Remaining — Final Sprint
-- [ ] **Schedule board "Request Change" button** for restricted admins (read-only users see button instead of edit)
-- [ ] **Apply feature flags to sidebar nav** — hide nav items based on `can_view_*` flags
+- [ ] **Schedule board "Request Change" button** — restricted admins see button instead of edit controls
 - [ ] **E2E live browser walkthrough** — create job → assign → complete → approve
-- [ ] Mobile responsive audit on operator pages
-- [ ] Patriot visual branding (logos, custom colors)
-- [ ] Connect Stripe live keys (add STRIPE_SECRET_KEY to Vercel)
-- [ ] Production deployment — Vercel env vars, custom domain, SSL
-- [ ] Merge to main + final release
+- [ ] **Connect Stripe live keys** — add STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET to Vercel
+- [ ] **Patriot logo and custom colors** — super admin does this in Settings → Branding (upload logo, pick colors)
+- [ ] **Vercel deployment** — IN PROGRESS (deploy agent handling env vars, domain, SSL)
+- [ ] **Merge feature/schedule-board-v2 to main** — after Vercel confirms working build
 
 ---
 
@@ -155,6 +177,7 @@ f52be035 fix: lazy Stripe init + force-dynamic on billing routes
 - Hook: `useFeatureFlags(userId, role)` in `lib/feature-flags.ts`
 - UI: `FeatureFlagsPanel` in Team Profiles → "Feature Permissions" tab
 - 4 presets: sales_admin, ops_admin, finance_admin, field_admin
+- Admin sidebar reads flags and hides/shows nav sections accordingly
 
 ### Account Creation Flow
 1. Super admin → Team Profiles → "Invite Member"
@@ -164,10 +187,23 @@ f52be035 fix: lazy Stripe init + force-dynamic on billing routes
 5. Step 1: photo + password | Step 2: waiver signing | Step 3: email/SMS consent
 6. Account created, flags applied, ready to log in
 
+### Branding Flow
+1. Super admin → Settings → Branding (7 sections)
+2. Set primary/secondary/accent colors, logo URL, company name
+3. BrandingProvider injects CSS custom properties site-wide
+4. Favicon and page title update automatically
+5. No code changes needed — all runtime via tenant_branding table
+
 ### Notification Flow
 - Completion requests → `notifications` table → admin bell ✅
 - Change requests → `notifications` table → super admin bell
 - Invite emails → Resend → `/setup-account`
+
+### Force-Dynamic Note
+- 14 API routes explicitly have `export const dynamic = 'force-dynamic'`
+- 192 routes rely on Next.js runtime detection (all use `requireAuth()` or `request.json()`)
+- Build passes cleanly — no static caching issues in production
+- If Vercel shows stale data, add `force-dynamic` to the specific offending route
 
 ### Database Tables (95+)
 New: `user_feature_flags`, `user_invitations`
@@ -186,9 +222,9 @@ Extended: `profiles` (avatar, setup, waiver), `schedule_change_requests` (reason
 ---
 
 ## NEXT SESSION PRIORITIES
-1. **Apply feature flags to sidebar** — hide nav items based on user's flags (TODAY)
-2. **Schedule board "Request Change" button** — restricted admins see this instead of edit controls
-3. **E2E browser test** — full job creation → operator completion → admin approval walkthrough
-4. **Mobile responsive audit** — operator pages
-5. **Patriot branding** — logo, custom colors
-6. **Stripe live keys + deploy** → production
+1. **Vercel deployment confirmation** — verify deploy agent's work, check Vercel build logs, confirm live URL works
+2. **Connect Stripe live keys** — STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET in Vercel env vars
+3. **Schedule board "Request Change" button** — restricted admins (has flags but not super_admin) see request button instead of edit controls
+4. **E2E browser walkthrough** — full job creation → operator completion → admin approval (use demo accounts)
+5. **Patriot branding** — log in as super admin → Settings → Branding → upload Patriot logo, set colors
+6. **Merge to main** — once Vercel deployment confirmed working, merge feature/schedule-board-v2 → main for production release
