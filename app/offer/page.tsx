@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { motion, useInView } from 'framer-motion';
+import { useState, useRef, useEffect } from 'react';
 import {
   Shield,
   CheckCircle,
@@ -30,7 +29,7 @@ import {
   Lock,
 } from 'lucide-react';
 
-// --- Scroll reveal wrapper ---
+// --- Native scroll reveal (React 19 safe — no framer-motion useInView) ---
 function Reveal({
   children,
   delay = 0,
@@ -41,18 +40,36 @@ function Reveal({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-80px' });
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '-60px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <motion.div
+    <div
       ref={ref}
-      initial={{ opacity: 0, y: 32 }}
-      animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.6, delay, ease: 'easeOut' }}
       className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(28px)',
+        transition: `opacity 0.6s ease-out ${delay}s, transform 0.6s ease-out ${delay}s`,
+      }}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -124,7 +141,7 @@ function CTAButton({
         </>
       ) : (
         <>
-          Claim Your Offer — $1,600
+          Claim Your Offer — $1,647
           <ArrowRight className="w-5 h-5" />
         </>
       )}
@@ -326,7 +343,7 @@ const faqs = [
   },
   {
     q: 'How does the money-back guarantee work?',
-    a: 'If after 30 days you don\'t think it\'s worth every penny — just tell me. I\'ll process 100% of the $1,600 refund with no questions, no contracts, and no hard feelings. The risk is entirely on me.',
+    a: 'If after 30 days you don\'t think it\'s worth every penny — just tell me. I\'ll process 100% of the $1,647 refund with no questions, no contracts, and no hard feelings. The risk is entirely on me.',
   },
   {
     q: 'Is this really just for one client at a time?',
@@ -350,16 +367,17 @@ function FAQItem({ q, a }: { q: string; a: string }) {
           <ChevronDown className="w-5 h-5 text-zinc-500 flex-shrink-0" />
         )}
       </button>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="px-6 pb-6"
-        >
-          <p className="text-zinc-400 leading-relaxed">{a}</p>
-        </motion.div>
-      )}
+      <div
+        style={{
+          maxHeight: open ? '500px' : '0',
+          overflow: 'hidden',
+          transition: 'max-height 0.3s ease-out, opacity 0.3s ease-out',
+          opacity: open ? 1 : 0,
+        }}
+        className="px-6 pb-6"
+      >
+        <p className="text-zinc-400 leading-relaxed">{a}</p>
+      </div>
     </div>
   );
 }
@@ -670,7 +688,7 @@ export default function OfferPage() {
             </p>
             <p className="text-3xl md:text-4xl font-black text-white mb-2">
               Your 30-day trial:{' '}
-              <span className="text-violet-400">$1,600</span>
+              <span className="text-violet-400">$1,647</span>
             </p>
             <p className="text-zinc-500 text-sm">
               Then $333/month for your entire team. Not per person — total.
@@ -756,7 +774,7 @@ export default function OfferPage() {
                   for concrete cutting, dispatch, and the chaos that comes with running a crew.
                 </p>
                 <p>
-                  The $1,600 covers my actual development costs for the onboarding period. I&apos;m
+                  The $1,647 covers my actual development costs for the onboarding period. I&apos;m
                   not trying to extract maximum value on day one. I want to{' '}
                   <span className="text-white font-semibold">earn a long-term partner</span>, and
                   I&apos;m confident enough in what I&apos;ve built to back it with a full money-back
@@ -841,7 +859,7 @@ export default function OfferPage() {
               <div className="border-t border-white/[0.06] pt-6 flex items-end justify-between">
                 <div>
                   <p className="text-zinc-500 text-sm">30-day trial investment</p>
-                  <p className="text-4xl font-black text-white">$1,600</p>
+                  <p className="text-4xl font-black text-white">$1,647</p>
                   <p className="text-zinc-600 text-sm mt-1">one-time • 100% refundable</p>
                 </div>
                 <CTAButton size="lg" />
