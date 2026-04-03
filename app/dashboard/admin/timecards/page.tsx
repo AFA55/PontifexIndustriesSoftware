@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
+import { useFeatureFlags } from '@/lib/feature-flags';
 import {
   ArrowLeft, Clock, CheckCircle, Calendar,
   User as UserIcon, FileText, Download,
@@ -119,6 +120,13 @@ export default function AdminTimecardsPage() {
   const router = useRouter();
   const isRedirecting = useRef(false);
 
+  // Feature flags
+  const _currentUserForFlags = getCurrentUser();
+  const { flags: pageFlags, loading: pageFlagsLoading } = useFeatureFlags(
+    _currentUserForFlags?.id ?? null,
+    _currentUserForFlags?.role ?? null
+  );
+
   const redirectToLogin = useCallback(() => {
     if (isRedirecting.current) return;
     isRedirecting.current = true;
@@ -130,6 +138,17 @@ export default function AdminTimecardsPage() {
     if (!currentUser || !isAdmin()) { router.push('/dashboard'); return; }
     setUser(currentUser);
   }, [router]);
+
+  // Feature flag guard
+  useEffect(() => {
+    if (pageFlagsLoading) return;
+    const role = _currentUserForFlags?.role ?? '';
+    const isBypass = role === 'super_admin' || role === 'operations_manager';
+    if (!isBypass && !pageFlags.can_view_timecards) {
+      router.push('/dashboard/admin');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageFlagsLoading, pageFlags.can_view_timecards]);
 
   const { monday, sunday } = useMemo(() => getWeekBounds(weekOffset), [weekOffset]);
   const mondayStr = useMemo(() => monday.toISOString().split('T')[0], [monday]);

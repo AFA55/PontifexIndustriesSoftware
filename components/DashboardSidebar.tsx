@@ -29,6 +29,7 @@ import {
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
 import { supabase } from '@/lib/supabase';
+import { useFeatureFlags, type UserFeatureFlags } from '@/lib/feature-flags';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,8 @@ interface NavItem {
   icon: React.ElementType;
   badgeKey?: 'timecards' | 'notifications';
   title?: string;
+  /** If set, this nav item is hidden when the flag is false (bypassed for super_admin/ops_manager) */
+  flagKey?: keyof UserFeatureFlags;
 }
 
 interface NavSection {
@@ -58,38 +61,38 @@ const NAV_SECTIONS: NavSection[] = [
     accent: 'text-blue-400',
     items: [
       { label: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-      { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar },
-      { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase },
-      { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit },
+      { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar, flagKey: 'can_view_schedule_board' },
+      { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase, flagKey: 'can_view_active_jobs' },
+      { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms' },
     ],
   },
   {
     label: 'MANAGEMENT',
     accent: 'text-purple-400',
     items: [
-      { label: 'Timecards', href: '/dashboard/admin/timecards', icon: Clock, badgeKey: 'timecards' },
-      { label: 'Team Profiles', href: '/dashboard/admin/team-profiles', icon: Users },
-      { label: 'Customers', href: '/dashboard/admin/customers', icon: UserCircle2 },
-      { label: 'Invoicing', href: '/dashboard/admin/billing', icon: CreditCard },
-      { label: 'Completed Jobs', href: '/dashboard/admin/completed-jobs', icon: CheckCircle2 },
+      { label: 'Timecards', href: '/dashboard/admin/timecards', icon: Clock, badgeKey: 'timecards', flagKey: 'can_view_timecards' },
+      { label: 'Team Profiles', href: '/dashboard/admin/team-profiles', icon: Users, flagKey: 'can_manage_team' },
+      { label: 'Customers', href: '/dashboard/admin/customers', icon: UserCircle2, flagKey: 'can_view_customers' },
+      { label: 'Invoicing', href: '/dashboard/admin/billing', icon: CreditCard, flagKey: 'can_view_invoicing' },
+      { label: 'Completed Jobs', href: '/dashboard/admin/completed-jobs', icon: CheckCircle2, flagKey: 'can_view_completed_jobs' },
     ],
   },
   {
     label: 'TOOLS',
     accent: 'text-emerald-400',
     items: [
-      { label: 'Facilities', href: '/dashboard/admin/facilities', icon: Building2 },
-      { label: 'NFC Tags', href: '/dashboard/admin/settings/nfc-tags', icon: Wifi },
-      { label: 'Form Builder', href: '/dashboard/admin/form-builder', icon: Layout },
+      { label: 'Facilities', href: '/dashboard/admin/facilities', icon: Building2, flagKey: 'can_view_facilities' },
+      { label: 'NFC Tags', href: '/dashboard/admin/settings/nfc-tags', icon: Wifi, flagKey: 'can_view_nfc_tags' },
+      { label: 'Form Builder', href: '/dashboard/admin/form-builder', icon: Layout, flagKey: 'can_view_form_builder' },
     ],
   },
   {
     label: 'ADMIN',
     accent: 'text-red-400',
     items: [
-      { label: 'Settings', href: '/dashboard/admin/settings', icon: Settings },
+      { label: 'Settings', href: '/dashboard/admin/settings', icon: Settings, flagKey: 'can_manage_settings' },
       { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, badgeKey: 'notifications' },
-      { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3 },
+      { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3, flagKey: 'can_view_analytics' },
       { label: 'Billing', href: '/dashboard/admin/subscription', icon: CreditCard },
     ],
   },
@@ -255,6 +258,8 @@ interface SidebarContentProps {
   pathname: string;
   onNavClick?: () => void;
   onSignOut: () => void;
+  flags: UserFeatureFlags;
+  flagsLoading: boolean;
 }
 
 function SidebarContent({
@@ -266,6 +271,8 @@ function SidebarContent({
   pathname,
   onNavClick,
   onSignOut,
+  flags,
+  flagsLoading,
 }: SidebarContentProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -327,51 +334,65 @@ function SidebarContent({
       {/* Nav sections — scrollable */}
       {/* ------------------------------------------------------------------ */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
-        {NAV_SECTIONS.map(section => (
-          <div key={section.label}>
-            {/* Section header */}
-            {!collapsed && (
-              <p
-                className={`px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest ${section.accent}`}
-              >
-                {section.label}
-              </p>
-            )}
-            {collapsed && (
-              <div className="flex justify-center mb-1">
-                <div className={`w-5 h-[1px] bg-current opacity-30 ${section.accent}`} />
+        {NAV_SECTIONS.map(section => {
+          // While flags are loading, show all items so there's no flash-hide.
+          // Once loaded, filter items whose flagKey is false.
+          const visibleItems = flagsLoading
+            ? section.items
+            : section.items.filter(item => {
+                if (!item.flagKey) return true; // no flag = always visible
+                return flags[item.flagKey] !== false;
+              });
+
+          // If every flagged item in this section is hidden, hide the section header too
+          if (visibleItems.length === 0) return null;
+
+          return (
+            <div key={section.label}>
+              {/* Section header */}
+              {!collapsed && (
+                <p
+                  className={`px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest ${section.accent}`}
+                >
+                  {section.label}
+                </p>
+              )}
+              {collapsed && (
+                <div className="flex justify-center mb-1">
+                  <div className={`w-5 h-[1px] bg-current opacity-30 ${section.accent}`} />
+                </div>
+              )}
+
+              <div className="space-y-0.5">
+                {visibleItems.map(item => {
+                  const badge =
+                    item.badgeKey === 'timecards'
+                      ? badgeCounts.timecards
+                      : item.badgeKey === 'notifications'
+                      ? badgeCounts.notifications
+                      : 0;
+
+                  // Exact match for dashboard root, prefix match for sub-pages
+                  const isActive =
+                    item.href === '/dashboard/admin'
+                      ? pathname === '/dashboard/admin'
+                      : pathname.startsWith(item.href);
+
+                  return (
+                    <NavItemRow
+                      key={item.href}
+                      item={item}
+                      isActive={isActive}
+                      collapsed={collapsed}
+                      badge={badge}
+                      onClick={onNavClick}
+                    />
+                  );
+                })}
               </div>
-            )}
-
-            <div className="space-y-0.5">
-              {section.items.map(item => {
-                const badge =
-                  item.badgeKey === 'timecards'
-                    ? badgeCounts.timecards
-                    : item.badgeKey === 'notifications'
-                    ? badgeCounts.notifications
-                    : 0;
-
-                // Exact match for dashboard root, prefix match for sub-pages
-                const isActive =
-                  item.href === '/dashboard/admin'
-                    ? pathname === '/dashboard/admin'
-                    : pathname.startsWith(item.href);
-
-                return (
-                  <NavItemRow
-                    key={item.href}
-                    item={item}
-                    isActive={isActive}
-                    collapsed={collapsed}
-                    badge={badge}
-                    onClick={onNavClick}
-                  />
-                );
-              })}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* ------------------------------------------------------------------ */}
@@ -470,6 +491,13 @@ export default function DashboardSidebar() {
     setUser(getCurrentUser());
   }, []);
 
+  // Feature flags — gated nav items hide/show per user permissions.
+  // Super admins and ops_managers bypass all flags (handled inside the hook).
+  const { flags, loading: flagsLoading } = useFeatureFlags(
+    user?.id ?? null,
+    user?.role ?? null
+  );
+
   // Close mobile drawer on route change
   const prevPathRef = useRef(pathname);
   useEffect(() => {
@@ -501,6 +529,8 @@ export default function DashboardSidebar() {
     badgeCounts,
     pathname,
     onSignOut: handleSignOut,
+    flags,
+    flagsLoading,
   };
 
   return (

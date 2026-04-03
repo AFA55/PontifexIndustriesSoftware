@@ -10,6 +10,7 @@ import {
   Megaphone, CheckCircle2, Sparkles, Zap, Brain
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { useFeatureFlags } from '@/lib/feature-flags';
 import { supabase } from '@/lib/supabase';
 import OperatorRow from './_components/OperatorRow';
 import PendingQueueSidebar from './_components/PendingQueueSidebar';
@@ -160,6 +161,13 @@ export default function ScheduleBoardPage() {
   const [userRole, setUserRole] = useState<string>('admin');
   const [operatorSkillMap, setOperatorSkillMap] = useState<Record<string, number | null>>({});
 
+  // Feature flags — gate page access per user permissions
+  const _currentUserForFlags = getCurrentUser();
+  const { flags: pageFlags, loading: pageFlagsLoading } = useFeatureFlags(
+    _currentUserForFlags?.id ?? null,
+    _currentUserForFlags?.role ?? null
+  );
+
   // canEdit is determined by role — only super_admin can edit
   const canEdit = userRole === 'super_admin';
 
@@ -284,6 +292,17 @@ export default function ScheduleBoardPage() {
     }
     setUserRole(role);
   }, [router]);
+
+  // ═══ FEATURE FLAG GUARD ═══
+  useEffect(() => {
+    if (pageFlagsLoading) return;
+    const role = _currentUserForFlags?.role ?? '';
+    const isBypass = role === 'super_admin' || role === 'operations_manager';
+    if (!isBypass && !pageFlags.can_view_schedule_board) {
+      router.push('/dashboard/admin');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageFlagsLoading, pageFlags.can_view_schedule_board]);
 
   // ═══ FETCH OPERATORS/HELPERS ═══
   useEffect(() => {
