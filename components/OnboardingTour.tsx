@@ -143,9 +143,10 @@ const OPERATOR_STEPS: OnboardingStep[] = [
 interface OnboardingTourProps {
   userId: string;
   onComplete: () => void;
+  onSkip?: () => void;
 }
 
-export default function OnboardingTour({ userId, onComplete }: OnboardingTourProps) {
+export default function OnboardingTour({ userId, onComplete, onSkip }: OnboardingTourProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
 
@@ -155,7 +156,7 @@ export default function OnboardingTour({ userId, onComplete }: OnboardingTourPro
 
   const handleNext = () => {
     if (isLastStep) {
-      localStorage.setItem(`patriot-onboarding-${userId}`, 'completed');
+      localStorage.setItem('pontifex_tour_completed', 'true');
       setIsVisible(false);
       onComplete();
     } else {
@@ -170,9 +171,13 @@ export default function OnboardingTour({ userId, onComplete }: OnboardingTourPro
   };
 
   const handleSkip = () => {
-    localStorage.setItem(`patriot-onboarding-${userId}`, 'skipped');
+    localStorage.setItem('pontifex_tour_completed', 'true');
     setIsVisible(false);
-    onComplete();
+    if (onSkip) {
+      onSkip();
+    } else {
+      onComplete();
+    }
   };
 
   if (!isVisible) return null;

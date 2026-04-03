@@ -166,18 +166,8 @@ export default function Dashboard() {
 
   // Check if user should see onboarding tour
   const checkOnboardingStatus = (currentUser: User) => {
-    const isDemoAccount = currentUser.email.toLowerCase().includes('demo');
-    const onboardingKey = `patriot-onboarding-${currentUser.id}`;
-    const hasSeenOnboarding = localStorage.getItem(onboardingKey);
-
-    // Demo accounts: always show tour
-    if (isDemoAccount) {
-      setShowOnboarding(true);
-      return;
-    }
-
-    // Regular accounts: only show on first login
-    if (!hasSeenOnboarding) {
+    const completed = localStorage.getItem('pontifex_tour_completed');
+    if (!completed) {
       setShowOnboarding(true);
     }
   };
@@ -650,6 +640,7 @@ export default function Dashboard() {
         <OnboardingTour
           userId={user.id}
           onComplete={() => setShowOnboarding(false)}
+          onSkip={() => setShowOnboarding(false)}
         />
       )}
 
