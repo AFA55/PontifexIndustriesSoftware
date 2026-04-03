@@ -36,10 +36,12 @@ import {
   Layers,
   Building,
   MessageSquare,
+  Lock,
+  Key,
 } from 'lucide-react';
 
 // ─── Personalization ─────────────────────────────────────────────────────────
-const COMPANY_NAME = "[Doug's Company]";
+const COMPANY_NAME = 'Patriot Concrete Cutting';
 const DEVELOPER_NAME = 'Andres';
 const DEVELOPER_EMAIL = 'andres.altamirano1280@gmail.com';
 const DEVELOPER_PHONE = '';
@@ -436,6 +438,9 @@ export default function DougSalesPage() {
             <button onClick={() => scrollTo('built')} className="hover:text-white transition-colors">
               Features
             </button>
+            <button onClick={() => scrollTo('security')} className="hover:text-white transition-colors">
+              Security
+            </button>
           </nav>
           <button
             onClick={() => scrollTo('contact')}
@@ -495,9 +500,9 @@ export default function DougSalesPage() {
           <FadeIn delay={0.3}>
             <div className="inline-block px-6 py-4 rounded-2xl bg-white/[0.03] border border-white/10 text-left max-w-xl mx-auto">
               <p className="text-zinc-300 text-base leading-relaxed italic">
-                "Doug — I've spent over a year building this specifically with concrete cutting operations in mind.
+                "I've spent over a year building this specifically with concrete cutting operations in mind.
                 Every feature, every screen, every workflow was designed around what field crews actually deal with.
-                I'd love to show you what it can do for your team."
+                I'd love to show you what it can do for Patriot's team."
               </p>
               <p className="text-violet-400 text-sm mt-3 font-semibold not-italic">— {DEVELOPER_NAME}</p>
             </div>
@@ -871,7 +876,7 @@ export default function DougSalesPage() {
             <div className="rounded-2xl bg-gradient-to-br from-violet-600/10 to-indigo-600/10 border border-violet-500/20 p-8 text-left max-w-2xl mx-auto">
               <div className="text-zinc-300 text-lg leading-relaxed italic">
                 "I didn't build this to sell it to a thousand companies. I built it because I know the industry and I
-                know what's missing. Doug, if you use this platform, I'll be your developer. We grow it together."
+                know what's missing. If Patriot runs on this platform, I'll be your developer. We grow it together."
               </div>
               <div className="mt-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center font-bold text-white">
@@ -926,6 +931,113 @@ export default function DougSalesPage() {
         </div>
       </section>
 
+      {/* ── SECURITY ─────────────────────────────────────────────────────────── */}
+      <section id="security" className="relative py-28 px-6 overflow-hidden">
+        <Orb color="radial-gradient(circle, #0ea5e9, transparent)" size={700} top="-10%" left="-10%" opacity={0.08} />
+        <Orb color="radial-gradient(circle, #6366f1, transparent)" size={500} top="60%" left="70%" opacity={0.07} />
+
+        <div className="relative z-10 max-w-6xl mx-auto">
+          <FadeIn>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-500/10 border border-sky-500/20 mb-6">
+              <Shield className="w-4 h-4 text-sky-400" />
+              <span className="text-sky-300 text-sm font-medium tracking-wide">Enterprise-Grade Security</span>
+            </div>
+            <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
+              Your Data Is{' '}
+              <span className="bg-gradient-to-r from-sky-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">
+                Protected
+              </span>
+            </h2>
+            <p className="text-zinc-400 text-xl leading-relaxed max-w-2xl">
+              Patriot&apos;s data — your employees, your jobs, your financials — stays locked down.
+              The platform is built with the same security standards used by enterprise software, applied to a system
+              built just for your team.
+            </p>
+          </FadeIn>
+
+          <div className="mt-16 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Lock,
+                title: 'Isolated Data Environment',
+                desc: 'Patriot\'s data exists in a completely isolated tenant — no data is shared across companies. Your crew info, job history, and financials are yours alone.',
+                color: 'sky',
+              },
+              {
+                icon: Shield,
+                title: 'Row-Level Security',
+                desc: 'Every database query is secured at the row level. Even if a request bypassed authentication, it could only ever access data that belongs to your tenant.',
+                color: 'indigo',
+              },
+              {
+                icon: Key,
+                title: 'Role-Based Access Control',
+                desc: 'Every user role (admin, operator, salesman) has a precise set of permissions. Operators can\'t see financials. Admins can\'t override audit logs. Access is minimal by design.',
+                color: 'violet',
+              },
+              {
+                icon: Lock,
+                title: 'Encrypted in Transit & At Rest',
+                desc: 'All data is encrypted in transit via HTTPS/TLS and encrypted at rest in the database. Credentials are never stored in plaintext — ever.',
+                color: 'cyan',
+              },
+              {
+                icon: Shield,
+                title: 'No Unauthorized API Access',
+                desc: 'Every API route requires authentication. Server-side admin operations use a service role key that never touches the client browser. Public endpoints expose nothing sensitive.',
+                color: 'blue',
+              },
+              {
+                icon: CheckCircle,
+                title: 'Audit Logging',
+                desc: 'Key actions — job updates, status changes, approvals — are logged with timestamps and user IDs. If something changes, we know who did it and when.',
+                color: 'emerald',
+              },
+            ].map((item, i) => {
+              const Icon = item.icon;
+              const colorMap: Record<string, string> = {
+                sky: 'bg-sky-500/10 border-sky-500/20 text-sky-400',
+                indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400',
+                violet: 'bg-violet-500/10 border-violet-500/20 text-violet-400',
+                cyan: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400',
+                blue: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
+                emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+              };
+              const cls = colorMap[item.color] || colorMap.sky;
+              return (
+                <FadeIn key={i} delay={i * 0.08}>
+                  <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6 space-y-4 hover:border-white/[0.12] transition-all h-full">
+                    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center ${cls}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-white font-bold text-lg">{item.title}</h3>
+                    <p className="text-zinc-500 text-sm leading-relaxed">{item.desc}</p>
+                  </div>
+                </FadeIn>
+              );
+            })}
+          </div>
+
+          {/* Security assurance banner */}
+          <FadeIn delay={0.3}>
+            <div className="mt-14 rounded-2xl bg-gradient-to-r from-sky-600/10 via-indigo-600/10 to-violet-600/10 border border-sky-500/20 p-8 flex flex-col sm:flex-row items-center gap-6 text-left">
+              <div className="w-16 h-16 rounded-2xl bg-sky-500/15 border border-sky-500/20 flex items-center justify-center shrink-0">
+                <Shield className="w-8 h-8 text-sky-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-xl mb-2">Built To Be Auditable</h3>
+                <p className="text-zinc-400 leading-relaxed">
+                  The platform is built on Supabase — a SOC 2 Type II certified infrastructure provider — with
+                  PostgreSQL row-level security, JWT-based authentication, and zero client-side secrets. Every
+                  security control can be reviewed and verified. If your IT team or an auditor wants to inspect
+                  the security model, we can walk through it together.
+                </p>
+              </div>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
       {/* ── CONTACT / CTA ────────────────────────────────────────────────────── */}
       <section id="contact" className="relative py-28 px-6 overflow-hidden">
         <Orb color="radial-gradient(circle, #7c3aed, transparent)" size={700} top="-20%" left="30%" opacity={0.12} />
@@ -956,8 +1068,8 @@ export default function DougSalesPage() {
 
           <FadeIn delay={0.1}>
             <p className="text-zinc-400 text-xl leading-relaxed">
-              Doug — I'd love to walk you through a live demo. No pitch deck, no sales slides. Just a real look at
-              the platform and how it fits your operation. Low-pressure, 30 minutes, your call.
+              I'd love to walk you through a live demo. No pitch deck, no sales slides. Just a real look at
+              the platform and how it fits Patriot's operation. Low-pressure, 30 minutes, your call.
             </p>
           </FadeIn>
 
