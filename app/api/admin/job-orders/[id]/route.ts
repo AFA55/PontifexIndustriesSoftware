@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PATCH(
   request: NextRequest,
@@ -67,12 +68,16 @@ export async function PATCH(
     const updates = await request.json();
     console.log(`Updating job order ${id} with:`, updates);
 
+    // Resolve tenant scope — supabaseAdmin bypasses RLS, must scope manually
+    const tenantId = await getTenantId(user.id);
+
     // Get the current job order before updating (for audit trail)
-    const { data: oldJobOrder, error: fetchError } = await supabaseAdmin
+    let oldJobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) oldJobQuery = oldJobQuery.eq('tenant_id', tenantId);
+    const { data: oldJobOrder, error: fetchError } = await oldJobQuery.single();
 
     if (fetchError || !oldJobOrder) {
       return NextResponse.json(
@@ -100,13 +105,13 @@ export async function PATCH(
       }
     });
 
-    // Update job order
-    const { data: jobOrder, error: updateError } = await supabaseAdmin
+    // Update job order (scoped to tenant)
+    let updateQuery = supabaseAdmin
       .from('job_orders')
       .update(updateFields)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+    if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+    const { data: jobOrder, error: updateError } = await updateQuery.select().single();
 
     console.log('Update result:', { jobOrder, updateError });
 
@@ -276,12 +281,16 @@ export async function DELETE(
       );
     }
 
-    // Get the job order before deleting (for audit trail)
-    const { data: jobOrder, error: fetchError } = await supabaseAdmin
+    // Resolve tenant scope — supabaseAdmin bypasses RLS, must scope manually
+    const tenantIdDel = await getTenantId(user.id);
+
+    // Get the job order before deleting (for audit trail), scoped to tenant
+    let fetchQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantIdDel) fetchQuery = fetchQuery.eq('tenant_id', tenantIdDel);
+    const { data: jobOrder, error: fetchError } = await fetchQuery.single();
 
     if (fetchError || !jobOrder) {
       return NextResponse.json(
@@ -308,11 +317,13 @@ export async function DELETE(
       console.error('Error logging deletion audit trail:', deleteHistoryError);
     }
 
-    // Delete the job order
-    const { error: deleteError } = await supabaseAdmin
+    // Delete the job order (scoped to tenant)
+    let deleteQuery = supabaseAdmin
       .from('job_orders')
       .delete()
       .eq('id', id);
+    if (tenantIdDel) deleteQuery = deleteQuery.eq('tenant_id', tenantIdDel);
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       console.error('Error deleting job order:', deleteError);

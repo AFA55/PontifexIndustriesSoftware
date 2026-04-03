@@ -54,8 +54,8 @@ export async function GET(
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view operator profiles' },
         { status: 403 }
@@ -156,8 +156,8 @@ export async function PATCH(
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can update operator profiles' },
         { status: 403 }

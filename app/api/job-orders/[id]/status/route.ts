@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -50,12 +51,16 @@ async function updateJobStatus(
       );
     }
 
-    // Check if job exists and user has permission
-    const { data: existingJob, error: checkError } = await supabaseAdmin
+    // Resolve tenant scope — supabaseAdmin bypasses RLS, must scope manually
+    const tenantId = await getTenantId(user.id);
+
+    // Check if job exists and user has permission (scoped to tenant)
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: existingJob, error: checkError } = await jobQuery.single();
 
     if (checkError || !existingJob) {
       return NextResponse.json(
@@ -143,26 +148,26 @@ async function updateJobStatus(
       }
     }
 
-    // Update job order
+    // Update job order (scoped to tenant)
     let updatedJob: any = null;
-    const { data: fullUpdateResult, error: updateError } = await supabaseAdmin
+    let fullUpdateQuery = supabaseAdmin
       .from('job_orders')
       .update(updateData)
-      .eq('id', jobId)
-      .select()
-      .single();
+      .eq('id', jobId);
+    if (tenantId) fullUpdateQuery = fullUpdateQuery.eq('tenant_id', tenantId);
+    const { data: fullUpdateResult, error: updateError } = await fullUpdateQuery.select().single();
 
     if (updateError) {
       // If the error is about unknown columns, retry with just the status field
       const errMsg = (updateError.message || '').toLowerCase();
       if (errMsg.includes('column') || errMsg.includes('does not exist') || errMsg.includes('undefined')) {
         console.log('Full update failed (likely missing columns), retrying with status only:', updateError.message);
-        const { data: fallbackResult, error: fallbackError } = await supabaseAdmin
+        let fallbackQuery = supabaseAdmin
           .from('job_orders')
           .update({ status })
-          .eq('id', jobId)
-          .select()
-          .single();
+          .eq('id', jobId);
+        if (tenantId) fallbackQuery = fallbackQuery.eq('tenant_id', tenantId);
+        const { data: fallbackResult, error: fallbackError } = await fallbackQuery.select().single();
 
         if (fallbackError) {
           console.error('Fallback status update also failed:', fallbackError);

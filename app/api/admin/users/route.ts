@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view users' },
         { status: 403 }

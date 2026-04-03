@@ -51,8 +51,8 @@ export async function PATCH(
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can update users' },
         { status: 403 }

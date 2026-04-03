@@ -47,14 +47,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user is admin
+    // Check if user is admin (any elevated role)
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if (!['admin', 'super_admin', 'operations_manager'].includes(profile?.role || '')) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - Admin access required' },
         { status: 403 }
