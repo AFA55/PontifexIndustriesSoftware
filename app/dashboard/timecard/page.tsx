@@ -311,33 +311,33 @@ function TimecardPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-14 h-14 mx-auto mb-4 relative">
-            <div className="absolute inset-0 rounded-full border-4 border-blue-100"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-purple-100"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-600 animate-spin"></div>
           </div>
-          <p className="text-slate-500 text-sm font-medium">Loading timecards...</p>
+          <p className="text-gray-500 text-sm font-medium">Loading timecards...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc]">
+    <div className="min-h-screen bg-gray-50">
       {/* ── Header ─────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-[1024px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1.5 text-gray-500 hover:text-gray-800 hover:bg-slate-100 rounded-lg transition-all text-sm font-medium"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Dashboard</span>
             </Link>
             <div className="h-6 w-px bg-slate-200" />
-            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+            <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-sm">
                 <Clock size={16} className="text-white" />
               </div>
@@ -348,7 +348,7 @@ function TimecardPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/request-time-off"
-              className="flex items-center gap-1.5 px-3 py-2.5 bg-white hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold border border-slate-200 shadow-sm transition-all min-h-[40px]"
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-white hover:bg-slate-50 text-gray-600 rounded-lg text-xs font-semibold border border-slate-200 shadow-sm transition-all min-h-[40px]"
             >
               <CalendarOff size={14} />
               <span className="hidden sm:inline">Request Time Off</span>
@@ -358,8 +358,8 @@ function TimecardPage() {
                 {user?.name?.charAt(0) || 'U'}
               </div>
               <div className="text-right">
-                <p className="text-sm font-semibold text-slate-800 leading-tight">{user?.name}</p>
-                <p className="text-[11px] text-slate-400 font-medium capitalize">{user?.role}</p>
+                <p className="text-sm font-semibold text-gray-800 leading-tight">{user?.name}</p>
+                <p className="text-[11px] text-gray-400 font-medium capitalize">{user?.role}</p>
               </div>
             </div>
           </div>
@@ -385,8 +385,8 @@ function TimecardPage() {
               </div>
 
               <div>
-                <p className="text-4xl font-bold text-slate-900 tabular-nums">{liveHours}</p>
-                <p className="text-sm text-slate-500">hours today</p>
+                <p className="text-4xl font-bold text-gray-900 tabular-nums">{liveHours}</p>
+                <p className="text-sm text-gray-500">hours today</p>
               </div>
 
               {/* Today's Timeline */}
@@ -412,7 +412,7 @@ function TimecardPage() {
                       })}
                     </div>
                   </div>
-                  <div className="flex justify-between text-[10px] text-slate-400">
+                  <div className="flex justify-between text-[10px] text-gray-400">
                     <span>0h</span>
                     <span>4h</span>
                     <span>8h</span>
@@ -434,7 +434,7 @@ function TimecardPage() {
             /* NOT CLOCKED IN STATE */
             <div className="space-y-4">
               <div className="flex justify-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-full">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-gray-600 rounded-full">
                   <div className="w-2 h-2 rounded-full bg-slate-400" />
                   <span className="text-sm font-semibold">Not Clocked In</span>
                 </div>
@@ -483,15 +483,15 @@ function TimecardPage() {
         <div className="mb-5 flex items-center justify-between">
           <button
             onClick={() => setCurrentWeekOffset(currentWeekOffset - 1)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-lg transition-all text-sm font-medium border border-slate-200 shadow-sm hover:shadow"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-gray-600 rounded-lg transition-all text-sm font-medium border border-slate-200 shadow-sm hover:shadow"
           >
             <ChevronLeft size={16} />
             <span className="hidden sm:inline">Prev</span>
           </button>
 
           <div className="text-center">
-            <p className="text-base font-bold text-slate-900">{formatWeekRange()}</p>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-base font-bold text-gray-900">{formatWeekRange()}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
               {isCurrentWeek() ? 'Current Week' : `${Math.abs(currentWeekOffset)} ${Math.abs(currentWeekOffset) === 1 ? 'week' : 'weeks'} ago`}
             </p>
           </div>
@@ -502,7 +502,7 @@ function TimecardPage() {
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all text-sm font-medium border shadow-sm ${
               isCurrentWeek()
                 ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
-                : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:shadow'
+                : 'bg-white hover:bg-slate-50 text-gray-600 border-slate-200 hover:shadow'
             }`}
           >
             <span className="hidden sm:inline">Next</span>
@@ -523,10 +523,10 @@ function TimecardPage() {
                     : 'border-slate-100 opacity-60'
               }`}
             >
-              <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${day.isToday ? 'text-blue-600' : 'text-slate-400'}`}>
+              <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${day.isToday ? 'text-blue-600' : 'text-gray-400'}`}>
                 {day.dayName}
               </p>
-              <p className={`text-sm sm:text-lg font-bold ${day.isToday ? 'text-blue-700' : 'text-slate-800'}`}>
+              <p className={`text-sm sm:text-lg font-bold ${day.isToday ? 'text-blue-700' : 'text-gray-800'}`}>
                 {day.dayNum}
               </p>
               {day.hasEntries ? (
@@ -565,7 +565,7 @@ function TimecardPage() {
 
         {/* ── Weekly Summary Cards ─────────────────────── */}
         <div className="grid grid-cols-3 gap-4 mb-5">
-          <div className="col-span-3 sm:col-span-1 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
+          <div className="col-span-3 sm:col-span-1 bg-purple-600 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={15} className="text-blue-200" />
@@ -589,27 +589,27 @@ function TimecardPage() {
 
           <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Days</span>
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Days</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
                 <Calendar size={15} className="text-emerald-600" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-slate-900">{weekData?.daysWorked || 0}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{weekData?.entries.length || 0} entries</p>
+            <p className="text-2xl font-bold text-gray-900">{weekData?.daysWorked || 0}</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">{weekData?.entries.length || 0} entries</p>
           </div>
 
           <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Approved</span>
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Approved</span>
               <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
                 <CheckCircle size={15} className="text-blue-600" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-slate-900">
+            <p className="text-2xl font-bold text-gray-900">
               {weekData?.entries.filter(e => e.is_approved).length || 0}
-              <span className="text-sm font-normal text-slate-400 ml-1">/ {weekData?.entries.length || 0}</span>
+              <span className="text-sm font-normal text-gray-400 ml-1">/ {weekData?.entries.length || 0}</span>
             </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-gray-400 mt-0.5">
               {(weekData?.entries.filter(e => !e.is_approved).length || 0) > 0
                 ? `${weekData?.entries.filter(e => !e.is_approved).length} pending`
                 : 'All approved'}
@@ -630,7 +630,7 @@ function TimecardPage() {
               <div className={color}>{icon}</div>
               <div>
                 <p className={`text-sm font-bold ${color}`}>{value}<span className="text-[10px] font-normal ml-0.5">hrs</span></p>
-                <p className="text-[10px] text-slate-500 font-medium">{label}</p>
+                <p className="text-[10px] text-gray-500 font-medium">{label}</p>
               </div>
             </div>
           ))}
@@ -658,8 +658,8 @@ function TimecardPage() {
         {/* ── Daily Entries Table ─────────────────────────── */}
         <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
-            <h2 className="text-sm font-bold text-slate-800">Daily Entries</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <h2 className="text-sm font-bold text-gray-800">Daily Entries</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
               {weekData?.entries.length || 0} {(weekData?.entries.length || 0) === 1 ? 'entry' : 'entries'} this week
             </p>
           </div>
@@ -670,27 +670,27 @@ function TimecardPage() {
                 <div className="absolute inset-0 rounded-full border-[3px] border-slate-100"></div>
                 <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-blue-600 animate-spin"></div>
               </div>
-              <p className="text-slate-400 text-sm">Loading entries...</p>
+              <p className="text-gray-400 text-sm">Loading entries...</p>
             </div>
           ) : !weekData || weekData.entries.length === 0 ? (
             <div className="p-16 text-center">
               <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Clock className="text-slate-300" size={28} />
               </div>
-              <p className="text-slate-600 font-semibold">No entries this week</p>
-              <p className="text-slate-400 text-sm mt-1">Clock in from the dashboard to start tracking</p>
+              <p className="text-gray-600 font-semibold">No entries this week</p>
+              <p className="text-gray-400 text-sm mt-1">Clock in from the dashboard to start tracking</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-100">
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clock In</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Clock Out</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hours</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Category</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Clock In</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Clock Out</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hours</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Category</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -705,14 +705,14 @@ function TimecardPage() {
                         }`}
                       >
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-sm font-medium text-slate-700">{formatDate(entry.date)}</span>
+                          <span className="text-sm font-medium text-gray-700">{formatDate(entry.date)}</span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-sm font-medium text-slate-700 tabular-nums">{formatTime(entry.clock_in_time)}</span>
+                          <span className="text-sm font-medium text-gray-700 tabular-nums">{formatTime(entry.clock_in_time)}</span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {entry.clock_out_time ? (
-                            <span className="text-sm font-medium text-slate-700 tabular-nums">{formatTime(entry.clock_out_time)}</span>
+                            <span className="text-sm font-medium text-gray-700 tabular-nums">{formatTime(entry.clock_out_time)}</span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
                               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
@@ -722,7 +722,7 @@ function TimecardPage() {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {entry.total_hours !== null ? (
-                            <span className="text-sm font-bold tabular-nums text-slate-800">{entry.total_hours.toFixed(2)}</span>
+                            <span className="text-sm font-bold tabular-nums text-gray-800">{entry.total_hours.toFixed(2)}</span>
                           ) : (
                             <span className="text-sm text-slate-300">&mdash;</span>
                           )}
@@ -734,7 +734,7 @@ function TimecardPage() {
                                 {badge.icon}{badge.label}
                               </span>
                             )) : (
-                              <span className="text-[10px] text-slate-400 font-medium">Regular</span>
+                              <span className="text-[10px] text-gray-400 font-medium">Regular</span>
                             )}
                           </div>
                         </td>
@@ -761,7 +761,7 @@ function TimecardPage() {
         </div>
 
         {/* ── Legend ──────────────────────────────────────── */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 px-2 py-3 text-[11px] text-slate-500">
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 px-2 py-3 text-[11px] text-gray-500">
           {[
             { color: 'bg-emerald-500', label: 'Regular (Mon-Fri, up to 40 hrs)' },
             { color: 'bg-orange-500', label: 'Weekly OT (Mon-Fri over 40 hrs)' },

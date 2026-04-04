@@ -99,7 +99,7 @@ export default function CustomersPage() {
   const totalJobs = customers.reduce((sum, c) => sum + c.job_count, 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 md:px-6 py-6 max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -117,7 +117,7 @@ export default function CustomersPage() {
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg flex items-center gap-2"
+            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Add Customer

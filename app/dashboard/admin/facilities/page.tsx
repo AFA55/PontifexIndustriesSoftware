@@ -217,7 +217,7 @@ function AddFacilityModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:bg-white/10 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -345,7 +345,7 @@ function EditFacilityModal({ facility, onClose, onSaved }: { facility: Facility;
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:bg-white/10 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -472,7 +472,7 @@ function AddBadgeModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:bg-white/10 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -770,38 +770,38 @@ export default function FacilitiesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 text-white">
+      <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center gap-3 mb-4">
-            <Link href="/dashboard/admin" className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-              <ChevronLeft className="w-5 h-5" />
+            <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
             </Link>
             <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <Building2 className="w-6 h-6" />
+              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Building2 className="w-6 h-6 text-purple-600" />
                 Facilities & Badges
               </h1>
-              <p className="text-purple-200 text-sm">Manage facility compliance and operator badging</p>
+              <p className="text-gray-500 text-sm">Manage facility compliance and operator badging</p>
             </div>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white/10 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold">{facilities.filter(f => f.is_active).length}</p>
-              <p className="text-xs text-purple-200">Active Facilities</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900">{facilities.filter(f => f.is_active).length}</p>
+              <p className="text-xs text-gray-500">Active Facilities</p>
             </div>
-            <div className="bg-white/10 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold">{activeBadges.length}</p>
-              <p className="text-xs text-purple-200">Active Badges</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900">{activeBadges.length}</p>
+              <p className="text-xs text-gray-500">Active Badges</p>
             </div>
-            <div className="bg-white/10 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-amber-300">{expiringBadges.length}</p>
-              <p className="text-xs text-purple-200">Expiring Soon</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-amber-600">{expiringBadges.length}</p>
+              <p className="text-xs text-amber-600">Expiring Soon</p>
             </div>
-            <div className="bg-white/10 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-red-300">{expiredBadges.length}</p>
-              <p className="text-xs text-purple-200">Expired (Active)</p>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-red-600">{expiredBadges.length}</p>
+              <p className="text-xs text-red-500">Expired (Active)</p>
             </div>
           </div>
         </div>

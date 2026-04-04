@@ -36,19 +36,19 @@ export default function AddProfileModal({ onSubmit, onClose }: AddProfileModalPr
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-xl w-full max-w-md animate-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-pink-500 p-5 rounded-t-2xl text-white">
+          <div className="bg-white border-b border-gray-200 p-5 rounded-t-2xl">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  <UserPlus className="w-5 h-5" />
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-purple-600" />
                   Add Team Member
                 </h2>
-                <p className="text-purple-200 text-sm">Create a new operator or helper account</p>
+                <p className="text-gray-500 text-sm">Create a new operator or helper account</p>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
-                <X className="w-5 h-5" />
+              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
           </div>
@@ -112,7 +112,7 @@ export default function AddProfileModal({ onSubmit, onClose }: AddProfileModalPr
               <button
                 onClick={handleSubmit}
                 disabled={submitting || !fullName.trim() || !email.trim()}
-                className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                 {submitting ? 'Creating...' : 'Create Account'}

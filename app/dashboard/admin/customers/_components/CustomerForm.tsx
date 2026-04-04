@@ -182,32 +182,32 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
     }
   };
 
-  const inputClass = 'w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-xl text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all placeholder-gray-400';
-  const labelClass = 'block text-xs font-bold text-gray-300 mb-1.5 uppercase tracking-wider';
-  const sectionClass = 'border border-white/10 rounded-xl p-4 space-y-3';
+  const inputClass = 'w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-lg text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none transition-all placeholder-gray-400';
+  const labelClass = 'block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wider';
+  const sectionClass = 'border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       {/* Hidden container required by PlacesService */}
       <div ref={placesServiceContainerRef} style={{ display: 'none' }} />
 
-      <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-white/10 sticky top-0 bg-slate-800 z-10 rounded-t-2xl">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
               <Building2 className="w-4 h-4 text-white" />
             </div>
             {isEdit ? 'Edit Customer' : 'New Customer'}
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-            <X className="w-5 h-5 text-gray-400" />
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
           {error && (
-            <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-sm text-red-300">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
               {error}
             </div>
           )}
@@ -215,8 +215,8 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
           {/* Company Info Section */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <Building2 className="w-4 h-4 text-purple-400" />
-              <h3 className="text-sm font-bold text-white">Company Information</h3>
+              <Building2 className="w-4 h-4 text-purple-600" />
+              <h3 className="text-sm font-bold text-gray-900">Company Information</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
@@ -246,9 +246,9 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
           {/* Primary Contact Section */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <User className="w-4 h-4 text-blue-400" />
-              <h3 className="text-sm font-bold text-white">Main Contact</h3>
-              <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">Primary point of contact</span>
+              <User className="w-4 h-4 text-blue-600" />
+              <h3 className="text-sm font-bold text-gray-900">Main Contact</h3>
+              <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Primary point of contact</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -267,11 +267,11 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
           </div>
 
           {/* Billing Contact Section */}
-          <div className={sectionClass + ' border-emerald-500/20 bg-emerald-500/5'}>
+          <div className="border border-emerald-200 bg-emerald-50 rounded-xl p-4 space-y-3">
             <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-bold text-white">Billing Contact</h3>
-              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">For invoices & payments</span>
+              <DollarSign className="w-4 h-4 text-emerald-600" />
+              <h3 className="text-sm font-bold text-gray-900">Billing Contact</h3>
+              <span className="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">For invoices & payments</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -292,8 +292,8 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
           {/* Payment & Billing Section */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <CreditCard className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-sm font-bold text-white">Payment & Billing</h3>
+              <CreditCard className="w-4 h-4 text-cyan-600" />
+              <h3 className="text-sm font-bold text-gray-900">Payment & Billing</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -318,10 +318,10 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
           {/* Address Section */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <MapPin className="w-4 h-4 text-red-400" />
-              <h3 className="text-sm font-bold text-white">Address</h3>
+              <MapPin className="w-4 h-4 text-red-500" />
+              <h3 className="text-sm font-bold text-gray-900">Address</h3>
               {isLoaded && (
-                <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">Autocomplete enabled</span>
+                <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Autocomplete enabled</span>
               )}
             </div>
             <div className="relative">
@@ -337,18 +337,18 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
                 autoComplete="off"
               />
               {showSuggestions && addressSuggestions.length > 0 && (
-                <div className="absolute z-50 left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-xl shadow-2xl overflow-hidden">
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
                   {addressSuggestions.map(prediction => (
                     <button
                       key={prediction.place_id}
                       type="button"
-                      className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-slate-600 transition-colors flex items-start gap-2 border-b border-slate-600/50 last:border-0"
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-900 hover:bg-gray-50 transition-colors flex items-start gap-2 border-b border-gray-100 last:border-0"
                       onMouseDown={() => handleSelectSuggestion(prediction)}
                     >
                       <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
                       <span>
                         <span className="font-medium">{prediction.structured_formatting.main_text}</span>
-                        <span className="text-gray-400 text-xs block">{prediction.structured_formatting.secondary_text}</span>
+                        <span className="text-gray-500 text-xs block">{prediction.structured_formatting.secondary_text}</span>
                       </span>
                     </button>
                   ))}
@@ -374,8 +374,8 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
           {/* Notes */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <FileText className="w-4 h-4 text-gray-400" />
-              <h3 className="text-sm font-bold text-white">Internal Notes</h3>
+              <FileText className="w-4 h-4 text-gray-500" />
+              <h3 className="text-sm font-bold text-gray-900">Internal Notes</h3>
             </div>
             <textarea
               className={inputClass + ' min-h-[80px] resize-y'}
@@ -386,14 +386,14 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
           </div>
 
           {/* Submit */}
-          <div className="flex justify-end gap-3 pt-2 border-t border-white/10">
-            <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-gray-400 hover:text-white transition-colors">
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
+            <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors">
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 rounded-xl font-bold text-sm text-white transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
+              className="px-8 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-sm text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {isEdit ? 'Save Changes' : 'Create Customer'}

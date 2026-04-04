@@ -316,16 +316,16 @@ export default function AdminNotificationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white/80 border-b border-gray-200 shadow-sm sticky top-0 z-40 backdrop-blur-xl">
+      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -365,7 +365,7 @@ export default function AdminNotificationsPage() {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-all ${
                   activeTab === tab.id
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
-                    : 'text-gray-400 hover:text-gray-300 hover:bg-gray-50'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
@@ -477,7 +477,7 @@ export default function AdminNotificationsPage() {
               <div className="space-y-4">
                 {/* Type Select */}
                 <div>
-                  <label className="text-xs text-gray-400 font-semibold mb-1.5 block">Type</label>
+                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Type</label>
                   <select
                     value={notifType}
                     onChange={e => setNotifType(e.target.value)}
@@ -493,7 +493,7 @@ export default function AdminNotificationsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-400 font-semibold mb-1.5 block">Title</label>
+                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Title</label>
                   <input
                     type="text"
                     value={title}
@@ -504,7 +504,7 @@ export default function AdminNotificationsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-400 font-semibold mb-1.5 block">Message</label>
+                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Message</label>
                   <textarea
                     value={message}
                     onChange={e => setMessage(e.target.value)}
@@ -515,7 +515,7 @@ export default function AdminNotificationsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-400 font-semibold mb-1.5 block">Action URL (optional)</label>
+                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Action URL (optional)</label>
                   <input
                     type="text"
                     value={actionUrl}
@@ -577,7 +577,7 @@ export default function AdminNotificationsPage() {
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_clock_in_reminder: !s.auto_clock_in_reminder }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_clock_in_reminder ? 'text-blue-600' : 'text-gray-300'}`}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_clock_in_reminder ? 'text-blue-600' : 'text-gray-400'}`}
                 >
                   {settings.auto_clock_in_reminder
                     ? <ToggleRight className="w-8 h-8" />
@@ -588,7 +588,7 @@ export default function AdminNotificationsPage() {
 
               {settings.auto_clock_in_reminder && (
                 <div className="pl-4">
-                  <label className="text-xs text-gray-400 font-semibold mb-1.5 block">Reminder Time</label>
+                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Reminder Time</label>
                   <input
                     type="time"
                     value={settings.clock_in_reminder_time}
@@ -606,7 +606,7 @@ export default function AdminNotificationsPage() {
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_overtime_alert: !s.auto_overtime_alert }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_overtime_alert ? 'text-blue-600' : 'text-gray-300'}`}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_overtime_alert ? 'text-blue-600' : 'text-gray-400'}`}
                 >
                   {settings.auto_overtime_alert
                     ? <ToggleRight className="w-8 h-8" />
@@ -617,7 +617,7 @@ export default function AdminNotificationsPage() {
 
               {settings.auto_overtime_alert && (
                 <div className="pl-4">
-                  <label className="text-xs text-gray-400 font-semibold mb-1.5 block">OT Threshold (hours)</label>
+                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">OT Threshold (hours)</label>
                   <input
                     type="number"
                     value={settings.overtime_alert_threshold}
@@ -635,7 +635,7 @@ export default function AdminNotificationsPage() {
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_timecard_approval_reminder: !s.auto_timecard_approval_reminder }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_timecard_approval_reminder ? 'text-blue-600' : 'text-gray-300'}`}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_timecard_approval_reminder ? 'text-blue-600' : 'text-gray-400'}`}
                 >
                   {settings.auto_timecard_approval_reminder
                     ? <ToggleRight className="w-8 h-8" />
@@ -690,10 +690,10 @@ export default function AdminNotificationsPage() {
                       <div className="text-right flex-shrink-0">
                         <div className="flex items-center gap-2">
                           {notif.is_read && (
-                            <span className="text-[10px] text-green-400 font-semibold px-2 py-0.5 bg-green-500/10 rounded-full">Read</span>
+                            <span className="text-[10px] text-green-700 font-semibold px-2 py-0.5 bg-green-100 border border-green-200 rounded-full">Read</span>
                           )}
                           {notif.is_email_sent && (
-                            <span className="text-[10px] text-blue-400 font-semibold px-2 py-0.5 bg-blue-500/10 rounded-full">Emailed</span>
+                            <span className="text-[10px] text-blue-700 font-semibold px-2 py-0.5 bg-blue-100 border border-blue-200 rounded-full">Emailed</span>
                           )}
                         </div>
                         <p className="text-[10px] text-gray-600 mt-1">

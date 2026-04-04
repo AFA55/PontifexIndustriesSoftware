@@ -140,13 +140,13 @@ const SEGMENT_COLORS: Record<string, { bg: string; label: string; icon: any }> =
 
 // Entry type badge styling
 const ENTRY_TYPE_STYLES: Record<string, { bg: string; text: string }> = {
-  regular: { bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
-  overtime: { bg: 'bg-orange-500/10', text: 'text-orange-400' },
-  double_time: { bg: 'bg-red-500/10', text: 'text-red-400' },
-  time_off: { bg: 'bg-purple-500/10', text: 'text-purple-400' },
-  holiday: { bg: 'bg-cyan-500/10', text: 'text-cyan-400' },
-  no_call_no_show: { bg: 'bg-red-500/10', text: 'text-red-400' },
-  late: { bg: 'bg-amber-500/10', text: 'text-amber-400' },
+  regular: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  overtime: { bg: 'bg-orange-50', text: 'text-orange-700' },
+  double_time: { bg: 'bg-red-50', text: 'text-red-700' },
+  time_off: { bg: 'bg-purple-50', text: 'text-purple-700' },
+  holiday: { bg: 'bg-cyan-50', text: 'text-cyan-700' },
+  no_call_no_show: { bg: 'bg-red-50', text: 'text-red-700' },
+  late: { bg: 'bg-amber-50', text: 'text-amber-700' },
 };
 
 // ── Component ─────────────────────────────────────────────────
@@ -410,12 +410,12 @@ function OperatorTimecardDetailPageInner() {
   // ── Status badge helper ─────────────────────────────────────
   const getStatusBadge = (status: string) => {
     const styles: Record<string, { bg: string; text: string; icon: any; label: string }> = {
-      draft: { bg: 'bg-gray-100', text: 'text-gray-500', icon: Clock, label: 'Draft' },
-      pending: { bg: 'bg-amber-500/10', text: 'text-amber-400', icon: Clock, label: 'Pending' },
-      active: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', icon: Clock, label: 'Active' },
-      submitted: { bg: 'bg-blue-500/10', text: 'text-blue-400', icon: Send, label: 'Submitted' },
-      approved: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', icon: CheckCircle, label: 'Approved' },
-      rejected: { bg: 'bg-red-500/10', text: 'text-red-400', icon: XCircle, label: 'Rejected' },
+      draft: { bg: 'bg-gray-100', text: 'text-gray-600', icon: Clock, label: 'Draft' },
+      pending: { bg: 'bg-amber-50', text: 'text-amber-700', icon: Clock, label: 'Pending' },
+      active: { bg: 'bg-emerald-50', text: 'text-emerald-700', icon: Clock, label: 'Active' },
+      submitted: { bg: 'bg-blue-50', text: 'text-blue-700', icon: Send, label: 'Submitted' },
+      approved: { bg: 'bg-emerald-50', text: 'text-emerald-700', icon: CheckCircle, label: 'Approved' },
+      rejected: { bg: 'bg-red-50', text: 'text-red-700', icon: XCircle, label: 'Rejected' },
     };
     const s = styles[status] || styles.draft;
     const Icon = s.icon;
@@ -460,7 +460,7 @@ function OperatorTimecardDetailPageInner() {
                   style={{ width: `${Math.max(width, 2)}%`, marginLeft: idx === 0 ? `${Math.max(left, 0)}%` : '0' }}
                   title={`${colors.label}: ${formatTime(seg.start)} - ${seg.end ? formatTime(seg.end) : 'now'}`}
                 >
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover/seg:block bg-gray-800 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap z-10">
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover/seg:block bg-gray-900 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap z-10">
                     {colors.label}
                   </div>
                 </div>
@@ -509,7 +509,7 @@ function OperatorTimecardDetailPageInner() {
   // ── Auth loading state ──────────────────────────────────────
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-14 h-14 mx-auto mb-4 relative">
             <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
@@ -524,7 +524,7 @@ function OperatorTimecardDetailPageInner() {
   // ── Error state ─────────────────────────────────────────────
   if (!loading && fetchError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="min-h-screen bg-gray-50">
         <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
             <Link
@@ -564,7 +564,7 @@ function OperatorTimecardDetailPageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       {/* ── Header ─────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -811,7 +811,7 @@ function OperatorTimecardDetailPageInner() {
           {loading ? (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-16 text-center">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
-              <p className="text-slate-500 text-sm">Loading entries...</p>
+              <p className="text-gray-500 text-sm">Loading entries...</p>
             </div>
           ) : (
             Object.entries(entriesByDay).map(([date, dayEntries]) => {
@@ -1370,7 +1370,7 @@ function OperatorTimecardDetailPageInner() {
 export default function OperatorTimecardDetailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-14 h-14 mx-auto mb-4 relative">
             <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>

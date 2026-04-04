@@ -219,18 +219,18 @@ export default function ScheduleFormHistoryPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-4 sm:px-6 py-6">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-5">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-3 mb-2">
-            <Link href="/dashboard/admin" className="text-orange-100 hover:text-white transition-colors">
-              <ArrowLeft className="w-5 h-5" />
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
             </Link>
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-              <ClipboardList className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+              <ClipboardList className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Schedule Form History</h1>
-              <p className="text-orange-100 text-sm">Track submitted, approved, and rejected schedule forms</p>
+              <h1 className="text-2xl font-bold text-gray-900">Schedule Form History</h1>
+              <p className="text-gray-500 text-sm">Track submitted, approved, and rejected schedule forms</p>
             </div>
           </div>
         </div>
@@ -270,7 +270,7 @@ export default function ScheduleFormHistoryPage() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search forms..."
-              className="pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none w-48 sm:w-64"
+              className="pl-9 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none w-48 sm:w-64"
             />
           </div>
         </div>
@@ -278,7 +278,7 @@ export default function ScheduleFormHistoryPage() {
         {/* Loading */}
         {loading && (
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full" />
+            <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full" />
           </div>
         )}
 
@@ -396,7 +396,7 @@ export default function ScheduleFormHistoryPage() {
                             {['admin', 'super_admin', 'operations_manager', 'salesman', 'supervisor'].includes(userRole) && (
                               <button
                                 onClick={() => handleEditAndResubmit(form)}
-                                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg hover:shadow-xl flex items-center gap-2 flex-shrink-0"
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-2 flex-shrink-0"
                               >
                                 <RefreshCw className="w-4 h-4" />
                                 Edit & Resubmit

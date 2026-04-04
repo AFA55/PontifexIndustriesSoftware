@@ -61,15 +61,15 @@ const ROLE_GRADIENT: Record<string, string> = {
 };
 
 const ROLE_BADGE: Record<string, string> = {
-  super_admin: 'bg-violet-500/20 text-violet-300 border-violet-500/40',
-  operations_manager: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
-  admin: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-  supervisor: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
-  shop_manager: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
-  inventory_manager: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
-  salesman: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
-  operator: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-  apprentice: 'bg-slate-500/20 text-slate-300 border-slate-500/40',
+  super_admin: 'bg-violet-50 text-violet-700 border-violet-200',
+  operations_manager: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  admin: 'bg-blue-50 text-blue-700 border-blue-200',
+  supervisor: 'bg-teal-50 text-teal-700 border-teal-200',
+  shop_manager: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  inventory_manager: 'bg-sky-50 text-sky-700 border-sky-200',
+  salesman: 'bg-orange-50 text-orange-700 border-orange-200',
+  operator: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  apprentice: 'bg-slate-50 text-slate-700 border-slate-200',
 };
 
 const ROLE_ICON: Record<string, React.ElementType> = {
@@ -155,8 +155,8 @@ function RolePill({ role }: { role: string }) {
 
 function StatusBadge({ active }: { active: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-semibold ${active ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-gray-800/80 text-gray-400 border-gray-700'}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-400' : 'bg-gray-500'}`} />
+    <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-semibold ${active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
       {active ? 'Active' : 'Inactive'}
     </span>
   );
@@ -176,23 +176,23 @@ function GrantSuperAdminDialog({
   saving: boolean;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#13131a] rounded-2xl border border-red-500/30 w-full max-w-sm">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xl w-full max-w-sm">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
-              <Crown className="w-5 h-5 text-red-400" />
+            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+              <Crown className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Grant Super Admin</h3>
-              <p className="text-sm text-gray-400">This action cannot be undone easily</p>
+              <h3 className="text-lg font-semibold text-gray-900">Grant Super Admin</h3>
+              <p className="text-sm text-gray-500">This action cannot be undone easily</p>
             </div>
           </div>
 
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-5">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-red-300">
+              <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-red-700">
                 <strong>{member.full_name}</strong> will gain full unrestricted access to all
                 platform features, data, and admin controls. This should only be granted to
                 trusted senior staff.
@@ -204,7 +204,7 @@ function GrantSuperAdminDialog({
             <button
               onClick={onCancel}
               disabled={saving}
-              className="flex-1 bg-white/[0.06] hover:bg-white/[0.10] text-gray-300 rounded-xl py-3 font-semibold transition-colors"
+              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-3 font-semibold transition-colors"
             >
               Cancel
             </button>
@@ -228,10 +228,10 @@ function GrantSuperAdminDialog({
 function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | null | undefined }) {
   return (
     <div className="flex items-start gap-3">
-      <Icon className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+      <Icon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
       <div className="min-w-0">
         <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
-        <p className="text-sm text-gray-300 break-all">{value || '—'}</p>
+        <p className="text-sm text-gray-700 break-all">{value || '—'}</p>
       </div>
     </div>
   );
@@ -252,24 +252,24 @@ function ActionButton({
 }) {
   const cls = `flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-sm font-medium group ${
     variant === 'danger'
-      ? 'bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20'
+      ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
       : variant === 'success'
-      ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20'
-      : 'bg-white/[0.04] hover:bg-white/[0.08] text-gray-300 border border-white/[0.06]'
+      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+      : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200'
   }`;
 
   if (href) {
     return (
       <Link href={href} className={cls}>
         <span>{label}</span>
-        <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors" />
+        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
       </Link>
     );
   }
   return (
     <button onClick={onClick} className={cls}>
       <span>{label}</span>
-      <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors" />
+      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
     </button>
   );
 }
@@ -332,7 +332,7 @@ function QuickActionsSection({
 
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Quick Actions</h3>
+      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Quick Actions</h3>
       <ActionButton label="Edit Permissions" onClick={onEditPermissions} />
       {member.role === 'operator' && (
         <ActionButton label="View Timecards" href="/dashboard/admin/timecards" />
@@ -426,7 +426,7 @@ function MemberDetailPanel({
 
       {/* Tab bar — only show permissions tab for non-super-admin */}
       {showPermissionsTab && (
-        <div className="flex gap-1 px-4 pt-4 flex-shrink-0 border-b border-white/[0.06] pb-0">
+        <div className="flex gap-1 px-4 pt-4 flex-shrink-0 border-b border-gray-200 pb-0">
           {(['info', 'permissions'] as DetailTab[]).map(t => (
             <button
               key={t}
@@ -434,7 +434,7 @@ function MemberDetailPanel({
               className={`px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-all capitalize ${
                 tab === t
                   ? 'bg-violet-600 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-white/[0.05]'
+                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
               {t === 'permissions' ? 'Feature Permissions' : 'Profile Info'}
@@ -444,11 +444,11 @@ function MemberDetailPanel({
       )}
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+      <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-gray-50">
         {(tab === 'info' || !showPermissionsTab) && (
           <>
             {/* Profile Info */}
-            <div className="bg-white/[0.03] rounded-xl border border-white/[0.07] p-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Profile Info</h3>
               <ProfileInfoSection member={member} />
             </div>
@@ -463,13 +463,13 @@ function MemberDetailPanel({
 
             {/* Grant Super Admin — only for super admins editing non-super-admin users */}
             {canGrant && (
-              <div className="pt-2 border-t border-white/[0.06]">
-                <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
+              <div className="pt-2 border-t border-gray-200">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                   <div className="flex items-start gap-3">
-                    <Crown className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <Crown className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-white mb-1">Elevate to Super Admin</h4>
-                      <p className="text-xs text-gray-400 mb-3">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-1">Elevate to Super Admin</h4>
+                      <p className="text-xs text-gray-600 mb-3">
                         Grants full unrestricted platform access. Cannot be undone without manual database access.
                       </p>
                       <button
@@ -640,26 +640,26 @@ export default function TeamProfilesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0f0f17] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <Users className="w-6 h-6 text-white" />
           </div>
-          <Loader2 className="w-6 h-6 animate-spin text-violet-400 mx-auto" />
+          <Loader2 className="w-6 h-6 animate-spin text-violet-600 mx-auto" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f17] text-white">
+    <div className="min-h-screen bg-gray-50">
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="bg-[#0c0c14] border-b border-white/[0.07] sticky top-0 z-40">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/admin"
-              className="p-2 bg-white/[0.05] hover:bg-white/[0.10] rounded-lg transition-colors text-gray-400"
+              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-600"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
@@ -668,7 +668,7 @@ export default function TeamProfilesPage() {
                 <Users className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h1 className="text-base sm:text-lg font-bold text-white">Team Profiles</h1>
+                <h1 className="text-base sm:text-lg font-bold text-gray-900">Team Profiles</h1>
                 <p className="text-xs text-gray-500 hidden sm:block">
                   {members.length} members &middot; Manage access &amp; feature permissions
                 </p>
@@ -691,9 +691,9 @@ export default function TeamProfilesPage() {
       {/* ── Success banner ──────────────────────────────────────── */}
       {successMsg && (
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pt-4">
-          <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-            <p className="text-emerald-300 text-sm">{successMsg}</p>
+          <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <p className="text-emerald-700 text-sm">{successMsg}</p>
           </div>
         </div>
       )}

@@ -392,7 +392,7 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
                 <button
                   onClick={handleApply}
                   disabled={selectedFields.size === 0}
-                  className="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" /> Apply to Form
                 </button>

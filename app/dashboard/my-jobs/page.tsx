@@ -208,9 +208,9 @@ export default function MyJobsPage() {
 
   if (loading && jobs.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto mb-4" />
           <p className="text-gray-600 text-lg font-medium">Loading your schedule...</p>
         </div>
       </div>
@@ -218,30 +218,30 @@ export default function MyJobsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Professional Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-50 shadow-2xl">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
-              className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all"
+              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl border border-gray-200 transition-all"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
             </Link>
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
-              <Briefcase className="w-5 h-5" />
+            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+              <Briefcase className="w-5 h-5 text-purple-600" />
             </div>
             <div className="flex-1">
-              <h1 className="text-lg font-bold">
+              <h1 className="text-lg font-bold text-gray-900">
                 {isHelper ? 'My Schedule' : 'My Schedule'}
               </h1>
-              <p className="text-blue-200 text-xs">
+              <p className="text-gray-500 text-xs">
                 {isHelper ? 'Team member duties for the day' : 'Dispatched job tickets'}
               </p>
             </div>
             {isHelper && (
-              <span className="text-xs px-2.5 py-1 bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 rounded-lg font-semibold">
+              <span className="text-xs px-2.5 py-1 bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg font-semibold">
                 Team Member
               </span>
             )}
@@ -256,7 +256,7 @@ export default function MyJobsPage() {
         {/* Continuing Projects (on_hold / in_progress from past dates) */}
         {continuingProjects.length > 0 && (
           <div className="mb-5 bg-purple-50 border-2 border-purple-200 rounded-2xl overflow-hidden shadow-md">
-            <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-700 to-violet-700">
+            <div className="flex items-center gap-3 px-4 py-3 bg-purple-600">
               <PauseCircle className="w-5 h-5 text-white" />
               <h3 className="text-sm font-bold text-white">
                 Continuing Projects ({continuingProjects.length})
@@ -322,7 +322,7 @@ export default function MyJobsPage() {
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           </div>
         ) : jobs.length === 0 ? (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-10 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 text-center">
             <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Inbox className="w-8 h-8 text-gray-400" />
             </div>
