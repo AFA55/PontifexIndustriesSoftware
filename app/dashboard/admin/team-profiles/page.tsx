@@ -128,7 +128,7 @@ function MemberAvatar({
       <img
         src={member.profile_picture_url}
         alt={member.full_name}
-        className={`${sizeClass} rounded-full object-cover flex-shrink-0 ring-2 ring-white/10`}
+        className={`${sizeClass} rounded-full object-cover flex-shrink-0 ring-2 ring-white`}
       />
     );
   }
@@ -703,16 +703,16 @@ export default function TeamProfilesPage() {
         {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {[
-            { label: 'Total Staff', value: members.length, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-            { label: 'Active', value: members.filter(m => m.active).length, icon: Activity, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-            { label: 'Super Admins', value: members.filter(m => m.role === 'super_admin').length, icon: Crown, color: 'text-violet-400', bg: 'bg-violet-500/10' },
-            { label: 'Roles In Use', value: allRoles.filter(r => roleBreakdown[r] > 0).length, icon: Shield, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+            { label: 'Total Staff', value: members.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+            { label: 'Active', value: members.filter(m => m.active).length, icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Super Admins', value: members.filter(m => m.role === 'super_admin').length, icon: Crown, color: 'text-violet-600', bg: 'bg-violet-50' },
+            { label: 'Roles In Use', value: allRoles.filter(r => roleBreakdown[r] > 0).length, icon: Shield, color: 'text-orange-600', bg: 'bg-orange-50' },
           ].map(stat => (
-            <div key={stat.label} className="bg-[#13131a] rounded-xl border border-white/[0.08] p-4">
+            <div key={stat.label} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{stat.label}</p>
-                  <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
                 </div>
                 <div className={`w-9 h-9 ${stat.bg} rounded-lg flex items-center justify-center`}>
                   <stat.icon className={`w-4 h-4 ${stat.color}`} />
@@ -726,17 +726,17 @@ export default function TeamProfilesPage() {
         <div className={`grid gap-6 ${selectedMember ? 'lg:grid-cols-[1fr,400px]' : 'grid-cols-1'}`}>
 
           {/* ── Member List ──────────────────────────────────────── */}
-          <div className="bg-[#13131a] rounded-2xl border border-white/[0.08] overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             {/* Search + filter toolbar */}
-            <div className="p-4 border-b border-white/[0.07] space-y-3">
+            <div className="p-4 border-b border-gray-200 space-y-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search by name or email..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 transition-colors"
+                  className="w-full bg-white border border-gray-300 rounded-lg pl-9 pr-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors"
                 />
               </div>
 
@@ -746,7 +746,7 @@ export default function TeamProfilesPage() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     roleFilter === 'all'
                       ? 'bg-violet-600 text-white'
-                      : 'bg-white/[0.05] text-gray-400 hover:bg-white/[0.09] hover:text-gray-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
                   }`}
                 >
                   All ({members.length})
@@ -758,7 +758,7 @@ export default function TeamProfilesPage() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       roleFilter === role
                         ? `bg-gradient-to-r ${ROLE_GRADIENT[role] || 'from-gray-500 to-gray-600'} text-white`
-                        : 'bg-white/[0.05] text-gray-400 hover:bg-white/[0.09] hover:text-gray-200'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
                     }`}
                   >
                     {getRoleLabel(role)} ({roleBreakdown[role]})
@@ -770,13 +770,13 @@ export default function TeamProfilesPage() {
             {/* Member rows */}
             {filtered.length === 0 ? (
               <div className="p-10 text-center">
-                <Users className="w-8 h-8 text-gray-700 mx-auto mb-3" />
+                <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 text-sm">
                   {search || roleFilter !== 'all' ? 'No members match your filters.' : 'No team members yet.'}
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-white/[0.05]">
+              <div className="divide-y divide-gray-100">
                 {filtered.map(member => {
                   const isSelected = selectedMember?.id === member.id;
                   return (
@@ -785,17 +785,17 @@ export default function TeamProfilesPage() {
                       onClick={() => setSelectedMember(isSelected ? null : member)}
                       className={`w-full px-4 py-3.5 flex items-center gap-3 text-left transition-colors border-l-2 ${
                         isSelected
-                          ? 'bg-violet-900/25 border-violet-500'
-                          : 'border-transparent hover:bg-white/[0.03] hover:border-violet-500/30'
+                          ? 'bg-violet-50 border-violet-500'
+                          : 'border-transparent hover:bg-gray-50 hover:border-violet-300'
                       }`}
                     >
                       <MemberAvatar member={member} size="md" />
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-white text-sm">{member.full_name}</span>
+                          <span className="font-semibold text-gray-900 text-sm">{member.full_name}</span>
                           {member.role === 'super_admin' && (
-                            <Crown className="w-3 h-3 text-violet-400" />
+                            <Crown className="w-3 h-3 text-violet-600" />
                           )}
                           <RolePill role={member.role} />
                         </div>
@@ -803,8 +803,8 @@ export default function TeamProfilesPage() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={`w-2 h-2 rounded-full ${member.active ? 'bg-emerald-500' : 'bg-gray-600'}`} />
-                        <ChevronRight className={`w-4 h-4 text-gray-600 transition-transform ${isSelected ? 'rotate-90' : ''}`} />
+                        <span className={`w-2 h-2 rounded-full ${member.active ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                        <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isSelected ? 'rotate-90' : ''}`} />
                       </div>
                     </button>
                   );
@@ -815,7 +815,7 @@ export default function TeamProfilesPage() {
 
           {/* ── Detail Panel ─────────────────────────────────────── */}
           {selectedMember && (
-            <div className="bg-[#13131a] rounded-2xl border border-white/[0.08] overflow-hidden flex flex-col max-h-[calc(100vh-200px)] sticky top-24">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-200px)] sticky top-24">
               <MemberDetailPanel
                 member={selectedMember}
                 isSuperAdmin={isSuperAdmin}

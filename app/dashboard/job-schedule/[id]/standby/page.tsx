@@ -226,7 +226,7 @@ export default function StandbyPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-orange-50">
       {/* Header */}
-      <div className="bg-white border-b-4 border-yellow-500 shadow-lg sticky top-0 z-50">
+      <div className="bg-white border-b-4 border-yellow-500 shadow-lg sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-2">
             <Link

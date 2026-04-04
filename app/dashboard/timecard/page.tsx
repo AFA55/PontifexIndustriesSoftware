@@ -53,7 +53,7 @@ function getWeekBounds(offset: number) {
 
 export default function TimecardPageWrapper() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full" /></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full" /></div>}>
       <TimecardPage />
     </Suspense>
   );
@@ -326,19 +326,19 @@ function TimecardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ── Header ─────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+      <header className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-[1024px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 px-3 py-1.5 text-gray-500 hover:text-gray-800 hover:bg-slate-100 rounded-lg transition-all text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all text-sm font-medium border border-gray-200"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Dashboard</span>
             </Link>
-            <div className="h-6 w-px bg-slate-200" />
+            <div className="h-6 w-px bg-gray-200" />
             <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shadow-sm">
                 <Clock size={16} className="text-white" />
               </div>
               My Timecard
@@ -348,13 +348,13 @@ function TimecardPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/request-time-off"
-              className="flex items-center gap-1.5 px-3 py-2.5 bg-white hover:bg-slate-50 text-gray-600 rounded-lg text-xs font-semibold border border-slate-200 shadow-sm transition-all min-h-[40px]"
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-white hover:bg-gray-50 text-gray-600 rounded-lg text-xs font-semibold border border-gray-200 shadow-sm transition-all min-h-[40px]"
             >
               <CalendarOff size={14} />
               <span className="hidden sm:inline">Request Time Off</span>
             </Link>
             <div className="hidden sm:flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
+              <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
                 {user?.name?.charAt(0) || 'U'}
               </div>
               <div className="text-right">
@@ -368,7 +368,7 @@ function TimecardPage() {
 
       <div className="max-w-[1024px] mx-auto px-4 sm:px-6 py-6">
         {/* ── Clock-In/Out Section ─────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 mb-6">
+        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-5 mb-6">
           {clockLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
@@ -393,7 +393,7 @@ function TimecardPage() {
               {todayEntries.length > 0 && (
                 <div className="max-w-sm mx-auto">
                   <div className="flex items-center gap-1 mb-2">
-                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                       {todayEntries.map((entry, i) => {
                         const hrs = entry.total_hours || parseFloat(liveHours) || 0;
                         const pct = Math.min((hrs / 10) * 100, 100);
@@ -434,8 +434,8 @@ function TimecardPage() {
             /* NOT CLOCKED IN STATE */
             <div className="space-y-4">
               <div className="flex justify-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-gray-600 rounded-full">
-                  <div className="w-2 h-2 rounded-full bg-slate-400" />
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-full">
+                  <div className="w-2 h-2 rounded-full bg-gray-400" />
                   <span className="text-sm font-semibold">Not Clocked In</span>
                 </div>
               </div>
@@ -483,7 +483,7 @@ function TimecardPage() {
         <div className="mb-5 flex items-center justify-between">
           <button
             onClick={() => setCurrentWeekOffset(currentWeekOffset - 1)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-gray-600 rounded-lg transition-all text-sm font-medium border border-slate-200 shadow-sm hover:shadow"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-600 rounded-lg transition-all text-sm font-medium border border-gray-200 shadow-sm hover:shadow"
           >
             <ChevronLeft size={16} />
             <span className="hidden sm:inline">Prev</span>
@@ -501,8 +501,8 @@ function TimecardPage() {
             disabled={isCurrentWeek()}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all text-sm font-medium border shadow-sm ${
               isCurrentWeek()
-                ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
-                : 'bg-white hover:bg-slate-50 text-gray-600 border-slate-200 hover:shadow'
+                ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                : 'bg-white hover:bg-gray-50 text-gray-600 border-gray-200 hover:shadow'
             }`}
           >
             <span className="hidden sm:inline">Next</span>
@@ -519,8 +519,8 @@ function TimecardPage() {
                 day.isToday
                   ? 'border-blue-300 shadow-md ring-2 ring-blue-100'
                   : day.hasEntries
-                    ? 'border-slate-200/60 shadow-sm'
-                    : 'border-slate-100 opacity-60'
+                    ? 'border-gray-200/60 shadow-sm'
+                    : 'border-gray-100 opacity-60'
               }`}
             >
               <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${day.isToday ? 'text-blue-600' : 'text-gray-400'}`}>
@@ -534,10 +534,10 @@ function TimecardPage() {
                   {day.totalHrs.toFixed(1)}h
                 </p>
               ) : (
-                <p className="text-[9px] text-slate-300 mt-0.5 sm:mt-1">&mdash;</p>
+                <p className="text-[9px] text-gray-300 mt-0.5 sm:mt-1">&mdash;</p>
               )}
               {/* Tiny bar */}
-              <div className="h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
+              <div className="h-1 bg-gray-100 rounded-full mt-1 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
                     day.totalHrs > 8 ? 'bg-orange-400' : 'bg-emerald-400'
@@ -556,7 +556,7 @@ function TimecardPage() {
               const mondayStr = monday.toISOString().split('T')[0];
               window.open(`/api/timecard/pdf?weekStart=${mondayStr}`, '_blank');
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-blue-700 rounded-lg transition-all text-sm font-medium border border-blue-200 shadow-sm hover:shadow"
+            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-blue-700 rounded-lg transition-all text-sm font-medium border border-blue-200 shadow-sm hover:shadow"
           >
             <FileText size={16} />
             Download My Timecard
@@ -587,7 +587,7 @@ function TimecardPage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
+          <div className="bg-white rounded-xl p-4 border border-gray-200/60 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Days</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
@@ -598,7 +598,7 @@ function TimecardPage() {
             <p className="text-[11px] text-gray-400 mt-0.5">{weekData?.entries.length || 0} entries</p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
+          <div className="bg-white rounded-xl p-4 border border-gray-200/60 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Approved</span>
               <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -656,8 +656,8 @@ function TimecardPage() {
         )}
 
         {/* ── Daily Entries Table ─────────────────────────── */}
-        <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
+        <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="text-sm font-bold text-gray-800">Daily Entries</h2>
             <p className="text-xs text-gray-400 mt-0.5">
               {weekData?.entries.length || 0} {(weekData?.entries.length || 0) === 1 ? 'entry' : 'entries'} this week
@@ -667,15 +667,15 @@ function TimecardPage() {
           {loading ? (
             <div className="p-16 text-center">
               <div className="w-10 h-10 mx-auto mb-3 relative">
-                <div className="absolute inset-0 rounded-full border-[3px] border-slate-100"></div>
+                <div className="absolute inset-0 rounded-full border-[3px] border-gray-100"></div>
                 <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-blue-600 animate-spin"></div>
               </div>
               <p className="text-gray-400 text-sm">Loading entries...</p>
             </div>
           ) : !weekData || weekData.entries.length === 0 ? (
             <div className="p-16 text-center">
-              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Clock className="text-slate-300" size={28} />
+              <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Clock className="text-gray-300" size={28} />
               </div>
               <p className="text-gray-600 font-semibold">No entries this week</p>
               <p className="text-gray-400 text-sm mt-1">Clock in from the dashboard to start tracking</p>
@@ -684,7 +684,7 @@ function TimecardPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-100">
+                  <tr className="bg-gray-50/80 border-b border-gray-100">
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Date</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Clock In</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Clock Out</th>
@@ -693,7 +693,7 @@ function TimecardPage() {
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-gray-50">
                   {weekData.entries.map((entry) => {
                     const badges = getEntryBadges(entry);
                     const isMandatoryOT = entry.hour_type === 'mandatory_overtime';
@@ -724,7 +724,7 @@ function TimecardPage() {
                           {entry.total_hours !== null ? (
                             <span className="text-sm font-bold tabular-nums text-gray-800">{entry.total_hours.toFixed(2)}</span>
                           ) : (
-                            <span className="text-sm text-slate-300">&mdash;</span>
+                            <span className="text-sm text-gray-300">&mdash;</span>
                           )}
                         </td>
                         <td className="px-4 py-3">

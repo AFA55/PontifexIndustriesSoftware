@@ -829,7 +829,7 @@ export default function Dashboard() {
       </div>
 
       {/* Modern Header with Professional Gradient */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
+      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-10 shadow-2xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             {/* Company Logo with Animation */}
