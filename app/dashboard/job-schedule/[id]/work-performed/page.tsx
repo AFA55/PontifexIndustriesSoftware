@@ -1272,16 +1272,16 @@ export default function WorkPerformed() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-50 shadow-2xl">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link
               href={`/dashboard/my-jobs/${params.id}/jobsite`}
-              className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all"
+              className="p-2 bg-gray-100 rounded-xl border border-gray-200 hover:bg-gray-200 transition-all"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </Link>
@@ -1291,16 +1291,16 @@ export default function WorkPerformed() {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold truncate">Work Performed</h1>
-              <p className="text-blue-200 text-xs">Select completed work items</p>
+              <h1 className="text-lg font-bold text-gray-900 truncate">Work Performed</h1>
+              <p className="text-gray-500 text-xs">Select completed work items</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="px-2 py-1.5 bg-white/20 backdrop-blur-sm text-white rounded-xl text-xs font-semibold">
+              <span className="px-2 py-1.5 bg-gray-100 text-gray-700 rounded-xl text-xs font-semibold border border-gray-200">
                 {selectedItems.length} Selected
               </span>
               <button
                 onClick={() => setView(view === 'search' ? 'selected' : 'search')}
-                className="px-3 py-1.5 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-all font-semibold text-xs border border-white/20"
+                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold text-xs border border-gray-200"
               >
                 {view === 'search' ? 'View Selected' : 'Add More'}
               </button>
@@ -1837,13 +1837,13 @@ export default function WorkPerformed() {
         )}
 
         {/* Job Photos Section */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-4">
           <div className="flex items-center gap-2 mb-3">
             <Camera className="w-5 h-5 text-blue-600" />
-            <h3 className="text-sm font-bold text-slate-700">Job Photos</h3>
-            <span className="text-xs text-slate-400">(optional)</span>
+            <h3 className="text-sm font-bold text-gray-700">Job Photos</h3>
+            <span className="text-xs text-gray-400">(optional)</span>
           </div>
-          <p className="text-xs text-slate-500 mb-3">
+          <p className="text-xs text-gray-500 mb-3">
             Take photos of work performed, site conditions, or anything noteworthy
           </p>
           <PhotoUploader
@@ -1858,13 +1858,13 @@ export default function WorkPerformed() {
         </div>
 
         {/* Voice Memo Notes */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-4">
           <div className="flex items-center gap-2 mb-3">
             <Mic className="w-5 h-5 text-blue-600" />
-            <h3 className="text-sm font-bold text-slate-700">Job Notes</h3>
-            <span className="text-xs text-slate-400">(voice or typed)</span>
+            <h3 className="text-sm font-bold text-gray-700">Job Notes</h3>
+            <span className="text-xs text-gray-400">(voice or typed)</span>
           </div>
-          <p className="text-xs text-slate-500 mb-3">
+          <p className="text-xs text-gray-500 mb-3">
             Describe work performed, conditions encountered, or anything noteworthy. Use the mic button to dictate notes hands-free.
           </p>
           <VoiceMemoNotes
@@ -2870,7 +2870,7 @@ export default function WorkPerformed() {
                       <button
                         type="button"
                         onClick={() => setShowBrokkModal(true)}
-                        className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-gray-700 to-slate-700 hover:from-gray-800 hover:to-slate-800 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                        className="w-full mb-3 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -3725,10 +3725,10 @@ export default function WorkPerformed() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 z-50">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-gray-700 to-slate-700 text-white p-4 sm:p-6 rounded-t-3xl flex justify-between items-center">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6 rounded-t-3xl flex justify-between items-center">
               <div>
-                <h2 className="text-lg sm:text-2xl font-bold">Brokk Quick Entry</h2>
-                <p className="text-gray-300 text-xs sm:text-sm mt-1">Calculate area and thickness</p>
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Brokk Quick Entry</h2>
+                <p className="text-gray-500 text-xs sm:text-sm mt-1">Calculate area and thickness</p>
               </div>
               <button
                 onClick={() => {
@@ -3803,7 +3803,7 @@ export default function WorkPerformed() {
                 <button
                   type="button"
                   onClick={addBrokkArea}
-                  className="mt-4 w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+                  className="mt-4 w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
                 >
                   Add Area to List
                 </button>
@@ -3880,7 +3880,7 @@ export default function WorkPerformed() {
               <button
                 type="button"
                 onClick={applyBrokkEntry}
-                className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+                className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
               >
                 Apply to Work Item
               </button>

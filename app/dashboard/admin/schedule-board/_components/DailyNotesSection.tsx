@@ -45,17 +45,17 @@ export default function DailyNotesSection({ date, notes, canEdit, onAddNote, onD
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full bg-gradient-to-r from-slate-600 to-slate-700 px-5 py-3 flex items-center justify-between"
+        className="w-full bg-gray-50 border-b border-gray-200 px-5 py-3 flex items-center justify-between"
       >
-        <div className="flex items-center gap-2 text-white">
-          <ClipboardList className="w-5 h-5" />
+        <div className="flex items-center gap-2 text-gray-900">
+          <ClipboardList className="w-5 h-5 text-gray-600" />
           <h3 className="font-bold">Daily Notes</h3>
           {notes.length > 0 && (
-            <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">{notes.length}</span>
+            <span className="px-2 py-0.5 bg-gray-200 rounded-full text-xs font-bold text-gray-700">{notes.length}</span>
           )}
-          <span className="text-slate-300 text-xs hidden sm:inline ml-2">{formatDate(date)}</span>
+          <span className="text-gray-500 text-xs hidden sm:inline ml-2">{formatDate(date)}</span>
         </div>
-        {expanded ? <ChevronUp className="w-4 h-4 text-white" /> : <ChevronDown className="w-4 h-4 text-white" />}
+        {expanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
       </button>
 
       {expanded && (
@@ -67,7 +67,7 @@ export default function DailyNotesSection({ date, notes, canEdit, onAddNote, onD
                 <div key={note.id} className="bg-gray-50 rounded-xl p-3 border border-gray-200 group">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
                         <User className="w-3.5 h-3.5 text-slate-600" />
                       </div>
                       <span className="text-sm font-bold text-gray-900">{note.author_name}</span>
@@ -108,7 +108,7 @@ export default function DailyNotesSection({ date, notes, canEdit, onAddNote, onD
                   onChange={(e) => setNewNote(e.target.value)}
                   placeholder="Add a note — schedule changes, crew out, reminders..."
                   rows={2}
-                  className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-slate-500 focus:ring-2 focus:ring-slate-200 text-sm text-gray-900 resize-none bg-white transition-all"
+                  className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 resize-none bg-white transition-all"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -119,7 +119,7 @@ export default function DailyNotesSection({ date, notes, canEdit, onAddNote, onD
                 <button
                   onClick={handleSubmit}
                   disabled={!newNote.trim()}
-                  className="p-3 bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-xl transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-3 bg-purple-600 text-white rounded-xl transition-all hover:bg-purple-700 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4" />
                 </button>

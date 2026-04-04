@@ -119,7 +119,7 @@ async function getToken(): Promise<string> {
 // ── Status Timeline Component ──
 function StatusTimeline({ data }: { data: FullJobData }) {
   const steps = [
-    { key: 'scheduled', label: 'Scheduled', time: data.scheduled_date ? formatDate(data.scheduled_date) : null, color: 'bg-slate-400' },
+    { key: 'scheduled', label: 'Scheduled', time: data.scheduled_date ? formatDate(data.scheduled_date) : null, color: 'bg-gray-400' },
     { key: 'loading', label: 'Loading', time: data.loading_started_at ? formatTimestamp(data.loading_started_at) : null, color: 'bg-amber-400' },
     { key: 'in_route', label: 'In Route', time: data.route_started_at ? formatTimestamp(data.route_started_at) : null, color: 'bg-blue-500' },
     { key: 'in_progress', label: 'Working', time: data.work_started_at ? formatTimestamp(data.work_started_at) : null, color: 'bg-orange-500' },

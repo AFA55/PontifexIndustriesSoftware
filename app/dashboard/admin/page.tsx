@@ -811,15 +811,15 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── View Active Jobs ─────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl border border-purple-500/30 shadow-lg shadow-purple-900/10">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-              <Activity className="w-4 h-4 text-purple-400" />
+            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Activity className="w-4 h-4 text-purple-600" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-white">View Active Jobs</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Jobs currently in progress or assigned</p>
+              <h2 className="text-sm font-semibold text-gray-900">View Active Jobs</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Jobs currently in progress or assigned</p>
             </div>
           </div>
           <Link
@@ -835,18 +835,18 @@ export default function AdminDashboard() {
           {activeJobsLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map(i => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-                  <div className="animate-pulse bg-slate-700 rounded w-20 h-4" />
-                  <div className="animate-pulse bg-slate-700 rounded flex-1 h-4" />
-                  <div className="animate-pulse bg-slate-700 rounded w-16 h-4" />
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+                  <div className="animate-pulse bg-gray-200 rounded w-20 h-4" />
+                  <div className="animate-pulse bg-gray-200 rounded flex-1 h-4" />
+                  <div className="animate-pulse bg-gray-200 rounded w-16 h-4" />
                 </div>
               ))}
             </div>
           ) : activeJobs.length === 0 ? (
             <div className="py-10 text-center">
-              <CheckCircle2 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-              <p className="text-sm text-slate-400 mb-1">No active jobs right now</p>
-              <p className="text-xs text-slate-500">Jobs with status &ldquo;assigned&rdquo; or &ldquo;in progress&rdquo; will appear here</p>
+              <CheckCircle2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500 mb-1">No active jobs right now</p>
+              <p className="text-xs text-gray-400">Jobs with status &ldquo;assigned&rdquo; or &ldquo;in progress&rdquo; will appear here</p>
               <Link
                 href="/dashboard/admin/schedule-form"
                 className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-lg transition-colors"
@@ -861,18 +861,18 @@ export default function AdminDashboard() {
                 <Link
                   key={job.id}
                   href={`/dashboard/admin/active-jobs`}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/40 hover:border-purple-500/30 transition-all group"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-purple-300 transition-all group"
                 >
                   {/* Job number */}
-                  <span className="text-xs font-mono bg-slate-700 px-2 py-1 rounded text-purple-300 flex-shrink-0 min-w-[72px] text-center">
+                  <span className="text-xs font-mono bg-purple-100 px-2 py-1 rounded text-purple-700 flex-shrink-0 min-w-[72px] text-center">
                     {job.job_number}
                   </span>
 
                   {/* Customer + operator */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{job.customer_name}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{job.customer_name}</p>
                     {job.operator_name && (
-                      <p className="text-xs text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                      <p className="text-xs text-gray-500 truncate flex items-center gap-1 mt-0.5">
                         <Users className="w-3 h-3 inline flex-shrink-0" />
                         {job.operator_name}
                       </p>
@@ -891,10 +891,10 @@ export default function AdminDashboard() {
                   <span
                     className={`flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
                       job.status === 'in_progress' || job.status === 'on_site'
-                        ? 'bg-green-900/50 text-green-400 border border-green-700/30'
+                        ? 'bg-green-100 text-green-700 border border-green-200'
                         : job.status === 'in_route'
-                        ? 'bg-amber-900/50 text-amber-400 border border-amber-700/30'
-                        : 'bg-blue-900/50 text-blue-400 border border-blue-700/30'
+                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                        : 'bg-blue-100 text-blue-700 border border-blue-200'
                     }`}
                   >
                     {job.status === 'in_progress' ? 'In Progress'
@@ -903,7 +903,7 @@ export default function AdminDashboard() {
                       : 'Assigned'}
                   </span>
 
-                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-purple-400 transition-colors flex-shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-purple-500 transition-colors flex-shrink-0" />
                 </Link>
               ))}
 

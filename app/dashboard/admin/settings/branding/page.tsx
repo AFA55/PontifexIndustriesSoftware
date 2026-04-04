@@ -484,7 +484,7 @@ export default function BrandingSettingsPage() {
             {/* Live preview */}
             <div>
               <label className="block text-xs font-bold text-gray-600 mb-2">Color Preview</label>
-              <div className="flex rounded-xl overflow-hidden h-10 border border-slate-600">
+              <div className="flex rounded-xl overflow-hidden h-10 border border-gray-200">
                 <div className="flex-1" style={{ backgroundColor: form.primary_color }} title="Primary" />
                 <div className="flex-1" style={{ backgroundColor: form.primary_color_dark }} title="Primary Dark" />
                 <div className="flex-1" style={{ backgroundColor: form.secondary_color }} title="Secondary" />
@@ -493,7 +493,7 @@ export default function BrandingSettingsPage() {
                 <div className="flex-1" style={{ backgroundColor: form.sidebar_bg_color }} title="Sidebar BG" />
                 <div className="flex-1" style={{ background: `linear-gradient(to right, ${form.login_bg_gradient_from}, ${form.login_bg_gradient_to})` }} title="Login Gradient" />
               </div>
-              <div className="flex text-[9px] text-slate-500 mt-1">
+              <div className="flex text-[9px] text-gray-500 mt-1">
                 <span className="flex-1 text-center">Primary</span>
                 <span className="flex-1 text-center">Dark</span>
                 <span className="flex-1 text-center">Secondary</span>
@@ -527,13 +527,13 @@ export default function BrandingSettingsPage() {
             defaultOpen={false}
           >
             <Toggle label="Billing Module" description="Invoice generation, payment tracking, and QuickBooks export" checked={form.show_billing_module} onChange={(v) => update('show_billing_module', v)} />
-            <div className="border-t border-slate-700" />
+            <div className="border-t border-gray-200" />
             <Toggle label="Analytics Module" description="Revenue dashboards, profitability reports, and trend analysis" checked={form.show_analytics_module} onChange={(v) => update('show_analytics_module', v)} />
-            <div className="border-t border-slate-700" />
+            <div className="border-t border-gray-200" />
             <Toggle label="Inventory Module" description="Equipment tracking, blade inventory, and consumables management" checked={form.show_inventory_module} onChange={(v) => update('show_inventory_module', v)} />
-            <div className="border-t border-slate-700" />
+            <div className="border-t border-gray-200" />
             <Toggle label="NFC Module" description="NFC tag clock-in/out and remote attendance verification" checked={form.show_nfc_module} onChange={(v) => update('show_nfc_module', v)} />
-            <div className="border-t border-slate-700" />
+            <div className="border-t border-gray-200" />
             <Toggle label="Customer CRM" description="Customer profiles, contacts, and relationship management" checked={form.show_customer_crm} onChange={(v) => update('show_customer_crm', v)} />
           </Section>
 
@@ -566,15 +566,15 @@ export default function BrandingSettingsPage() {
 
       {/* Floating save bar when dirty */}
       {isDirty && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-slate-800/95 backdrop-blur-lg border-t border-slate-700 shadow-2xl">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-gray-200 shadow-2xl">
           <div className="container mx-auto px-4 md:px-6 py-3 flex items-center justify-between max-w-4xl">
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-gray-700">
               You have unsaved changes
             </p>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => { setForm(JSON.parse(initialRef.current)); setIsDirty(false); }}
-                className="px-4 py-2 text-sm text-slate-300 hover:text-white transition-colors"
+                className="px-4 py-2 text-sm text-gray-700 hover:text-white transition-colors"
               >
                 Discard
               </button>

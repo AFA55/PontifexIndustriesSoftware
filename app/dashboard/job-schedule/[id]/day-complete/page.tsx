@@ -361,7 +361,7 @@ export default function DayCompletePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
@@ -370,7 +370,7 @@ export default function DayCompletePage() {
   // ─── Job not found ────────────────────────────────────────────────────────
   if (!loading && !job) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl border border-red-100 p-8 max-w-sm w-full text-center">
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Job Not Found</h2>
@@ -379,7 +379,7 @@ export default function DayCompletePage() {
           </p>
           <button
             onClick={() => router.push('/dashboard/my-jobs')}
-            className="w-full bg-gradient-to-r from-slate-600 to-slate-700 text-white py-3 rounded-xl font-semibold"
+            className="w-full bg-gray-700 hover:bg-gray-800 text-white py-3 rounded-xl font-semibold"
           >
             Back to My Jobs
           </button>
@@ -391,7 +391,7 @@ export default function DayCompletePage() {
   // ─── Submitted success screen ────────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl border border-green-100 p-8 max-w-sm w-full text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-green-600" />
@@ -412,20 +412,20 @@ export default function DayCompletePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-50 shadow-2xl">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link
               href={`/dashboard/job-schedule/${jobId}/work-performed`}
-              className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all"
+              className="p-2 bg-gray-100 rounded-xl border border-gray-200 hover:bg-gray-200 transition-all"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
             </Link>
             <div>
-              <h1 className="text-lg font-bold">Day Complete</h1>
-              <p className="text-xs text-blue-200">{job?.job_number} &bull; {job?.customer_name}</p>
+              <h1 className="text-lg font-bold text-gray-900">Day Complete</h1>
+              <p className="text-xs text-gray-500">{job?.job_number} &bull; {job?.customer_name}</p>
             </div>
           </div>
         </div>
@@ -443,14 +443,14 @@ export default function DayCompletePage() {
 
       <div className="container mx-auto px-4 py-6 max-w-lg space-y-6">
         {/* Hours Worked Today */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-blue-100 rounded-xl">
               <Clock className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-slate-500">Hours Worked Today</p>
-              <p className="text-2xl font-bold text-slate-900">{getHoursWorked()} hrs</p>
+              <p className="text-sm text-gray-500">Hours Worked Today</p>
+              <p className="text-2xl font-bold text-gray-900">{getHoursWorked()} hrs</p>
             </div>
           </div>
           {job?.is_multi_day && (
@@ -463,14 +463,14 @@ export default function DayCompletePage() {
         </div>
 
         {/* Completion Photos */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-indigo-100 rounded-xl">
               <Camera className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-700">Completion Photos</h3>
-              <p className="text-xs text-slate-500">Before/after photos, site conditions</p>
+              <h3 className="text-sm font-bold text-gray-700">Completion Photos</h3>
+              <p className="text-xs text-gray-500">Before/after photos, site conditions</p>
             </div>
           </div>
           <PhotoUploader
@@ -487,7 +487,7 @@ export default function DayCompletePage() {
         {/* Main Decision */}
         {!showSignature ? (
           <div className="space-y-4">
-            <h2 className="text-center text-lg font-semibold text-slate-800">
+            <h2 className="text-center text-lg font-semibold text-gray-800">
               {isLastScheduledDay === true
                 ? 'This is the final scheduled day'
                 : 'Are you done with this job?'}
@@ -537,7 +537,7 @@ export default function DayCompletePage() {
             {/* Legacy: still allow customer signature for same-day completions */}
             <button
               onClick={() => setShowSignature(true)}
-              className="w-full text-slate-500 text-xs text-center py-2 hover:text-slate-700"
+              className="w-full text-gray-500 text-xs text-center py-2 hover:text-gray-700"
             >
               Add customer signature first
             </button>
@@ -548,19 +548,19 @@ export default function DayCompletePage() {
             <div className="flex items-center gap-2 mb-2">
               <button
                 onClick={() => setShowSignature(false)}
-                className="p-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all"
+                className="p-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all"
               >
                 <ArrowLeft className="w-4 h-4 text-slate-600" />
               </button>
-              <h2 className="text-lg font-semibold text-slate-800">
+              <h2 className="text-lg font-semibold text-gray-800">
                 Customer Signature
               </h2>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
               {/* Signer Name */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Customer Name (optional)
                 </label>
                 <input
@@ -568,14 +568,14 @@ export default function DayCompletePage() {
                   value={signerName}
                   onChange={(e) => setSignerName(e.target.value)}
                   placeholder="Name of person signing"
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
                 />
               </div>
 
               {/* Signature Pad */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
                     <PenTool className="w-3.5 h-3.5" />
                     Signature (optional)
                   </label>
@@ -588,7 +588,7 @@ export default function DayCompletePage() {
                     </button>
                   )}
                 </div>
-                <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50">
+                <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-gray-50">
                   <canvas
                     ref={canvasRef}
                     width={600}
@@ -604,7 +604,7 @@ export default function DayCompletePage() {
                     onTouchEnd={stopDrawing}
                   />
                 </div>
-                <p className="text-xs text-slate-400 mt-1 text-center">
+                <p className="text-xs text-gray-400 mt-1 text-center">
                   Draw signature above or skip
                 </p>
               </div>
@@ -633,7 +633,7 @@ export default function DayCompletePage() {
               <button
                 onClick={() => { setShowSignature(false); setShowCompletionModal(true); }}
                 disabled={submitting}
-                className="w-full text-slate-500 text-sm hover:text-slate-700 py-2 disabled:opacity-40"
+                className="w-full text-gray-500 text-sm hover:text-gray-700 py-2 disabled:opacity-40"
               >
                 Skip signature and submit for approval
               </button>

@@ -634,7 +634,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Onboarding Tour */}
       {showOnboarding && user && (
         <OnboardingTour
@@ -829,18 +829,18 @@ export default function Dashboard() {
       </div>
 
       {/* Modern Header with Professional Gradient */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-800 sticky top-0 z-50 shadow-2xl">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             {/* Company Logo with Animation */}
             <div className="transform hover:scale-105 transition-transform duration-200">
-              <BrandedLogo className="h-10 text-white" logoUrl={branding.logo_dark_url || branding.logo_url} companyName={branding.company_name} />
+              <BrandedLogo className="h-10 text-gray-900" logoUrl={branding.logo_dark_url || branding.logo_url} companyName={branding.company_name} />
             </div>
 
             {/* Modern Profile Section */}
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-3 bg-white/10 backdrop-blur-lg px-4 py-2 rounded-xl border border-white/20">
-                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white/30 overflow-hidden flex-shrink-0">
+              <div className="hidden sm:flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg overflow-hidden flex-shrink-0">
                   {operatorAvatarUrl ? (
                     <img src={operatorAvatarUrl} alt={user?.name || ''} className="w-full h-full object-cover" />
                   ) : (
@@ -848,8 +848,8 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-white">{user?.name || 'Demo Operator'}</p>
-                  <p className="text-xs text-blue-200 capitalize font-medium">{user?.role || 'Operator'}</p>
+                  <p className="text-sm font-bold text-gray-900">{user?.name || 'Demo Operator'}</p>
+                  <p className="text-xs text-gray-500 capitalize font-medium">{user?.role || 'Operator'}</p>
                 </div>
               </div>
 

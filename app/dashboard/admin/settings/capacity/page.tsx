@@ -151,12 +151,12 @@ export default function CapacitySettingsPage() {
     max?: number;
   }) => (
     <div className="flex items-center gap-3">
-      <label className="text-sm text-gray-300 flex-1">{label}</label>
+      <label className="text-sm text-gray-700 flex-1">{label}</label>
       <div className="flex items-center gap-1">
         <button
           onClick={() => updateSetting(settingKey, (settings[settingKey] as number) - 1)}
           disabled={(settings[settingKey] as number) <= min}
-          className="w-7 h-7 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 disabled:opacity-30 flex items-center justify-center text-lg leading-none transition-colors"
+          className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 flex items-center justify-center text-lg leading-none transition-colors"
         >
           −
         </button>
@@ -166,12 +166,12 @@ export default function CapacitySettingsPage() {
           max={max}
           value={settings[settingKey] as number}
           onChange={e => updateSetting(settingKey, parseInt(e.target.value, 10) || 0)}
-          className="w-16 text-center bg-gray-800 border border-gray-700 rounded text-white text-sm py-1 focus:outline-none focus:border-purple-500"
+          className="w-16 text-center bg-white border border-gray-300 rounded text-gray-900 text-sm py-1 focus:outline-none focus:border-purple-500"
         />
         <button
           onClick={() => updateSetting(settingKey, (settings[settingKey] as number) + 1)}
           disabled={(settings[settingKey] as number) >= max}
-          className="w-7 h-7 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 disabled:opacity-30 flex items-center justify-center text-lg leading-none transition-colors"
+          className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 flex items-center justify-center text-lg leading-none transition-colors"
         >
           +
         </button>
@@ -181,21 +181,21 @@ export default function CapacitySettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 p-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       {/* Toast */}
       {toast && (
         <div
           className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border transition-all
             ${toast.type === 'success'
-              ? 'bg-green-900/80 border-green-500/50 text-green-200'
-              : 'bg-red-900/80 border-red-500/50 text-red-200'
+              ? 'bg-green-50 border-green-300 text-green-700'
+              : 'bg-red-50 border-red-300 text-red-700'
             }`}
         >
           {toast.type === 'success'
@@ -211,16 +211,16 @@ export default function CapacitySettingsPage() {
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={() => router.push('/dashboard/admin/settings')}
-            className="p-2 bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
+            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Settings className="w-6 h-6 text-purple-400" />
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Settings className="w-6 h-6 text-purple-600" />
               Capacity Settings
             </h1>
-            <p className="text-gray-400 mt-1 text-sm">
+            <p className="text-gray-600 mt-1 text-sm">
               Configure maximum simultaneous jobs per skill type and crew size constraints
             </p>
           </div>
@@ -228,32 +228,32 @@ export default function CapacitySettingsPage() {
 
         <div className="space-y-6">
           {/* Section 1: Skill-Based Capacity */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
             <div className="flex items-center gap-3 mb-5">
               <div className="p-2 bg-purple-500/20 rounded-lg">
                 <Wrench className="w-5 h-5 text-purple-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Skill-Based Capacity</h2>
-                <p className="text-gray-400 text-sm">Maximum simultaneous jobs that can be scheduled per equipment type</p>
+                <h2 className="text-lg font-semibold text-gray-900">Skill-Based Capacity</h2>
+                <p className="text-gray-600 text-sm">Maximum simultaneous jobs that can be scheduled per equipment type</p>
               </div>
             </div>
 
             <div className="space-y-4">
               {SKILL_TYPES.map(skill => (
-                <div key={skill.key} className="bg-gray-800/50 rounded-xl p-4">
+                <div key={skill.key} className="bg-gray-50 rounded-xl border border-gray-100 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="text-white font-medium text-sm">{skill.label}</div>
+                      <div className="text-gray-900 font-medium text-sm">{skill.label}</div>
                       <div className="text-gray-500 text-xs mt-0.5">{skill.description}</div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-gray-400 text-xs">Max jobs:</span>
+                      <span className="text-gray-600 text-xs">Max jobs:</span>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => updateSetting(skill.key, (settings[skill.key] as number) - 1)}
                           disabled={(settings[skill.key] as number) <= 0}
-                          className="w-7 h-7 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 disabled:opacity-30 flex items-center justify-center text-lg leading-none transition-colors"
+                          className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 flex items-center justify-center text-lg leading-none transition-colors"
                         >
                           −
                         </button>
@@ -263,12 +263,12 @@ export default function CapacitySettingsPage() {
                           max={20}
                           value={settings[skill.key] as number}
                           onChange={e => updateSetting(skill.key, parseInt(e.target.value, 10) || 0)}
-                          className="w-16 text-center bg-gray-800 border border-gray-700 rounded text-white text-sm py-1 focus:outline-none focus:border-purple-500"
+                          className="w-16 text-center bg-white border border-gray-300 rounded text-gray-900 text-sm py-1 focus:outline-none focus:border-purple-500"
                         />
                         <button
                           onClick={() => updateSetting(skill.key, (settings[skill.key] as number) + 1)}
                           disabled={(settings[skill.key] as number) >= 20}
-                          className="w-7 h-7 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 disabled:opacity-30 flex items-center justify-center text-lg leading-none transition-colors"
+                          className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 flex items-center justify-center text-lg leading-none transition-colors"
                         >
                           +
                         </button>
@@ -281,26 +281,26 @@ export default function CapacitySettingsPage() {
           </div>
 
           {/* Section 2: High-Priority Job Limit */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
             <div className="flex items-center gap-3 mb-5">
               <div className="p-2 bg-amber-500/20 rounded-lg">
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">High-Priority Job Limits</h2>
-                <p className="text-gray-400 text-sm">Prevent over-scheduling of high-complexity jobs simultaneously</p>
+                <h2 className="text-lg font-semibold text-gray-900">High-Priority Job Limits</h2>
+                <p className="text-gray-600 text-sm">Prevent over-scheduling of high-complexity jobs simultaneously</p>
               </div>
             </div>
 
             <div className="space-y-4">
-              <div className="bg-gray-800/50 rounded-xl p-4 space-y-4">
+              <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-4">
                 <NumInput
                   label="Difficulty threshold (jobs rated at or above this are 'high-priority')"
                   settingKey="high_difficulty_threshold"
                   min={1}
                   max={10}
                 />
-                <div className="border-t border-gray-700/50" />
+                <div className="border-t border-gray-200" />
                 <NumInput
                   label={`Maximum simultaneous jobs with difficulty ≥ ${settings.high_difficulty_threshold}`}
                   settingKey="max_high_difficulty_jobs"
@@ -308,32 +308,32 @@ export default function CapacitySettingsPage() {
                   max={20}
                 />
               </div>
-              <p className="text-gray-500 text-xs px-1">
+              <p className="text-gray-500 text-xs px-1 mt-2">
                 When this limit is reached, new jobs rated {settings.high_difficulty_threshold}+ will be flagged as over-capacity on the schedule board.
               </p>
             </div>
           </div>
 
           {/* Section 3: Crew Size Limits */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
             <div className="flex items-center gap-3 mb-5">
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <Users className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Crew Size Limits</h2>
-                <p className="text-gray-400 text-sm">Control operator assignments per job</p>
+                <h2 className="text-lg font-semibold text-gray-900">Crew Size Limits</h2>
+                <p className="text-gray-600 text-sm">Control operator assignments per job</p>
               </div>
             </div>
 
-            <div className="bg-gray-800/50 rounded-xl p-4 space-y-4">
+            <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-4">
               <NumInput
                 label="Maximum operators per job"
                 settingKey="max_operators_per_job"
                 min={1}
                 max={10}
               />
-              <div className="border-t border-gray-700/50" />
+              <div className="border-t border-gray-200" />
               <NumInput
                 label={`Minimum operators required for jobs rated ${settings.high_difficulty_threshold}+`}
                 settingKey="min_operators_high_difficulty"
@@ -344,25 +344,25 @@ export default function CapacitySettingsPage() {
           </div>
 
           {/* Section 4: General Capacity (existing) */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
             <div className="flex items-center gap-3 mb-5">
               <div className="p-2 bg-green-500/20 rounded-lg">
                 <Settings className="w-5 h-5 text-green-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">General Schedule Capacity</h2>
-                <p className="text-gray-400 text-sm">Overall daily schedule limits shown on the schedule board</p>
+                <h2 className="text-lg font-semibold text-gray-900">General Schedule Capacity</h2>
+                <p className="text-gray-600 text-sm">Overall daily schedule limits shown on the schedule board</p>
               </div>
             </div>
 
-            <div className="bg-gray-800/50 rounded-xl p-4 space-y-4">
+            <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-4">
               <NumInput
                 label="Maximum total jobs per day"
                 settingKey="max_slots"
                 min={1}
                 max={50}
               />
-              <div className="border-t border-gray-700/50" />
+              <div className="border-t border-gray-200" />
               <NumInput
                 label="Warning threshold (show amber indicator above this count)"
                 settingKey="warning_threshold"
@@ -370,7 +370,7 @@ export default function CapacitySettingsPage() {
                 max={50}
               />
             </div>
-            <p className="text-gray-500 text-xs px-1 mt-3">
+            <p className="text-gray-500 text-xs px-1 mt-2 mt-3">
               The schedule board displays a warning when daily jobs exceed the warning threshold, and blocks new additions at the maximum.
             </p>
           </div>

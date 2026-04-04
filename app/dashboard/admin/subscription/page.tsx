@@ -179,7 +179,7 @@ function CompactPlanCard({
           className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
             plan.highlighted
               ? 'bg-purple-600 hover:bg-purple-700 text-white'
-              : 'bg-gray-800 hover:bg-gray-900 text-white'
+              : 'bg-gray-700 hover:bg-gray-800 text-white'
           }`}
         >
           {loading ? (
@@ -489,7 +489,7 @@ function SubscriptionPageInner() {
               <button
                 onClick={handlePortal}
                 disabled={portalLoading || !sub.hasStripeCustomer}
-                className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-xl transition-colors text-sm"
+                className="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-xl transition-colors text-sm"
               >
                 {portalLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

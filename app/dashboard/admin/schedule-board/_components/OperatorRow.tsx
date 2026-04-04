@@ -236,13 +236,13 @@ export default function OperatorRow({
 
         {/* Time-off overlay */}
         {timeOff && (
-          <div className="flex items-center gap-3 py-3 px-4 mb-3 rounded-lg bg-slate-600/20 border border-slate-400 text-slate-700">
-            <div className="w-8 h-8 rounded-lg bg-slate-500/20 flex items-center justify-center flex-shrink-0">
+          <div className="flex items-center gap-3 py-3 px-4 mb-3 rounded-lg bg-gray-100 border border-gray-200 text-gray-700">
+            <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
               <span className="text-sm">&#128564;</span>
             </div>
             <div>
               <span className="text-sm font-bold">{TIME_OFF_LABELS[timeOff.type] || timeOff.type}</span>
-              {timeOff.notes && <p className="text-xs text-slate-500 mt-0.5">{timeOff.notes}</p>}
+              {timeOff.notes && <p className="text-xs text-gray-500 mt-0.5">{timeOff.notes}</p>}
             </div>
           </div>
         )}

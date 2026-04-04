@@ -186,30 +186,30 @@ export default function CrewScheduleGrid({ onDateClick }: CrewScheduleGridProps)
         <div className="flex items-center gap-2">
           <button
             onClick={() => shiftDates(-1)}
-            className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all text-white"
+            className="p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-gray-600 shadow-sm"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={goToToday}
-            className="px-4 py-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all text-white text-sm font-medium"
+            className="px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-gray-700 text-sm font-medium shadow-sm"
           >
             Today
           </button>
           <button
             onClick={() => shiftDates(1)}
-            className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all text-white"
+            className="p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-gray-600 shadow-sm"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
-          <span className="text-sm text-blue-200 ml-2">
+          <span className="text-sm text-gray-600 ml-2">
             {data.dates[0]?.month} {data.dates[0]?.dayNum} — {data.dates[data.dates.length - 1]?.month} {data.dates[data.dates.length - 1]?.dayNum}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Day range selector */}
-          <div className="inline-flex rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 p-1">
+          <div className="inline-flex rounded-xl bg-white border border-gray-200 p-1 shadow-sm">
             {[7, 14, 21].map(d => (
               <button
                 key={d}
@@ -217,7 +217,7 @@ export default function CrewScheduleGrid({ onDateClick }: CrewScheduleGridProps)
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
                   days === d
                     ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
-                    : 'text-blue-200 hover:bg-white/10 hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {d}d
@@ -226,7 +226,7 @@ export default function CrewScheduleGrid({ onDateClick }: CrewScheduleGridProps)
           </div>
 
           {/* Legend */}
-          <div className="hidden sm:flex items-center gap-3 ml-3 text-xs text-blue-200">
+          <div className="hidden sm:flex items-center gap-3 ml-3 text-xs text-gray-500">
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500"></span> Available</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-500"></span> Near Cap</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500"></span> Full</span>
@@ -241,30 +241,30 @@ export default function CrewScheduleGrid({ onDateClick }: CrewScheduleGridProps)
           <table className="w-full border-collapse min-w-[800px]">
             {/* Date Header */}
             <thead>
-              <tr className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800">
-                <th className="sticky left-0 z-10 bg-slate-800 px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider w-[140px] min-w-[140px]">
+              <tr className="bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 border-b border-gray-200">
+                <th className="sticky left-0 z-10 bg-gray-100 px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-[140px] min-w-[140px]">
                   <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-blue-300" />
+                    <User className="w-4 h-4 text-gray-500" />
                     Operator
                   </div>
                 </th>
                 {data.dates.map(d => (
                   <th
                     key={d.date}
-                    className={`px-1 py-3 text-center text-xs font-medium min-w-[70px] cursor-pointer hover:bg-white/10 transition-colors ${
+                    className={`px-1 py-3 text-center text-xs font-medium min-w-[70px] cursor-pointer hover:bg-gray-200 transition-colors ${
                       d.isToday
-                        ? 'bg-blue-600/30 text-blue-200'
+                        ? 'bg-blue-50 text-blue-700'
                         : d.isWeekend
                           ? 'text-gray-400'
-                          : 'text-gray-300'
+                          : 'text-gray-600'
                     }`}
                     onClick={() => onDateClick?.(d.date)}
                   >
                     <div className="leading-tight">
-                      <div className={`text-[10px] uppercase tracking-wider ${d.isToday ? 'text-blue-300 font-bold' : ''}`}>
+                      <div className={`text-[10px] uppercase tracking-wider ${d.isToday ? 'text-blue-600 font-bold' : ''}`}>
                         {d.dayName}
                       </div>
-                      <div className={`text-sm font-bold ${d.isToday ? 'text-white' : ''}`}>
+                      <div className={`text-sm font-bold ${d.isToday ? 'text-blue-700' : ''}`}>
                         {d.dayNum}
                       </div>
                       {(d.dayNum === 1 || d === data.dates[0]) && (

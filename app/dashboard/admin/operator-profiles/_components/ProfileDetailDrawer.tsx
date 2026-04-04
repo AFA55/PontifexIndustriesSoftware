@@ -106,21 +106,21 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
   return (
     <>
       <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[70]" onClick={onClose} />
-      <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] bg-white shadow-2xl z-[80] flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] bg-white border-l border-gray-200 shadow-2xl z-[80] flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-500 p-5 text-white">
+        <div className="bg-white border-b border-gray-200 p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <User className="w-5 h-5" />
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <User className="w-5 h-5 text-purple-600" />
                 {profile?.full_name || 'Loading...'}
               </h2>
               {profile && (
-                <p className="text-purple-200 text-sm capitalize">{profile.role === 'apprentice' ? 'Helper' : profile.role}</p>
+                <p className="text-gray-500 text-sm capitalize">{profile.role === 'apprentice' ? 'Helper' : profile.role}</p>
               )}
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
-              <X className="w-5 h-5" />
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
         </div>

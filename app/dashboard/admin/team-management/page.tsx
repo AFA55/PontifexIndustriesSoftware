@@ -839,7 +839,7 @@ export default function TeamManagementPage() {
                   onClick={() => setRoleFilter('all')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     roleFilter === 'all'
-                      ? 'bg-gray-800 text-white'
+                      ? 'bg-purple-600 text-white'
                       : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                   }`}
                 >
