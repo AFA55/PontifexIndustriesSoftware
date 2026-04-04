@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Building2, Loader2, User, DollarSign, MapPin, FileText, CreditCard, Plus, Users } from 'lucide-react';
+import { X, Building2, Loader2, User, DollarSign, MapPin, FileText, Plus, Users } from 'lucide-react';
 import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 
 interface AdditionalContact {
@@ -48,26 +48,6 @@ const CUSTOMER_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
-const PAYMENT_TERMS = [
-  { value: '', label: 'Select terms...' },
-  { value: 'cod', label: 'COD (Cash on Delivery)' },
-  { value: '0', label: 'Due on Receipt' },
-  { value: '15', label: 'Net 15' },
-  { value: '30', label: 'Net 30' },
-  { value: '45', label: 'Net 45' },
-  { value: '60', label: 'Net 60' },
-  { value: '90', label: 'Net 90' },
-];
-
-const PAYMENT_METHODS = [
-  { value: '', label: 'Select method...' },
-  { value: 'check', label: 'Check' },
-  { value: 'credit_card', label: 'Credit Card' },
-  { value: 'ach', label: 'ACH / Bank Transfer' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'wire', label: 'Wire Transfer' },
-  { value: 'other', label: 'Other' },
-];
 
 export default function CustomerForm({ customer, onSubmit, onClose, showAdditionalContacts = true, defaultCompanyName }: CustomerFormProps) {
   const isEdit = !!customer?.id;
@@ -88,9 +68,6 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
     state: customer?.state || '',
     zip: customer?.zip || '',
     customer_type: customer?.customer_type || '',
-    payment_terms: customer?.payment_terms?.toString() || '',
-    payment_method: customer?.payment_method || '',
-    tax_id: customer?.tax_id || '',
     website: customer?.website || '',
     notes: customer?.notes || '',
   });
@@ -388,32 +365,6 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
               </button>
             </div>
           )}
-
-          {/* Payment & Billing Section */}
-          <div className={sectionClass}>
-            <div className="flex items-center gap-2 mb-1">
-              <CreditCard className="w-4 h-4 text-cyan-600" />
-              <h3 className="text-sm font-bold text-gray-900">Payment & Billing</h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className={labelClass}>Payment Terms</label>
-                <select className={inputClass} value={form.payment_terms} onChange={e => update('payment_terms', e.target.value)}>
-                  {PAYMENT_TERMS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Payment Method</label>
-                <select className={inputClass} value={form.payment_method} onChange={e => update('payment_method', e.target.value)}>
-                  {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Tax ID / EIN</label>
-                <input type="text" className={inputClass} placeholder="XX-XXXXXXX" value={form.tax_id} onChange={e => update('tax_id', e.target.value)} />
-              </div>
-            </div>
-          </div>
 
           {/* Address Section */}
           <div className={sectionClass}>
