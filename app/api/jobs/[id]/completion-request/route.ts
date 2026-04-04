@@ -27,12 +27,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { operator_notes } = body;
 
     // Fetch the job to validate and get job_number / salesperson info
-    const { data: job, error: jobError } = await supabaseAdmin
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('id, job_number, status, created_by, assigned_to, tenant_id')
-      .eq('id', jobId)
-      .eq('tenant_id', tenantId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
@@ -50,10 +50,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // Create the completion request record
+    // Use the tenant_id from the fetched job (most reliable source)
+    const resolvedTenantId = job.tenant_id || tenantId || null;
     const { data: completionRequest, error: createError } = await supabaseAdmin
       .from('job_completion_requests')
       .insert({
-        tenant_id: tenantId,
+        tenant_id: resolvedTenantId,
         job_order_id: jobId,
         submitted_by: auth.userId,
         submitted_at: new Date().toISOString(),
@@ -69,15 +71,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // Update job_orders status and completion_submitted_at
-    const { error: updateError } = await supabaseAdmin
+    let statusUpdateQuery = supabaseAdmin
       .from('job_orders')
       .update({
         status: 'pending_completion',
         completion_submitted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', jobId)
-      .eq('tenant_id', tenantId);
+      .eq('id', jobId);
+    if (resolvedTenantId) statusUpdateQuery = statusUpdateQuery.eq('tenant_id', resolvedTenantId);
+    const { error: updateError } = await statusUpdateQuery;
 
     if (updateError) {
       console.error('Error updating job status to pending_completion:', updateError);

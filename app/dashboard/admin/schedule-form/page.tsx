@@ -1509,9 +1509,9 @@ export default function ScheduleFormPage() {
                   <button
                     type="button"
                     onClick={() => setShowNewCustomerModal(true)}
-                    className="flex items-center gap-2 px-5 py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all whitespace-nowrap"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm whitespace-nowrap"
                   >
-                    <Plus size={18} />
+                    <Plus className="w-4 h-4" />
                     New Customer
                   </button>
                 </div>

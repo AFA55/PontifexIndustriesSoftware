@@ -1295,14 +1295,17 @@ export default function WorkPerformed() {
               <p className="text-gray-500 text-xs">Select completed work items</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="px-2 py-1.5 bg-gray-100 text-gray-700 rounded-xl text-xs font-semibold border border-gray-200">
-                {selectedItems.length} Selected
-              </span>
+              {selectedItems.length > 0 && (
+                <span className="px-2 py-1.5 bg-gray-100 text-gray-700 rounded-xl text-xs font-semibold border border-gray-200">
+                  {selectedItems.length}
+                </span>
+              )}
               <button
                 onClick={() => setView(view === 'search' ? 'selected' : 'search')}
-                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold text-xs border border-gray-200"
+                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold text-xs border border-gray-200 min-h-[36px]"
               >
-                {view === 'search' ? 'View Selected' : 'Add More'}
+                <span className="hidden sm:inline">{view === 'search' ? 'View Selected' : 'Add More'}</span>
+                <span className="sm:hidden">{view === 'search' ? 'Selected' : 'Search'}</span>
               </button>
             </div>
           </div>

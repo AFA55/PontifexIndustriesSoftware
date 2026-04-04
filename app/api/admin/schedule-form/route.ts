@@ -24,16 +24,12 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
-    // Verify admin role
+    // Fetch full_name for logging (role already verified by requireAdmin)
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('role, full_name')
+      .select('full_name')
       .eq('id', auth.userId)
       .single();
-
-    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Only administrators can create schedule forms' }, { status: 403 });
-    }
 
     const tenantId = await getTenantId(auth.userId);
 
@@ -133,14 +129,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`✅ Schedule Form job created: ${jobNumber} by ${profile.full_name}`);
+    console.log(`✅ Schedule Form job created: ${jobNumber} by ${profile?.full_name}`);
 
     // ── Track submission in schedule_form_submissions ──────────
     Promise.resolve(
       supabaseAdmin.from('schedule_form_submissions').insert({
         job_order_id: jobOrder.id,
         submitted_by: auth.userId,
-        submitted_by_name: profile.full_name,
+        submitted_by_name: profile?.full_name,
         action: 'submitted',
         form_snapshot: body,
       })
