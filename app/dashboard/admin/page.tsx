@@ -20,6 +20,8 @@ import {
   FileText,
   CreditCard,
   UserCircle2,
+  Activity,
+  Wrench,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
@@ -79,6 +81,17 @@ interface DashboardData {
   crew_utilization: CrewUtilization;
   team_status: TeamMember[];
   recent_activity: ActivityItem[];
+}
+
+interface ActiveJob {
+  id: string;
+  job_number: string;
+  customer_name: string;
+  operator_name: string | null;
+  status: string;
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  work_items_count: number;
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -172,6 +185,9 @@ export default function AdminDashboard() {
   const [dashData, setDashData] = useState<DashboardData | null>(null);
   const [dashLoading, setDashLoading] = useState(true);
 
+  const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
+  const [activeJobsLoading, setActiveJobsLoading] = useState(true);
+
   // ── scope toggle (personal / team) ────────────────────────────────────────
   const [scope, setScope] = useState<'personal' | 'team'>('personal');
 
@@ -253,6 +269,34 @@ export default function AdminDashboard() {
 
     fetchDash();
   }, [user, scope]);
+
+  // ── active jobs fetch ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchActiveJobs = async () => {
+      setActiveJobsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const res = await fetch('/api/admin/active-jobs-summary', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          setActiveJobs(json.data ?? []);
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setActiveJobsLoading(false);
+      }
+    };
+
+    fetchActiveJobs();
+  }, [user]);
 
   // ── onboarding ────────────────────────────────────────────────────────────
   const checkOnboardingStatus = async (userId: string) => {
@@ -763,6 +807,116 @@ export default function AdminDashboard() {
               </Link>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── View Active Jobs ─────────────────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl border border-purple-500/30 shadow-lg shadow-purple-900/10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+              <Activity className="w-4 h-4 text-purple-400" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-white">View Active Jobs</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Jobs currently in progress or assigned</p>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/admin/active-jobs"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-lg transition-colors"
+          >
+            View All
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="p-4">
+          {activeJobsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
+                  <div className="animate-pulse bg-slate-700 rounded w-20 h-4" />
+                  <div className="animate-pulse bg-slate-700 rounded flex-1 h-4" />
+                  <div className="animate-pulse bg-slate-700 rounded w-16 h-4" />
+                </div>
+              ))}
+            </div>
+          ) : activeJobs.length === 0 ? (
+            <div className="py-10 text-center">
+              <CheckCircle2 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+              <p className="text-sm text-slate-400 mb-1">No active jobs right now</p>
+              <p className="text-xs text-slate-500">Jobs with status &ldquo;assigned&rdquo; or &ldquo;in progress&rdquo; will appear here</p>
+              <Link
+                href="/dashboard/admin/schedule-form"
+                className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-lg transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Schedule a Job
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {activeJobs.slice(0, 6).map(job => (
+                <Link
+                  key={job.id}
+                  href={`/dashboard/admin/active-jobs`}
+                  className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/40 hover:border-purple-500/30 transition-all group"
+                >
+                  {/* Job number */}
+                  <span className="text-xs font-mono bg-slate-700 px-2 py-1 rounded text-purple-300 flex-shrink-0 min-w-[72px] text-center">
+                    {job.job_number}
+                  </span>
+
+                  {/* Customer + operator */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">{job.customer_name}</p>
+                    {job.operator_name && (
+                      <p className="text-xs text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                        <Users className="w-3 h-3 inline flex-shrink-0" />
+                        {job.operator_name}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Work items */}
+                  {job.work_items_count > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-emerald-400 flex-shrink-0">
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>{job.work_items_count} item{job.work_items_count !== 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+
+                  {/* Status pill */}
+                  <span
+                    className={`flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      job.status === 'in_progress' || job.status === 'on_site'
+                        ? 'bg-green-900/50 text-green-400 border border-green-700/30'
+                        : job.status === 'in_route'
+                        ? 'bg-amber-900/50 text-amber-400 border border-amber-700/30'
+                        : 'bg-blue-900/50 text-blue-400 border border-blue-700/30'
+                    }`}
+                  >
+                    {job.status === 'in_progress' ? 'In Progress'
+                      : job.status === 'on_site' ? 'On Site'
+                      : job.status === 'in_route' ? 'En Route'
+                      : 'Assigned'}
+                  </span>
+
+                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-purple-400 transition-colors flex-shrink-0" />
+                </Link>
+              ))}
+
+              {activeJobs.length > 6 && (
+                <Link
+                  href="/dashboard/admin/active-jobs"
+                  className="block text-center py-2 text-xs text-purple-400 hover:text-purple-300 font-medium transition-colors"
+                >
+                  +{activeJobs.length - 6} more active jobs &rarr;
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

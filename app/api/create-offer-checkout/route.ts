@@ -13,7 +13,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-03-25.dahlia',
 });
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pontifexindustries.com';
+// Always use production URL for Stripe callbacks — never localhost
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost')
+    ? 'https://pontifexindustries.com'
+    : process.env.NEXT_PUBLIC_APP_URL || 'https://pontifexindustries.com';
 
 export async function POST(request: NextRequest) {
   try {

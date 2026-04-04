@@ -541,6 +541,19 @@ export default function DougSalesPage() {
             </div>
           </FadeIn>
 
+          {/* Exclusive Offer CTA */}
+          <FadeIn delay={0.5}>
+            <div className="flex justify-center">
+              <a
+                href="/offer"
+                className="group inline-flex items-center gap-2 px-6 py-3 rounded-2xl border border-violet-500/50 hover:border-violet-400 text-violet-300 hover:text-violet-200 font-semibold text-base transition-all hover:bg-violet-500/10"
+              >
+                View My Exclusive Offer
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </a>
+            </div>
+          </FadeIn>
+
           {/* Stats row */}
           <FadeIn delay={0.5}>
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">

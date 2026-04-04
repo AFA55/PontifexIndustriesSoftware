@@ -27,9 +27,11 @@ import {
   AlertTriangle,
   TrendingDown,
   Lock,
+  Database,
+  X,
 } from 'lucide-react';
 
-// --- Native scroll reveal (React 19 safe — no framer-motion useInView) ---
+// --- Native scroll reveal (React 19 safe — no framer-motion) ---
 function Reveal({
   children,
   delay = 0,
@@ -90,6 +92,81 @@ function Section({
   );
 }
 
+// --- Simple agreement modal ---
+function AgreementModal({
+  onAgree,
+  onClose,
+}: {
+  onAgree: () => void;
+  onClose: () => void;
+}) {
+  const [agreed, setAgreed] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-[#13131a] border border-white/[0.1] rounded-2xl p-8 max-w-lg w-full shadow-2xl">
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-black text-white mb-1">Simple Agreement</h3>
+            <p className="text-zinc-500 text-sm">Plain language — no legal jargon.</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-400 transition-colors mt-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4 mb-6">
+          {[
+            '30-day trial at $1,647 — 100% refundable, no questions asked.',
+            'If you decide to continue: $2,000 for 6 months. Your $1,647 trial payment is credited, so you owe $686 to lock in the full term ($353 + $333 one-time onboarding fee).',
+            'After the 6-month term, pricing adjusts monthly based on your actual team size.',
+            'All your data is yours. Exportable at any time. No lock-in.',
+            'Cancel with 30 days notice after the 6-month term ends.',
+          ].map((term, i) => (
+            <div key={i} className="flex gap-3">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-violet-500/20 border border-violet-500/40 flex items-center justify-center text-violet-400 text-xs font-bold mt-0.5">
+                {i + 1}
+              </span>
+              <p className="text-zinc-300 text-sm leading-relaxed">{term}</p>
+            </div>
+          ))}
+        </div>
+
+        <label className="flex items-start gap-3 cursor-pointer mb-6 select-none">
+          <div
+            className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all mt-0.5 ${
+              agreed ? 'bg-violet-600 border-violet-600' : 'border-zinc-600'
+            }`}
+            onClick={() => setAgreed(!agreed)}
+          >
+            {agreed && <CheckCircle className="w-3 h-3 text-white" />}
+          </div>
+          <span className="text-zinc-400 text-sm leading-relaxed">
+            I&apos;ve read and agree to these terms. I understand this is a 30-day trial and I can
+            request a full refund at any time within the trial period.
+          </span>
+        </label>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 rounded-xl border border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/20 transition-all text-sm font-semibold"
+          >
+            Go back
+          </button>
+          <button
+            onClick={onAgree}
+            disabled={!agreed}
+            className="flex-1 px-4 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm transition-all"
+          >
+            Proceed to Payment →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- CTA Button ---
 function CTAButton({
   size = 'lg',
@@ -99,8 +176,10 @@ function CTAButton({
   className?: string;
 }) {
   const [loading, setLoading] = useState(false);
+  const [showAgreement, setShowAgreement] = useState(false);
 
-  async function handleClick() {
+  async function handleAgree() {
+    setShowAgreement(false);
     setLoading(true);
     try {
       const res = await fetch('/api/create-offer-checkout', {
@@ -129,23 +208,28 @@ function CTAButton({
   };
 
   return (
-    <button
-      onClick={handleClick}
-      disabled={loading}
-      className={`${base} ${sizes[size]} bg-violet-600 hover:bg-violet-500 active:scale-95 text-white shadow-lg shadow-violet-900/50 disabled:opacity-60 disabled:cursor-not-allowed ${className}`}
-    >
-      {loading ? (
-        <>
-          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          Processing...
-        </>
-      ) : (
-        <>
-          Claim Your Offer — $1,647
-          <ArrowRight className="w-5 h-5" />
-        </>
+    <>
+      <button
+        onClick={() => setShowAgreement(true)}
+        disabled={loading}
+        className={`${base} ${sizes[size]} bg-violet-600 hover:bg-violet-500 active:scale-95 text-white shadow-lg shadow-violet-900/50 disabled:opacity-60 disabled:cursor-not-allowed ${className}`}
+      >
+        {loading ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            Processing...
+          </>
+        ) : (
+          <>
+            Claim Your Offer — $1,647
+            <ArrowRight className="w-5 h-5" />
+          </>
+        )}
+      </button>
+      {showAgreement && (
+        <AgreementModal onAgree={handleAgree} onClose={() => setShowAgreement(false)} />
       )}
-    </button>
+    </>
   );
 }
 
@@ -169,7 +253,7 @@ const comparisonRows = [
     label: 'Total — year one',
     dsm: '$6,396+',
     cenpoint: '$7,300+',
-    pontifex: '$3,600',
+    pontifex: '~$3,600',
     pontifexHighlight: true,
     bold: true,
   },
@@ -239,7 +323,7 @@ const features = [
   {
     icon: Smartphone,
     name: 'Operator Mobile App',
-    description: 'Clock in/out, GPS tracking, daily job logs, photos — all from a phone browser, nothing to install.',
+    description: 'GPS-verified clock in/out, daily job logs, photos — all from a phone browser, nothing to install.',
     competitorValue: '$15/operator/mo',
   },
   {
@@ -281,7 +365,7 @@ const features = [
   {
     icon: Tag,
     name: 'NFC Time Clock Tags',
-    description: 'Operators tap an NFC tag on-site to clock in — GPS-verified, zero-friction.',
+    description: 'Operators tap an NFC tag on-site to clock in — GPS-verified location, zero-friction.',
     competitorValue: '$100 setup + $30/mo',
   },
   {
@@ -298,8 +382,8 @@ const features = [
   },
   {
     icon: MapPin,
-    name: 'GPS Job Tracking',
-    description: 'Operator locations on the clock, job site proximity verification, mileage tracking.',
+    name: 'GPS Clock-In Verification',
+    description: 'Every clock-in is location-stamped. Operators can\'t self-report start times — the system verifies they\'re actually on-site.',
     competitorValue: '$50/mo',
   },
   {
@@ -309,6 +393,12 @@ const features = [
     competitorValue: 'Included in mobile',
   },
   {
+    icon: Database,
+    name: 'Automated Contact Backups',
+    description: 'Daily automatic backups of all customer and contact data. Export anytime — your data is always yours.',
+    competitorValue: 'Not available',
+  },
+  {
     icon: Lock,
     name: 'Enterprise-Grade Security',
     description: 'Supabase (backed by AWS), RLS policies on every table, daily backups, 99.9% uptime SLA.',
@@ -316,7 +406,7 @@ const features = [
   },
 ];
 
-const competitorTotal = 930 + 15 * 10; // ~$1,080/mo
+const competitorTotal = 930 + 15 * 10;
 const annualCompetitorValue = competitorTotal * 12;
 
 // --- FAQ items ---
@@ -331,7 +421,7 @@ const faqs = [
   },
   {
     q: 'What happens after the 30 days?',
-    a: '$2,000 for 6 months — that\'s ~$333/month for your entire team (10 operators + up to 9 helpers). Cancel anytime after that. No annual lock-in.',
+    a: 'Pricing adjusts based on your actual team size at that point — how many operators and helpers you have on the platform. We\'ll review your crew together and confirm the exact rate before you commit to anything.',
   },
   {
     q: 'Do I need to install anything?',
@@ -339,15 +429,11 @@ const faqs = [
   },
   {
     q: 'What about my data?',
-    a: 'Hosted on Supabase (backed by AWS), enterprise-grade security, row-level security on every table, daily backups, 99.9% uptime SLA. Your data is yours.',
+    a: 'Hosted on Supabase (backed by AWS), enterprise-grade security, row-level security on every table, daily automated backups, 99.9% uptime SLA. Contact data is exportable at any time. Your data is always yours.',
   },
   {
     q: 'How does the money-back guarantee work?',
     a: 'If after 30 days you don\'t think it\'s worth every penny — just tell me. I\'ll process 100% of the $1,647 refund with no questions, no contracts, and no hard feelings. The risk is entirely on me.',
-  },
-  {
-    q: 'Is this really just for one client at a time?',
-    a: 'During active builds — yes. Andres personally handles every implementation, so to maintain quality and response time, he onboards one new client at a time. When that slot opens, it\'s gone.',
   },
 ];
 
@@ -369,9 +455,9 @@ function FAQItem({ q, a }: { q: string; a: string }) {
       </button>
       <div
         style={{
-          maxHeight: open ? '500px' : '0',
+          maxHeight: open ? '400px' : '0',
           overflow: 'hidden',
-          transition: 'max-height 0.3s ease-out, opacity 0.3s ease-out',
+          transition: 'max-height 0.3s ease-out, opacity 0.25s ease-out',
           opacity: open ? 1 : 0,
         }}
         className="px-6 pb-6"
@@ -389,7 +475,7 @@ export default function OfferPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       {/* Top nav bar */}
-      <div className="border-b border-white/[0.05] px-6 py-4 sticky top-0 z-50 bg-[#0a0a0f]/90 backdrop-blur-md">
+      <div className="border-b border-white/[0.05] px-6 py-4 sticky top-0 z-40 bg-[#0a0a0f]/90 backdrop-blur-md">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center">
@@ -403,7 +489,6 @@ export default function OfferPage() {
 
       {/* ─── HERO ─── */}
       <Section className="pt-24 md:pt-32 pb-20 text-center">
-        {/* Badge */}
         <Reveal>
           <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/30 rounded-full px-4 py-2 text-violet-300 text-sm font-semibold mb-8">
             <Star className="w-4 h-4" />
@@ -427,7 +512,6 @@ export default function OfferPage() {
           </p>
         </Reveal>
 
-        {/* Stats */}
         <Reveal delay={0.3}>
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
             <div className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.08] rounded-2xl px-8 py-5">
@@ -450,11 +534,10 @@ export default function OfferPage() {
         <Reveal delay={0.4}>
           <CTAButton size="xl" />
           <p className="mt-4 text-sm text-zinc-500">
-            If it doesn&apos;t work after 30 days, you get every dollar back. No questions.
+            Review a simple 5-point agreement, then proceed to secure payment.
           </p>
         </Reveal>
 
-        {/* Scroll indicator */}
         <Reveal delay={0.6}>
           <div className="mt-16 flex flex-col items-center gap-2 text-zinc-600">
             <p className="text-xs uppercase tracking-widest">See why the math is obvious</p>
@@ -491,9 +574,9 @@ export default function OfferPage() {
             },
             {
               icon: MapPin,
-              title: 'Zero visibility until it\'s too late',
+              title: 'No clock-in verification — operators self-report',
               description:
-                'No real-time job progress, no operator location awareness, no daily logs until the job is done. You find out about problems after they\'ve already cost you.',
+                'No GPS check at clock-in. Operators enter whatever time they "started." No location awareness, no verification. Those extra self-reported minutes every day add up to hours of payroll every week that the clock never actually ran.',
               color: 'orange',
             },
             {
@@ -624,12 +707,13 @@ export default function OfferPage() {
               </p>
             </div>
             <div className="bg-violet-500/5 border border-violet-500/30 rounded-2xl p-6">
-              <p className="text-sm text-violet-400 font-semibold uppercase tracking-wider mb-2">Pontifex pricing</p>
+              <p className="text-sm text-violet-400 font-semibold uppercase tracking-wider mb-2">Pontifex 6-month deal</p>
               <p className="text-zinc-300 text-sm leading-relaxed">
-                <span className="text-white font-semibold">$20/operator/mo</span> for full operators
-                + <span className="text-white font-semibold">$10/helper/mo</span> — full feature
-                access for everyone. 10 operators + 9 helpers ={' '}
-                <span className="text-violet-300 font-bold">$290/month</span>. That&apos;s it.
+                <span className="text-white font-semibold">$2,000 for 6 months</span>{' '}
+                ($333.34/month) for your entire crew — operators and helpers included.
+                Your $1,647 trial payment is credited, so you only owe{' '}
+                <span className="text-violet-300 font-bold">$686 to lock in the full term</span>{' '}
+                ($353 + $333 one-time onboarding fee). After 6 months, pricing adjusts to your exact team size.
               </p>
             </div>
           </div>
@@ -645,7 +729,7 @@ export default function OfferPage() {
               Everything You Get
             </div>
             <h2 className="text-4xl md:text-5xl font-black text-white mb-4">
-              14 features. One platform. One price.
+              15 features. One platform. One price.
             </h2>
             <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
               Every single one of these would cost you separately from piecemeal software.
@@ -686,16 +770,17 @@ export default function OfferPage() {
                 ${annualCompetitorValue.toLocaleString()}+/year
               </span>
             </p>
-            <p className="text-3xl md:text-4xl font-black text-white mb-2">
+            <p className="text-3xl md:text-4xl font-black text-white mb-1">
               Your 30-day trial:{' '}
               <span className="text-violet-400">$1,647</span>
             </p>
-            <p className="text-zinc-500 text-sm">
-              Then $333/month for your entire team. Not per person — total.
+            <p className="text-zinc-400 text-sm mb-1">
+              If you continue: $2,000 for 6 months ($333.34/month) — your $1,647 is credited.
             </p>
-            <div className="mt-6">
-              <CTAButton size="lg" />
-            </div>
+            <p className="text-zinc-500 text-xs mb-6">
+              You only owe $686 to lock in the full 6-month term ($353 + $333 one-time onboarding). Still less than DSM&apos;s sign-on fee alone.
+            </p>
+            <CTAButton size="lg" />
           </div>
         </Reveal>
       </Section>
@@ -717,11 +802,12 @@ export default function OfferPage() {
                 feelings.&rdquo;
               </p>
               <p className="text-zinc-400 leading-relaxed">
-                The risk here is entirely on me. You either love it and we build a long-term
-                partnership, or you get a full refund and we part ways as friends. I have 14 months
-                of development invested in this platform — I&apos;m not worried about the guarantee
-                because I know it works. But I also know you&apos;ve been burned before by software
-                promises, and I want to remove every last shred of risk from your decision.
+                I&apos;m not here looking for a big salary just because I built something. I want to
+                show you I&apos;m worth it through results first. The risk is entirely on me. Either
+                the platform solves real problems for Patriot&apos;s operation — or you get every
+                dollar back. I have 14 months of work invested in this. I&apos;m not worried about
+                the guarantee because I know it works. But I also know you&apos;ve been burned before
+                by software promises, and I want to remove every last shred of risk from your decision.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-4 items-start">
                 <div className="flex items-center gap-3">
@@ -763,30 +849,30 @@ export default function OfferPage() {
                 </div>
                 <div>
                   <p className="font-bold text-white">Andres</p>
-                  <p className="text-sm text-zinc-500">Developer, Pontifex Industries</p>
+                  <p className="text-sm text-zinc-500">Developer & Operator, Pontifex Industries</p>
                 </div>
               </div>
 
               <div className="space-y-5 text-zinc-300 leading-relaxed">
                 <p>
-                  I&apos;ve spent 14 months building this platform specifically for operations like
-                  Patriot. Not a generic construction app that sort of works — a system purpose-built
-                  for concrete cutting, dispatch, and the chaos that comes with running a crew.
+                  This platform didn&apos;t come from me sitting behind a screen guessing what concrete
+                  cutting operations need. It came from working the same jobs, hearing the same
+                  frustrations firsthand, and building solutions around real feedback — from real
+                  operators who tested every screen, and management who told me exactly what visibility
+                  they needed.
                 </p>
                 <p>
-                  The $1,647 covers my actual development costs for the onboarding period. I&apos;m
-                  not trying to extract maximum value on day one. I want to{' '}
-                  <span className="text-white font-semibold">earn a long-term partner</span>, and
-                  I&apos;m confident enough in what I&apos;ve built to back it with a full money-back
-                  guarantee.
+                  I built what was actually requested. Not what I assumed would work. Every feature
+                  went through real-world testing with the people who use it daily. That&apos;s why
+                  the clock-in is GPS-verified, why payroll exports in two clicks, why the dispatch
+                  board shows everything a manager actually needs to know.
                 </p>
                 <p>
-                  After the trial — if you love it — we do $2,000 for 6 months. That&apos;s $333 a
-                  month for your entire operation. Less than DSM charges for a single operator.
-                </p>
-                <p className="text-white font-semibold">
-                  If it works for you (and it will), we&apos;ll build a long-term relationship. That&apos;s
-                  the goal. Not to lock you in — to be the only platform you ever want to use.
+                  The $1,647 covers my development costs for onboarding. I&apos;m not trying to
+                  extract a big payday on day one — I&apos;m trying to{' '}
+                  <span className="text-white font-semibold">prove I&apos;m worth it first</span>.
+                  After the trial: $2,000 for 6 months. That&apos;s less than what DSM charges just
+                  to sign the contract.
                 </p>
               </div>
             </div>
@@ -820,7 +906,6 @@ export default function OfferPage() {
       <Section className="bg-gradient-to-b from-violet-950/20 to-[#0a0a0f] border-t border-white/[0.04]">
         <Reveal>
           <div className="max-w-2xl mx-auto text-center">
-            {/* Availability badge */}
             <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-full px-4 py-2 text-green-400 text-sm font-semibold mb-8">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
               1 client slot — currently available
@@ -845,10 +930,11 @@ export default function OfferPage() {
               <div className="space-y-3 mb-6">
                 {[
                   'Full platform access — every feature, every screen',
-                  '1 month to run real jobs with real operators',
+                  '30 days to run real jobs with real operators',
                   'Andres personally on-call for every question and change',
                   '100% money-back if it doesn\'t work — zero risk',
-                  'After 30 days: $333/month for your whole crew',
+                  'Continue: $2,000 for 6 months (trial credited — owe just $686)',
+                  'Daily automated backups of all your contact and job data',
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-violet-400 flex-shrink-0" />
@@ -856,7 +942,7 @@ export default function OfferPage() {
                   </div>
                 ))}
               </div>
-              <div className="border-t border-white/[0.06] pt-6 flex items-end justify-between">
+              <div className="border-t border-white/[0.06] pt-6 flex items-end justify-between flex-wrap gap-4">
                 <div>
                   <p className="text-zinc-500 text-sm">30-day trial investment</p>
                   <p className="text-4xl font-black text-white">$1,647</p>
@@ -867,7 +953,7 @@ export default function OfferPage() {
             </div>
 
             <p className="text-zinc-600 text-sm">
-              Secure payment processed by Stripe. Receipt sent to your email.
+              You&apos;ll review a simple 5-point agreement before payment. Secure checkout via Stripe.
               <br />
               Questions? Text Andres directly at{' '}
               <a href="tel:+1" className="text-zinc-400 hover:text-white transition-colors">

@@ -43,6 +43,8 @@ interface NavItem {
   title?: string;
   /** If set, this nav item is hidden when the flag is false (bypassed for super_admin/ops_manager) */
   flagKey?: keyof UserFeatureFlags;
+  /** If true, only super_admin can see this item */
+  superAdminOnly?: boolean;
 }
 
 interface NavSection {
@@ -61,9 +63,9 @@ const NAV_SECTIONS: NavSection[] = [
     accent: 'text-blue-400',
     items: [
       { label: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-      { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar, flagKey: 'can_view_schedule_board' },
+      { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar },
       { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase, flagKey: 'can_view_active_jobs' },
-      { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms' },
+      { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit },
     ],
   },
   {
@@ -93,7 +95,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Settings', href: '/dashboard/admin/settings', icon: Settings, flagKey: 'can_manage_settings' },
       { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, badgeKey: 'notifications' },
       { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3, flagKey: 'can_view_analytics' },
-      { label: 'Billing', href: '/dashboard/admin/subscription', icon: CreditCard },
+      { label: 'Billing', href: '/dashboard/admin/subscription', icon: CreditCard, superAdminOnly: true },
     ],
   },
 ];
@@ -260,6 +262,7 @@ interface SidebarContentProps {
   onSignOut: () => void;
   flags: UserFeatureFlags;
   flagsLoading: boolean;
+  userRole: string | null;
 }
 
 function SidebarContent({
@@ -273,6 +276,7 @@ function SidebarContent({
   onSignOut,
   flags,
   flagsLoading,
+  userRole,
 }: SidebarContentProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -338,8 +342,9 @@ function SidebarContent({
           // While flags are loading, show all items so there's no flash-hide.
           // Once loaded, filter items whose flagKey is false.
           const visibleItems = flagsLoading
-            ? section.items
+            ? section.items.filter(item => !item.superAdminOnly || userRole === 'super_admin')
             : section.items.filter(item => {
+                if (item.superAdminOnly && userRole !== 'super_admin') return false;
                 if (!item.flagKey) return true; // no flag = always visible
                 return flags[item.flagKey] !== false;
               });
@@ -531,6 +536,7 @@ export default function DashboardSidebar() {
     onSignOut: handleSignOut,
     flags,
     flagsLoading,
+    userRole: user?.role ?? null,
   };
 
   return (
