@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, email, active')
+      .select('id, full_name, role, email, active, phone_number, phone, profile_picture_url, created_at, date_of_birth, hire_date, next_review_date, nickname')
       .eq('active', true)
       .order('full_name');
 

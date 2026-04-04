@@ -7,9 +7,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Users, UserPlus, Search, Shield, Crown,
-  Star, Briefcase, User, Eye, Settings, X,
+  Star, Briefcase, User, Settings, X,
   AlertTriangle, CheckCircle2, Mail, Phone, Calendar,
-  Loader2, ChevronRight, Activity,
+  Loader2, ChevronRight, Activity, Clock, UserCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
@@ -27,9 +27,26 @@ interface TeamMember {
   phone?: string | null;
   profile_picture_url?: string | null;
   created_at?: string;
+  date_of_birth?: string | null;
+  hire_date?: string | null;
+  next_review_date?: string | null;
+  nickname?: string | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Maps backend role values to human-friendly display labels */
+const ROLE_LABEL: Record<string, string> = {
+  super_admin: 'Owner / Super Admin',
+  operations_manager: 'Management',
+  admin: 'Admin',
+  supervisor: 'Supervisor',
+  salesman: 'Project Manager',
+  inventory_manager: 'Office Admin',
+  shop_manager: 'Office Admin',
+  operator: 'Operator',
+  apprentice: 'Team Member',
+};
 
 const ROLE_GRADIENT: Record<string, string> = {
   super_admin: 'from-purple-500 to-indigo-600',
@@ -38,6 +55,7 @@ const ROLE_GRADIENT: Record<string, string> = {
   supervisor: 'from-teal-500 to-emerald-600',
   salesman: 'from-orange-500 to-amber-600',
   shop_manager: 'from-cyan-500 to-blue-600',
+  inventory_manager: 'from-sky-500 to-blue-600',
   operator: 'from-green-500 to-emerald-600',
   apprentice: 'from-slate-400 to-slate-600',
 };
@@ -58,15 +76,38 @@ const ROLE_ICON: Record<string, React.ElementType> = {
   super_admin: Crown,
   operations_manager: Shield,
   admin: Briefcase,
-  supervisor: Eye,
+  supervisor: UserCheck,
   salesman: Star,
   shop_manager: Settings,
+  inventory_manager: Settings,
   operator: User,
   apprentice: User,
 };
 
-function formatRole(role: string) {
-  return role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+/** Ordered list of roles used for tab filtering */
+const ROLE_ORDER = [
+  'super_admin',
+  'operations_manager',
+  'admin',
+  'supervisor',
+  'salesman',
+  'inventory_manager',
+  'shop_manager',
+  'operator',
+  'apprentice',
+];
+
+function getRoleLabel(role: string): string {
+  return ROLE_LABEL[role] ?? role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return '—';
+  }
 }
 
 // ─── Member Avatar ────────────────────────────────────────────────────────────
@@ -87,7 +128,7 @@ function MemberAvatar({
       <img
         src={member.profile_picture_url}
         alt={member.full_name}
-        className={`${sizeClass} rounded-full object-cover flex-shrink-0 ring-2 ring-gray-700`}
+        className={`${sizeClass} rounded-full object-cover flex-shrink-0 ring-2 ring-white/10`}
       />
     );
   }
@@ -95,6 +136,29 @@ function MemberAvatar({
     <div className={`${sizeClass} bg-gradient-to-br ${gradient} rounded-full flex items-center justify-center text-white font-bold flex-shrink-0`}>
       {member.full_name.charAt(0).toUpperCase()}
     </div>
+  );
+}
+
+// ─── Role Badge Pill ──────────────────────────────────────────────────────────
+
+function RolePill({ role }: { role: string }) {
+  const RoleIcon = ROLE_ICON[role] || User;
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-semibold ${ROLE_BADGE[role] || 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+      <RoleIcon className="w-3 h-3" />
+      {getRoleLabel(role)}
+    </span>
+  );
+}
+
+// ─── Status Badge ──────────────────────────────────────────────────────────────
+
+function StatusBadge({ active }: { active: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-semibold ${active ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-gray-800/80 text-gray-400 border-gray-700'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-400' : 'bg-gray-500'}`} />
+      {active ? 'Active' : 'Inactive'}
+    </span>
   );
 }
 
@@ -112,8 +176,8 @@ function GrantSuperAdminDialog({
   saving: boolean;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl border border-red-500/30 w-full max-w-sm">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#13131a] rounded-2xl border border-red-500/30 w-full max-w-sm">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
@@ -140,7 +204,7 @@ function GrantSuperAdminDialog({
             <button
               onClick={onCancel}
               disabled={saving}
-              className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl py-3 font-semibold transition-colors"
+              className="flex-1 bg-white/[0.06] hover:bg-white/[0.10] text-gray-300 rounded-xl py-3 font-semibold transition-colors"
             >
               Cancel
             </button>
@@ -159,6 +223,129 @@ function GrantSuperAdminDialog({
   );
 }
 
+// ─── InfoRow ──────────────────────────────────────────────────────────────────
+
+function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | null | undefined }) {
+  return (
+    <div className="flex items-start gap-3">
+      <Icon className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
+        <p className="text-sm text-gray-300 break-all">{value || '—'}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── ActionButton (for quick actions) ────────────────────────────────────────
+
+function ActionButton({
+  label,
+  href,
+  onClick,
+  variant = 'default',
+}: {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  variant?: 'default' | 'danger' | 'success';
+}) {
+  const cls = `flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-sm font-medium group ${
+    variant === 'danger'
+      ? 'bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20'
+      : variant === 'success'
+      ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20'
+      : 'bg-white/[0.04] hover:bg-white/[0.08] text-gray-300 border border-white/[0.06]'
+  }`;
+
+  if (href) {
+    return (
+      <Link href={href} className={cls}>
+        <span>{label}</span>
+        <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors" />
+      </Link>
+    );
+  }
+  return (
+    <button onClick={onClick} className={cls}>
+      <span>{label}</span>
+      <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors" />
+    </button>
+  );
+}
+
+// ─── Role-Specific Profile Info ───────────────────────────────────────────────
+
+function ProfileInfoSection({ member }: { member: TeamMember }) {
+  const phone = member.phone_number || member.phone;
+
+  // super_admin: name, email, DOB, join date
+  if (member.role === 'super_admin') {
+    return (
+      <div className="space-y-3">
+        <InfoRow icon={Mail} label="Email" value={member.email} />
+        <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(member.date_of_birth)} />
+        <InfoRow icon={Clock} label="Member Since" value={formatDate(member.created_at)} />
+      </div>
+    );
+  }
+
+  // operator / apprentice: email, phone, hire_date, next_review_date
+  if (member.role === 'operator' || member.role === 'apprentice') {
+    return (
+      <div className="space-y-3">
+        <InfoRow icon={Mail} label="Email" value={member.email} />
+        {phone && <InfoRow icon={Phone} label="Phone" value={phone} />}
+        <InfoRow icon={Calendar} label="Hire Date" value={formatDate(member.hire_date)} />
+        <InfoRow icon={Clock} label="Next Review" value={formatDate(member.next_review_date)} />
+      </div>
+    );
+  }
+
+  // admin / operations_manager / salesman / supervisor / inventory_manager / shop_manager
+  return (
+    <div className="space-y-3">
+      <InfoRow icon={Mail} label="Email" value={member.email} />
+      {phone && <InfoRow icon={Phone} label="Phone" value={phone} />}
+      <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(member.date_of_birth)} />
+      {member.nickname && <InfoRow icon={User} label="Nickname" value={member.nickname} />}
+      <InfoRow icon={Clock} label="Member Since" value={formatDate(member.created_at)} />
+    </div>
+  );
+}
+
+// ─── Role-Specific Quick Actions ──────────────────────────────────────────────
+
+function QuickActionsSection({
+  member,
+  isSuperAdmin,
+  onEditPermissions,
+  onToggleActive,
+}: {
+  member: TeamMember;
+  isSuperAdmin: boolean;
+  onEditPermissions: () => void;
+  onToggleActive: () => void;
+}) {
+  // super_admin: no quick actions
+  if (member.role === 'super_admin') return null;
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Quick Actions</h3>
+      <ActionButton label="Edit Permissions" onClick={onEditPermissions} />
+      {member.role === 'operator' && (
+        <ActionButton label="View Timecards" href="/dashboard/admin/timecards" />
+      )}
+      <ActionButton
+        label={member.active ? 'Deactivate Account' : 'Activate Account'}
+        onClick={onToggleActive}
+        variant={member.active ? 'danger' : 'success'}
+      />
+    </div>
+  );
+}
+
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 
 type DetailTab = 'info' | 'permissions';
@@ -169,6 +356,7 @@ function MemberDetailPanel({
   currentUserId,
   onClose,
   onGrantSuperAdmin,
+  onToggleActive,
   getAuthHeaders,
 }: {
   member: TeamMember;
@@ -176,6 +364,7 @@ function MemberDetailPanel({
   currentUserId: string;
   onClose: () => void;
   onGrantSuperAdmin: (member: TeamMember) => void;
+  onToggleActive: (member: TeamMember) => void;
   getAuthHeaders: () => Promise<Record<string, string>>;
 }) {
   const [tab, setTab] = useState<DetailTab>('info');
@@ -183,126 +372,105 @@ function MemberDetailPanel({
   const [loadingFlags, setLoadingFlags] = useState(false);
 
   useEffect(() => {
+    // Reset tab when member changes
+    setTab('info');
+    setFlags(null);
+  }, [member.id]);
+
+  useEffect(() => {
     if (tab === 'permissions' && flags === null) {
       setLoadingFlags(true);
       getAuthHeaders().then(headers =>
         fetch(`/api/admin/user-flags/${member.id}`, { headers })
           .then(r => r.json())
-          .then(json => {
-            setFlags(json.data || {});
-          })
+          .then(json => setFlags(json.data || {}))
           .catch(() => setFlags({}))
           .finally(() => setLoadingFlags(false))
       );
     }
   }, [tab, member.id, flags, getAuthHeaders]);
 
-  const RoleIcon = ROLE_ICON[member.role] || User;
   const isOwnProfile = member.id === currentUserId;
   const canGrant = isSuperAdmin && !isOwnProfile && member.role !== 'super_admin';
+  const showPermissionsTab = member.role !== 'super_admin';
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-start justify-between p-6 border-b border-gray-800 flex-shrink-0">
+      <div className={`relative bg-gradient-to-r ${ROLE_GRADIENT[member.role] || 'from-gray-600 to-gray-700'} p-6 flex-shrink-0`}>
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
         <div className="flex items-center gap-4">
           <MemberAvatar member={member} size="lg" />
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl font-bold text-white">{member.full_name}</h2>
               {member.role === 'super_admin' && (
-                <Crown className="w-4 h-4 text-purple-400" />
+                <Crown className="w-4 h-4 text-yellow-300" />
               )}
             </div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border ${ROLE_BADGE[member.role] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                <RoleIcon className="w-3 h-3" />
-                {formatRole(member.role)}
-              </span>
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${member.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${member.active ? 'bg-green-500' : 'bg-gray-400'}`} />
-                {member.active ? 'Active' : 'Inactive'}
-              </span>
+            {member.nickname && (
+              <p className="text-sm text-white/70 mt-0.5">&ldquo;{member.nickname}&rdquo;</p>
+            )}
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <RolePill role={member.role} />
+              <StatusBadge active={member.active} />
             </div>
           </div>
         </div>
-        <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
-          <X className="w-5 h-5" />
-        </button>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 px-6 pt-4 flex-shrink-0">
-        {(['info', 'permissions'] as DetailTab[]).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all capitalize ${
-              tab === t
-                ? 'bg-purple-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
-            }`}
-          >
-            {t === 'permissions' ? 'Feature Permissions' : 'Profile Info'}
-          </button>
-        ))}
-      </div>
+      {/* Tab bar — only show permissions tab for non-super-admin */}
+      {showPermissionsTab && (
+        <div className="flex gap-1 px-4 pt-4 flex-shrink-0 border-b border-white/[0.06] pb-0">
+          {(['info', 'permissions'] as DetailTab[]).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-all capitalize ${
+                tab === t
+                  ? 'bg-violet-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-white/[0.05]'
+              }`}
+            >
+              {t === 'permissions' ? 'Feature Permissions' : 'Profile Info'}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {tab === 'info' && (
-          <div className="space-y-4">
-            {/* Contact */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 space-y-3">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Contact</h3>
-              <div className="flex items-center gap-3 text-sm text-gray-300">
-                <Mail className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                <span>{member.email}</span>
-              </div>
-              {(member.phone_number || member.phone) && (
-                <div className="flex items-center gap-3 text-sm text-gray-300">
-                  <Phone className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                  <span>{member.phone_number || member.phone}</span>
-                </div>
-              )}
-              {member.created_at && (
-                <div className="flex items-center gap-3 text-sm text-gray-300">
-                  <Calendar className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                  <span>Joined {new Date(member.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                </div>
-              )}
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        {(tab === 'info' || !showPermissionsTab) && (
+          <>
+            {/* Profile Info */}
+            <div className="bg-white/[0.03] rounded-xl border border-white/[0.07] p-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Profile Info</h3>
+              <ProfileInfoSection member={member} />
             </div>
 
-            {/* Quick actions */}
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Quick Actions</h3>
-              <Link
-                href={`/dashboard/admin/operator-profiles`}
-                className="flex items-center justify-between px-4 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors"
-              >
-                <span className="text-sm text-gray-300">View Operator Profile & History</span>
-                <ChevronRight className="w-4 h-4 text-gray-500" />
-              </Link>
-              <Link
-                href={`/dashboard/admin/timecards`}
-                className="flex items-center justify-between px-4 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors"
-              >
-                <span className="text-sm text-gray-300">View Timecards</span>
-                <ChevronRight className="w-4 h-4 text-gray-500" />
-              </Link>
-            </div>
+            {/* Quick Actions */}
+            <QuickActionsSection
+              member={member}
+              isSuperAdmin={isSuperAdmin}
+              onEditPermissions={() => setTab('permissions')}
+              onToggleActive={() => onToggleActive(member)}
+            />
 
             {/* Grant Super Admin — only for super admins editing non-super-admin users */}
             {canGrant && (
-              <div className="mt-6 pt-4 border-t border-gray-800">
+              <div className="pt-2 border-t border-white/[0.06]">
                 <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
                   <div className="flex items-start gap-3">
                     <Crown className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <h4 className="text-sm font-semibold text-white mb-1">Elevate to Super Admin</h4>
                       <p className="text-xs text-gray-400 mb-3">
-                        Grants full unrestricted platform access. This should only be used for
-                        senior leadership. Cannot be undone without manual database access.
+                        Grants full unrestricted platform access. Cannot be undone without manual database access.
                       </p>
                       <button
                         onClick={() => onGrantSuperAdmin(member)}
@@ -316,23 +484,14 @@ function MemberDetailPanel({
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
 
-        {tab === 'permissions' && (
+        {tab === 'permissions' && showPermissionsTab && (
           <div>
             {loadingFlags ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
-              </div>
-            ) : member.role === 'super_admin' ? (
-              <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-6 text-center">
-                <Crown className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                <h3 className="text-white font-semibold mb-1">Super Admin</h3>
-                <p className="text-gray-400 text-sm">
-                  Super admins have unrestricted access to all platform features.
-                  Individual feature flags are not applicable.
-                </p>
+                <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
               </div>
             ) : (
               <FeatureFlagsPanel
@@ -391,7 +550,7 @@ export default function TeamProfilesPage() {
       if (!user) { router.push('/login'); return; }
       setUserId(user.id);
 
-      let role = user.user_metadata?.role || 'operator';
+      const role = user.user_metadata?.role || 'operator';
       setUserRole(role);
 
       const adminRoles = ['super_admin', 'operations_manager', 'admin'];
@@ -428,15 +587,43 @@ export default function TeamProfilesPage() {
       } else {
         alert(json.error || 'Failed to grant super admin');
       }
-    } catch (e: any) {
-      alert(e.message);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'An error occurred');
     } finally {
       setGrantSaving(false);
     }
   };
 
+  const handleToggleActive = useCallback(async (member: TeamMember) => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/users/${member.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ active: !member.active }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSuccessMsg(`${member.full_name} has been ${member.active ? 'deactivated' : 'activated'}.`);
+        setTimeout(() => setSuccessMsg(''), 4000);
+        await fetchMembers();
+        setSelectedMember(null);
+      } else {
+        alert(json.error || 'Failed to update user status');
+      }
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'An error occurred');
+    }
+  }, [getAuthHeaders, fetchMembers]);
+
   // Filtered + sorted members
-  const allRoles = Array.from(new Set(members.map(m => m.role)));
+  const allRoles = Array.from(new Set(members.map(m => m.role)))
+    .sort((a, b) => {
+      const ai = ROLE_ORDER.indexOf(a);
+      const bi = ROLE_ORDER.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+
   const filtered = members.filter(m => {
     if (roleFilter !== 'all' && m.role !== roleFilter) return false;
     if (search) {
@@ -453,37 +640,37 @@ export default function TeamProfilesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0f0f17] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <Users className="w-6 h-6 text-white" />
           </div>
-          <Loader2 className="w-6 h-6 animate-spin text-purple-400 mx-auto" />
+          <Loader2 className="w-6 h-6 animate-spin text-violet-400 mx-auto" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-[#0f0f17] text-white">
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
+      <div className="bg-[#0c0c14] border-b border-white/[0.07] sticky top-0 z-40">
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/admin"
-              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors text-gray-400"
+              className="p-2 bg-white/[0.05] hover:bg-white/[0.10] rounded-lg transition-colors text-gray-400"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
+              <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-lg flex items-center justify-center">
                 <Users className="w-4 h-4 text-white" />
               </div>
               <div>
                 <h1 className="text-base sm:text-lg font-bold text-white">Team Profiles</h1>
                 <p className="text-xs text-gray-500 hidden sm:block">
-                  {members.length} members · Manage access & feature permissions
+                  {members.length} members &middot; Manage access &amp; feature permissions
                 </p>
               </div>
             </div>
@@ -492,7 +679,7 @@ export default function TeamProfilesPage() {
           {isSuperAdmin && (
             <button
               onClick={() => setShowInviteModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-semibold text-sm transition-colors"
             >
               <UserPlus className="w-4 h-4" />
               <span className="hidden sm:inline">Invite Member</span>
@@ -504,9 +691,9 @@ export default function TeamProfilesPage() {
       {/* ── Success banner ──────────────────────────────────────── */}
       {successMsg && (
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pt-4">
-          <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3">
-            <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
-            <p className="text-green-300 text-sm">{successMsg}</p>
+          <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <p className="text-emerald-300 text-sm">{successMsg}</p>
           </div>
         </div>
       )}
@@ -517,11 +704,11 @@ export default function TeamProfilesPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {[
             { label: 'Total Staff', value: members.length, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-            { label: 'Active', value: members.filter(m => m.active).length, icon: Activity, color: 'text-green-400', bg: 'bg-green-500/10' },
-            { label: 'Super Admins', value: members.filter(m => m.role === 'super_admin').length, icon: Crown, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-            { label: 'Roles In Use', value: Object.values(roleBreakdown).filter(v => v > 0).length, icon: Shield, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+            { label: 'Active', value: members.filter(m => m.active).length, icon: Activity, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+            { label: 'Super Admins', value: members.filter(m => m.role === 'super_admin').length, icon: Crown, color: 'text-violet-400', bg: 'bg-violet-500/10' },
+            { label: 'Roles In Use', value: allRoles.filter(r => roleBreakdown[r] > 0).length, icon: Shield, color: 'text-orange-400', bg: 'bg-orange-500/10' },
           ].map(stat => (
-            <div key={stat.label} className="bg-white/[0.03] rounded-xl border border-white/[0.06] p-4 backdrop-blur-sm">
+            <div key={stat.label} className="bg-[#13131a] rounded-xl border border-white/[0.08] p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{stat.label}</p>
@@ -536,12 +723,12 @@ export default function TeamProfilesPage() {
         </div>
 
         {/* Two-column layout: list + detail */}
-        <div className={`grid gap-6 ${selectedMember ? 'lg:grid-cols-[1fr,420px]' : 'grid-cols-1'}`}>
+        <div className={`grid gap-6 ${selectedMember ? 'lg:grid-cols-[1fr,400px]' : 'grid-cols-1'}`}>
 
           {/* ── Member List ──────────────────────────────────────── */}
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+          <div className="bg-[#13131a] rounded-2xl border border-white/[0.08] overflow-hidden">
             {/* Search + filter toolbar */}
-            <div className="p-4 border-b border-gray-800 space-y-3">
+            <div className="p-4 border-b border-white/[0.07] space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input
@@ -549,7 +736,7 @@ export default function TeamProfilesPage() {
                   placeholder="Search by name or email..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 transition-colors"
                 />
               </div>
 
@@ -557,7 +744,9 @@ export default function TeamProfilesPage() {
                 <button
                   onClick={() => setRoleFilter('all')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    roleFilter === 'all' ? 'bg-gray-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    roleFilter === 'all'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-white/[0.05] text-gray-400 hover:bg-white/[0.09] hover:text-gray-200'
                   }`}
                 >
                   All ({members.length})
@@ -569,10 +758,10 @@ export default function TeamProfilesPage() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       roleFilter === role
                         ? `bg-gradient-to-r ${ROLE_GRADIENT[role] || 'from-gray-500 to-gray-600'} text-white`
-                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                        : 'bg-white/[0.05] text-gray-400 hover:bg-white/[0.09] hover:text-gray-200'
                     }`}
                   >
-                    {formatRole(role)} ({roleBreakdown[role]})
+                    {getRoleLabel(role)} ({roleBreakdown[role]})
                   </button>
                 ))}
               </div>
@@ -587,18 +776,17 @@ export default function TeamProfilesPage() {
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-800">
+              <div className="divide-y divide-white/[0.05]">
                 {filtered.map(member => {
-                  const RoleIcon = ROLE_ICON[member.role] || User;
                   const isSelected = selectedMember?.id === member.id;
                   return (
                     <button
                       key={member.id}
                       onClick={() => setSelectedMember(isSelected ? null : member)}
-                      className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors border-l-2 ${
+                      className={`w-full px-4 py-3.5 flex items-center gap-3 text-left transition-colors border-l-2 ${
                         isSelected
-                          ? 'bg-violet-900/30 border-violet-600'
-                          : 'border-transparent hover:bg-white/5 hover:border-violet-500/40'
+                          ? 'bg-violet-900/25 border-violet-500'
+                          : 'border-transparent hover:bg-white/[0.03] hover:border-violet-500/30'
                       }`}
                     >
                       <MemberAvatar member={member} size="md" />
@@ -607,18 +795,15 @@ export default function TeamProfilesPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-white text-sm">{member.full_name}</span>
                           {member.role === 'super_admin' && (
-                            <Crown className="w-3 h-3 text-purple-400" />
+                            <Crown className="w-3 h-3 text-violet-400" />
                           )}
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${ROLE_BADGE[member.role] || 'bg-gray-800 text-gray-400 border-gray-700'}`}>
-                            <RoleIcon className="w-2.5 h-2.5" />
-                            {formatRole(member.role)}
-                          </span>
+                          <RolePill role={member.role} />
                         </div>
-                        <p className="text-xs text-gray-500 truncate">{member.email}</p>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{member.email}</p>
                       </div>
 
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={`w-1.5 h-1.5 rounded-full ${member.active ? 'bg-green-500' : 'bg-gray-600'}`} />
+                        <span className={`w-2 h-2 rounded-full ${member.active ? 'bg-emerald-500' : 'bg-gray-600'}`} />
                         <ChevronRight className={`w-4 h-4 text-gray-600 transition-transform ${isSelected ? 'rotate-90' : ''}`} />
                       </div>
                     </button>
@@ -630,13 +815,14 @@ export default function TeamProfilesPage() {
 
           {/* ── Detail Panel ─────────────────────────────────────── */}
           {selectedMember && (
-            <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden flex flex-col max-h-[calc(100vh-200px)] sticky top-24">
+            <div className="bg-[#13131a] rounded-2xl border border-white/[0.08] overflow-hidden flex flex-col max-h-[calc(100vh-200px)] sticky top-24">
               <MemberDetailPanel
                 member={selectedMember}
                 isSuperAdmin={isSuperAdmin}
                 currentUserId={userId || ''}
                 onClose={() => setSelectedMember(null)}
                 onGrantSuperAdmin={setGrantTarget}
+                onToggleActive={handleToggleActive}
                 getAuthHeaders={getAuthHeaders}
               />
             </div>
