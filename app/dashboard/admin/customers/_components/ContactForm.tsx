@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, User, Loader2 } from 'lucide-react';
+import { X, User, Loader2, MapPin, DollarSign, Users } from 'lucide-react';
 
 interface ContactFormProps {
   contact?: {
@@ -13,6 +13,7 @@ interface ContactFormProps {
     is_primary?: boolean;
     is_billing_contact?: boolean;
     notes?: string | null;
+    contact_type?: string | null;
   } | null;
   onSubmit: (data: Record<string, any>) => Promise<void>;
   onClose: () => void;
@@ -25,6 +26,30 @@ const ROLES = [
   { value: 'billing', label: 'Billing' },
   { value: 'owner', label: 'Owner' },
   { value: 'other', label: 'Other' },
+];
+
+const CONTACT_TYPES = [
+  {
+    value: 'general',
+    label: 'General',
+    icon: Users,
+    activeClass: 'bg-gray-600 border-gray-500 text-white',
+    inactiveClass: 'border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-300',
+  },
+  {
+    value: 'on_site',
+    label: 'On-Site Contact',
+    icon: MapPin,
+    activeClass: 'bg-amber-600/30 border-amber-500 text-amber-300',
+    inactiveClass: 'border-gray-600 text-gray-400 hover:border-amber-600 hover:text-amber-400',
+  },
+  {
+    value: 'billing',
+    label: 'Billing Contact',
+    icon: DollarSign,
+    activeClass: 'bg-emerald-600/30 border-emerald-500 text-emerald-300',
+    inactiveClass: 'border-gray-600 text-gray-400 hover:border-emerald-600 hover:text-emerald-400',
+  },
 ];
 
 export default function ContactForm({ contact, onSubmit, onClose }: ContactFormProps) {
@@ -40,6 +65,7 @@ export default function ContactForm({ contact, onSubmit, onClose }: ContactFormP
     is_primary: contact?.is_primary || false,
     is_billing_contact: contact?.is_billing_contact || false,
     notes: contact?.notes || '',
+    contact_type: contact?.contact_type || 'general',
   });
 
   const update = (key: string, value: string | boolean) => setForm(f => ({ ...f, [key]: value }));
@@ -83,6 +109,30 @@ export default function ContactForm({ contact, onSubmit, onClose }: ContactFormP
               {error}
             </div>
           )}
+
+          {/* Contact Type Selector */}
+          <div>
+            <label className={labelClass}>Contact Type</label>
+            <div className="flex gap-2">
+              {CONTACT_TYPES.map(type => {
+                const Icon = type.icon;
+                const isActive = form.contact_type === type.value;
+                return (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => update('contact_type', type.value)}
+                    className={`flex-1 flex flex-col items-center gap-1 px-2 py-2.5 border rounded-xl text-xs font-bold transition-all ${
+                      isActive ? type.activeClass : type.inactiveClass
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="text-center leading-tight">{type.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div>
             <label className={labelClass}>Name *</label>

@@ -9,9 +9,10 @@ import {
   Loader2, CheckCircle, XCircle, Star, Briefcase, Clock, TrendingUp,
   FileText, MessageSquare, DollarSign, ChevronRight, Plus,
   AlertTriangle, Award, Shield, X, Trash2, ChevronDown,
-  BarChart3, Hash, MapPin, Filter
+  BarChart3, Hash, MapPin, Filter, Zap
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import SkillsTab from './_components/SkillsTab';
 import { supabase } from '@/lib/supabase';
 import AddProfileModal from './_components/AddProfileModal';
 
@@ -197,7 +198,10 @@ export default function OperatorProfilesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Detail state
-  const [detailTab, setDetailTab] = useState<'overview' | 'jobs' | 'timecards' | 'notes' | 'pay'>('overview');
+  const [detailTab, setDetailTab] = useState<'overview' | 'jobs' | 'timecards' | 'notes' | 'pay' | 'skills'>('overview');
+
+  // Skill summary state (top-3 rated skills for the selected operator)
+  const [skillSummary, setSkillSummary] = useState<{ name: string; rating: number }[]>([]);
   const [history, setHistory] = useState<OperatorHistory | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [notes, setNotes] = useState<OperatorNote[]>([]);
@@ -314,6 +318,21 @@ export default function OperatorProfilesPage() {
       fetchNotes(selectedId);
       setDetailTab('overview');
       setWeekOffset(0);
+      setSkillSummary([]);
+      // Fetch top skills for mini badge display
+      apiFetch(`/api/admin/operators/${selectedId}/skills`)
+        .then(res => res.ok ? res.json() : null)
+        .then(json => {
+          if (json?.data) {
+            const top = (json.data as { category_name: string; rating: number | null }[])
+              .filter(s => s.rating !== null)
+              .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+              .slice(0, 3)
+              .map(s => ({ name: s.category_name, rating: s.rating as number }));
+            setSkillSummary(top);
+          }
+        })
+        .catch(() => {});
     }
   }, [selectedId, fetchDetail, fetchNotes]);
 
@@ -516,6 +535,21 @@ export default function OperatorProfilesPage() {
                           </span>
                           <span className="text-[11px] text-gray-400 truncate">{p.email}</span>
                         </div>
+                        {/* Top skill badges — visible for selected operator */}
+                        {isSelected && skillSummary.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {skillSummary.map(s => (
+                              <span
+                                key={s.name}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 border border-purple-200 rounded-full text-[10px] font-semibold text-purple-700"
+                              >
+                                <Zap className="w-2.5 h-2.5" />
+                                {s.name.length > 12 ? s.name.slice(0, 12) + '\u2026' : s.name}
+                                <span className="font-bold text-purple-900">{s.rating}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
                     </button>
@@ -617,6 +651,7 @@ export default function OperatorProfilesPage() {
                     { key: 'jobs', label: 'Job History', icon: Briefcase },
                     { key: 'timecards', label: 'Timecards', icon: Clock },
                     { key: 'notes', label: 'Notes & Reviews', icon: MessageSquare },
+                    { key: 'skills', label: 'Skills', icon: Zap },
                     ...(currentUserRole === 'super_admin' ? [{ key: 'pay', label: 'Pay & Comp', icon: DollarSign }] : []),
                   ] as { key: typeof detailTab; label: string; icon: typeof Star }[]).map(({ key, label, icon: Icon }) => (
                     <button
@@ -974,6 +1009,20 @@ export default function OperatorProfilesPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* ── Skills Tab ───────────────────────────── */}
+                {detailTab === 'skills' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-purple-500" />
+                        Skill Rankings
+                      </h3>
+                      <p className="text-xs text-gray-400">Rate on a 1–10 scale</p>
+                    </div>
+                    <SkillsTab operatorId={selectedId!} apiFetch={apiFetch} />
                   </div>
                 )}
 

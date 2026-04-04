@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { X, Building2, Loader2, User, DollarSign, MapPin, FileText, CreditCard } from 'lucide-react';
+import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 
 interface CustomerFormProps {
   customer?: {
@@ -64,6 +65,7 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
   const isEdit = !!customer?.id;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { isLoaded } = useGoogleMaps();
 
   const [form, setForm] = useState({
     company_name: customer?.name || '',
@@ -84,6 +86,82 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
     website: customer?.website || '',
     notes: customer?.notes || '',
   });
+
+  // Google Places autocomplete state
+  const [addressInputValue, setAddressInputValue] = useState(customer?.address || '');
+  const [addressSuggestions, setAddressSuggestions] = useState<google.maps.places.AutocompletePrediction[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+  const placesServiceContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined' && window.google) {
+      autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+      if (placesServiceContainerRef.current) {
+        placesServiceRef.current = new window.google.maps.places.PlacesService(
+          placesServiceContainerRef.current
+        );
+      }
+    }
+  }, [isLoaded]);
+
+  const handleAddressInput = (value: string) => {
+    setAddressInputValue(value);
+    setForm(f => ({ ...f, address: value }));
+
+    if (!value.trim() || !autocompleteServiceRef.current) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    autocompleteServiceRef.current.getPlacePredictions(
+      {
+        input: value,
+        componentRestrictions: { country: 'us' },
+        types: ['address'],
+      },
+      (predictions, status) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setAddressSuggestions(predictions);
+          setShowSuggestions(true);
+        } else {
+          setAddressSuggestions([]);
+          setShowSuggestions(false);
+        }
+      }
+    );
+  };
+
+  const handleSelectSuggestion = (prediction: google.maps.places.AutocompletePrediction) => {
+    if (!placesServiceRef.current) return;
+
+    placesServiceRef.current.getDetails(
+      { placeId: prediction.place_id, fields: ['address_components'] },
+      (place, status) => {
+        if (status !== window.google.maps.places.PlacesServiceStatus.OK || !place) return;
+
+        const components = place.address_components || [];
+        const get = (type: string) =>
+          components.find(c => c.types.includes(type))?.long_name || '';
+        const getShort = (type: string) =>
+          components.find(c => c.types.includes(type))?.short_name || '';
+
+        const streetNumber = get('street_number');
+        const route = get('route');
+        const street = [streetNumber, route].filter(Boolean).join(' ');
+        const city = get('locality') || get('sublocality') || get('neighborhood');
+        const state = getShort('administrative_area_level_1');
+        const zip = get('postal_code');
+
+        setAddressInputValue(street);
+        setForm(f => ({ ...f, address: street, city, state, zip }));
+        setShowSuggestions(false);
+        setAddressSuggestions([]);
+      }
+    );
+  };
 
   const update = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
 
@@ -110,6 +188,9 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      {/* Hidden container required by PlacesService */}
+      <div ref={placesServiceContainerRef} style={{ display: 'none' }} />
+
       <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-white/10 sticky top-0 bg-slate-800 z-10 rounded-t-2xl">
@@ -239,10 +320,40 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
             <div className="flex items-center gap-2 mb-1">
               <MapPin className="w-4 h-4 text-red-400" />
               <h3 className="text-sm font-bold text-white">Address</h3>
+              {isLoaded && (
+                <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">Autocomplete enabled</span>
+              )}
             </div>
-            <div>
+            <div className="relative">
               <label className={labelClass}>Street Address</label>
-              <input type="text" className={inputClass} placeholder="123 Main St" value={form.address} onChange={e => update('address', e.target.value)} />
+              <input
+                type="text"
+                className={inputClass}
+                placeholder="123 Main St — start typing for suggestions"
+                value={addressInputValue}
+                onChange={e => handleAddressInput(e.target.value)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                onFocus={() => addressSuggestions.length > 0 && setShowSuggestions(true)}
+                autoComplete="off"
+              />
+              {showSuggestions && addressSuggestions.length > 0 && (
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-xl shadow-2xl overflow-hidden">
+                  {addressSuggestions.map(prediction => (
+                    <button
+                      key={prediction.place_id}
+                      type="button"
+                      className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-slate-600 transition-colors flex items-start gap-2 border-b border-slate-600/50 last:border-0"
+                      onMouseDown={() => handleSelectSuggestion(prediction)}
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                      <span>
+                        <span className="font-medium">{prediction.structured_formatting.main_text}</span>
+                        <span className="text-gray-400 text-xs block">{prediction.structured_formatting.secondary_text}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>

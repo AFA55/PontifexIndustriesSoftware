@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import {
   Briefcase,
   Calendar,
-  Clock,
+  ArrowRight,
   AlertCircle,
   ChevronRight,
   MapPin,
@@ -46,9 +46,8 @@ export default function ActiveJobsPage() {
   const [user, setUser] = useState<any>(null);
   const [jobs, setJobs] = useState<ActiveJob[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'today' | 'in_progress' | 'attention'>('all');
-  const [viewAll, setViewAll] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'today' | 'coming_up' | 'attention'>('all');
+  const [viewAll, setViewAll] = useState(true);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -62,7 +61,6 @@ export default function ActiveJobsPage() {
       return;
     }
     setUser(currentUser);
-    setIsSuperAdmin(['super_admin', 'operations_manager'].includes(currentUser.role));
   }, [router]);
 
   useEffect(() => {
@@ -94,16 +92,18 @@ export default function ActiveJobsPage() {
 
   const filtered = jobs.filter(j => {
     const today = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
     if (filter === 'today') return j.scheduled_date === today;
-    if (filter === 'in_progress') return j.status === 'in_progress' || j.status === 'in_route';
+    if (filter === 'coming_up') return j.scheduled_date === tomorrow;
     if (filter === 'attention') return (j.pending_change_requests ?? 0) > 0 || j.pending_completion_approval;
     return true;
   });
 
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const stats = {
     total: jobs.length,
     today: jobs.filter(j => j.scheduled_date === new Date().toISOString().split('T')[0]).length,
-    inProgress: jobs.filter(j => j.status === 'in_progress' || j.status === 'in_route').length,
+    comingUp: jobs.filter(j => j.scheduled_date === tomorrow).length,
     needsAttention: jobs.filter(
       j => (j.pending_change_requests ?? 0) > 0 || j.pending_completion_approval
     ).length,
@@ -117,22 +117,20 @@ export default function ActiveJobsPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">Active Jobs</h1>
             <p className="text-gray-400 mt-1">
-              {viewAll ? 'All company jobs' : 'Jobs you are attached to'}
+              {viewAll ? 'All company jobs' : 'My assigned jobs'}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {isSuperAdmin && (
-              <button
-                onClick={() => setViewAll(!viewAll)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
-                  ${viewAll
-                    ? 'bg-purple-600/20 border-purple-500/50 text-purple-300'
-                    : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
-                  }`}
-              >
-                {viewAll ? 'Showing All' : 'My Jobs Only'}
-              </button>
-            )}
+            <button
+              onClick={() => setViewAll(!viewAll)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
+                ${viewAll
+                  ? 'bg-purple-600/20 border-purple-500/50 text-purple-300'
+                  : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+                }`}
+            >
+              {viewAll ? 'Showing All' : 'My Jobs Only'}
+            </button>
             <button
               onClick={fetchJobs}
               disabled={loading}
@@ -148,7 +146,7 @@ export default function ActiveJobsPage() {
           {[
             { label: 'Total Active', value: stats.total, icon: Briefcase, color: 'text-blue-400', tab: 'all' as const },
             { label: 'Today', value: stats.today, icon: Calendar, color: 'text-green-400', tab: 'today' as const },
-            { label: 'In Progress', value: stats.inProgress, icon: Clock, color: 'text-amber-400', tab: 'in_progress' as const },
+            { label: 'Coming Up', value: stats.comingUp, icon: ArrowRight, color: 'text-indigo-400', tab: 'coming_up' as const },
             { label: 'Needs Attention', value: stats.needsAttention, icon: AlertCircle, color: 'text-red-400', tab: 'attention' as const },
           ].map(stat => (
             <button
@@ -172,7 +170,7 @@ export default function ActiveJobsPage() {
           {([
             ['all', 'All'],
             ['today', 'Today'],
-            ['in_progress', 'In Progress'],
+            ['coming_up', 'Coming Up'],
             ['attention', 'Needs Attention'],
           ] as const).map(([val, label]) => (
             <button

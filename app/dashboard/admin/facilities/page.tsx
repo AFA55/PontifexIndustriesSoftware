@@ -217,7 +217,7 @@ function AddFacilityModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:bg-white/10 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -345,7 +345,7 @@ function EditFacilityModal({ facility, onClose, onSaved }: { facility: Facility;
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:bg-white/10 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -472,7 +472,7 @@ function AddBadgeModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:bg-white/10 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -834,7 +834,7 @@ export default function FacilitiesPage() {
               <input
                 type="text" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder={activeTab === 'facilities' ? 'Search facilities...' : 'Search by facility...'}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
               />
             </div>
             <button

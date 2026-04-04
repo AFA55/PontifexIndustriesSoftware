@@ -334,7 +334,7 @@ export default function NfcTagsPage() {
                   onChange={(e) => setNewTag(prev => ({ ...prev, tag_uid: e.target.value }))}
                   placeholder="Scan the tag with your phone to read the UID, or type it in"
                   required
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">The unique serial number printed on or read from the NFC chip</p>
               </div>
@@ -347,7 +347,7 @@ export default function NfcTagsPage() {
                     onChange={(e) => setNewTag(prev => ({ ...prev, label: e.target.value }))}
                     placeholder="e.g. Admin Keychain"
                     required
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
                   />
                 </div>
                 <div>
@@ -355,7 +355,7 @@ export default function NfcTagsPage() {
                   <select
                     value={newTag.tag_type}
                     onChange={(e) => setNewTag(prev => ({ ...prev, tag_type: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
                   >
                     <option value="shop">Shop</option>
                     <option value="truck">Truck</option>
@@ -370,7 +370,7 @@ export default function NfcTagsPage() {
                     value={newTag.location_description}
                     onChange={(e) => setNewTag(prev => ({ ...prev, location_description: e.target.value }))}
                     placeholder="e.g. Front wall"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
                   />
                 </div>
               </div>
@@ -590,7 +590,7 @@ export default function NfcTagsPage() {
                       onChange={(e) => setProgramForm(prev => ({ ...prev, label: e.target.value }))}
                       placeholder="e.g. Shop Wall Tag, Truck 5 Tag"
                       required
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                     />
                   </div>
 
@@ -599,7 +599,7 @@ export default function NfcTagsPage() {
                     <select
                       value={programForm.tag_type}
                       onChange={(e) => setProgramForm(prev => ({ ...prev, tag_type: e.target.value }))}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                     >
                       <option value="shop">Shop</option>
                       <option value="truck">Truck</option>
@@ -613,7 +613,7 @@ export default function NfcTagsPage() {
                     <select
                       value={programForm.operator_id}
                       onChange={(e) => setProgramForm(prev => ({ ...prev, operator_id: e.target.value }))}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                     >
                       <option value="">-- No operator --</option>
                       {operators.map(op => (
@@ -629,7 +629,7 @@ export default function NfcTagsPage() {
                       value={programForm.pontifex_nfc_id}
                       onChange={(e) => setProgramForm(prev => ({ ...prev, pontifex_nfc_id: e.target.value }))}
                       placeholder="PCC-NFC-001"
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 font-mono transition-all"
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 font-mono transition-all"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">Auto-generated ID. Can be written to the tag on supported devices.</p>
                   </div>
@@ -688,7 +688,7 @@ export default function NfcTagsPage() {
                 <select
                   value={reassignOperatorId}
                   onChange={(e) => setReassignOperatorId(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                 >
                   <option value="">-- Unassigned --</option>
                   {operators.map(op => (

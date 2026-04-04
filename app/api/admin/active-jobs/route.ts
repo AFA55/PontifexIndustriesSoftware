@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
       .not('status', 'in', '("completed","cancelled","archived")')
       .order('scheduled_date', { ascending: true });
 
-    // Scope to user's own jobs if mineOnly or not super admin
-    if (mineOnly || !isSuperAdmin) {
+    // Scope to user's own jobs only when explicitly requested
+    if (mineOnly) {
       query = query.or(`created_by.eq.${auth.userId},assigned_to.eq.${auth.userId}`);
     }
 
