@@ -51,7 +51,7 @@ function getStatusColor(job: JobCardData): { border: string; dot: string; bg: st
     return { border: 'border-amber-400', dot: 'bg-amber-400', bg: '' };
   }
   // scheduled or assigned with no activity
-  return { border: '', dot: 'bg-slate-300', bg: '' };
+  return { border: '', dot: 'bg-gray-300', bg: '' };
 }
 
 const STATUS_LABELS: Record<string, string> = {

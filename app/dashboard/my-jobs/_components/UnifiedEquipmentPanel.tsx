@@ -56,7 +56,7 @@ const CATEGORY_COLORS: Record<EquipmentCategory, { border: string; bg: string; t
   cutting_accessories: { border: 'border-l-orange-500', bg: 'bg-orange-50', text: 'text-orange-700', icon: 'text-orange-500' },
   hoses_cords:         { border: 'border-l-cyan-500',   bg: 'bg-cyan-50',   text: 'text-cyan-700',   icon: 'text-cyan-500'  },
   drums_containment:   { border: 'border-l-amber-500',  bg: 'bg-amber-50',  text: 'text-amber-700',  icon: 'text-amber-500' },
-  supplies:            { border: 'border-l-slate-400',  bg: 'bg-slate-50',  text: 'text-slate-600',  icon: 'text-slate-400' },
+  supplies:            { border: 'border-l-gray-400',   bg: 'bg-gray-50',   text: 'text-gray-600',   icon: 'text-gray-400'  },
 };
 
 // ── Service Tag Colors ──────────────────────────────────────

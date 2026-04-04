@@ -367,17 +367,17 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
             {/* ── Jobsite Conditions ── */}
             {conditions && activeConditions.length > 0 && (
-              <div className={`rounded-xl border overflow-hidden ${warningConditions.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+              <div className={`rounded-xl border overflow-hidden ${warningConditions.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
                 <button
                   onClick={() => toggleSection('conditions')}
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/5 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <ClipboardList className={`w-4 h-4 ${warningConditions.length > 0 ? 'text-amber-600' : 'text-slate-600'}`} />
-                    <span className={`text-sm font-bold ${warningConditions.length > 0 ? 'text-amber-900' : 'text-slate-900'}`}>
+                    <ClipboardList className={`w-4 h-4 ${warningConditions.length > 0 ? 'text-amber-600' : 'text-gray-600'}`} />
+                    <span className={`text-sm font-bold ${warningConditions.length > 0 ? 'text-amber-900' : 'text-gray-900'}`}>
                       Jobsite Conditions
                     </span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${warningConditions.length > 0 ? 'bg-amber-200 text-amber-700' : 'bg-slate-200 text-slate-700'}`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${warningConditions.length > 0 ? 'bg-amber-200 text-amber-700' : 'bg-gray-200 text-gray-700'}`}>
                       {activeConditions.length} active
                     </span>
                     {warningConditions.length > 0 && (
@@ -386,15 +386,15 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                       </span>
                     )}
                   </div>
-                  {expandedSections.conditions ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                  {expandedSections.conditions ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
                 </button>
 
                 {expandedSections.conditions && (
                   <div className="px-4 pb-3">
                     {/* Inside/Outside indicator */}
                     {conditions.inside_outside && (
-                      <div className="mb-2 text-xs font-bold text-slate-600 uppercase">
-                        Work Area: <span className="text-slate-900">{conditions.inside_outside}</span>
+                      <div className="mb-2 text-xs font-bold text-gray-600 uppercase">
+                        Work Area: <span className="text-gray-900">{conditions.inside_outside}</span>
                       </div>
                     )}
                     <div className="grid grid-cols-2 gap-1.5">
@@ -404,7 +404,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
                             cond.warning
                               ? 'bg-red-50 text-red-700 border border-red-200'
-                              : 'bg-white text-slate-700 border border-slate-200'
+                              : 'bg-white text-gray-700 border border-gray-200'
                           }`}
                         >
                           {cond.icon}
