@@ -5,9 +5,11 @@ export const dynamic = 'force-dynamic';
  * Clock in with NFC verification, GPS fallback, or remote mode
  *
  * Clock-in methods:
- * - NFC:     Scan registered NFC tag (shop, truck, or jobsite)
- * - GPS:     Legacy geolocation check within shop radius
- * - REMOTE:  Out-of-town with selfie photo + GPS (requires admin approval)
+ * - NFC:         Scan registered NFC tag (shop, truck, or jobsite) via Web NFC API or URL tap
+ * - GPS:         Legacy geolocation check within shop radius
+ * - REMOTE:      Out-of-town with selfie photo + GPS (requires admin approval)
+ * - GPS_REMOTE:  Out-of-town GPS-only mode; no photo required; requires admin approval
+ * - PIN:         Daily shop PIN entered on device without NFC support
  *
  * Hour categorization rules:
  * - REGULAR:          Mon-Fri, clock-in before 3 PM, non-shop
@@ -38,26 +40,28 @@ export async function POST(request: NextRequest) {
       accuracy,
       is_shop_hours,
       // NFC fields
-      clock_in_method = 'gps',   // 'nfc' | 'gps' | 'remote'
+      clock_in_method = 'gps',   // 'nfc' | 'gps' | 'remote' | 'gps_remote' | 'pin'
       nfc_tag_id,                 // UUID of the verified NFC tag
-      nfc_tag_uid,                // raw NFC tag UID
-      // Remote fields
+      nfc_tag_uid,                // raw NFC tag UID (NDEF text or serial)
+      nfc_tag_serial,             // hardware serial number from Web NFC API NDEFReader
+      // Remote / approval fields
       remote_photo_url,           // selfie URL for remote clock-in
+      requires_approval,          // boolean — true for gps_remote clock-ins
     } = body;
 
     // Validate clock_in_method to prevent injection of unexpected values
-    const VALID_CLOCK_METHODS = ['nfc', 'gps', 'remote'] as const;
+    const VALID_CLOCK_METHODS = ['nfc', 'gps', 'remote', 'gps_remote', 'pin'] as const;
     if (!VALID_CLOCK_METHODS.includes(clock_in_method as any)) {
       return NextResponse.json(
-        { error: 'Invalid clock_in_method. Must be nfc, gps, or remote.' },
+        { error: 'Invalid clock_in_method. Must be nfc, gps, remote, gps_remote, or pin.' },
         { status: 400 }
       );
     }
 
-    // Validation - location required for GPS and remote; optional for NFC
+    // Validation - location required for GPS and remote; optional for NFC and pin
     const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
 
-    if (!hasLocation && clock_in_method !== 'nfc') {
+    if (!hasLocation && clock_in_method !== 'nfc' && clock_in_method !== 'pin') {
       return NextResponse.json(
         { error: 'Invalid location data. Latitude and longitude are required.' },
         { status: 400 }
@@ -67,6 +71,7 @@ export async function POST(request: NextRequest) {
     // --- Server-side bypass_nfc verification ---
     // If NFC is required by settings but user is using GPS method, verify they have
     // an admin-issued bypass notification (prevents manual URL param bypass)
+    // gps_remote and pin bypass the NFC requirement by design (they use separate approval flows)
     if (clock_in_method === 'gps') {
       try {
         let settingsQuery = supabaseAdmin
@@ -112,7 +117,7 @@ export async function POST(request: NextRequest) {
     // -- Method-specific validation --
 
     if (clock_in_method === 'nfc') {
-      if (!nfc_tag_id && !nfc_tag_uid) {
+      if (!nfc_tag_id && !nfc_tag_uid && !nfc_tag_serial) {
         return NextResponse.json(
           { error: 'NFC tag verification required. Please scan your NFC tag.' },
           { status: 400 }
@@ -122,7 +127,7 @@ export async function POST(request: NextRequest) {
       // Double-check the tag is valid and active
       const tagQuery = nfc_tag_id
         ? supabaseAdmin.from('nfc_tags').select('id, tag_uid, is_active, label, tag_type').eq('id', nfc_tag_id).maybeSingle()
-        : supabaseAdmin.from('nfc_tags').select('id, tag_uid, is_active, label, tag_type').eq('tag_uid', nfc_tag_uid).maybeSingle();
+        : supabaseAdmin.from('nfc_tags').select('id, tag_uid, is_active, label, tag_type').eq('tag_uid', nfc_tag_uid || nfc_tag_serial).maybeSingle();
 
       const { data: tag } = await tagQuery;
 
@@ -139,6 +144,16 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+    } else if (clock_in_method === 'gps_remote') {
+      // GPS-only out-of-town mode — just needs valid coordinates; requires admin approval
+      if (!hasLocation || (latitude === 0 && longitude === 0)) {
+        return NextResponse.json(
+          { error: 'GPS coordinates are required for out-of-town clock-in. Enable location access and try again.' },
+          { status: 400 }
+        );
+      }
+    } else if (clock_in_method === 'pin') {
+      // PIN already verified by /api/timecard/verify-pin before this call; no extra check needed here
     } else {
       // GPS clock-in: verify location within shop radius
       const locationCheck = isWithinShopRadius({ latitude, longitude, accuracy });
@@ -203,7 +218,9 @@ export async function POST(request: NextRequest) {
     if (isMandatoryOvertime) hourType = 'mandatory_overtime';
     else if (isNightShift) hourType = 'night_shift';
 
-    // -- Create timecard entry --
+    // -- Build insert data --
+    const needsApproval = clock_in_method === 'gps_remote' || requires_approval === true;
+
     const insertData: Record<string, unknown> = {
       user_id: user.id,
       tenant_id: auth.tenantId || null,
@@ -219,10 +236,12 @@ export async function POST(request: NextRequest) {
       clock_in_method,
       nfc_tag_id: nfc_tag_id || null,
       nfc_tag_uid: nfc_tag_uid || null,
+      nfc_tag_serial: nfc_tag_serial || null,
       remote_photo_url: remote_photo_url || null,
+      requires_approval: needsApproval,
     };
 
-    if (clock_in_method === 'remote') {
+    if (clock_in_method === 'remote' || clock_in_method === 'gps_remote') {
       insertData.remote_verified = null; // null = pending review
     }
 
@@ -250,6 +269,7 @@ export async function POST(request: NextRequest) {
     if (is_shop_hours) flags.push('Shop Hours');
     if (isNightShift) flags.push('Night Shift');
     if (isMandatoryOvertime) flags.push('Mandatory OT (Weekend)');
+    if (needsApproval) flags.push('Needs Approval');
     flags.push(`Method: ${clock_in_method.toUpperCase()}`);
 
     const locationCheck = hasLocation
@@ -261,8 +281,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: clock_in_method === 'remote'
-          ? 'Remote clock-in recorded. Pending admin verification.'
+        message: clock_in_method === 'remote' || clock_in_method === 'gps_remote'
+          ? 'Remote clock-in recorded. Pending admin approval.'
           : `Clocked in successfully at ${now.toLocaleTimeString()}`,
         data: {
           id: timecard.id,
@@ -272,6 +292,7 @@ export async function POST(request: NextRequest) {
           hourType: timecard.hour_type,
           clockInMethod: timecard.clock_in_method,
           needsVerification: clock_in_method === 'remote',
+          requiresApproval: needsApproval,
           location: {
             latitude: timecard.clock_in_latitude,
             longitude: timecard.clock_in_longitude,

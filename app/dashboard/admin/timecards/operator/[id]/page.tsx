@@ -66,6 +66,9 @@ interface TimecardEntry {
   clock_out_gps_lng: number | null;
   nfc_clock_in: boolean;
   nfc_clock_out: boolean;
+  clock_in_method: string | null;
+  requires_approval: boolean | null;
+  remote_verified: boolean | null;
   job_order_id: string | null;
   job_number: string | null;
   job_customer_name: string | null;
@@ -1004,6 +1007,27 @@ function OperatorTimecardDetailPageInner() {
                                     -{entry.break_minutes}m break
                                   </span>
                                 )}
+                                {entry.clock_in_method === 'gps_remote' && (
+                                  <span
+                                    title={
+                                      entry.remote_verified === null
+                                        ? 'Remote GPS clock-in — needs admin approval'
+                                        : entry.remote_verified
+                                        ? 'Remote GPS — approved'
+                                        : 'Remote GPS — rejected'
+                                    }
+                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                      entry.remote_verified === null
+                                        ? 'bg-amber-500/15 text-amber-500'
+                                        : entry.remote_verified
+                                        ? 'bg-emerald-500/10 text-emerald-400'
+                                        : 'bg-red-500/10 text-red-400'
+                                    }`}
+                                  >
+                                    <MapPin size={8} />
+                                    {entry.remote_verified === null ? 'Remote · Review' : entry.remote_verified ? 'Remote · OK' : 'Remote · Rejected'}
+                                  </span>
+                                )}
                               </div>
 
                               {/* Status + actions */}
@@ -1065,6 +1089,28 @@ function OperatorTimecardDetailPageInner() {
                                   <p className="text-[10px] text-gray-600">{entry.notes}</p>
                                 </div>
                               )}
+                            </div>
+                          )}
+
+                          {/* GPS Remote map link — shown for gps_remote clock-ins */}
+                          {entry.clock_in_method === 'gps_remote' && (entry.clock_in_latitude || entry.clock_in_gps_lat) && (
+                            <div className="mt-2 px-2 py-1.5 bg-amber-50 rounded-md border border-amber-200 flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <MapPin size={10} className="text-amber-500" />
+                                <span className="text-[9px] font-bold text-amber-700 uppercase">Remote Clock-In Location</span>
+                                {entry.remote_verified === null && (
+                                  <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-amber-500/20 text-amber-600 animate-pulse">Needs Review</span>
+                                )}
+                              </div>
+                              <a
+                                href={`https://maps.google.com/maps?q=${entry.clock_in_gps_lat || entry.clock_in_latitude},${entry.clock_in_gps_lng || entry.clock_in_longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-[9px] font-bold text-amber-700 hover:bg-amber-200 transition-colors"
+                              >
+                                <ExternalLink size={9} />
+                                View on Maps
+                              </a>
                             </div>
                           )}
 

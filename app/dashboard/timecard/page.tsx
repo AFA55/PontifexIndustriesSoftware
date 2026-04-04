@@ -10,7 +10,7 @@ import {
   LogOut, Loader2, FileText, CalendarOff, Wifi, MapPin
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import NfcClockInButton from '@/components/NfcClockInButton';
+import NFCClockIn, { type ClockInResult } from '@/components/NFCClockIn';
 
 interface TimecardEntry {
   id: string;
@@ -69,7 +69,6 @@ function TimecardPage() {
   const [clockLoading, setClockLoading] = useState(true);
   const [clockingAction, setClockingAction] = useState(false);
   const [clockMethod, setClockMethod] = useState<'nfc' | 'gps' | 'remote'>('nfc');
-  const [nfcScanning, setNfcScanning] = useState(false);
   const [liveHours, setLiveHours] = useState('0.0');
   const [showTimeOffRequest, setShowTimeOffRequest] = useState(false);
   const [bypassNfc, setBypassNfc] = useState(false);
@@ -175,7 +174,6 @@ function TimecardPage() {
       alert(err.message || 'Clock-in failed');
     }
     setClockingAction(false);
-    setNfcScanning(false);
   }, [clockMethod, fetchActiveTimecard]);
 
   const handleClockOut = useCallback(async () => {
@@ -213,25 +211,6 @@ function TimecardPage() {
     setClockingAction(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleNfcScan = useCallback(async (tagUid: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const verifyRes = await fetch('/api/timecard/verify-nfc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ tag_uid: tagUid }),
-    });
-
-    if (verifyRes.ok) {
-      await handleClockIn(tagUid);
-    } else {
-      const err = await verifyRes.json();
-      alert(err.error || 'NFC tag not recognized');
-      setNfcScanning(false);
-    }
-  }, [handleClockIn]);
 
   const fetchTimecards = useCallback(async () => {
     if (isRedirecting.current) return;
@@ -453,10 +432,12 @@ function TimecardPage() {
             </div>
           ) : (
             /* NOT CLOCKED IN STATE */
-            <div className="text-center space-y-4">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-full">
-                <div className="w-2 h-2 rounded-full bg-slate-400" />
-                <span className="text-sm font-semibold">Not Clocked In</span>
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-full">
+                  <div className="w-2 h-2 rounded-full bg-slate-400" />
+                  <span className="text-sm font-semibold">Not Clocked In</span>
+                </div>
               </div>
 
               {/* Bypass NFC Banner */}
@@ -474,50 +455,25 @@ function TimecardPage() {
                 </div>
               )}
 
-              {/* Method selector — hidden when bypass NFC is active */}
-              {!bypassNfc && (
-                <div className="flex justify-center gap-2">
-                  {([
-                    { key: 'nfc' as const, label: 'NFC Badge', icon: <Wifi size={13} /> },
-                    { key: 'gps' as const, label: 'GPS', icon: <MapPin size={13} /> },
-                    { key: 'remote' as const, label: 'Remote', icon: <Calendar size={13} /> },
-                  ]).map(({ key, label, icon }) => (
-                    <button key={key} onClick={() => setClockMethod(key)}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                        clockMethod === key ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}>
-                      {icon} {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
               {bypassNfc ? (
+                /* Legacy bypass flow — kept for admin-bypass notifications */
                 <button onClick={() => handleClockIn()} disabled={clockingAction}
                   className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
                   {clockingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
                   Clock In (Remote - No NFC)
                 </button>
-              ) : clockMethod === 'nfc' && !nfcScanning ? (
-                <button onClick={() => setNfcScanning(true)} disabled={clockingAction}
-                  className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
-                  <Wifi className="w-5 h-5" />
-                  Scan NFC to Clock In
-                </button>
-              ) : clockMethod === 'nfc' && nfcScanning ? (
-                <NfcClockInButton
-                  scanning={nfcScanning}
-                  onScanResult={handleNfcScan}
-                  onError={(err) => { alert(err); setNfcScanning(false); }}
-                  onStartScan={() => setNfcScanning(true)}
-                  onStopScan={() => setNfcScanning(false)}
-                />
               ) : (
-                <button onClick={() => handleClockIn()} disabled={clockingAction}
-                  className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
-                  {clockingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : <Clock className="w-5 h-5" />}
-                  Clock In ({clockMethod === 'gps' ? 'GPS' : 'Remote'})
-                </button>
+                /* NFCClockIn component: NFC scan / daily PIN / out-of-town GPS remote */
+                <NFCClockIn
+                  disabled={clockingAction}
+                  onClockIn={(result: ClockInResult) => {
+                    if (result.success) {
+                      fetchActiveTimecard();
+                    } else {
+                      alert(result.error);
+                    }
+                  }}
+                />
               )}
             </div>
           )}
