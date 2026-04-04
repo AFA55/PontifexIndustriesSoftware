@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, role, active, profile_picture_url, created_at')
+      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, hire_date, next_review_date, role, active, profile_picture_url, created_at')
       .in('role', ['operator', 'apprentice'])
       .order('full_name');
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
-    const { fullName, email, role, dateOfBirth } = body;
+    const { fullName, email, role, dateOfBirth, hireDate, nextReviewDate, nickname } = body;
 
     if (!fullName || !email || !role) {
       return NextResponse.json(
@@ -96,6 +96,9 @@ export async function POST(request: NextRequest) {
         role,
         active: true,
         date_of_birth: dateOfBirth || null,
+        hire_date: hireDate || null,
+        next_review_date: nextReviewDate || null,
+        nickname: nickname || null,
         tenant_id: tenantId || null,
       })
       .select()
