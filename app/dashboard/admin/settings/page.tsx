@@ -8,7 +8,8 @@ import Link from 'next/link';
 import {
   ChevronLeft, Settings, Calendar, Save, Loader2,
   LayoutGrid, StickyNote, AlertTriangle, CheckCircle,
-  Hash, Bell, Minus, Plus, Users, Palette, ChevronRight
+  Hash, Bell, Minus, Plus, Users, Palette, ChevronRight,
+  Database,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -504,6 +505,27 @@ export default function SettingsPage() {
               </Link>
             </div>
           </div>
+
+          {/* ══════════════════════════════════════════════
+              DATA BACKUPS
+             ══════════════════════════════════════════════ */}
+          <Link
+            href="/dashboard/admin/settings/backups"
+            className="block bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden hover:shadow-2xl transition-all hover:scale-[1.01]"
+          >
+            <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-6 py-4 text-white flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="h-10 w-10 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <Database className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold">Data Backups</h2>
+                  <p className="text-purple-200 text-sm mt-0.5">Export customer &amp; contact data as CSV, view backup history</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-white/70 flex-shrink-0" />
+            </div>
+          </Link>
 
           {/* ══════════════════════════════════════════════
               OPERATOR SKILL LEVELS (super_admin only)
