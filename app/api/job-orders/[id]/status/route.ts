@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST/PUT /api/job-orders/[id]/status
  * Update job order status with automatic timestamp tracking
@@ -5,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -49,12 +51,16 @@ async function updateJobStatus(
       );
     }
 
-    // Check if job exists and user has permission
-    const { data: existingJob, error: checkError } = await supabaseAdmin
+    // Resolve tenant scope — supabaseAdmin bypasses RLS, must scope manually
+    const tenantId = await getTenantId(user.id);
+
+    // Check if job exists and user has permission (scoped to tenant)
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', jobId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: existingJob, error: checkError } = await jobQuery.single();
 
     if (checkError || !existingJob) {
       return NextResponse.json(
@@ -70,8 +76,9 @@ async function updateJobStatus(
       .eq('id', user.id)
       .single();
 
-    // Check permissions: operator can only update their own jobs, admin can update any
-    if (profile?.role !== 'admin' && existingJob.assigned_to !== user.id) {
+    // Check permissions: operator can only update their own jobs, admin roles can update any
+    const adminRoles = ['admin', 'super_admin', 'operations_manager'];
+    if (!adminRoles.includes(profile?.role || '') && existingJob.assigned_to !== user.id) {
       return NextResponse.json(
         { error: 'You can only update jobs assigned to you' },
         { status: 403 }
@@ -129,6 +136,10 @@ async function updateJobStatus(
       'job_difficulty_rating', 'job_access_rating',
       'job_difficulty_notes', 'job_access_notes',
       'feedback_submitted_at',
+      // Equipment confirmation tracking (per-operator)
+      'equipment_confirmed_by',
+      // Job survey (smart post-work survey)
+      'job_survey',
     ];
 
     for (const field of allowedExtraFields) {
@@ -137,26 +148,26 @@ async function updateJobStatus(
       }
     }
 
-    // Update job order
+    // Update job order (scoped to tenant)
     let updatedJob: any = null;
-    const { data: fullUpdateResult, error: updateError } = await supabaseAdmin
+    let fullUpdateQuery = supabaseAdmin
       .from('job_orders')
       .update(updateData)
-      .eq('id', jobId)
-      .select()
-      .single();
+      .eq('id', jobId);
+    if (tenantId) fullUpdateQuery = fullUpdateQuery.eq('tenant_id', tenantId);
+    const { data: fullUpdateResult, error: updateError } = await fullUpdateQuery.select().single();
 
     if (updateError) {
       // If the error is about unknown columns, retry with just the status field
       const errMsg = (updateError.message || '').toLowerCase();
       if (errMsg.includes('column') || errMsg.includes('does not exist') || errMsg.includes('undefined')) {
         console.log('Full update failed (likely missing columns), retrying with status only:', updateError.message);
-        const { data: fallbackResult, error: fallbackError } = await supabaseAdmin
+        let fallbackQuery = supabaseAdmin
           .from('job_orders')
           .update({ status })
-          .eq('id', jobId)
-          .select()
-          .single();
+          .eq('id', jobId);
+        if (tenantId) fallbackQuery = fallbackQuery.eq('tenant_id', tenantId);
+        const { data: fallbackResult, error: fallbackError } = await fallbackQuery.select().single();
 
         if (fallbackError) {
           console.error('Fallback status update also failed:', fallbackError);
@@ -222,7 +233,7 @@ async function updateJobStatus(
   }
 }
 
-// Export both POST and PUT handlers
+// Export POST, PUT, and PATCH handlers (day-complete page uses PATCH)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -231,6 +242,13 @@ export async function POST(
 }
 
 export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return updateJobStatus(request, params);
+}
+
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST/GET /api/admin/job-orders
  * Create new job orders and retrieve all job orders (admin only)
@@ -5,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // GET: Fetch all job orders (admin only)
 export async function GET(request: NextRequest) {
@@ -45,7 +48,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin
-    if (profile.role !== 'admin') {
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view all job orders' },
         { status: 403 }
@@ -59,11 +62,19 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
+    // Resolve tenant scope — REQUIRED for supabaseAdmin (service role bypasses RLS)
+    const tenantId = await getTenantId(user.id);
+
     // Build query directly from job_orders table
     let query = supabaseAdmin
       .from('job_orders')
       .select('*')
       .order('created_at', { ascending: false });
+
+    // Scope to tenant (mandatory when using admin client)
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // Apply filters
     if (status) {
@@ -165,7 +176,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is admin
-    if (profile.role !== 'admin') {
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can create job orders' },
         { status: 403 }
@@ -182,6 +193,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Resolve tenant scope — REQUIRED for supabaseAdmin (service role bypasses RLS)
+    const tenantIdPost = await getTenantId(user.id);
 
     // Prepare job order data
     const jobOrderData: any = {
@@ -210,6 +224,7 @@ export async function POST(request: NextRequest) {
       po_number: body.po_number,
       customer_job_number: body.customer_job_number,
       created_by: user.id,
+      tenant_id: tenantIdPost || undefined,
     };
 
     // Set assigned_at if assigning to operator

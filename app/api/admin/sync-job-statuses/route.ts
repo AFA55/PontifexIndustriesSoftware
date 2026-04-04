@@ -1,5 +1,8 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,18 +26,26 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if (!['admin', 'super_admin', 'operations_manager'].includes(profile?.role || '')) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    // Get all job orders
-    const { data: jobs, error: jobsError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Get all job orders (scoped to tenant)
+    let jobsQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
       .order('scheduled_date', { ascending: false });
+    if (tenantId) {
+      jobsQuery = jobsQuery.eq('tenant_id', tenantId);
+    }
+    const { data: jobs, error: jobsError } = await jobsQuery;
 
     if (jobsError) {
-      return NextResponse.json({ error: jobsError.message }, { status: 500 });
+      console.error('Error fetching jobs for sync:', jobsError);
+      return NextResponse.json({ error: 'Failed to fetch jobs for status sync' }, { status: 500 });
     }
 
     const updates: any = {
@@ -109,6 +120,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Error syncing job statuses:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to sync job statuses' }, { status: 500 });
   }
 }

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/access-requests
  * Submit a new access request with secure password hashing
@@ -124,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     const emailSent = await sendEmail({
       to: email,
-      subject: 'Access Request Received - Pontifex Industries',
+      subject: 'Access Request Received - Patriot Concrete Cutting',
       html: confirmationEmailHtml,
     });
 

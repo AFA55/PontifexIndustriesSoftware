@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/setup/check-admin
  * Check if admin exists and get their email
@@ -22,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       return NextResponse.json(
-        { error: `Database error: ${error.message}` },
+        { error: "Database error checking admin accounts" },
         { status: 500 }
       );
     }

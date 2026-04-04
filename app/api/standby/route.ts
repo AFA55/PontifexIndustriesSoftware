@@ -1,7 +1,10 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { STANDBY_POLICY_VERSION, STANDBY_HOURLY_RATE, calculateStandbyCharge } from '@/lib/legal/standby-policy';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 /**
  * POST /api/standby - Start a standby log
@@ -9,23 +12,8 @@ import { STANDBY_POLICY_VERSION, STANDBY_HOURLY_RATE, calculateStandbyCharge } f
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { success: false, error: 'Authorization required' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid or expired token' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
     const { jobId, reason, startedAt } = body;
@@ -38,17 +26,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create standby log - jobId is already a UUID
-    const { data: standbyLog, error: insertError } = await supabaseAdmin
-      .from('standby_logs')
-      .insert({
+    // Create standby log - jobId is already a UUID (with tenant scope)
+    const tenantId = await getTenantId(auth.userId);
+    const standbyData: any = {
         job_order_id: jobId,
-        operator_id: user.id,
+        operator_id: auth.userId,
         started_at: startedAt || new Date().toISOString(),
         ended_at: null,
         reason: reason,
         status: 'active'
-      })
+    };
+    if (tenantId) standbyData.tenant_id = tenantId;
+
+    const { data: standbyLog, error: insertError } = await supabaseAdmin
+      .from('standby_logs')
+      .insert(standbyData)
       .select()
       .single();
 
@@ -63,10 +55,7 @@ export async function POST(request: NextRequest) {
       }
       console.error('Error creating standby log:', insertError);
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Failed to create standby log'
-        },
+        { success: false, error: 'Failed to create standby log' },
         { status: 500 }
       );
     }
@@ -91,23 +80,8 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { success: false, error: 'Authorization required' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid or expired token' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
     const { standbyLogId, endedAt } = body;
@@ -125,7 +99,7 @@ export async function PUT(request: NextRequest) {
       .from('standby_logs')
       .select('*')
       .eq('id', standbyLogId)
-      .eq('operator_id', user.id)
+      .eq('operator_id', auth.userId)
       .single();
 
     if (fetchError) {
@@ -191,32 +165,22 @@ export async function PUT(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { success: false, error: 'Authorization required' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid or expired token' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
     const operatorId = searchParams.get('operatorId');
 
+    const tenantIdGet = await getTenantId(auth.userId);
     let query = supabaseAdmin
       .from('standby_logs')
       .select('*')
       .order('started_at', { ascending: false });
+
+    if (tenantIdGet) {
+      query = query.eq('tenant_id', tenantIdGet);
+    }
 
     if (jobId) {
       query = query.eq('job_order_id', jobId);

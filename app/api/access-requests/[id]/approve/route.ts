@@ -1,33 +1,49 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/access-requests/[id]/approve
- * Approve an access request and create user account
- * SECURITY: Uses password_hash for verification, generates temp password for account creation
+ * Approve an access request and create user account.
+ * Accepts role + optional card_permissions for granular RBAC.
+ * SECURITY: Only super_admin/operations_manager can approve requests.
+ *           Only super_admin can grant super_admin role.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmail, generateApprovalEmail } from '@/lib/email';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireOpsManager } from '@/lib/api-auth';
+import { ROLES_WITH_LABELS, ALL_CARD_KEYS, type PermissionLevel } from '@/lib/rbac';
 import crypto from 'crypto';
+
+const VALID_ROLES = ROLES_WITH_LABELS.map(r => r.value);
+const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'submit', 'full'];
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Security: only admins can approve access requests
-    const auth = await requireAdmin(request);
+    // Security: only super_admin/operations_manager can approve access requests
+    const auth = await requireOpsManager(request);
     if (!auth.authorized) return auth.response;
 
     const { id } = await params;
     const body = await request.json();
-    const { role, reviewedBy } = body;
+    const { role, reviewedBy, card_permissions } = body;
 
-    // Validation
-    if (!role || !['admin', 'operator', 'apprentice'].includes(role)) {
+    // Validation: role must be one of our defined roles
+    if (!role || !VALID_ROLES.includes(role)) {
       return NextResponse.json(
-        { error: 'Invalid role. Must be "admin", "operator", or "apprentice"' },
+        { error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` },
         { status: 400 }
+      );
+    }
+
+    // Guard: only super_admin can grant super_admin role
+    if (role === 'super_admin' && auth.role !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Only a Super Admin can grant the Super Admin role.' },
+        { status: 403 }
       );
     }
 
@@ -36,6 +52,24 @@ export async function POST(
         { error: 'reviewedBy (admin user ID) is required' },
         { status: 400 }
       );
+    }
+
+    // Validate card_permissions if provided
+    if (card_permissions && typeof card_permissions === 'object') {
+      for (const [key, level] of Object.entries(card_permissions)) {
+        if (!ALL_CARD_KEYS.includes(key)) {
+          return NextResponse.json(
+            { error: `Invalid card key in permissions: ${key}` },
+            { status: 400 }
+          );
+        }
+        if (!VALID_LEVELS.includes(level as PermissionLevel)) {
+          return NextResponse.json(
+            { error: `Invalid permission level for ${key}: ${level}` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Fetch the access request
@@ -153,7 +187,27 @@ export async function POST(
       }
     }
 
-    // Step 3: Update access request status
+    // Step 3: Upsert card-level permissions if provided
+    if (card_permissions && typeof card_permissions === 'object' && Object.keys(card_permissions).length > 0) {
+      const permRows = Object.entries(card_permissions).map(([card_key, permission_level]) => ({
+        user_id: userId,
+        card_key,
+        permission_level: permission_level as string,
+        updated_by: auth.userId,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error: permError } = await supabaseAdmin
+        .from('user_card_permissions')
+        .upsert(permRows, { onConflict: 'user_id,card_key' });
+
+      if (permError) {
+        console.error('[approve] Error upserting card permissions:', permError);
+        // Non-critical: log but continue
+      }
+    }
+
+    // Step 4: Update access request status
     const { error: updateError } = await supabaseAdmin
       .from('access_requests')
       .update({
@@ -168,7 +222,7 @@ export async function POST(
       console.error('[approve] Error updating access request status:', updateError);
     }
 
-    // Step 4: Send approval confirmation email
+    // Step 5: Send approval confirmation email
     const approvalEmailHtml = generateApprovalEmail(
       accessRequest.full_name,
       accessRequest.email,
@@ -177,7 +231,7 @@ export async function POST(
 
     const emailSent = await sendEmail({
       to: accessRequest.email,
-      subject: 'Access Approved - Pontifex Industries',
+      subject: 'Access Approved - Patriot Concrete Cutting',
       html: approvalEmailHtml,
     });
 
@@ -185,7 +239,7 @@ export async function POST(
       console.warn('[approve] Could not send approval confirmation email');
     }
 
-    // Step 5: Generate a password reset link so user can set their own password
+    // Step 6: Generate a password reset link so user can set their own password
     const { data: resetData } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: accessRequest.email,

@@ -1,48 +1,29 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAdmin } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
+export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.authorized) return auth.response
+  const tenantId = await getTenantId(auth.userId)
 
-export async function POST(request: Request) {
   try {
-    const { inventory_id, operator_id, serial_number, notes, assigned_by } = await request.json()
+    const { inventory_id, operator_id, serial_number, notes } = await request.json()
 
-    // Validate required fields
-    if (!inventory_id || !operator_id || !serial_number || !assigned_by) {
+    if (!inventory_id || !operator_id || !serial_number) {
       return NextResponse.json(
-        { error: 'Missing required fields: inventory_id, operator_id, serial_number, assigned_by' },
+        { error: 'Missing required fields: inventory_id, operator_id, serial_number' },
         { status: 400 }
       )
     }
 
-    // Verify user has permission (admin or inventory_manager)
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', assigned_by)
-      .single()
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'inventory_manager')) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Insufficient permissions' },
-        { status: 403 }
-      )
-    }
-
-    // Check if serial number already exists
-    const { data: existingEquipment } = await supabaseAdmin
-      .from('equipment')
-      .select('id, serial_number, name')
-      .eq('serial_number', serial_number)
-      .single()
+    // Check if serial number already exists (tenant-scoped)
+    let serialCheck = supabaseAdmin.from('equipment').select('id, serial_number, name').eq('serial_number', serial_number)
+    if (tenantId) serialCheck = serialCheck.eq('tenant_id', tenantId)
+    const { data: existingEquipment } = await serialCheck.single()
 
     if (existingEquipment) {
       return NextResponse.json(
@@ -51,26 +32,22 @@ export async function POST(request: Request) {
       )
     }
 
-    // Call the database function to assign equipment
     const { data, error } = await supabaseAdmin.rpc('assign_equipment_from_inventory', {
       p_inventory_id: inventory_id,
       p_operator_id: operator_id,
       p_serial_number: serial_number,
-      p_assigned_by: assigned_by,
+      p_assigned_by: auth.userId,
       p_notes: notes || null
     })
 
     if (error) {
       console.error('Error assigning equipment:', error)
-
-      // Handle duplicate serial number error
       if (error.code === '23505' && error.message.includes('equipment_serial_number_key')) {
         return NextResponse.json(
           { error: `Serial number "${serial_number}" has already been used. Please use a unique serial number.` },
           { status: 400 }
         )
       }
-
       return NextResponse.json(
         { error: error.message || 'Failed to assign equipment' },
         { status: 500 }
@@ -82,7 +59,6 @@ export async function POST(request: Request) {
       equipment_id: data,
       message: 'Equipment assigned successfully'
     })
-
   } catch (error: any) {
     console.error('Error in assign route:', error)
     return NextResponse.json(

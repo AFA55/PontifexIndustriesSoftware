@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/users
  * Get users by role (admin only)
@@ -6,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,13 +47,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view users' },
         { status: 403 }
       );
     }
+
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
 
     // Get role filter from query params
     const { searchParams } = new URL(request.url);
@@ -59,9 +65,14 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, email, active')
+      .select('id, full_name, role, email, active, phone_number, phone, profile_picture_url, created_at, date_of_birth, hire_date, next_review_date, nickname')
       .eq('active', true)
       .order('full_name');
+
+    // Scope to tenant
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // Apply role filter if provided
     if (roleFilter) {

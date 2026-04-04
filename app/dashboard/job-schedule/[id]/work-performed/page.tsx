@@ -1,12 +1,17 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import WorkflowNavigation from '@/components/WorkflowNavigation';
 import QuickAccessButtons from '@/components/QuickAccessButtons';
 import EquipmentUsageForm from '@/components/EquipmentUsageForm';
+import RecommendedItems from './_components/RecommendedItems';
+import PhotoUploader from '@/components/PhotoUploader';
+import { Camera, Mic } from 'lucide-react';
+import VoiceMemoNotes from './_components/VoiceMemoNotes';
 
 // Organized work item categories based on DSM screenshots
 const WORK_CATEGORIES = {
@@ -23,7 +28,8 @@ const WORK_CATEGORIES = {
     'HAND SAW',
     'FLUSH CUT HAND SAW',
     'CHAIN SAW',
-    'RING SAW'
+    'RING SAW',
+    'PUSH SAW'
   ],
   'Breaking & Removal': [
     'BREAK & REMOVE',
@@ -204,6 +210,63 @@ export default function WorkPerformed() {
   const [difficultyNotes, setDifficultyNotes] = useState('');
   const [accessNotes, setAccessNotes] = useState('');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [jobType, setJobType] = useState<string>('');
+  const [currentDayNumber, setCurrentDayNumber] = useState<number>(1);
+  const [jobPhotos, setJobPhotos] = useState<string[]>([]);
+  const [voiceNotes, setVoiceNotes] = useState<string>('');
+
+  // ─── Day lock state (read-only if today's daily log already submitted) ──────
+  const [dayAlreadySubmitted, setDayAlreadySubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch job type and day number for smart recommendations + correct work item tracking
+  useEffect(() => {
+    const fetchJobInfo = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        // Fetch only this specific job (not all jobs) for efficiency on long-term projects
+        const res = await fetch(`/api/job-orders?id=${params.id}&include_helper_jobs=true&includeCompleted=true`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const found = (json.data || [])[0];
+          if (found?.job_type) setJobType(found.job_type);
+          // Calculate the current day number: total_days_worked + 1 (today is a new day)
+          const daysWorked = found?.total_days_worked || 0;
+          setCurrentDayNumber(daysWorked + 1);
+        }
+      } catch (err) {
+        console.error('Error fetching job info:', err);
+      }
+    };
+    fetchJobInfo();
+  }, [params.id]);
+
+  // Check if today's daily log is already submitted (lock the page if so)
+  useEffect(() => {
+    const checkDaySubmitted = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const today = new Date().toISOString().split('T')[0];
+        const res = await fetch(`/api/job-orders/${params.id}/daily-log`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          // Check if any log for today already has day_completed_at set
+          const todayLog = (json.logs || []).find((l: any) => l.log_date === today && l.day_completed_at);
+          if (todayLog) {
+            setDayAlreadySubmitted(true);
+          }
+        }
+      } catch { /* non-critical — default to editable */ }
+    };
+    checkDaySubmitted();
+  }, [params.id]);
+
   const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
   const [totalStandbyMinutes, setTotalStandbyMinutes] = useState(0);
 
@@ -1110,87 +1173,57 @@ export default function WorkPerformed() {
       return;
     }
 
-    // Show feedback modal instead of submitting directly
-    setShowFeedbackModal(true);
-  };
-
-  const handleSubmitWithFeedback = async () => {
-    // Validate feedback ratings
-    if (jobDifficultyRating === 0) {
-      showNotification('Please rate the job difficulty', 'warning');
-      return;
-    }
-
-    if (jobAccessRating === 0) {
-      showNotification('Please rate the job site access', 'warning');
-      return;
-    }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
-      // Save work performed data
-      const workPerformedData = {
-        jobId: params.id,
-        items: selectedItems,
-        timestamp: new Date().toISOString()
-      };
-
-      console.log('Submitting work performed:', workPerformedData);
-
-      // Save to localStorage (in real app, send to backend)
-      localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
-
-      // Track blade usage for sawing work
       const { data: { session } } = await supabase.auth.getSession();
+
       if (session) {
-        try {
-          const trackingResponse = await fetch('/api/equipment/track-usage', {
+        // Save work items to database (primary storage)
+        const res = await fetch(`/api/job-orders/${params.id}/work-items`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            items: selectedItems,
+            dayNumber: currentDayNumber,
+            notes: voiceNotes || undefined
+          })
+        });
+
+        if (!res.ok) {
+          console.error('Failed to save work items to DB, falling back to localStorage');
+        }
+
+        // Track blade usage for sawing work (fire and forget)
+        fetch('/api/equipment/track-usage', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            job_order_id: params.id,
+            work_items: selectedItems
+          })
+        }).catch(err => console.error('Blade tracking error:', err));
+
+        // Save photos if any were taken
+        if (jobPhotos.length > 0) {
+          fetch(`/api/job-orders/${params.id}/photos`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`
             },
-            body: JSON.stringify({
-              job_order_id: params.id,
-              work_items: selectedItems
-            })
-          });
-
-          if (trackingResponse.ok) {
-            const trackingData = await trackingResponse.json();
-            console.log('Blade usage tracked:', trackingData);
-          }
-        } catch (trackingError) {
-          console.error('Error tracking blade usage:', trackingError);
-          // Continue even if blade tracking fails
+            body: JSON.stringify({ photo_urls: jobPhotos })
+          }).catch(err => console.error('Photo save error:', err));
         }
 
-        // Save job feedback ratings — use status API (POST, not PATCH)
-        try {
-          const feedbackResponse = await fetch(`/api/job-orders/${params.id}/status`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify({
-              status: 'in_progress',
-              job_difficulty_rating: jobDifficultyRating,
-              job_access_rating: jobAccessRating,
-              job_difficulty_notes: difficultyNotes,
-              job_access_notes: accessNotes,
-              feedback_submitted_at: new Date().toISOString()
-            })
-          });
-
-          if (feedbackResponse.ok) {
-            console.log('Job feedback saved successfully');
-          }
-        } catch (feedbackError) {
-          console.error('Error saving job feedback:', feedbackError);
-          // Continue even if feedback saving fails
-        }
-
-        // Update workflow — fire and forget (optional tracking)
+        // Update workflow tracking (fire and forget)
         fetch('/api/workflow', {
           method: 'POST',
           headers: {
@@ -1200,58 +1233,74 @@ export default function WorkPerformed() {
           body: JSON.stringify({
             jobId: params.id,
             completedStep: 'work_performed',
-            currentStep: 'pictures',
+            currentStep: 'day_complete',
           })
-        }).catch(err => console.log('Workflow tracking unavailable:', err));
+        }).catch(() => {});
       }
 
-      showNotification('Work performed and feedback saved successfully!', 'success');
+      // Also save to localStorage as backup
+      const workPerformedData = {
+        jobId: params.id,
+        items: selectedItems,
+        photos: jobPhotos,
+        notes: voiceNotes || '',
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
 
-      // Navigate to pictures page after a short delay
+      showNotification('Work performed saved!', 'success');
+
+      // Navigate to day completion page (done for today vs fully complete)
       setTimeout(() => {
-        router.push(`/dashboard/job-schedule/${params.id}/pictures`);
-      }, 1500);
+        router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
+      }, 800);
     } catch (error) {
       console.error('Error submitting work performed:', error);
-      // Still navigate — work was saved to localStorage
-      router.push(`/dashboard/job-schedule/${params.id}/pictures`);
+      // Fallback: save to localStorage and still navigate
+      const workPerformedData = {
+        jobId: params.id,
+        items: selectedItems,
+        photos: jobPhotos,
+        notes: voiceNotes || '',
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
+      router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-600 to-orange-500 sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-3 sm:py-5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-              <Link
-                href={`/dashboard/job-schedule/${params.id}/silica-exposure`}
-                className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl transition-all text-white flex-shrink-0"
-              >
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="hidden sm:flex w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl items-center justify-center flex-shrink-0">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-lg sm:text-2xl font-bold text-white truncate">Work Performed</h1>
-                  <p className="text-xs sm:text-sm text-orange-100 hidden sm:block">Select completed work items</p>
-                </div>
-              </div>
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div className="container mx-auto px-4 py-4 max-w-lg">
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/dashboard/my-jobs/${params.id}/jobsite`}
+              className="p-2 bg-gray-100 rounded-xl border border-gray-200 hover:bg-gray-200 transition-all"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </Link>
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
             </div>
-            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              <span className="px-2 sm:px-4 py-1.5 sm:py-2 bg-white/20 backdrop-blur-sm text-white rounded-xl text-xs sm:text-sm font-semibold shadow-lg">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold text-gray-900 truncate">Work Performed</h1>
+              <p className="text-gray-500 text-xs">Select completed work items</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="px-2 py-1.5 bg-gray-100 text-gray-700 rounded-xl text-xs font-semibold border border-gray-200">
                 {selectedItems.length} Selected
               </span>
               <button
                 onClick={() => setView(view === 'search' ? 'selected' : 'search')}
-                className="px-3 sm:px-5 py-1.5 sm:py-2 bg-white text-orange-600 rounded-xl hover:bg-orange-50 transition-all font-semibold text-xs sm:text-sm shadow-lg"
+                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold text-xs border border-gray-200"
               >
                 {view === 'search' ? 'View Selected' : 'Add More'}
               </button>
@@ -1260,17 +1309,34 @@ export default function WorkPerformed() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
-        {/* Workflow Navigation */}
-        <WorkflowNavigation jobId={params.id as string} currentStepId="work_performed" />
-
+      <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
         {/* Quick Access Buttons */}
         <QuickAccessButtons jobId={params.id as string} />
+
+        {/* ─── Day Already Submitted Banner ───────────────────────────── */}
+        {dayAlreadySubmitted && (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0-6v2m-6 4h12a2 2 0 002-2V9a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <div>
+              <p className="text-sm font-bold text-amber-800">Day already submitted</p>
+              <p className="text-xs text-amber-700 mt-0.5">You have already tapped &quot;Done for Today&quot; for this job. Your work log is saved and cannot be edited.</p>
+            </div>
+          </div>
+        )}
 
         {view === 'search' ? (
           <>
             {/* Autocomplete Search Bar */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-4 mb-4">
+              {/* Smart Recommendations based on job type */}
+              <RecommendedItems
+                jobType={jobType}
+                selectedItems={selectedItems.map(i => i.name)}
+                onAddItem={(itemName) => handleQuickAddItem(itemName)}
+              />
+
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Search and Add Work Items
               </label>
@@ -1321,7 +1387,7 @@ export default function WorkPerformed() {
 
             {/* Selected Items Display */}
             {selectedItems.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+              <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-4 mb-4">
                 <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -1663,10 +1729,10 @@ export default function WorkPerformed() {
             {/* Equipment Usage Section */}
             {selectedItems.length > 0 && (
               <div className="mt-8 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-xl p-6 border-2 border-indigo-200">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-3">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
                         <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1679,7 +1745,7 @@ export default function WorkPerformed() {
                   <button
                     onClick={() => setShowEquipmentForm(true)}
                     disabled={savingEquipment}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2"
+                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -1770,24 +1836,63 @@ export default function WorkPerformed() {
           </div>
         )}
 
+        {/* Job Photos Section */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Camera className="w-5 h-5 text-blue-600" />
+            <h3 className="text-sm font-bold text-gray-700">Job Photos</h3>
+            <span className="text-xs text-gray-400">(optional)</span>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Take photos of work performed, site conditions, or anything noteworthy
+          </p>
+          <PhotoUploader
+            bucket="job-photos"
+            pathPrefix={params.id as string}
+            photos={jobPhotos}
+            onPhotosChange={setJobPhotos}
+            maxPhotos={10}
+            label="Add Job Photos"
+            lightMode={true}
+          />
+        </div>
+
+        {/* Voice Memo Notes */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Mic className="w-5 h-5 text-blue-600" />
+            <h3 className="text-sm font-bold text-gray-700">Job Notes</h3>
+            <span className="text-xs text-gray-400">(voice or typed)</span>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Describe work performed, conditions encountered, or anything noteworthy. Use the mic button to dictate notes hands-free.
+          </p>
+          <VoiceMemoNotes
+            notes={voiceNotes}
+            onNotesChange={setVoiceNotes}
+            placeholder="Tap the mic and describe what you did today..."
+          />
+        </div>
+
         {/* Submit Button */}
-        {selectedItems.length > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-            <div className="container mx-auto max-w-6xl flex gap-3">
+        {selectedItems.length > 0 && !dayAlreadySubmitted && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 p-4 pb-6 z-50">
+            <div className="container mx-auto max-w-lg flex gap-3">
               <button
-                onClick={() => router.push(`/dashboard/job-schedule/${params.id}`)}
-                className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-semibold"
+                onClick={() => router.push(`/dashboard/my-jobs/${params.id}`)}
+                className="flex-shrink-0 px-5 py-3.5 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-semibold text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center gap-2"
+                disabled={isSubmitting}
+                className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
-                Submit Work Performed
+                {isSubmitting ? 'Saving...' : 'Next: Job Survey'}
               </button>
             </div>
           </div>
@@ -2765,7 +2870,7 @@ export default function WorkPerformed() {
                       <button
                         type="button"
                         onClick={() => setShowBrokkModal(true)}
-                        className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-gray-700 to-slate-700 hover:from-gray-800 hover:to-slate-800 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                        className="w-full mb-3 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -2860,140 +2965,6 @@ export default function WorkPerformed() {
               onSave={handleSaveEquipmentUsage}
               onCancel={() => setShowEquipmentForm(false)}
             />
-          </div>
-        </div>
-      )}
-
-      {/* Job Feedback Modal */}
-      {showFeedbackModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-2xl w-full p-4 sm:p-8 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Job Feedback</h2>
-              <p className="text-gray-600">Help us improve by rating this job</p>
-            </div>
-
-            <div className="space-y-6">
-              {/* Job Difficulty Rating */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  How difficult was this job? *
-                </label>
-                <div className="flex gap-2 justify-between">
-                  {[1, 2, 3, 4, 5].map((rating) => (
-                    <button
-                      key={rating}
-                      type="button"
-                      onClick={() => setJobDifficultyRating(rating)}
-                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
-                        jobDifficultyRating === rating
-                          ? 'bg-blue-500 text-white border-blue-600'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">
-                        {rating === 1 && '😊'}
-                        {rating === 2 && '🙂'}
-                        {rating === 3 && '😐'}
-                        {rating === 4 && '😰'}
-                        {rating === 5 && '😫'}
-                      </div>
-                      <div className="text-xs font-medium">
-                        {rating === 1 && 'Very Easy'}
-                        {rating === 2 && 'Easy'}
-                        {rating === 3 && 'Moderate'}
-                        {rating === 4 && 'Hard'}
-                        {rating === 5 && 'Very Hard'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Difficulty Notes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  What made it {jobDifficultyRating >= 4 ? 'difficult' : jobDifficultyRating >= 3 ? 'challenging' : 'easy'}? (Optional)
-                </label>
-                <textarea
-                  value={difficultyNotes}
-                  onChange={(e) => setDifficultyNotes(e.target.value)}
-                  placeholder="E.g., Steel rebar, tight spaces, complex cuts..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-gray-900"
-                  rows={2}
-                />
-              </div>
-
-              {/* Job Access Rating */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  How was the job site access? *
-                </label>
-                <div className="flex gap-2 justify-between">
-                  {[1, 2, 3, 4, 5].map((rating) => (
-                    <button
-                      key={rating}
-                      type="button"
-                      onClick={() => setJobAccessRating(rating)}
-                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
-                        jobAccessRating === rating
-                          ? 'bg-green-500 text-white border-green-600'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-green-300'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">
-                        {rating === 1 && '✅'}
-                        {rating === 2 && '👍'}
-                        {rating === 3 && '👌'}
-                        {rating === 4 && '⚠️'}
-                        {rating === 5 && '🚫'}
-                      </div>
-                      <div className="text-xs font-medium">
-                        {rating === 1 && 'Excellent'}
-                        {rating === 2 && 'Good'}
-                        {rating === 3 && 'Fair'}
-                        {rating === 4 && 'Poor'}
-                        {rating === 5 && 'Very Poor'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Access Notes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Access details (Optional)
-                </label>
-                <textarea
-                  value={accessNotes}
-                  onChange={(e) => setAccessNotes(e.target.value)}
-                  placeholder="E.g., Narrow stairs, elevator out of service, parking far away..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none text-gray-900"
-                  rows={2}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-8">
-              <button
-                onClick={() => setShowFeedbackModal(false)}
-                className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitWithFeedback}
-                disabled={jobDifficultyRating === 0 || jobAccessRating === 0}
-                className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl ${
-                  jobDifficultyRating === 0 || jobAccessRating === 0
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white'
-                }`}
-              >
-                Submit Work Performed
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -3754,10 +3725,10 @@ export default function WorkPerformed() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 z-50">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-gray-700 to-slate-700 text-white p-4 sm:p-6 rounded-t-3xl flex justify-between items-center">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6 rounded-t-3xl flex justify-between items-center">
               <div>
-                <h2 className="text-lg sm:text-2xl font-bold">Brokk Quick Entry</h2>
-                <p className="text-gray-300 text-xs sm:text-sm mt-1">Calculate area and thickness</p>
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Brokk Quick Entry</h2>
+                <p className="text-gray-500 text-xs sm:text-sm mt-1">Calculate area and thickness</p>
               </div>
               <button
                 onClick={() => {
@@ -3832,7 +3803,7 @@ export default function WorkPerformed() {
                 <button
                   type="button"
                   onClick={addBrokkArea}
-                  className="mt-4 w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+                  className="mt-4 w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
                 >
                   Add Area to List
                 </button>
@@ -3909,7 +3880,7 @@ export default function WorkPerformed() {
               <button
                 type="button"
                 onClick={applyBrokkEntry}
-                className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
+                className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors shadow-md hover:shadow-lg"
               >
                 Apply to Work Item
               </button>

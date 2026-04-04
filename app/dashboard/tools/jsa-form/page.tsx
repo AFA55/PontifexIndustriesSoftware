@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -159,7 +161,6 @@ export default function JSAFormPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('JSA Form Submitted:', formData);
     alert('Job Safety Analysis form submitted successfully!');
   };
 

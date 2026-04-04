@@ -22,6 +22,13 @@ function isRateLimited(key: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(key);
 
+  // Lazy cleanup: remove expired entries every 100 checks (no setInterval needed for Edge)
+  if (rateLimitMap.size > 50) {
+    for (const [k, v] of rateLimitMap.entries()) {
+      if (now > v.resetAt) rateLimitMap.delete(k);
+    }
+  }
+
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
     return false;
@@ -33,16 +40,6 @@ function isRateLimited(key: string): boolean {
   }
   return false;
 }
-
-// Clean up old entries periodically (avoid memory leak)
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(key);
-    }
-  }
-}, 60_000);
 
 // Public API endpoints that should be rate-limited
 const RATE_LIMITED_PATHS = [
@@ -79,7 +76,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set(
     'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(self), payment=()'
+    'camera=(self), microphone=(), geolocation=(self), payment=()'
   );
 
   // Prevent caching of API responses with sensitive data

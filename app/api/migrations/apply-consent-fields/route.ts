@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/migrations/apply-consent-fields
  * Apply migration to add consent tracking fields to access_requests table

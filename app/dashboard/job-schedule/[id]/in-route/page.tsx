@@ -1,9 +1,11 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { MapPin, Phone, User, PlayCircle, ArrowLeft } from 'lucide-react';
+import { MapPin, Phone, User, PlayCircle, ArrowLeft, AlertTriangle, FileText, Briefcase } from 'lucide-react';
 import Notification from '@/components/Notification';
 
 interface JobOrder {
@@ -20,6 +22,10 @@ interface JobOrder {
   arrival_time?: string;
   contact_on_site?: string;
   contact_phone?: string;
+  salesman_name?: string;
+  created_by_name?: string;
+  created_by_email?: string;
+  job_type?: string;
 }
 
 export default function InRoutePage() {
@@ -35,6 +41,7 @@ export default function InRoutePage() {
   const [arrivalTime, setArrivalTime] = useState('');
   const [displayTime, setDisplayTime] = useState('');
   const [hasStartedProcess, setHasStartedProcess] = useState(false);
+  const [showWorkDiffersModal, setShowWorkDiffersModal] = useState(false);
 
   useEffect(() => {
     checkEquipmentChecklist();
@@ -87,14 +94,9 @@ export default function InRoutePage() {
         if (result.success && result.data) {
           const workflow = result.data;
 
-          // If they've moved past in_route step, redirect them forward
+          // If they've moved past in_route step, redirect them to work-performed
           if (workflow.current_step && workflow.current_step !== 'in_route' && workflow.current_step !== 'equipment_checklist') {
-            // They've already started - redirect to appropriate page
-            if (workflow.current_step === 'liability_release') {
-              router.push(`/dashboard/job-schedule/${jobId}/liability-release`);
-            } else if (workflow.current_step === 'silica_form') {
-              router.push(`/dashboard/job-schedule/${jobId}/silica-exposure`);
-            }
+            router.push(`/dashboard/job-schedule/${jobId}/work-performed`);
           }
         }
       }
@@ -123,22 +125,17 @@ export default function InRoutePage() {
         if (result.success && result.data) {
           const workflow = result.data;
 
-          // If equipment checklist NOT completed, redirect back
-          if (!workflow.equipment_checklist_completed) {
-            router.replace(`/dashboard/job-schedule/${jobId}/equipment-checklist`);
-            return;
-          }
+          // Equipment is now handled in my-jobs page before operator reaches in-route
+          // No redirect needed — operator already confirmed equipment
 
           setEquipmentChecklistComplete(true);
         } else if (result.success && !result.data) {
           // Workflow table doesn't exist yet — if operator navigated here
           // through the normal flow, assume checklist is done
-          console.log('Workflow table not available — assuming equipment checklist complete');
           setEquipmentChecklistComplete(true);
         }
       } else {
         // API error — don't block the operator, assume checklist is done
-        console.log('Workflow API error — assuming equipment checklist complete');
         setEquipmentChecklistComplete(true);
       }
     } catch (error) {
@@ -206,7 +203,7 @@ export default function InRoutePage() {
           timestamp: new Date().toISOString(),
           time: displayTime
         })
-      }).catch(err => console.log('History tracking unavailable:', err));
+      }).catch(() => {});
 
       // 2. Update workflow — fire and forget (optional tracking)
       fetch('/api/workflow', {
@@ -218,9 +215,9 @@ export default function InRoutePage() {
         body: JSON.stringify({
           jobId: jobId,
           completedStep: 'in_route',
-          currentStep: 'liability_release'
+          currentStep: 'work_performed'
         })
-      }).catch(err => console.log('Workflow tracking unavailable:', err));
+      }).catch(() => {});
 
       // 3. Update job status to in_progress via API (avoids RLS issues)
       // This is the important call — but don't let it block navigation
@@ -238,14 +235,14 @@ export default function InRoutePage() {
         });
 
         if (!statusResponse.ok) {
-          console.log('Status update returned non-ok, but continuing navigation');
+          // Status update returned non-ok, but continuing navigation
         }
       } catch (statusErr) {
-        console.log('Status update failed, but continuing navigation:', statusErr);
+        // Status update failed, but continuing navigation
       }
 
-      // 4. Redirect to liability release page — always navigate regardless of API results
-      router.push(`/dashboard/job-schedule/${jobId}/liability-release`);
+      // 4. Redirect to work-performed page — always navigate regardless of API results
+      router.push(`/dashboard/job-schedule/${jobId}/work-performed`);
 
     } catch (error) {
       console.error('Error starting in process:', error);
@@ -291,40 +288,98 @@ export default function InRoutePage() {
         />
       )}
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 py-6">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white sticky top-0 z-10 shadow-lg">
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-              <MapPin className="w-6 h-6" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center flex-shrink-0">
+              <MapPin className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">In Route</h1>
+              <h1 className="text-xl sm:text-2xl font-bold">In Route</h1>
               <p className="text-blue-100 text-sm">Location revealed - ready to go!</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
         {/* Job Information */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl border border-gray-200/50 p-8 mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Job Details</h2>
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 mb-5">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Job Details</h2>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-gray-600">Customer</p>
               <p className="text-lg font-semibold text-gray-900">{job.customer_name}</p>
             </div>
+            {job.job_type && (
+              <div>
+                <p className="text-sm text-gray-600">Service Type</p>
+                <p className="text-lg font-semibold text-purple-700">{job.job_type}</p>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Work Description */}
+        {job.description && (
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-blue-200 p-5 mb-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Work Description</h2>
+            </div>
+            <p className="text-gray-800 text-base leading-relaxed whitespace-pre-wrap">{job.description}</p>
+
+            {/* Work Differs Button */}
+            <button
+              onClick={() => setShowWorkDiffersModal(true)}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl font-semibold text-sm transition-all border border-amber-300"
+            >
+              <AlertTriangle className="w-4 h-4" />
+              Work Differs from Description
+            </button>
+          </div>
+        )}
+
+        {/* Project Manager */}
+        {(job.salesman_name || job.created_by_name) && (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 sm:p-6 mb-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Project Manager</h3>
+                <p className="text-sm text-gray-500">Contact if you have questions about the work</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3 min-w-0">
+                <User className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                <span className="font-semibold text-gray-900 truncate">{job.salesman_name || job.created_by_name}</span>
+              </div>
+              {job.created_by_email && (
+                <a
+                  href={`tel:${job.created_by_email}`}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-xl font-semibold text-sm transition-all"
+                >
+                  <Phone className="w-4 h-4" />
+                  Call
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Location Information - NOW VISIBLE */}
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 backdrop-blur-lg rounded-3xl shadow-2xl border-2 border-green-300 p-8 mb-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-14 h-14 bg-green-600 rounded-2xl flex items-center justify-center">
-              <MapPin className="w-7 h-7 text-white" />
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-green-300 p-5 mb-5">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <MapPin className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Location Details</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Location Details</h2>
               <p className="text-sm text-green-700">Equipment checklist completed ✓</p>
             </div>
           </div>
@@ -342,7 +397,7 @@ export default function InRoutePage() {
                 href={getDirectionsUrl(job.address)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all shadow-lg"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all shadow-lg"
               >
                 <MapPin className="w-5 h-5" />
                 Get Directions
@@ -385,12 +440,12 @@ export default function InRoutePage() {
         </div>
 
         {/* Start In Process Button */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl border border-gray-200/50 p-8">
-          <div className="text-center mb-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 sm:p-8">
+          <div className="text-center mb-5">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">
               Ready to Start Work?
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-sm sm:text-base">
               Click below when you arrive at the job site to log your arrival time
             </p>
           </div>
@@ -398,7 +453,7 @@ export default function InRoutePage() {
           <button
             onClick={handleStartInProcess}
             disabled={submitting}
-            className={`w-full px-8 py-5 rounded-2xl font-bold text-xl transition-all shadow-2xl flex items-center justify-center gap-3 ${
+            className={`w-full px-6 py-4 rounded-2xl font-bold text-lg min-h-[56px] transition-all shadow-xl flex items-center justify-center gap-3 ${
               submitting
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white transform hover:scale-[1.02]'
@@ -418,14 +473,14 @@ export default function InRoutePage() {
           </button>
 
           <p className="text-sm text-gray-500 text-center mt-4">
-            This will log your jobsite arrival time and proceed to the liability release form
+            This will log your jobsite arrival time and proceed to the work performed form
           </p>
         </div>
 
         {/* Back Button - Disabled after starting process */}
         <div className="mt-6">
           <button
-            onClick={() => !hasStartedProcess && router.push('/dashboard/job-schedule')}
+            onClick={() => !hasStartedProcess && router.push('/dashboard/my-jobs')}
             disabled={hasStartedProcess}
             className={`w-full px-6 py-3 rounded-xl transition-all font-semibold flex items-center justify-center gap-2 ${
               hasStartedProcess
@@ -434,15 +489,58 @@ export default function InRoutePage() {
             }`}
           >
             <ArrowLeft className="w-5 h-5" />
-            {hasStartedProcess ? 'Arrival Confirmed - Continue Forward' : 'Back to Job Schedule'}
+            {hasStartedProcess ? 'Arrival Confirmed - Continue Forward' : 'Back to My Schedule'}
           </button>
         </div>
       </div>
 
+      {/* Work Differs Modal */}
+      {showWorkDiffersModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto transform transition-all">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-8 h-8 text-amber-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Work Differs?</h3>
+              <p className="text-gray-600 text-sm">
+                If the actual work at the jobsite differs from the description, contact the Project Manager before proceeding.
+              </p>
+            </div>
+
+            <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 mb-6">
+              <p className="text-sm text-amber-800 font-medium mb-2">
+                Do NOT proceed with work that differs from the job description without PM approval.
+              </p>
+              <p className="text-xs text-amber-700">
+                Changes to scope must be authorized to ensure proper billing and safety compliance.
+              </p>
+            </div>
+
+            {(job.salesman_name || job.created_by_name) && (
+              <a
+                href={job.created_by_email ? `tel:${job.created_by_email}` : '#'}
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white rounded-xl font-bold text-lg transition-all shadow-lg mb-4"
+              >
+                <Phone className="w-5 h-5" />
+                Call {job.salesman_name || job.created_by_name}
+              </a>
+            )}
+
+            <button
+              onClick={() => setShowWorkDiffersModal(false)}
+              className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

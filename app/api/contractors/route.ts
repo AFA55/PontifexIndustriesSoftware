@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: /api/contractors
  * Manage contractor profiles
@@ -6,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, requireAdmin } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // GET - List all contractors
 export async function GET(request: NextRequest) {
@@ -13,6 +16,7 @@ export async function GET(request: NextRequest) {
     // Security: require authenticated user
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+    const tenantId = await getTenantId(auth.userId);
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
     const status = searchParams.get('status') || 'active';
@@ -22,6 +26,11 @@ export async function GET(request: NextRequest) {
       .from('contractors')
       .select('*')
       .order('contractor_name', { ascending: true });
+
+    // Scope to tenant
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
     // Filter by status
     if (status && status !== 'all') {
@@ -100,11 +109,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create contractor
-    const { data, error } = await supabaseAdmin
-      .from('contractors')
-      .insert([
-        {
+    // Create contractor (with tenant scope)
+    const tenantIdPost = await getTenantId(auth.userId);
+    const contractorData: any = {
           contractor_name,
           contact_person,
           contact_phone,
@@ -114,8 +121,12 @@ export async function POST(request: NextRequest) {
           tax_id,
           internal_notes,
           status: 'active',
-        },
-      ])
+    };
+    if (tenantIdPost) contractorData.tenant_id = tenantIdPost;
+
+    const { data, error } = await supabaseAdmin
+      .from('contractors')
+      .insert([contractorData])
       .select()
       .single();
 

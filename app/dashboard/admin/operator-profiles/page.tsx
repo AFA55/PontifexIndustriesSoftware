@@ -1,985 +1,1282 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import dynamic from 'next/dynamic';
+import {
+  ChevronLeft, Users, UserPlus, Search, Mail, Phone, Calendar,
+  Loader2, CheckCircle, XCircle, Star, Briefcase, Clock, TrendingUp,
+  FileText, MessageSquare, DollarSign, ChevronRight, Plus,
+  AlertTriangle, Award, Shield, X, Trash2, ChevronDown,
+  BarChart3, Hash, MapPin, Filter, Zap
+} from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
-import { User, DollarSign, Briefcase, Wrench, Upload, File, X as XIcon } from 'lucide-react';
+import SkillsTab from './_components/SkillsTab';
+import { supabase } from '@/lib/supabase';
+import AddProfileModal from './_components/AddProfileModal';
 
-interface OperatorProfile {
+// Dynamic import for Recharts (SSR issues)
+const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false });
+const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false });
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false });
+const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false });
+const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false });
+const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false });
+
+// ── Types ───────────────────────────────────────────────────
+interface Profile {
   id: string;
   full_name: string;
+  nickname: string | null;
   email: string;
   phone: string | null;
   phone_number: string | null;
+  date_of_birth: string | null;
   role: string;
-  hourly_rate: number | null;
-  skill_levels: Record<string, { level: string; proficiency: number }>;
-  tasks_qualified_for: string[];
-  equipment_qualified_for: Record<string, { qualified: boolean; proficiency: number }>;
-  certifications: Array<{
-    name: string;
-    issued_date: string;
-    expiry_date?: string;
-  }>;
-  certification_documents: Array<{
-    cert_name: string;
-    file_url: string;
-    file_name: string;
-    uploaded_at: string;
-  }>;
-  years_experience: number | null;
-  hire_date: string | null;
-  notes: string | null;
-  performance: {
-    total_jobs_completed: number;
-    total_revenue_generated: number;
-    total_hours_worked: number;
-    avg_production_rate: number;
-    revenue_per_hour: number;
-    on_time_completion_rate: number;
-  };
-  cleanliness_rating_avg: number | null;
-  cleanliness_rating_count: number;
-  communication_rating_avg: number | null;
-  communication_rating_count: number;
-  overall_rating_avg: number | null;
-  overall_rating_count: number;
-  total_ratings_received: number;
-  last_rating_received_at: string | null;
+  active: boolean;
+  profile_picture_url: string | null;
+  created_at: string;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
 }
 
-const AVAILABLE_TASKS = [
-  { id: 'core_drilling', label: 'Core Drilling', icon: '🔵', gradient: 'from-blue-500 via-cyan-500 to-teal-500' },
-  { id: 'slab_sawing', label: 'Slab Sawing', icon: '🔷', gradient: 'from-purple-500 via-pink-500 to-rose-500' },
-  { id: 'wall_sawing', label: 'Wall Sawing', icon: '🔶', gradient: 'from-orange-500 via-amber-500 to-yellow-500' },
-  { id: 'hand_sawing', label: 'Hand Sawing', icon: '✋', gradient: 'from-green-500 via-emerald-500 to-teal-500' },
-  { id: 'demolition', label: 'Demolition', icon: '💥', gradient: 'from-red-500 via-orange-500 to-amber-500' },
-  { id: 'flat_sawing', label: 'Flat Sawing', icon: '⬜', gradient: 'from-indigo-500 via-purple-500 to-pink-500' },
-  { id: 'wire_sawing', label: 'Wire Sawing', icon: '🔗', gradient: 'from-cyan-500 via-blue-500 to-indigo-500' },
-];
+interface OperatorHistory {
+  profile: Profile & {
+    hire_date?: string | null;
+    hourly_rate?: number | null;
+    skill_level?: string | null;
+    tasks_qualified_for?: string[] | null;
+    equipment_qualified_for?: string[] | null;
+    overall_rating_avg?: number | null;
+    total_ratings_received?: number | null;
+  };
+  stats: {
+    total_jobs: number;
+    total_hours: number;
+    total_revenue: number;
+    avg_rating: number;
+    total_ratings: number;
+    on_time_rate: number;
+    jobs_this_month: number;
+    hours_this_month: number;
+    // Fallback for original API shape
+    totalJobs?: number;
+    completedJobs?: number;
+    totalHours?: number;
+    onTimePercent?: number;
+  };
+  job_history: JobRecord[];
+  monthly_performance: { month: string; jobs_completed: number; hours_worked: number }[];
+  certifications?: { name: string; expiry_date: string | null; is_expired: boolean }[];
+  skills?: { task: string; proficiency: string }[];
+  pay_history?: { effective_date: string; hourly_rate: number | null; reason: string | null }[];
+  // Fallback for original API shape
+  jobHistory?: JobRecord[];
+  monthlyPerformance?: { month: string; jobs: number; hours: number }[];
+}
 
-const AVAILABLE_EQUIPMENT = [
-  { id: 'mini_x', label: 'Mini X', gradient: 'from-blue-400 to-cyan-500' },
-  { id: 'brokk', label: 'Brokk', gradient: 'from-purple-400 to-pink-500' },
-  { id: 'skid_steer', label: 'Skid Steer', gradient: 'from-orange-400 to-red-500' },
-  { id: 'sherpa', label: 'Sherpa', gradient: 'from-green-400 to-emerald-500' },
-  { id: 'forklift', label: 'Forklift', gradient: 'from-yellow-400 to-orange-500' },
-  { id: 'scissorlift', label: 'Scissorlift', gradient: 'from-pink-400 to-rose-500' },
-  { id: 'lull', label: 'Lull', gradient: 'from-indigo-400 to-purple-500' },
-];
+interface JobRecord {
+  id: string;
+  job_number: string;
+  customer_name: string;
+  job_type: string;
+  location: string | null;
+  status: string;
+  scheduled_date: string | null;
+  end_date: string | null;
+  work_completed_at: string | null;
+  estimated_duration: number | null;
+  hours_worked: number | null;
+  estimated_cost: number | null;
+  customer_rating: number | null;
+}
 
-const SKILL_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+interface OperatorNote {
+  id: string;
+  operator_id: string;
+  author_id: string;
+  note_type: string;
+  title: string;
+  content: string;
+  is_private: boolean;
+  created_at: string;
+  author_name?: string;
+  author_email?: string | null;
+  author?: { full_name: string; email: string } | null;
+}
 
-const EQUIPMENT_PROFICIENCY = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+interface Timecard {
+  id: string;
+  date: string;
+  clock_in_time: string;
+  clock_out_time: string | null;
+  total_hours: number | null;
+  is_approved: boolean;
+  is_shop_hours: boolean;
+  is_night_shift: boolean;
+  hour_type: string;
+}
 
-const CARD_GRADIENTS = [
-  'from-purple-500 via-pink-500 to-rose-500',
-  'from-blue-500 via-cyan-500 to-teal-500',
-  'from-orange-500 via-red-500 to-pink-500',
-  'from-green-500 via-emerald-500 to-cyan-500',
-  'from-indigo-500 via-purple-500 to-pink-500',
-  'from-cyan-500 via-blue-500 to-indigo-500',
-];
+// ── Helpers ─────────────────────────────────────────────────
+async function getToken() {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || '';
+}
 
+async function apiFetch(url: string, opts?: RequestInit) {
+  const token = await getToken();
+  return fetch(url, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...opts?.headers,
+    },
+  });
+}
+
+const ROLE_COLORS: Record<string, { bg: string; text: string; avatar: string }> = {
+  operator: { bg: 'bg-blue-50', text: 'text-blue-700', avatar: 'from-blue-500 to-blue-700' },
+  apprentice: { bg: 'bg-teal-50', text: 'text-teal-700', avatar: 'from-teal-500 to-teal-700' },
+  shop_manager: { bg: 'bg-amber-50', text: 'text-amber-700', avatar: 'from-amber-500 to-amber-700' },
+  admin: { bg: 'bg-purple-50', text: 'text-purple-700', avatar: 'from-purple-500 to-purple-700' },
+};
+
+const NOTE_TYPE_CONFIG: Record<string, { label: string; color: string; icon: typeof Star }> = {
+  general: { label: 'General', color: 'bg-gray-100 text-gray-700', icon: MessageSquare },
+  performance_review: { label: 'Performance', color: 'bg-blue-100 text-blue-700', icon: BarChart3 },
+  incident: { label: 'Incident', color: 'bg-red-100 text-red-700', icon: AlertTriangle },
+  commendation: { label: 'Commendation', color: 'bg-green-100 text-green-700', icon: Award },
+  warning: { label: 'Warning', color: 'bg-amber-100 text-amber-700', icon: AlertTriangle },
+  training: { label: 'Training', color: 'bg-purple-100 text-purple-700', icon: Briefcase },
+};
+
+function formatDate(d: string | null) {
+  if (!d) return '--';
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatShortDate(d: string | null) {
+  if (!d) return '--';
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getWeekBounds(offset: number) {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  const monday = new Date(now);
+  monday.setDate(monday.getDate() - diff + offset * 7);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { monday, sunday };
+}
+
+function statusColor(status: string) {
+  switch (status) {
+    case 'completed': return 'bg-green-50 text-green-700 border-green-200';
+    case 'in_progress': return 'bg-blue-50 text-blue-700 border-blue-200';
+    case 'scheduled': case 'assigned': return 'bg-purple-50 text-purple-700 border-purple-200';
+    case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
+    default: return 'bg-gray-50 text-gray-700 border-gray-200';
+  }
+}
+
+// ── Main Component ──────────────────────────────────────────
 export default function OperatorProfilesPage() {
   const router = useRouter();
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [operators, setOperators] = useState<OperatorProfile[]>([]);
-  const [selectedOperator, setSelectedOperator] = useState<OperatorProfile | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'basic' | 'skills' | 'equipment' | 'certs'>('basic');
-  const [uploadingPdf, setUploadingPdf] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Detail state
+  const [detailTab, setDetailTab] = useState<'overview' | 'jobs' | 'timecards' | 'notes' | 'pay' | 'skills'>('overview');
+
+  // Skill summary state (top-3 rated skills for the selected operator)
+  const [skillSummary, setSkillSummary] = useState<{ name: string; rating: number }[]>([]);
+  const [history, setHistory] = useState<OperatorHistory | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [notes, setNotes] = useState<OperatorNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [showAddNote, setShowAddNote] = useState(false);
+
+  // Timecard state
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [timecards, setTimecards] = useState<Timecard[]>([]);
+  const [timecardsLoading, setTimecardsLoading] = useState(false);
+
+  // Job filter state
+  const [jobStatusFilter, setJobStatusFilter] = useState<string>('all');
+
+  // Auth guard
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
     const currentUser = getCurrentUser();
-    if (!currentUser) {
-      router.push('/login');
-      return;
-    }
-    if (currentUser.role !== 'admin') {
+    if (!currentUser) { router.push('/login'); return; }
+    const role = currentUser.role || '';
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor'].includes(role)) {
       router.push('/dashboard');
       return;
     }
-    setLoading(false);
-    fetchOperators();
-  };
+    setCurrentUserRole(role);
+  }, [router]);
 
-  const fetchOperators = async () => {
+  // Fetch profiles list
+  const fetchProfiles = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const response = await fetch('/api/admin/operator-profiles', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        setOperators(result.data);
+      const res = await apiFetch('/api/admin/profiles');
+      if (res.ok) {
+        const json = await res.json();
+        setProfiles(json.data || []);
       }
-    } catch (error) {
-      console.error('Error fetching operators:', error);
-    }
-  };
-
-  const handleEditOperator = (operator: OperatorProfile) => {
-    setSelectedOperator({
-      ...operator,
-      skill_levels: operator.skill_levels || {},
-      equipment_qualified_for: operator.equipment_qualified_for || {},
-      certification_documents: operator.certification_documents || [],
-    });
-    setActiveTab('basic');
-    setShowEditModal(true);
-  };
-
-  const handleSaveOperator = async () => {
-    if (!selectedOperator) return;
-
-    setSaving(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const response = await fetch(`/api/admin/operator-profiles/${selectedOperator.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          full_name: selectedOperator.full_name,
-          phone_number: selectedOperator.phone_number,
-          email: selectedOperator.email,
-          hourly_rate: selectedOperator.hourly_rate,
-          skill_levels: selectedOperator.skill_levels,
-          tasks_qualified_for: selectedOperator.tasks_qualified_for,
-          equipment_qualified_for: selectedOperator.equipment_qualified_for,
-          certifications: selectedOperator.certifications,
-          certification_documents: selectedOperator.certification_documents,
-          years_experience: selectedOperator.years_experience,
-          hire_date: selectedOperator.hire_date,
-          notes: selectedOperator.notes,
-        }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        setShowEditModal(false);
-        fetchOperators();
-      } else {
-        alert('Failed to update: ' + result.error);
-      }
-    } catch (error) {
-      console.error('Error saving:', error);
-      alert('Failed to save');
+    } catch (err) {
+      console.error('Failed to fetch profiles:', err);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const updateTaskSkillLevel = (taskId: string, proficiency: number) => {
-    if (!selectedOperator) return;
-    setSelectedOperator({
-      ...selectedOperator,
-      skill_levels: {
-        ...selectedOperator.skill_levels,
-        [taskId]: {
-          level: `level_${proficiency}`,
-          proficiency
-        }
-      }
-    });
-  };
+  useEffect(() => { fetchProfiles(); }, [fetchProfiles]);
 
-  const updateEquipmentProficiency = (equipId: string, proficiency: number) => {
-    if (!selectedOperator) return;
-    setSelectedOperator({
-      ...selectedOperator,
-      equipment_qualified_for: {
-        ...selectedOperator.equipment_qualified_for,
-        [equipId]: {
-          qualified: true,
-          proficiency
-        }
-      }
-    });
-  };
-
-  const toggleTask = (taskId: string) => {
-    if (!selectedOperator) return;
-    const tasks = selectedOperator.tasks_qualified_for || [];
-    const newTasks = tasks.includes(taskId)
-      ? tasks.filter(t => t !== taskId)
-      : [...tasks, taskId];
-    setSelectedOperator({
-      ...selectedOperator,
-      tasks_qualified_for: newTasks
-    });
-  };
-
-  const toggleEquipment = (equipId: string) => {
-    if (!selectedOperator) return;
-    const equipment = selectedOperator.equipment_qualified_for || {};
-    const isQualified = equipment[equipId]?.qualified;
-
-    if (isQualified) {
-      // Remove
-      const newEquip = { ...equipment };
-      delete newEquip[equipId];
-      setSelectedOperator({
-        ...selectedOperator,
-        equipment_qualified_for: newEquip
-      });
-    } else {
-      // Add with default proficiency
-      setSelectedOperator({
-        ...selectedOperator,
-        equipment_qualified_for: {
-          ...equipment,
-          [equipId]: { qualified: true, proficiency: 5 }
-        }
-      });
-    }
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !selectedOperator) return;
-
-    if (file.type !== 'application/pdf') {
-      alert('Please upload a PDF file');
-      return;
-    }
-
-    setUploadingPdf(true);
+  // Fetch detail when selected
+  const fetchDetail = useCallback(async (id: string) => {
+    setDetailLoading(true);
+    setHistory(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      // Upload to Supabase Storage
-      const fileExt = 'pdf';
-      const fileName = `${selectedOperator.id}/${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('certification-documents')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('certification-documents')
-        .getPublicUrl(fileName);
-
-      // Add to certification documents
-      const newDoc = {
-        cert_name: file.name.replace('.pdf', ''),
-        file_url: urlData.publicUrl,
-        file_name: file.name,
-        uploaded_at: new Date().toISOString()
-      };
-
-      setSelectedOperator({
-        ...selectedOperator,
-        certification_documents: [
-          ...(selectedOperator.certification_documents || []),
-          newDoc
-        ]
-      });
-
-      alert('File uploaded successfully!');
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      alert('Failed to upload file. Make sure the storage bucket exists.');
-    } finally {
-      setUploadingPdf(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      const res = await apiFetch(`/api/admin/operators/${id}/history`);
+      if (res.ok) {
+        const json = await res.json();
+        // Normalize: ensure both snake_case and camelCase fields exist for compat
+        const d = json.data;
+        if (d) {
+          if (!d.jobHistory && d.job_history) d.jobHistory = d.job_history;
+          if (!d.job_history && d.jobHistory) d.job_history = d.jobHistory;
+          if (!d.monthlyPerformance && d.monthly_performance) d.monthlyPerformance = d.monthly_performance;
+          if (!d.monthly_performance && d.monthlyPerformance) d.monthly_performance = d.monthlyPerformance;
+          if (d.stats) {
+            if (d.stats.total_jobs != null && d.stats.totalJobs == null) d.stats.totalJobs = d.stats.total_jobs;
+            if (d.stats.on_time_rate != null && d.stats.onTimePercent == null) d.stats.onTimePercent = d.stats.on_time_rate;
+            if (d.stats.total_hours != null && d.stats.totalHours == null) d.stats.totalHours = d.stats.total_hours;
+          }
+        }
+        setHistory(d);
       }
+    } catch (err) {
+      console.error('Failed to fetch operator history:', err);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  // Fetch notes
+  const fetchNotes = useCallback(async (id: string) => {
+    setNotesLoading(true);
+    try {
+      const res = await apiFetch(`/api/admin/operators/${id}/notes`);
+      if (res.ok) {
+        const json = await res.json();
+        setNotes(json.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notes:', err);
+    } finally {
+      setNotesLoading(false);
+    }
+  }, []);
+
+  // Fetch timecards for selected operator
+  const { monday, sunday } = useMemo(() => getWeekBounds(weekOffset), [weekOffset]);
+
+  const fetchTimecards = useCallback(async (id: string) => {
+    setTimecardsLoading(true);
+    try {
+      const startDate = monday.toISOString().split('T')[0];
+      const endDate = sunday.toISOString().split('T')[0];
+      const res = await apiFetch(`/api/admin/timecards?userId=${id}&startDate=${startDate}&endDate=${endDate}&limit=200`);
+      if (res.ok) {
+        const json = await res.json();
+        setTimecards(json.data?.timecards || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch timecards:', err);
+    } finally {
+      setTimecardsLoading(false);
+    }
+  }, [monday, sunday]);
+
+  // When selection changes
+  useEffect(() => {
+    if (selectedId) {
+      fetchDetail(selectedId);
+      fetchNotes(selectedId);
+      setDetailTab('overview');
+      setWeekOffset(0);
+      setSkillSummary([]);
+      // Fetch top skills for mini badge display
+      apiFetch(`/api/admin/operators/${selectedId}/skills`)
+        .then(res => res.ok ? res.json() : null)
+        .then(json => {
+          if (json?.data) {
+            const top = (json.data as { category_name: string; rating: number | null }[])
+              .filter(s => s.rating !== null)
+              .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+              .slice(0, 3)
+              .map(s => ({ name: s.category_name, rating: s.rating as number }));
+            setSkillSummary(top);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [selectedId, fetchDetail, fetchNotes]);
+
+  // When week changes, refetch timecards
+  useEffect(() => {
+    if (selectedId && detailTab === 'timecards') {
+      fetchTimecards(selectedId);
+    }
+  }, [selectedId, detailTab, weekOffset, fetchTimecards]);
+
+  // Filter profiles
+  const filteredProfiles = useMemo(() => {
+    return profiles.filter(p => {
+      const matchesSearch = !search ||
+        p.full_name.toLowerCase().includes(search.toLowerCase()) ||
+        p.email.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && p.active) ||
+        (statusFilter === 'inactive' && !p.active);
+      return matchesSearch && matchesStatus;
+    });
+  }, [profiles, search, statusFilter]);
+
+  // Add profile handler
+  const handleAddProfile = async (data: { fullName: string; email: string; role: string; dateOfBirth: string | null }) => {
+    const res = await apiFetch('/api/admin/profiles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const json = await res.json();
+      throw new Error(json.error || 'Failed to create account');
+    }
+    setShowAddModal(false);
+    fetchProfiles();
+  };
+
+  // Add note handler
+  const handleAddNote = async (noteData: { title: string; content: string; note_type: string; is_private: boolean }) => {
+    if (!selectedId) return;
+    const res = await apiFetch(`/api/admin/operators/${selectedId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(noteData),
+    });
+    if (res.ok) {
+      setShowAddNote(false);
+      fetchNotes(selectedId);
     }
   };
 
-  const removeCertDocument = (index: number) => {
-    if (!selectedOperator) return;
-    const newDocs = [...selectedOperator.certification_documents];
-    newDocs.splice(index, 1);
-    setSelectedOperator({
-      ...selectedOperator,
-      certification_documents: newDocs
-    });
+  // Delete note handler
+  const handleDeleteNote = async (noteId: string) => {
+    if (!selectedId) return;
+    const res = await apiFetch(`/api/admin/operators/${selectedId}/notes?noteId=${noteId}`, { method: 'DELETE' });
+    if (res.ok) {
+      fetchNotes(selectedId);
+    }
   };
 
-  const addCertification = () => {
-    if (!selectedOperator) return;
-    setSelectedOperator({
-      ...selectedOperator,
-      certifications: [
-        ...(selectedOperator.certifications || []),
-        { name: '', issued_date: '' }
-      ]
-    });
-  };
+  const selectedProfile = profiles.find(p => p.id === selectedId);
+  const roleConfig = selectedProfile ? (ROLE_COLORS[selectedProfile.role] || ROLE_COLORS.operator) : ROLE_COLORS.operator;
 
-  const removeCertification = (index: number) => {
-    if (!selectedOperator) return;
-    const newCerts = [...selectedOperator.certifications];
-    newCerts.splice(index, 1);
-    setSelectedOperator({
-      ...selectedOperator,
-      certifications: newCerts
-    });
-  };
+  // Timecard calculations
+  const tcTotalHours = timecards.reduce((s, t) => s + (t.total_hours || 0), 0);
+  const tcRegular = Math.min(timecards.filter(t => t.hour_type !== 'mandatory_overtime').reduce((s, t) => s + (t.total_hours || 0), 0), 40);
+  const tcOT = Math.max(0, timecards.filter(t => t.hour_type !== 'mandatory_overtime').reduce((s, t) => s + (t.total_hours || 0), 0) - 40);
+  const tcNight = timecards.filter(t => t.is_night_shift).reduce((s, t) => s + (t.total_hours || 0), 0);
+  const tcShop = timecards.filter(t => t.is_shop_hours).reduce((s, t) => s + (t.total_hours || 0), 0);
 
-  const updateCertification = (index: number, field: string, value: string) => {
-    if (!selectedOperator) return;
-    const newCerts = [...selectedOperator.certifications];
-    newCerts[index] = { ...newCerts[index], [field]: value };
-    setSelectedOperator({
-      ...selectedOperator,
-      certifications: newCerts
-    });
-  };
+  const formatFullDate = (date: Date) =>
+    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading operator profiles...</p>
-        </div>
-      </div>
-    );
-  }
+  const formatTime = (dateString: string) =>
+    new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+  // Normalize job history from either API shape
+  const allJobs = useMemo(() => {
+    if (!history) return [];
+    return history.job_history || history.jobHistory || [];
+  }, [history]);
+
+  // Filtered jobs
+  const filteredJobs = useMemo(() => {
+    if (jobStatusFilter === 'all') return allJobs;
+    return allJobs.filter((j: any) => j.status === jobStatusFilter);
+  }, [allJobs, jobStatusFilter]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="backdrop-blur-xl bg-white/95 border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
+      <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/admin" className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+              <ChevronLeft className="w-5 h-5 text-gray-500" />
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
+                <Users size={16} className="text-white" />
+              </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Operator Profiles</h1>
-                <p className="text-sm text-gray-500">Manage skills, costs, and certifications</p>
+                <h1 className="text-base font-bold text-gray-900">Operator Management</h1>
+                <p className="text-[11px] text-gray-400 hidden sm:block">{profiles.length} team members</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl text-sm font-semibold shadow-lg">
-                <User size={16} />
-                {operators.length} Operators
-              </span>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm flex items-center gap-1.5"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span className="hidden sm:inline">Add Member</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="max-w-[1600px] mx-auto flex flex-col lg:flex-row min-h-[calc(100vh-56px)]">
+        {/* ── Left Panel: Operator List ──────────────────────── */}
+        <div className={`w-full lg:w-[400px] xl:w-[440px] flex-shrink-0 border-r border-gray-200 bg-white flex flex-col ${selectedId ? 'hidden lg:flex' : 'flex'}`}>
+          {/* Search + Filter */}
+          <div className="p-3 border-b border-gray-100 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search operators..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 placeholder-gray-400 transition-all"
+              />
+            </div>
+            <div className="flex gap-1">
+              {(['all', 'active', 'inactive'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    statusFilter === f
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {f === 'all' ? `All (${profiles.length})` : f === 'active' ? `Active (${profiles.filter(p => p.active).length})` : `Inactive (${profiles.filter(p => !p.active).length})`}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="container mx-auto px-4 sm:px-6 py-8">
-        {/* Operators Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {operators.map((operator, index) => {
-            const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
-            return (
-              <div
-                key={operator.id}
-                className="bg-white rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:scale-[1.02]"
-              >
-                {/* Card Header with Vibrant Gradient */}
-                <div className={`bg-gradient-to-br ${gradient} p-6`}>
-                  <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 bg-white/30 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-xl border-2 border-white/40">
-                      {operator.full_name.charAt(0)}
+          {/* Profiles List */}
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-7 h-7 animate-spin text-blue-500" />
+              </div>
+            ) : filteredProfiles.length === 0 ? (
+              <div className="text-center py-16 px-4">
+                <Users className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                <p className="font-semibold text-gray-500 text-sm">No operators found</p>
+                <p className="text-xs text-gray-400 mt-1">{search ? 'Try a different search' : 'Add your first team member'}</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {filteredProfiles.map((p) => {
+                  const rc = ROLE_COLORS[p.role] || ROLE_COLORS.operator;
+                  const isSelected = p.id === selectedId;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setSelectedId(p.id)}
+                      className={`w-full px-4 py-3 text-left transition-all flex items-center gap-3 ${
+                        isSelected
+                          ? 'bg-blue-50 border-l-[3px] border-l-blue-600'
+                          : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'
+                      }`}
+                    >
+                      {/* Avatar */}
+                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${rc.avatar} flex items-center justify-center flex-shrink-0`}>
+                        {p.profile_picture_url ? (
+                          <img src={p.profile_picture_url} alt="" className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <span className="text-white font-bold text-sm">
+                            {p.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900 text-sm truncate">{p.full_name}</p>
+                          {p.active ? (
+                            <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                          ) : (
+                            <span className="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${rc.bg} ${rc.text}`}>
+                            {p.role === 'apprentice' ? 'Helper' : p.role.replace('_', ' ')}
+                          </span>
+                          <span className="text-[11px] text-gray-400 truncate">{p.email}</span>
+                        </div>
+                        {/* Top skill badges — visible for selected operator */}
+                        {isSelected && skillSummary.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {skillSummary.map(s => (
+                              <span
+                                key={s.name}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 border border-purple-200 rounded-full text-[10px] font-semibold text-purple-700"
+                              >
+                                <Zap className="w-2.5 h-2.5" />
+                                {s.name.length > 12 ? s.name.slice(0, 12) + '\u2026' : s.name}
+                                <span className="font-bold text-purple-900">{s.rating}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Right Panel: Detail ────────────────────────────── */}
+        <div className={`flex-1 flex flex-col ${!selectedId ? 'hidden lg:flex' : 'flex'}`}>
+          {!selectedId ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center px-4">
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-gray-300" />
+                </div>
+                <p className="text-gray-500 font-semibold">Select an operator</p>
+                <p className="text-sm text-gray-400 mt-1">Choose someone from the list to view their profile</p>
+              </div>
+            </div>
+          ) : detailLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
+                <p className="text-sm text-gray-400">Loading operator data...</p>
+              </div>
+            </div>
+          ) : history ? (
+            <>
+              {/* Mobile back button */}
+              <div className="lg:hidden p-3 border-b border-gray-100">
+                <button onClick={() => setSelectedId(null)} className="flex items-center gap-1.5 text-sm text-gray-500 font-medium">
+                  <ChevronLeft className="w-4 h-4" /> Back to list
+                </button>
+              </div>
+
+              {/* Profile Header */}
+              <div className="p-4 sm:p-6 border-b border-gray-200 bg-white">
+                <div className="flex items-start gap-4">
+                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${roleConfig.avatar} flex items-center justify-center flex-shrink-0 shadow-lg`}>
+                    {history.profile.profile_picture_url ? (
+                      <img src={history.profile.profile_picture_url} alt="" className="w-full h-full rounded-xl object-cover" />
+                    ) : (
+                      <span className="text-white font-bold text-xl">
+                        {history.profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-lg font-bold text-gray-900">{history.profile.full_name}</h2>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${roleConfig.bg} ${roleConfig.text}`}>
+                        {history.profile.role === 'apprentice' ? 'Helper' : history.profile.role.replace('_', ' ')}
+                      </span>
+                      {history.profile.active ? (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700">Active</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Inactive</span>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold text-white truncate drop-shadow-md">{operator.full_name}</h3>
-                      <p className="text-white/95 text-sm truncate drop-shadow">{operator.email}</p>
+                    <div className="flex items-center gap-4 mt-1.5 flex-wrap">
+                      <span className="text-xs text-gray-500 flex items-center gap-1"><Mail className="w-3 h-3" />{history.profile.email}</span>
+                      {(history.profile.phone || history.profile.phone_number) && (
+                        <span className="text-xs text-gray-500 flex items-center gap-1"><Phone className="w-3 h-3" />{history.profile.phone_number || history.profile.phone}</span>
+                      )}
+                      <span className="text-xs text-gray-500 flex items-center gap-1"><Calendar className="w-3 h-3" />Since {formatDate(history.profile.created_at?.split('T')[0])}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Card Body */}
-                <div className="p-6 space-y-4">
-                  {/* Quick Stats with Colorful Gradients */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-xl p-3 border-2 border-green-200">
-                      <div className="flex items-center gap-2 text-green-700 mb-1">
-                        <DollarSign size={14} className="flex-shrink-0" />
-                        <span className="text-xs font-medium">Rate</span>
+                {/* Quick Stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                  {[
+                    { label: 'Total Jobs', value: history.stats.total_jobs ?? history.stats.totalJobs ?? 0, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50' },
+                    { label: 'Total Hours', value: `${history.stats.total_hours ?? history.stats.totalHours ?? 0}h`, icon: Clock, color: 'text-purple-600', bg: 'bg-purple-50' },
+                    { label: 'Avg Rating', value: history.stats.avg_rating ? `${history.stats.avg_rating}/5` : 'N/A', icon: Star, color: 'text-green-600', bg: 'bg-green-50' },
+                    { label: 'On-Time %', value: `${history.stats.on_time_rate ?? history.stats.onTimePercent ?? 0}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50' },
+                  ].map(({ label, value, icon: Icon, color, bg }) => (
+                    <div key={label} className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</span>
+                        <div className={`w-7 h-7 rounded-lg ${bg} flex items-center justify-center`}>
+                          <Icon size={14} className={color} />
+                        </div>
                       </div>
-                      <p className="text-lg font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                        {operator.hourly_rate ? `$${operator.hourly_rate}/hr` : 'Not set'}
-                      </p>
+                      <p className="text-xl font-bold text-gray-900">{value}</p>
                     </div>
-                    <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-xl p-3 border-2 border-blue-200">
-                      <div className="flex items-center gap-2 text-blue-700 mb-1">
-                        <Briefcase size={14} className="flex-shrink-0" />
-                        <span className="text-xs font-medium">Jobs</span>
-                      </div>
-                      <p className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        {operator.performance.total_jobs_completed || 0}
-                      </p>
-                    </div>
-                    <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 rounded-xl p-3 border-2 border-amber-200">
-                      <div className="flex items-center gap-2 text-amber-700 mb-1">
-                        <DollarSign size={14} className="flex-shrink-0" />
-                        <span className="text-xs font-medium">Revenue</span>
-                      </div>
-                      <p className="text-lg font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                        ${(operator.performance.total_revenue_generated || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                      </p>
-                    </div>
-                    <div className="bg-gradient-to-br from-rose-50 via-pink-50 to-red-50 rounded-xl p-3 border-2 border-rose-200">
-                      <div className="flex items-center gap-2 text-rose-700 mb-1">
-                        <DollarSign size={14} className="flex-shrink-0" />
-                        <span className="text-xs font-medium">Labor Cost</span>
-                      </div>
-                      <p className="text-lg font-bold bg-gradient-to-r from-rose-600 to-red-600 bg-clip-text text-transparent">
-                        ${((operator.performance.total_hours_worked || 0) * (operator.hourly_rate || 0)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                      </p>
-                    </div>
-                  </div>
+                  ))}
+                </div>
+              </div>
 
-                  {/* Customer Ratings Section */}
-                  {operator.total_ratings_received > 0 && (
-                    <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-xl p-4 border-2 border-green-200">
-                      <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                        </svg>
-                        <p className="text-xs font-bold text-green-900 uppercase">Customer Ratings</p>
+              {/* Tabs */}
+              <div className="px-4 sm:px-6 pt-3 bg-white border-b border-gray-200 overflow-x-auto">
+                <div className="flex gap-1 min-w-max">
+                  {([
+                    { key: 'overview', label: 'Overview', icon: BarChart3 },
+                    { key: 'jobs', label: 'Job History', icon: Briefcase },
+                    { key: 'timecards', label: 'Timecards', icon: Clock },
+                    { key: 'notes', label: 'Notes & Reviews', icon: MessageSquare },
+                    { key: 'skills', label: 'Skills', icon: Zap },
+                    ...(currentUserRole === 'super_admin' ? [{ key: 'pay', label: 'Pay & Comp', icon: DollarSign }] : []),
+                  ] as { key: typeof detailTab; label: string; icon: typeof Star }[]).map(({ key, label, icon: Icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => setDetailTab(key)}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 mb-2 ${
+                        detailTab === key
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                      }`}
+                    >
+                      <Icon size={13} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tab Content */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                {/* ── Overview Tab ──────────────────────────── */}
+                {detailTab === 'overview' && (
+                  <div className="space-y-6">
+                    {/* Monthly Performance Chart */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5">
+                      <h3 className="text-sm font-bold text-gray-900 mb-4">Monthly Performance (Last 12 Months)</h3>
+                      <div className="h-56">
+                        {(() => {
+                          // Normalize data from either API shape
+                          const rawData = history.monthly_performance || history.monthlyPerformance || [];
+                          const chartData = rawData.map((d: any) => ({
+                            month: d.month,
+                            jobs: d.jobs_completed ?? d.jobs ?? 0,
+                            hours: d.hours_worked ?? d.hours ?? 0,
+                          }));
+                          return (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={chartData}>
+                                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                                <Tooltip
+                                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
+                                  formatter={(value: any, name: any) => [value, name === 'jobs' ? 'Jobs' : 'Hours']}
+                                />
+                                <Bar dataKey="jobs" fill="#2563eb" radius={[4, 4, 0, 0]} name="jobs" />
+                                <Bar dataKey="hours" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="hours" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          );
+                        })()}
                       </div>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        <div className="text-center bg-white rounded-lg p-2">
-                          <div className="text-lg font-bold text-green-600">
-                            {operator.cleanliness_rating_avg?.toFixed(1) || 'N/A'}
+                    </div>
+
+                    {/* Contact & Emergency Info */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Contact Information</h3>
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5 text-sm">
+                            <Mail className="w-4 h-4 text-gray-400" />
+                            <span className="text-gray-700">{history.profile.email}</span>
                           </div>
-                          <div className="text-xs text-gray-600">Cleanliness</div>
-                        </div>
-                        <div className="text-center bg-white rounded-lg p-2">
-                          <div className="text-lg font-bold text-blue-600">
-                            {operator.communication_rating_avg?.toFixed(1) || 'N/A'}
-                          </div>
-                          <div className="text-xs text-gray-600">Communication</div>
-                        </div>
-                        <div className="text-center bg-white rounded-lg p-2">
-                          <div className="text-lg font-bold text-purple-600">
-                            {operator.overall_rating_avg?.toFixed(1) || 'N/A'}
-                          </div>
-                          <div className="text-xs text-gray-600">Overall</div>
+                          {(history.profile.phone || history.profile.phone_number) && (
+                            <div className="flex items-center gap-2.5 text-sm">
+                              <Phone className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-700">{history.profile.phone_number || history.profile.phone}</span>
+                            </div>
+                          )}
+                          {history.profile.date_of_birth && (
+                            <div className="flex items-center gap-2.5 text-sm">
+                              <Calendar className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-700">{formatDate(history.profile.date_of_birth)}</span>
+                            </div>
+                          )}
+                          {history.profile.nickname && (
+                            <div className="flex items-center gap-2.5 text-sm">
+                              <Users className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-700">Goes by &ldquo;{history.profile.nickname}&rdquo;</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="text-xs text-center text-gray-500">
-                        Based on {operator.total_ratings_received} customer {operator.total_ratings_received === 1 ? 'review' : 'reviews'}
+
+                      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <Shield className="w-3.5 h-3.5 text-red-500" />
+                          Emergency Contact
+                        </h3>
+                        {history.profile.emergency_contact_name ? (
+                          <div className="space-y-1.5">
+                            <p className="text-sm font-semibold text-gray-900">{history.profile.emergency_contact_name}</p>
+                            {history.profile.emergency_contact_relationship && (
+                              <p className="text-xs text-gray-500">{history.profile.emergency_contact_relationship}</p>
+                            )}
+                            {history.profile.emergency_contact_phone && (
+                              <p className="text-sm text-gray-700">{history.profile.emergency_contact_phone}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400 italic">No emergency contact on file</p>
+                        )}
                       </div>
-                      {operator.last_rating_received_at && (
-                        <div className="text-xs text-center text-gray-400 mt-1">
-                          Last review: {new Date(operator.last_rating_received_at).toLocaleDateString()}
+                    </div>
+
+                    {/* Skills & Certifications */}
+                    {((history.skills && history.skills.length > 0) || (history.certifications && history.certifications.length > 0)) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                            <Award className="w-3.5 h-3.5 text-blue-500" /> Skills & Qualifications
+                          </h3>
+                          <div className="flex flex-wrap gap-1.5">
+                            {history.skills && history.skills.length > 0 ? history.skills.map((s: any, i: number) => (
+                              <span key={i} className="px-2 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">{s.task}</span>
+                            )) : <p className="text-sm text-gray-400 italic">No skills on file</p>}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                            <Shield className="w-3.5 h-3.5 text-green-500" /> Certifications
+                          </h3>
+                          {history.certifications && history.certifications.length > 0 ? (
+                            <div className="space-y-2">
+                              {history.certifications.map((c: any, i: number) => (
+                                <div key={i} className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-700">{c.name}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${c.is_expired ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                                    {c.is_expired ? 'Expired' : c.expiry_date ? `Valid` : 'No expiry'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : <p className="text-sm text-gray-400 italic">No certifications on file</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recent Jobs */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Jobs</h3>
+                        <button onClick={() => setDetailTab('jobs')} className="text-xs font-semibold text-blue-600 hover:text-blue-700">View All</button>
+                      </div>
+                      {allJobs.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic text-center py-4">No jobs assigned yet</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {allJobs.slice(0, 5).map((job: any) => (
+                            <div key={job.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 truncate">{job.customer_name}</p>
+                                <p className="text-xs text-gray-400">{job.job_number} &middot; {job.job_type?.split(',')[0]?.trim()}</p>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                                <span className="text-xs text-gray-400">{formatShortDate(job.scheduled_date)}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusColor(job.status)}`}>
+                                  {job.status.replace(/_/g, ' ')}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* Skills Overview */}
-                  {Object.keys(operator.skill_levels || {}).length > 0 && (
-                    <div>
-                      <p className="text-xs font-bold text-gray-500 uppercase mb-2">Top Skills</p>
-                      <div className="space-y-2">
-                        {Object.entries(operator.skill_levels || {}).slice(0, 3).map(([taskId, skill]) => {
-                          const task = AVAILABLE_TASKS.find(t => t.id === taskId);
+                {/* ── Job History Tab ───────────────────────── */}
+                {detailTab === 'jobs' && (
+                  <div className="space-y-4">
+                    {/* Summary + Filter */}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-4">
+                        <p className="text-sm text-gray-600">
+                          <span className="font-bold text-gray-900">{allJobs.length}</span> total jobs
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Filter className="w-3.5 h-3.5 text-gray-400 mr-1" />
+                        {['all', 'completed', 'in_progress', 'scheduled', 'cancelled'].map(s => (
+                          <button
+                            key={s}
+                            onClick={() => setJobStatusFilter(s)}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                              jobStatusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Job Table */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                      {filteredJobs.length === 0 ? (
+                        <div className="p-12 text-center">
+                          <Briefcase className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                          <p className="text-sm text-gray-400">No jobs match this filter</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-100">
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Job #</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Customer</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Type</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hours</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {filteredJobs.map(job => (
+                                <tr key={job.id} className="hover:bg-blue-50/30 transition-colors cursor-pointer" onClick={() => router.push(`/dashboard/admin/jobs/${job.id}`)}>
+                                  <td className="px-4 py-2.5 text-sm text-gray-700 whitespace-nowrap">{formatShortDate(job.scheduled_date)}</td>
+                                  <td className="px-4 py-2.5 text-sm font-medium text-gray-900 whitespace-nowrap">{job.job_number}</td>
+                                  <td className="px-4 py-2.5 text-sm text-gray-700 max-w-[200px] truncate">{job.customer_name}</td>
+                                  <td className="px-4 py-2.5 text-sm text-gray-500 whitespace-nowrap">{job.job_type?.split(',')[0]?.trim()}</td>
+                                  <td className="px-4 py-2.5 text-sm font-medium text-gray-700 tabular-nums whitespace-nowrap">{(job as any).hours_worked != null ? `${(job as any).hours_worked}h` : '--'}</td>
+                                  <td className="px-4 py-2.5 whitespace-nowrap">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusColor(job.status)}`}>
+                                      {job.status.replace(/_/g, ' ')}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Timecards Tab ─────────────────────────── */}
+                {detailTab === 'timecards' && (
+                  <div className="space-y-4">
+                    {/* Week Navigation */}
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => setWeekOffset(weekOffset - 1)}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-600 rounded-lg text-sm font-medium border border-gray-200 shadow-sm"
+                      >
+                        <ChevronLeft size={14} /> Prev
+                      </button>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-gray-900">{formatFullDate(monday)} -- {formatFullDate(sunday)}</p>
+                        <p className="text-[11px] text-gray-400">{weekOffset === 0 ? 'Current Week' : `${Math.abs(weekOffset)} week${Math.abs(weekOffset) > 1 ? 's' : ''} ago`}</p>
+                      </div>
+                      <button
+                        onClick={() => setWeekOffset(weekOffset + 1)}
+                        disabled={weekOffset >= 0}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium border shadow-sm ${
+                          weekOffset >= 0 ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : 'bg-white hover:bg-gray-50 text-gray-600 border-gray-200'
+                        }`}
+                      >
+                        Next <ChevronRight size={14} />
+                      </button>
+                    </div>
+
+                    {/* Hours Breakdown */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { label: 'Total', value: tcTotalHours.toFixed(1), color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+                        { label: 'Regular', value: tcRegular.toFixed(1), color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
+                        { label: 'Weekly OT', value: tcOT.toFixed(1), color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+                        { label: 'Night', value: tcNight.toFixed(1), color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
+                        { label: 'Shop', value: tcShop.toFixed(1), color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+                      ].map(({ label, value, color, bg, border }) => (
+                        <div key={label} className={`px-3 py-2.5 rounded-lg border ${border} ${bg}`}>
+                          <p className={`text-lg font-bold ${color}`}>{value}<span className="text-xs font-normal ml-0.5">h</span></p>
+                          <p className="text-[10px] text-gray-500 font-medium">{label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Timecard Table */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <p className="text-sm font-bold text-gray-800">Time Entries</p>
+                        <button
+                          onClick={() => {
+                            const mondayStr = monday.toISOString().split('T')[0];
+                            window.open(`/api/admin/timecards/${selectedId}/pdf?weekStart=${mondayStr}`, '_blank');
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-gray-50 text-blue-700 rounded-lg text-xs font-medium border border-blue-200 shadow-sm"
+                        >
+                          <FileText size={13} /> Download PDF
+                        </button>
+                      </div>
+
+                      {timecardsLoading ? (
+                        <div className="p-12 text-center">
+                          <Loader2 className="w-6 h-6 animate-spin text-blue-500 mx-auto mb-2" />
+                          <p className="text-xs text-gray-400">Loading timecards...</p>
+                        </div>
+                      ) : timecards.length === 0 ? (
+                        <div className="p-12 text-center">
+                          <Clock className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                          <p className="text-sm text-gray-400">No entries this week</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-100">
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">In</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Out</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hours</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Type</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {timecards.map(tc => (
+                                <tr key={tc.id} className="hover:bg-blue-50/30">
+                                  <td className="px-4 py-2.5 text-sm text-gray-700 whitespace-nowrap">
+                                    {new Date(tc.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-sm font-medium text-gray-700 tabular-nums">{formatTime(tc.clock_in_time)}</td>
+                                  <td className="px-4 py-2.5 text-sm text-gray-700 tabular-nums">
+                                    {tc.clock_out_time ? formatTime(tc.clock_out_time) : (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-green-600 border border-green-200">
+                                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> Active
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-sm font-bold text-gray-800 tabular-nums">{tc.total_hours?.toFixed(2) || '--'}</td>
+                                  <td className="px-4 py-2.5">
+                                    <div className="flex flex-wrap gap-1">
+                                      {tc.is_shop_hours && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">Shop</span>}
+                                      {tc.is_night_shift && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">Night</span>}
+                                      {tc.hour_type === 'mandatory_overtime' && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200">Wknd OT</span>}
+                                      {!tc.is_shop_hours && !tc.is_night_shift && tc.hour_type !== 'mandatory_overtime' && <span className="text-[10px] text-gray-400">Regular</span>}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2.5">
+                                    {tc.is_approved ? (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-green-600 border border-green-200">
+                                        <CheckCircle size={10} /> Approved
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
+                                        <Clock size={10} /> Pending
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Skills Tab ───────────────────────────── */}
+                {detailTab === 'skills' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-purple-500" />
+                        Skill Rankings
+                      </h3>
+                      <p className="text-xs text-gray-400">Rate on a 1–10 scale</p>
+                    </div>
+                    <SkillsTab operatorId={selectedId!} apiFetch={apiFetch} />
+                  </div>
+                )}
+
+                {/* ── Notes & Reviews Tab ───────────────────── */}
+                {detailTab === 'notes' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-gray-900">Notes & Reviews</h3>
+                      <button
+                        onClick={() => setShowAddNote(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                      >
+                        <Plus size={13} /> Add Note
+                      </button>
+                    </div>
+
+                    {notesLoading ? (
+                      <div className="text-center py-12">
+                        <Loader2 className="w-6 h-6 animate-spin text-blue-500 mx-auto" />
+                      </div>
+                    ) : notes.length === 0 ? (
+                      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+                        <MessageSquare className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                        <p className="text-sm text-gray-400">No notes yet</p>
+                        <p className="text-xs text-gray-300 mt-1">Add a note to track performance, incidents, or training</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {notes.map(note => {
+                          const config = NOTE_TYPE_CONFIG[note.note_type] || NOTE_TYPE_CONFIG.general;
+                          const NoteIcon = config.icon;
                           return (
-                            <div key={taskId} className="flex items-center gap-2">
-                              <span className="text-xs text-gray-600 w-24 truncate">{task?.label}</span>
-                              <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                                <div
-                                  className={`h-2.5 rounded-full bg-gradient-to-r ${task?.gradient || 'from-blue-400 to-blue-600'}`}
-                                  style={{ width: `${skill.proficiency * 10}%` }}
-                                />
+                            <div key={note.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start gap-3 flex-1 min-w-0">
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${config.color}`}>
+                                    <NoteIcon size={14} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="text-sm font-semibold text-gray-900">{note.title}</p>
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${config.color}`}>{config.label}</span>
+                                      {note.is_private && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">Private</span>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{note.content}</p>
+                                    <p className="text-xs text-gray-400 mt-2">
+                                      {note.author_name || note.author?.full_name || 'Unknown'} &middot; {new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                  </div>
+                                </div>
+                                {currentUserRole === 'super_admin' && (
+                                  <button
+                                    onClick={() => handleDeleteNote(note.id)}
+                                    className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-gray-400 hover:text-red-600"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
                         })}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-                    <button
-                      onClick={() => handleEditOperator(operator)}
-                      className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm transition-all shadow-md hover:shadow-lg"
-                    >
-                      Edit Profile
-                    </button>
-                    <Link
-                      href={`/dashboard/admin/operator-profiles/${operator.id}/equipment`}
-                      className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
-                    >
-                      <Wrench size={16} />
-                      Equipment
-                    </Link>
+                    )}
                   </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                )}
 
-        {operators.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
-            <User size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-600 text-lg font-medium">No operators found</p>
-            <p className="text-gray-400 text-sm mt-2">Operators will appear here once they're added</p>
-          </div>
-        )}
+                {/* ── Pay & Compensation Tab (super_admin only) ─ */}
+                {detailTab === 'pay' && currentUserRole === 'super_admin' && (
+                  <div className="space-y-4">
+                    {/* Current Rate */}
+                    {(history.profile as any).hourly_rate && (
+                      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Current Rate</h3>
+                        <p className="text-3xl font-bold text-gray-900">${(history.profile as any).hourly_rate}<span className="text-base font-normal text-gray-400">/hr</span></p>
+                      </div>
+                    )}
+
+                    {/* Pay History */}
+                    {history.pay_history && history.pay_history.length > 0 ? (
+                      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Pay History</h3>
+                        <div className="space-y-3">
+                          {history.pay_history.map((pay: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">${pay.hourly_rate}/hr</p>
+                                {pay.reason && <p className="text-xs text-gray-500 mt-0.5">{pay.reason}</p>}
+                              </div>
+                              <span className="text-xs text-gray-400">{formatDate(pay.effective_date)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Compensation</h3>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-semibold text-amber-800">Pay tracking coming soon</p>
+                            <p className="text-xs text-amber-700 mt-1">
+                              Hourly rate management, pay history timeline, and rate change tracking will be available in a future update.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <AlertTriangle className="w-10 h-10 text-red-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Failed to load operator data</p>
+                <button onClick={() => selectedId && fetchDetail(selectedId)} className="mt-2 text-sm text-blue-600 font-semibold hover:text-blue-700">Try again</button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Edit Modal */}
-      {showEditModal && selectedOperator && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Modal Header with Vibrant Gradient */}
-            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 px-6 py-5 flex items-center justify-between flex-shrink-0">
-              <div>
-                <h2 className="text-2xl font-bold text-white drop-shadow-md">{selectedOperator.full_name}</h2>
-                <p className="text-white/95 text-sm drop-shadow">{selectedOperator.email}</p>
+      {/* ── Add Profile Modal ──────────────────────────────── */}
+      {showAddModal && (
+        <AddProfileModal onSubmit={handleAddProfile} onClose={() => setShowAddModal(false)} />
+      )}
+
+      {/* ── Add Note Modal ─────────────────────────────────── */}
+      {showAddNote && (
+        <AddNoteModal
+          onSubmit={handleAddNote}
+          onClose={() => setShowAddNote(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Add Note Modal Component ────────────────────────────────
+function AddNoteModal({ onSubmit, onClose }: {
+  onSubmit: (data: { title: string; content: string; note_type: string; is_private: boolean }) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [noteType, setNoteType] = useState('general');
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!title.trim() || !content.trim()) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({ title: title.trim(), content: content.trim(), note_type: noteType, is_private: isPrivate });
+    } catch {
+      // handled by parent
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
+      <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+          <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-blue-600" />
+              Add Note
+            </h3>
+            <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+              <X size={18} className="text-gray-400" />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {/* Note Type */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Type</label>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(NOTE_TYPE_CONFIG).map(([key, config]) => (
+                  <button
+                    key={key}
+                    onClick={() => setNoteType(key)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      noteType === key ? 'bg-blue-600 text-white' : `${config.color} hover:opacity-80`
+                    }`}
+                  >
+                    {config.label}
+                  </button>
+                ))}
               </div>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors backdrop-blur-sm"
-              >
-                <XIcon size={20} className="text-white" />
-              </button>
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-gray-200 px-6 flex gap-1 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0">
-              <button
-                onClick={() => setActiveTab('basic')}
-                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
-                  activeTab === 'basic'
-                    ? 'border-purple-600 text-purple-600 bg-white rounded-t-lg'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Basic Info
-              </button>
-              <button
-                onClick={() => setActiveTab('skills')}
-                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
-                  activeTab === 'skills'
-                    ? 'border-purple-600 text-purple-600 bg-white rounded-t-lg'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Skills & Tasks
-              </button>
-              <button
-                onClick={() => setActiveTab('equipment')}
-                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
-                  activeTab === 'equipment'
-                    ? 'border-purple-600 text-purple-600 bg-white rounded-t-lg'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Equipment (1-10)
-              </button>
-              <button
-                onClick={() => setActiveTab('certs')}
-                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
-                  activeTab === 'certs'
-                    ? 'border-purple-600 text-purple-600 bg-white rounded-t-lg'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Certifications & Docs
-              </button>
+            {/* Title */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Title</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Brief description..."
+                className="w-full px-3.5 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 transition-all"
+              />
             </div>
 
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto flex-1">
-              {/* Basic Info Tab */}
-              {activeTab === 'basic' && (
-                <div className="space-y-6">
-                  {/* Contact Information Section */}
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
-                    <h3 className="font-bold text-gray-900 text-lg mb-4">Contact Information</h3>
-                    <p className="text-xs text-gray-600 mb-4">This information will autofill silica exposure forms</p>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                          Full Name
-                        </label>
-                        <input
-                          type="text"
-                          value={selectedOperator.full_name || ''}
-                          onChange={(e) => setSelectedOperator({
-                            ...selectedOperator,
-                            full_name: e.target.value
-                          })}
-                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold text-gray-900 bg-white"
-                          placeholder="John Doe"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                          Phone Number
-                        </label>
-                        <input
-                          type="tel"
-                          value={selectedOperator.phone_number || ''}
-                          onChange={(e) => setSelectedOperator({
-                            ...selectedOperator,
-                            phone_number: e.target.value || null
-                          })}
-                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold text-gray-900 bg-white"
-                          placeholder="5555551234"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          value={selectedOperator.email || ''}
-                          onChange={(e) => setSelectedOperator({
-                            ...selectedOperator,
-                            email: e.target.value
-                          })}
-                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold text-gray-900 bg-white"
-                          placeholder="operator@pontifexindustries.com"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Employment Information Section */}
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Hourly Rate (Labor Cost)
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-lg">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={selectedOperator.hourly_rate || ''}
-                          onChange={(e) => setSelectedOperator({
-                            ...selectedOperator,
-                            hourly_rate: parseFloat(e.target.value) || null
-                          })}
-                          className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold"
-                          placeholder="25.00"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Years Experience
-                      </label>
-                      <input
-                        type="number"
-                        value={selectedOperator.years_experience || ''}
-                        onChange={(e) => setSelectedOperator({
-                          ...selectedOperator,
-                          years_experience: parseInt(e.target.value) || null
-                        })}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold"
-                        placeholder="5"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Hire Date
-                      </label>
-                      <input
-                        type="date"
-                        value={selectedOperator.hire_date || ''}
-                        onChange={(e) => setSelectedOperator({
-                          ...selectedOperator,
-                          hire_date: e.target.value || null
-                        })}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-lg font-semibold"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Admin Notes
-                    </label>
-                    <textarea
-                      value={selectedOperator.notes || ''}
-                      onChange={(e) => setSelectedOperator({
-                        ...selectedOperator,
-                        notes: e.target.value || null
-                      })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                      rows={4}
-                      placeholder="Internal notes about this operator..."
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Skills Tab */}
-              {activeTab === 'skills' && (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-500 mb-4">Rate skill level for each task (1-10 scale, 10 = Expert)</p>
-                  {AVAILABLE_TASKS.map((task) => {
-                    const isQualified = (selectedOperator.tasks_qualified_for || []).includes(task.id);
-                    const skillLevel = selectedOperator.skill_levels?.[task.id]?.proficiency || 0;
-
-                    return (
-                      <div key={task.id} className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-5 border-2 border-gray-200 hover:border-gray-300 transition-all">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{task.icon}</span>
-                            <div>
-                              <h3 className="font-bold text-gray-900">{task.label}</h3>
-                              <p className="text-xs text-gray-500">
-                                {isQualified ? `Skill Level: ${skillLevel}/10` : 'Not qualified'}
-                              </p>
-                            </div>
-                          </div>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={isQualified}
-                              onChange={() => toggleTask(task.id)}
-                              className="w-5 h-5 text-purple-600 rounded"
-                            />
-                            <span className="text-sm font-medium text-gray-700">Qualified</span>
-                          </label>
-                        </div>
-
-                        {isQualified && (
-                          <div className="grid grid-cols-10 gap-2">
-                            {SKILL_LEVELS.map((level) => (
-                              <button
-                                key={level}
-                                onClick={() => updateTaskSkillLevel(task.id, level)}
-                                className={`aspect-square rounded-lg text-xs font-bold transition-all ${
-                                  skillLevel === level
-                                    ? `bg-gradient-to-br ${task.gradient} text-white shadow-lg scale-110`
-                                    : 'bg-white text-gray-600 hover:bg-gray-50 border-2 border-gray-200'
-                                }`}
-                              >
-                                {level}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Equipment Tab with 1-10 Rating */}
-              {activeTab === 'equipment' && (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-500 mb-4">Rate proficiency for each equipment (1-10 scale, 10 = Master)</p>
-                  {AVAILABLE_EQUIPMENT.map((equip) => {
-                    const equipData = selectedOperator.equipment_qualified_for?.[equip.id];
-                    const isQualified = equipData?.qualified || false;
-                    const proficiency = equipData?.proficiency || 0;
-
-                    return (
-                      <div key={equip.id} className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-5 border-2 border-gray-200 hover:border-gray-300 transition-all">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <Wrench size={24} className={isQualified ? `text-${equip.gradient.split('-')[1]}-500` : 'text-gray-400'} />
-                            <div>
-                              <h3 className="font-bold text-gray-900">{equip.label}</h3>
-                              <p className="text-xs text-gray-500">
-                                {isQualified ? `Proficiency: ${proficiency}/10` : 'Not qualified'}
-                              </p>
-                            </div>
-                          </div>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={isQualified}
-                              onChange={() => toggleEquipment(equip.id)}
-                              className="w-5 h-5 text-purple-600 rounded"
-                            />
-                            <span className="text-sm font-medium text-gray-700">Qualified</span>
-                          </label>
-                        </div>
-
-                        {isQualified && (
-                          <div className="grid grid-cols-10 gap-2">
-                            {EQUIPMENT_PROFICIENCY.map((level) => (
-                              <button
-                                key={level}
-                                onClick={() => updateEquipmentProficiency(equip.id, level)}
-                                className={`aspect-square rounded-lg text-xs font-bold transition-all ${
-                                  proficiency === level
-                                    ? `bg-gradient-to-br ${equip.gradient} text-white shadow-lg scale-110`
-                                    : 'bg-white text-gray-600 hover:bg-gray-50 border-2 border-gray-200'
-                                }`}
-                              >
-                                {level}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Certifications Tab with PDF Upload */}
-              {activeTab === 'certs' && (
-                <div className="space-y-6">
-                  {/* PDF Upload Section */}
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-lg">Certification Documents</h3>
-                        <p className="text-sm text-gray-600">Upload PDF files (OSHA cards, licenses, etc.)</p>
-                      </div>
-                      <div>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="application/pdf"
-                          onChange={handleFileUpload}
-                          className="hidden"
-                        />
-                        <button
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploadingPdf}
-                          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold text-sm transition-all flex items-center gap-2 disabled:opacity-50"
-                        >
-                          <Upload size={16} />
-                          {uploadingPdf ? 'Uploading...' : 'Upload PDF'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* List of uploaded documents */}
-                    <div className="space-y-2">
-                      {(selectedOperator.certification_documents || []).map((doc, index) => (
-                        <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200">
-                          <div className="flex items-center gap-3">
-                            <File size={20} className="text-red-500" />
-                            <div>
-                              <p className="font-medium text-gray-900">{doc.cert_name}</p>
-                              <p className="text-xs text-gray-500">{doc.file_name}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={doc.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
-                            >
-                              View
-                            </a>
-                            <button
-                              onClick={() => removeCertDocument(index)}
-                              className="w-8 h-8 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-colors flex items-center justify-center"
-                            >
-                              <XIcon size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {(!selectedOperator.certification_documents || selectedOperator.certification_documents.length === 0) && (
-                        <p className="text-gray-400 text-center py-4">No documents uploaded yet</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Certification Details */}
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-900 text-lg">Certification Details</h3>
-                      <button
-                        onClick={addCertification}
-                        className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-sm transition-all"
-                      >
-                        + Add Certification
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      {(selectedOperator.certifications || []).map((cert, index) => (
-                        <div key={index} className="flex gap-3 items-start bg-gray-50 p-4 rounded-xl border-2 border-gray-200">
-                          <div className="flex-1 grid grid-cols-3 gap-3">
-                            <input
-                              type="text"
-                              value={cert.name || ''}
-                              onChange={(e) => updateCertification(index, 'name', e.target.value)}
-                              className="px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none font-medium"
-                              placeholder="Certification Name"
-                            />
-                            <input
-                              type="date"
-                              value={cert.issued_date || ''}
-                              onChange={(e) => updateCertification(index, 'issued_date', e.target.value)}
-                              className="px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none"
-                            />
-                            <input
-                              type="date"
-                              value={cert.expiry_date || ''}
-                              onChange={(e) => updateCertification(index, 'expiry_date', e.target.value)}
-                              className="px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none"
-                              placeholder="Expiry (Optional)"
-                            />
-                          </div>
-                          <button
-                            onClick={() => removeCertification(index)}
-                            className="w-10 h-10 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-colors flex items-center justify-center font-bold"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                      {(!selectedOperator.certifications || selectedOperator.certifications.length === 0) && (
-                        <p className="text-gray-400 text-center py-8">No certifications added yet</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+            {/* Content */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Content</label>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={4}
+                placeholder="Detailed notes..."
+                className="w-full px-3.5 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 resize-none transition-all"
+              />
             </div>
 
-            {/* Modal Footer */}
-            <div className="border-t border-gray-200 px-6 py-4 flex gap-3 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0">
+            {/* Private */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">Mark as private (visible to super admins only)</span>
+            </label>
+
+            {/* Actions */}
+            <div className="flex gap-2.5 pt-1">
               <button
-                onClick={() => setShowEditModal(false)}
-                className="flex-1 px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-300 rounded-xl font-semibold transition-all"
+                onClick={onClose}
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleSaveOperator}
-                disabled={saving}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 hover:from-purple-700 hover:via-pink-700 hover:to-rose-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                onClick={handleSubmit}
+                disabled={submitting || !title.trim() || !content.trim()}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {submitting ? 'Saving...' : 'Save Note'}
               </button>
             </div>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

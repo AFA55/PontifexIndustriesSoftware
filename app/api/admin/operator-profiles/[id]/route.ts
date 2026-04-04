@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/operator-profiles/[id]
  * Get a single operator profile with detailed analytics
@@ -8,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
@@ -51,20 +54,26 @@ export async function GET(
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view operator profiles' },
         { status: 403 }
       );
     }
 
-    // Get operator profile
-    const { data: operator, error: operatorError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Get operator profile (scoped to tenant)
+    let operatorQuery = supabaseAdmin
       .from('profiles')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (tenantId) {
+      operatorQuery = operatorQuery.eq('tenant_id', tenantId);
+    }
+    const { data: operator, error: operatorError } = await operatorQuery.single();
 
     if (operatorError || !operator) {
       return NextResponse.json(
@@ -147,8 +156,8 @@ export async function PATCH(
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can update operator profiles' },
         { status: 403 }
@@ -186,11 +195,18 @@ export async function PATCH(
 
     sanitizedUpdates.updated_at = new Date().toISOString();
 
-    // Update operator profile
-    const { data: updatedOperator, error: updateError } = await supabaseAdmin
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
+    // Update operator profile (scoped to tenant)
+    let updateQuery = supabaseAdmin
       .from('profiles')
       .update(sanitizedUpdates)
-      .eq('id', id)
+      .eq('id', id);
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId);
+    }
+    const { data: updatedOperator, error: updateError } = await updateQuery
       .select()
       .single();
 

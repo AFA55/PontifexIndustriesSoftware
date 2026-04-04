@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/liability-release/pdf
  * Generate PDF of liability release and send via email
@@ -6,36 +8,18 @@
 import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { LiabilityReleasePDF } from '@/components/pdf/LiabilityReleasePDF';
 import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
     console.log('[LIABILITY PDF] Starting PDF generation...');
 
-    // Get user from Supabase session
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    // SECURITY: Require authenticated user
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     // Parse request body
     const body = await request.json();
@@ -69,7 +53,7 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('email, full_name')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
 
     const isDemoOperator = profile?.email === 'demo@pontifex.com' ||
@@ -86,6 +70,29 @@ export async function POST(request: NextRequest) {
       }, { status: 200 });
     }
 
+    // Fetch branding for PDF
+    let pdfBranding: Record<string, unknown> = {};
+    try {
+      const { data: brandingRow } = await supabaseAdmin
+        .from('tenant_branding')
+        .select('company_name, support_phone, support_email, pdf_footer_text, pdf_show_logo, primary_color, logo_url')
+        .limit(1)
+        .single();
+      if (brandingRow) {
+        pdfBranding = {
+          company_name: brandingRow.company_name,
+          support_phone: brandingRow.support_phone,
+          support_email: brandingRow.support_email,
+          pdf_footer_text: brandingRow.pdf_footer_text,
+          pdf_show_logo: brandingRow.pdf_show_logo,
+          primary_color: brandingRow.primary_color,
+          logo_url: brandingRow.logo_url,
+        };
+      }
+    } catch {
+      // Use defaults if branding fetch fails
+    }
+
     // Generate PDF
     console.log('[LIABILITY PDF] Generating PDF document...');
     const pdfElement = LiabilityReleasePDF({
@@ -95,7 +102,8 @@ export async function POST(request: NextRequest) {
       signatureDataURL,
       jobNumber: jobNumber || jobId,
       jobAddress: jobAddress || 'N/A',
-      signedAt: new Date().toISOString()
+      signedAt: new Date().toISOString(),
+      branding: pdfBranding as any,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfBuffer = await renderToBuffer(pdfElement as any);
@@ -127,18 +135,22 @@ export async function POST(request: NextRequest) {
     console.log('[LIABILITY PDF] Sending email to:', customerEmail);
 
     try {
+      const emailCompanyName = (pdfBranding.company_name as string) || 'Pontifex Industries';
+      const emailPhone = (pdfBranding.support_phone as string) || '(833) 695-4288';
+      const emailSupportAddr = (pdfBranding.support_email as string) || 'support@pontifexindustries.com';
+      const resend = new Resend(process.env.RESEND_API_KEY);
       const emailResult = await resend.emails.send({
-        from: 'Pontifex Industries <noreply@pontifexindustries.com>',
+        from: process.env.RESEND_FROM_EMAIL || `${emailCompanyName} <noreply@resend.dev>`,
         to: customerEmail,
         subject: `Liability Release - Job #${jobNumber || jobId}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #EA580C;">Pontifex Industries</h1>
+            <h1 style="color: #EA580C;">${emailCompanyName}</h1>
             <h2 style="color: #334155;">Liability Release & Indemnification</h2>
 
             <p>Dear ${customerName},</p>
 
-            <p>Thank you for working with Pontifex Industries. This email confirms that the Liability Release & Indemnification agreement has been signed for:</p>
+            <p>Thank you for working with ${emailCompanyName}. This email confirms that the Liability Release & Indemnification agreement has been signed for:</p>
 
             <div style="background: #F1F5F9; padding: 16px; border-radius: 8px; margin: 20px 0;">
               <p style="margin: 4px 0;"><strong>Job Number:</strong> ${jobNumber || jobId}</p>
@@ -152,11 +164,11 @@ export async function POST(request: NextRequest) {
             <p>If you have any questions or concerns, please don't hesitate to contact us:</p>
 
             <div style="margin: 20px 0;">
-              <p style="margin: 4px 0;"><strong>Phone:</strong> (833) 695-4288</p>
-              <p style="margin: 4px 0;"><strong>Email:</strong> support@pontifexindustries.com</p>
+              <p style="margin: 4px 0;"><strong>Phone:</strong> ${emailPhone}</p>
+              <p style="margin: 4px 0;"><strong>Email:</strong> ${emailSupportAddr}</p>
             </div>
 
-            <p>Thank you for choosing Pontifex Industries.</p>
+            <p>Thank you for choosing ${emailCompanyName}.</p>
 
             <p style="margin-top: 30px; color: #64748B; font-size: 14px;">
               This is an automated message. Please do not reply to this email.

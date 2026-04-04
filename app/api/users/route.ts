@@ -1,6 +1,9 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireAuth } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,11 +14,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role')
 
+    const tenantId = await getTenantId(auth.userId)
     let query = supabaseAdmin
       .from('profiles')
       .select('id, full_name, email, role')
       .eq('active', true)
       .order('full_name', { ascending: true })
+
+    // Scope to tenant
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId)
+    }
 
     // Filter by role if specified
     if (role) {

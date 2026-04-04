@@ -23,23 +23,23 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-zinc-500 text-sm max-w-md leading-relaxed">
-              Custom software and automation solutions for {BRAND.industry} companies.
-              We build personalized platforms that eliminate paperwork, track profitability
-              in real-time, and scale with your business.
+              A multi-tenant white-label operations management platform built specifically
+              for {BRAND.industry} companies. Complete dispatch-to-invoice workflow with
+              15+ live modules.
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
             <h3 className="text-white font-semibold mb-4 text-sm uppercase tracking-wider">
-              Quick Links
+              Explore
             </h3>
             <ul className="space-y-3 text-sm">
               {[
-                { label: 'Features', href: '#features' },
-                { label: 'How It Works', href: '#how-it-works' },
-                { label: 'ROI Calculator', href: '#roi' },
-                { label: 'Schedule Demo', href: '#demo' },
+                { label: 'Live Features', href: '#features' },
+                { label: 'vs DSM & CenPoint', href: '#comparison' },
+                { label: 'Architecture', href: '#architecture' },
+                { label: 'Enter Platform', href: '/company' },
               ].map((link) => (
                 <li key={link.href}>
                   <a
@@ -56,17 +56,16 @@ export default function Footer() {
           {/* Get Started */}
           <div>
             <h3 className="text-white font-semibold mb-4 text-sm uppercase tracking-wider">
-              Get in Touch
+              Get Started
             </h3>
             <p className="text-zinc-500 text-sm mb-5 leading-relaxed">
-              Want to see how it works for your business? Reach out for a
-              personalized walkthrough.
+              See how the platform can streamline your concrete cutting operations.
             </p>
             <a
-              href={`mailto:${BRAND.contactEmail}`}
+              href="/request-demo"
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg text-sm font-semibold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all hover:scale-105"
             >
-              Contact Us
+              Request a Demo
               <ArrowRight className="w-4 h-4" />
             </a>
           </div>
@@ -80,13 +79,13 @@ export default function Footer() {
           </p>
           <div className="flex items-center gap-6 text-sm">
             <a
-              href="#"
+              href="/privacy"
               className="text-zinc-600 hover:text-zinc-400 transition-colors"
             >
               Privacy
             </a>
             <a
-              href="#"
+              href="/terms"
               className="text-zinc-600 hover:text-zinc-400 transition-colors"
             >
               Terms

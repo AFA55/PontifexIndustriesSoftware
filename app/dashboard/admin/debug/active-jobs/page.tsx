@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -37,7 +39,7 @@ export default function ActiveJobsDebugPage() {
       router.push('/login');
       return;
     }
-    if (currentUser.role !== 'admin') {
+    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(currentUser.role)) {
       router.push('/dashboard');
     }
   };

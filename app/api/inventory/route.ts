@@ -1,12 +1,19 @@
-import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+export const dynamic = 'force-dynamic';
 
-export async function GET() {
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireAdmin } from '@/lib/api-auth'
+import { getTenantId } from '@/lib/get-tenant-id'
+
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.authorized) return auth.response
+  const tenantId = await getTenantId(auth.userId)
+
   try {
-    const { data: inventory, error } = await supabaseAdmin
-      .from('inventory')
-      .select('*')
-      .order('created_at', { ascending: false })
+    let invQuery = supabaseAdmin.from('inventory').select('*').order('created_at', { ascending: false })
+    if (tenantId) invQuery = invQuery.eq('tenant_id', tenantId)
+    const { data: inventory, error } = await invQuery
 
     if (error) {
       console.error('Error fetching inventory:', error)
@@ -20,13 +27,17 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.authorized) return auth.response
+  const tenantId = await getTenantId(auth.userId)
+
   try {
     const inventoryData = await request.json()
 
     const { data: newInventory, error } = await supabaseAdmin
       .from('inventory')
-      .insert(inventoryData)
+      .insert({ ...inventoryData, tenant_id: tenantId || null })
       .select()
       .single()
 
@@ -36,22 +47,19 @@ export async function POST(request: Request) {
     }
 
     // Create transaction record for the stock addition
-    const { error: transactionError } = await supabaseAdmin
-      .from('inventory_transactions')
-      .insert({
-        inventory_id: newInventory.id,
-        transaction_type: 'add_stock',
-        quantity_change: inventoryData.quantity_in_stock || 0,
-        quantity_before: 0,
-        quantity_after: inventoryData.quantity_in_stock || 0,
-        notes: `Initial stock added: ${inventoryData.quantity_in_stock || 0} units`,
-        performed_by: inventoryData.created_by || null
-      })
-
-    if (transactionError) {
-      console.error('Error creating transaction record:', transactionError)
-      // Don't fail the request, just log the error
-    }
+    Promise.resolve(
+      supabaseAdmin
+        .from('inventory_transactions')
+        .insert({
+          inventory_id: newInventory.id,
+          transaction_type: 'add_stock',
+          quantity_change: inventoryData.quantity_in_stock || 0,
+          quantity_before: 0,
+          quantity_after: inventoryData.quantity_in_stock || 0,
+          notes: `Initial stock added: ${inventoryData.quantity_in_stock || 0} units`,
+          performed_by: auth.userId,
+        })
+    ).then(() => {}).catch((e: any) => console.error('Error creating transaction record:', e))
 
     return NextResponse.json(newInventory)
   } catch (error) {

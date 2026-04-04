@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/auth/forgot-password
  * Send password reset email to user
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     const emailSent = await sendEmail({
       to: email,
-      subject: 'Password Reset Request - Pontifex Industries',
+      subject: 'Password Reset Request - Patriot Concrete Cutting',
       html: resetEmailHtml,
     });
 

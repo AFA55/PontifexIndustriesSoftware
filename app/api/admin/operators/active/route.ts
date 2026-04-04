@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/operators/active
  * Get all active operators with their current status (admin only)
@@ -5,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,20 +46,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view operator status' },
         { status: 403 }
       );
     }
 
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
     // Get all active operators — try the view first, fall back to empty
     let activeOperators: any[] = [];
-    const { data: viewData, error: fetchError } = await supabaseAdmin
+    let statusQuery = supabaseAdmin
       .from('current_operator_status')
       .select('*')
       .order('timestamp', { ascending: false });
+    if (tenantId) {
+      statusQuery = statusQuery.eq('tenant_id', tenantId);
+    }
+    const { data: viewData, error: fetchError } = await statusQuery;
 
     if (!fetchError && viewData) {
       activeOperators = viewData;

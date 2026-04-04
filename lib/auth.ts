@@ -48,7 +48,7 @@ export const checkCredentials = async (email: string, password: string): Promise
 
     // Store user in localStorage
     if (typeof window !== 'undefined') {
-      localStorage.setItem('pontifex-user', JSON.stringify(matchingCredential.user));
+      localStorage.setItem('patriot-user', JSON.stringify(matchingCredential.user));
       console.log('💾 User stored in localStorage');
     }
 
@@ -79,7 +79,7 @@ export const getCurrentUser = (): User | null => {
     }
 
     // Fallback to old localStorage system for backwards compatibility
-    const userStr = localStorage.getItem('pontifex-user');
+    const userStr = localStorage.getItem('patriot-user');
     if (userStr && userStr.trim()) {
       const user = JSON.parse(userStr);
       console.log('👤 Current user from localStorage:', user);
@@ -88,7 +88,7 @@ export const getCurrentUser = (): User | null => {
   } catch (error) {
     console.error('Error getting user from localStorage:', error);
     // Clear corrupted data
-    localStorage.removeItem('pontifex-user');
+    localStorage.removeItem('patriot-user');
     localStorage.removeItem('supabase-user');
   }
 
@@ -102,13 +102,19 @@ export const logout = async (): Promise<void> => {
   try {
     const { supabase } = await import('@/lib/supabase');
     await supabase.auth.signOut();
-  } catch (e) {
-    console.log('Supabase signOut skipped:', e);
+  } catch {
+    // Supabase signOut may fail if no session exists
   }
 
-  localStorage.removeItem('pontifex-user');
+  localStorage.removeItem('patriot-user');
   localStorage.removeItem('supabase-user');
-  console.log('🚪 User logged out');
+  localStorage.removeItem('platform-user');
+  localStorage.removeItem('current-tenant');
+  // Clear all branding caches
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('branding-')) localStorage.removeItem(key);
+  });
+  console.log('User logged out');
 };
 
 export const isAuthenticated = (): boolean => {
@@ -117,7 +123,27 @@ export const isAuthenticated = (): boolean => {
 
 export const isAdmin = (): boolean => {
   const user = getCurrentUser();
-  return user?.role === 'admin';
+  return ['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(user?.role || '');
+};
+
+export const isSuperAdmin = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'super_admin';
+};
+
+export const isOpsManager = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'operations_manager';
+};
+
+export const isSupervisor = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'supervisor';
+};
+
+export const isSalesman = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'salesman';
 };
 
 export const isOperator = (): boolean => {
@@ -128,4 +154,14 @@ export const isOperator = (): boolean => {
 export const hasRole = (role: string): boolean => {
   const user = getCurrentUser();
   return user?.role === role;
+};
+
+export const isShopUser = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'shop_manager' || user?.role === 'admin' || user?.role === 'operator';
+};
+
+export const isShopManager = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'shop_manager' || user?.role === 'admin';
 };

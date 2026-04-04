@@ -1,35 +1,49 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Clock, Calendar, User, Navigation, Play, CheckCircle, FileText } from 'lucide-react';
+import {
+  ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
+  ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer,
+  Paperclip, Upload, Trash2, PauseCircle, X, Image, File, MapPin, Phone, Eye
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
+import HelperWorkLog from '../_components/HelperWorkLog';
+import type { JobTicketData } from '../_components/JobTicketCard';
+import { isMandatoryComplete } from '@/lib/equipment-map';
+import { unifyEquipmentSelections, allItemsConfirmed as checkAllConfirmed } from '@/lib/equipment-unifier';
+import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
+import { PhotoViewer } from '@/components/PhotoUploader';
 
-interface JobOrder {
-  id: string;
-  job_number: string;
-  title: string;
-  customer_name: string;
-  customer_contact: string;
-  job_type: string;
-  location: string;
-  address: string;
-  description: string;
-  status: string;
-  priority: string;
-  scheduled_date: string;
-  arrival_time: string;
-  estimated_hours: number;
-  foreman_name: string;
-  foreman_phone: string;
-  salesman_name: string;
-  route_started_at: string;
-  work_started_at: string;
-  work_completed_at: string;
-  drive_hours: number;
-  production_hours: number;
-  total_hours: number;
+function toDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatTime(time: string | null) {
+  if (!time) return null;
+  if (/[APap][Mm]/.test(time)) return time.trim();
+  const parts = time.split(':');
+  if (parts.length < 2) return time;
+  const h = parseInt(parts[0]);
+  const m = parts[1].padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${displayH}:${m} ${ampm}`;
+}
+
+function getStatusStyle(status: string) {
+  switch (status) {
+    case 'assigned': return 'bg-blue-100 text-blue-700 border-blue-200';
+    case 'in_route': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+    case 'in_progress': return 'bg-orange-100 text-orange-700 border-orange-200';
+    case 'on_hold': return 'bg-purple-100 text-purple-700 border-purple-200';
+    case 'completed': return 'bg-green-100 text-green-700 border-green-200';
+    default: return 'bg-gray-100 text-gray-700 border-gray-200';
+  }
 }
 
 export default function JobDetailPage() {
@@ -37,26 +51,30 @@ export default function JobDetailPage() {
   const params = useParams();
   const jobId = params.id as string;
 
-  const [job, setJob] = useState<JobOrder | null>(null);
+  const [job, setJob] = useState<JobTicketData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [showCompletionForm, setShowCompletionForm] = useState(false);
+  const [userRole, setUserRole] = useState<string>('operator');
+  const [userId, setUserId] = useState<string>('');
+  const [startingRoute, setStartingRoute] = useState(false);
 
-  const [completionData, setCompletionData] = useState({
-    work_performed: '',
-    materials_used: '',
-    equipment_used: '',
-    operator_notes: '',
-    issues_encountered: '',
-    customer_satisfied: true,
-  });
+  // Equipment checklist state
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const [workDetailsOpen, setWorkDetailsOpen] = useState(true);
+  const [equipmentOpen, setEquipmentOpen] = useState(true);
 
-  useEffect(() => {
-    fetchJob();
-  }, [jobId]);
+  // Documents state
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [docsOpen, setDocsOpen] = useState(true); // Open by default now
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docCategory, setDocCategory] = useState('other');
+  const [docNotes, setDocNotes] = useState('');
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
 
-  const fetchJob = async () => {
+  const isHelper = userRole === 'apprentice';
+
+  const fetchJob = useCallback(async () => {
+    setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -64,222 +82,229 @@ export default function JobDetailPage() {
         return;
       }
 
-      const response = await fetch(`/api/job-orders`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
+      const uid = session.user.id;
+      setUserId(uid);
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          const foundJob = result.data.find((j: JobOrder) => j.id === jobId);
-          if (foundJob) {
-            setJob(foundJob);
+      // Fetch only this specific job by ID for efficiency
+      const res = await fetch(
+        `/api/job-orders?id=${jobId}&include_helper_jobs=true&includeCompleted=true`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          if (json.user_role) setUserRole(json.user_role);
+          const found = (json.data || [])[0];
+          if (found && found.id === jobId) {
+            setJob({
+              ...found,
+              isHelper: found.helper_assigned_to === uid && found.assigned_to !== uid,
+            });
           } else {
             router.push('/dashboard/my-jobs');
           }
         }
       }
-    } catch (error) {
-      console.error('Error fetching job:', error);
+    } catch (err) {
+      console.error('Error fetching job:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [jobId, router]);
 
-  const getLocation = (): Promise<{ latitude: number; longitude: number; accuracy: number }> => {
-    return new Promise((resolve) => {
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            resolve({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-            });
-          },
-          () => {
-            resolve({ latitude: 0, longitude: 0, accuracy: 0 });
-          }
-        );
-      } else {
-        resolve({ latitude: 0, longitude: 0, accuracy: 0 });
-      }
-    });
-  };
-
-  const updateStatus = async (newStatus: 'in_route' | 'in_progress' | 'completed') => {
-    if (newStatus === 'completed') {
-      setShowCompletionForm(true);
-      return;
-    }
-
-    setStatusLoading(true);
-    setStatusMessage(null);
-
+  const fetchDocuments = useCallback(async () => {
     try {
-      const location = await getLocation();
       const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        setStatusMessage({
-          type: 'error',
-          text: 'Session expired. Please log in again.',
-        });
-        setStatusLoading(false);
-        return;
+      if (!session) return;
+      const res = await fetch(`/api/job-orders/${jobId}/documents`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setDocuments(json.data || []);
       }
+    } catch {
+      // silent
+    }
+  }, [jobId]);
 
-      const response = await fetch(`/api/job-orders/${jobId}/status`, {
-        method: 'PUT',
+  useEffect(() => {
+    fetchJob();
+    fetchDocuments();
+  }, [fetchJob, fetchDocuments]);
+
+  const toggleEquipment = (item: string) => {
+    setCheckedItems(prev => ({ ...prev, [item]: !prev[item] }));
+  };
+
+  // Equipment logic — unified panel
+  const mandatoryItems = job?.mandatory_equipment || [];
+  const allEquipment = job?.equipment_needed || [];
+  const mandatoryComplete = isMandatoryComplete(mandatoryItems, checkedItems);
+
+  // Unified equipment items (deduplicated, categorized)
+  const unifiedItems = useMemo(
+    () => unifyEquipmentSelections(job?.equipment_selections, job?.equipment_needed, job?.mandatory_equipment),
+    [job?.equipment_selections, job?.equipment_needed, job?.mandatory_equipment],
+  );
+
+  const hasEquipmentSelections = !!(job?.equipment_selections &&
+    Object.keys(job.equipment_selections).length > 0);
+
+  const hasOperatorConfirmedEquipment = (): boolean => {
+    if (!job || !userId) return false;
+    const confirmedBy = job.equipment_confirmed_by || [];
+    return confirmedBy.includes(userId);
+  };
+
+  const equipmentAlreadyConfirmed = job ? hasOperatorConfirmedEquipment() : false;
+
+  const canStartRoute = equipmentAlreadyConfirmed ||
+    (hasEquipmentSelections
+      ? checkAllConfirmed(unifiedItems, checkedItems)
+      : mandatoryComplete);
+  const isCompleted = job?.status === 'completed';
+  const isOnHold = job?.status === 'on_hold';
+  const isInProgress = job ? ['in_route', 'in_progress'].includes(job.status) : false;
+  const jobIsHelper = job?.isHelper || isHelper;
+
+  // Split documents into admin-attached and operator-uploaded
+  const adminDocs = documents.filter(d => d.uploaded_by !== userId);
+  const operatorDocs = documents.filter(d => d.uploaded_by === userId);
+
+  const handleStartRoute = async () => {
+    if (!canStartRoute || !job) return;
+    setStartingRoute(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const currentConfirmed = job.equipment_confirmed_by || [];
+      const updatedConfirmed = currentConfirmed.includes(userId)
+        ? currentConfirmed
+        : [...currentConfirmed, userId];
+
+      await fetch(`/api/job-orders/${job.id}/status`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          status: newStatus,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
+          status: 'in_route',
+          equipment_confirmed_by: updatedConfirmed,
         }),
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        setStatusMessage({
-          type: 'success',
-          text: result.message,
-        });
-        // Refresh job data
-        await fetchJob();
-      } else {
-        setStatusMessage({
-          type: 'error',
-          text: result.error || 'Failed to update status',
-        });
-      }
-
-      setTimeout(() => setStatusMessage(null), 3000);
-    } catch (error: any) {
-      console.error('Error updating status:', error);
-      setStatusMessage({
-        type: 'error',
-        text: error.message || 'An error occurred',
-      });
+      router.push(`/dashboard/my-jobs/${job.id}/jobsite`);
+    } catch (err) {
+      console.error('Error starting route:', err);
     } finally {
-      setStatusLoading(false);
+      setStartingRoute(false);
     }
   };
 
-  const submitCompletion = async () => {
-    setStatusLoading(true);
-    setStatusMessage(null);
+  const handleContinueJob = () => {
+    if (!job) return;
+    if (job.status === 'in_route') {
+      router.push(`/dashboard/my-jobs/${job.id}/jobsite`);
+    } else if (job.status === 'in_progress') {
+      router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
+    }
+  };
 
+  const handleViewCompleted = () => {
+    if (!job) return;
+    router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
+  };
+
+  const handleResumeJob = async () => {
+    if (!job) return;
     try {
-      const location = await getLocation();
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-      if (!session) {
-        setStatusMessage({
-          type: 'error',
-          text: 'Session expired. Please log in again.',
-        });
-        setStatusLoading(false);
+      await fetch(`/api/job-orders/${job.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+
+      router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
+    } catch (err) {
+      console.error('Error resuming job:', err);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !job) return;
+    setUploadingDoc(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const path = `${jobId}/documents/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('job-photos')
+        .upload(path, file, { contentType: file.type });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
         return;
       }
 
-      const response = await fetch(`/api/job-orders/${jobId}/submit`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
+      const { data: urlData } = supabase.storage.from('job-photos').getPublicUrl(path);
+      const fileUrl = urlData?.publicUrl;
+
+      const res = await fetch(`/api/job-orders/${jobId}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
-          ...completionData,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
+          file_name: file.name,
+          file_url: fileUrl,
+          file_size: file.size,
+          file_type: file.type,
+          category: docCategory,
+          notes: docNotes.trim() || null,
+          uploaded_by_name: session.user.user_metadata?.full_name || '',
         }),
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        setStatusMessage({
-          type: 'success',
-          text: 'Job completed successfully!',
-        });
-        setShowCompletionForm(false);
-        // Refresh job data
-        await fetchJob();
-        // Redirect after a moment
-        setTimeout(() => {
-          router.push('/dashboard/my-jobs');
-        }, 2000);
-      } else {
-        setStatusMessage({
-          type: 'error',
-          text: result.error || 'Failed to submit completion data',
-        });
+      if (res.ok) {
+        setDocNotes('');
+        setShowUploadForm(false);
+        fetchDocuments();
       }
-    } catch (error: any) {
-      console.error('Error submitting completion:', error);
-      setStatusMessage({
-        type: 'error',
-        text: error.message || 'An error occurred',
-      });
+    } catch (err) {
+      console.error('Error uploading document:', err);
     } finally {
-      setStatusLoading(false);
+      setUploadingDoc(false);
+      e.target.value = '';
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'scheduled':
-      case 'assigned':
-        return 'bg-blue-500 border-blue-600';
-      case 'in_route':
-        return 'bg-yellow-500 border-yellow-600';
-      case 'in_progress':
-        return 'bg-orange-500 border-orange-600';
-      case 'completed':
-        return 'bg-green-500 border-green-600';
-      default:
-        return 'bg-gray-500 border-gray-600';
+  const handleDeleteDocument = async (docId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`/api/job-orders/${jobId}/documents/${docId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      setDocuments(prev => prev.filter(d => d.id !== docId));
+    } catch (err) {
+      console.error('Error deleting document:', err);
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'Not scheduled';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  const formatDateTime = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading job details...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg font-medium">Loading job details...</p>
         </div>
       </div>
     );
@@ -287,354 +312,552 @@ export default function JobDetailPage() {
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 text-lg">Job not found</p>
-          <Link href="/dashboard/my-jobs" className="mt-4 inline-block text-blue-600 hover:underline">
-            Back to My Jobs
+          <Inbox className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-600 text-lg font-medium">Job not found</p>
+          <Link href="/dashboard/my-jobs" className="mt-3 inline-block text-blue-600 hover:underline font-semibold">
+            Back to My Schedule
           </Link>
         </div>
       </div>
     );
   }
 
+  const arrivalDisplay = formatTime(job.arrival_time);
+  const shopArrival = formatTime(job.shop_arrival_time);
+  const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
+
+  const categoryLabels: Record<string, string> = {
+    site_photo: 'Site Photo', before_after: 'Before/After',
+    permit: 'Permit', customer_doc: 'Customer Doc',
+    scope: 'Scope', other: 'Other',
+  };
+
+  const renderDocCard = (doc: any, canDelete: boolean = false) => {
+    const isImage = doc.file_type?.startsWith('image/');
+    return (
+      <div key={doc.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Clickable preview area */}
+        <a
+          href={doc.file_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block p-4 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-start gap-4">
+            <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              isImage ? 'bg-indigo-100' : 'bg-gray-100'
+            }`}>
+              {isImage ? <Image className="w-7 h-7 text-indigo-500" /> : <File className="w-7 h-7 text-gray-400" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-bold text-gray-900 truncate">{doc.file_name}</p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-xs font-semibold text-white bg-indigo-500 px-2 py-0.5 rounded-full">
+                  {categoryLabels[doc.category] || doc.category}
+                </span>
+                {doc.uploaded_by_name && (
+                  <span className="text-xs text-gray-500">by {doc.uploaded_by_name}</span>
+                )}
+              </div>
+              {doc.notes && (
+                <p className="text-sm text-gray-600 mt-1">{doc.notes}</p>
+              )}
+            </div>
+            <Eye className="w-5 h-5 text-blue-500 flex-shrink-0 mt-1" />
+          </div>
+        </a>
+        {canDelete && (
+          <div className="border-t border-gray-100 px-4 py-2">
+            <button
+              onClick={() => handleDeleteDocument(doc.id)}
+              className="text-xs text-red-500 hover:text-red-700 font-semibold flex items-center gap-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Remove
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Professional Header */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-10 shadow-2xl">
+        <div className="container mx-auto px-4 py-4 max-w-lg">
+          <div className="flex items-center gap-3">
             <Link
               href="/dashboard/my-jobs"
-              className="p-3 bg-white rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
+              className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all"
             >
-              <ArrowLeft className="w-6 h-6" />
+              <ArrowLeft className="w-5 h-5" />
             </Link>
-            <div>
-              <h1 className="text-4xl font-bold text-gray-800">
-                Job #{job.job_number}
-              </h1>
-              <p className="text-gray-600 font-medium mt-1">{job.title}</p>
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
+              <Briefcase className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold truncate">Job #{job.job_number}</h1>
+              <p className="text-blue-200 text-xs truncate">{job.customer_name}</p>
+            </div>
+            {jobIsHelper && (
+              <span className="text-xs px-2.5 py-1 bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 rounded-lg font-semibold flex-shrink-0">
+                Team Member
+              </span>
+            )}
+            <button
+              onClick={async () => {
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) return;
+                  const url = `/api/job-orders/${jobId}/dispatch-pdf`;
+                  const res = await fetch(url, {
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                  });
+                  if (res.ok) {
+                    const blob = await res.blob();
+                    const pdfUrl = URL.createObjectURL(blob);
+                    window.open(pdfUrl, '_blank');
+                  }
+                } catch (err) {
+                  console.error('Error generating PDF:', err);
+                }
+              }}
+              className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all flex-shrink-0"
+              title="Print Dispatch Ticket"
+            >
+              <Printer className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-5 max-w-lg space-y-4">
+
+        {/* Equipment already confirmed banner */}
+        {equipmentAlreadyConfirmed && (
+          <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-4 py-3 rounded-xl text-base font-semibold flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5" />
+            Equipment confirmed — checklist not required
+          </div>
+        )}
+
+        {/* Special Arrival Time */}
+        {(arrivalDisplay || shopArrival) && !isCompleted && (
+          <div className="bg-gradient-to-r from-red-500 via-red-500 to-orange-500 text-white px-5 py-4 rounded-2xl flex items-center gap-4 shadow-lg">
+            <Clock className="w-6 h-6 flex-shrink-0" />
+            <div className="text-base font-bold">
+              {shopArrival && <span>Shop: {shopArrival}</span>}
+              {shopArrival && arrivalDisplay && <span className="mx-2">&bull;</span>}
+              {arrivalDisplay && <span>Arrive: {arrivalDisplay}</span>}
             </div>
           </div>
-          <span className={`px-4 py-2 rounded-xl text-white font-bold ${getStatusColor(job.status)}`}>
-            {job.status.replace('_', ' ').toUpperCase()}
+        )}
+
+        {/* Status & Priority Badges */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-sm px-3 py-1.5 rounded-full border font-bold ${getStatusStyle(job.status)}`}>
+            {job.readable_status}
           </span>
+          {isMultiDay && (
+            <span className="text-sm px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full font-bold border border-purple-200">
+              Multi-Day
+            </span>
+          )}
+          {jobIsHelper && (
+            <span className="text-sm px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-full font-bold border border-emerald-200">
+              Team Member
+            </span>
+          )}
+          {job.priority === 'urgent' && (
+            <span className="text-sm px-3 py-1.5 bg-red-500 text-white rounded-full font-bold">URGENT</span>
+          )}
+          {job.priority === 'high' && (
+            <span className="text-sm px-3 py-1.5 bg-orange-500 text-white rounded-full font-bold">HIGH</span>
+          )}
         </div>
 
-        {/* Status Message */}
-        {statusMessage && (
-          <div className={`${
-            statusMessage.type === 'success'
-              ? 'bg-green-50 border-green-300'
-              : 'bg-red-50 border-red-300'
-          } border-2 rounded-2xl p-6 shadow-lg mb-6`}>
-            <div className="flex items-center space-x-3">
-              <div className={`w-12 h-12 ${
-                statusMessage.type === 'success' ? 'bg-green-200' : 'bg-red-200'
-              } rounded-full flex items-center justify-center`}>
-                {statusMessage.type === 'success' ? (
-                  <CheckCircle className="w-6 h-6 text-green-700" />
-                ) : (
-                  <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+        {/* On-Hold Banner */}
+        {isOnHold && (
+          <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <PauseCircle className="w-6 h-6 text-purple-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-base font-bold text-purple-800">Job On Hold</p>
+                {job.pause_reason && (
+                  <p className="text-sm text-purple-600 mt-1">{job.pause_reason}</p>
+                )}
+                {job.return_date && (
+                  <p className="text-sm text-purple-500 mt-1">Expected return: {job.return_date}</p>
                 )}
               </div>
-              <p className={`${
-                statusMessage.type === 'success' ? 'text-green-800' : 'text-red-800'
-              } font-bold text-lg`}>
-                {statusMessage.text}
-              </p>
             </div>
           </div>
         )}
 
-        {/* Status Actions */}
-        {job.status !== 'completed' && (
-          <div className="bg-white rounded-2xl shadow-xl border-2 border-blue-100 p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Update Job Status</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {(job.status === 'scheduled' || job.status === 'assigned') && (
-                <button
-                  onClick={() => updateStatus('in_route')}
-                  disabled={statusLoading}
-                  className="flex items-center justify-center gap-3 px-6 py-4 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold transition-all shadow-lg disabled:opacity-50"
-                >
-                  <Navigation className="w-6 h-6" />
-                  Start Driving (In Route)
-                </button>
-              )}
-
-              {job.status === 'in_route' && (
-                <button
-                  onClick={() => updateStatus('in_progress')}
-                  disabled={statusLoading}
-                  className="flex items-center justify-center gap-3 px-6 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold transition-all shadow-lg disabled:opacity-50"
-                >
-                  <Play className="w-6 h-6" />
-                  Start Work (In Progress)
-                </button>
-              )}
-
-              {job.status === 'in_progress' && (
-                <button
-                  onClick={() => updateStatus('completed')}
-                  disabled={statusLoading}
-                  className="flex items-center justify-center gap-3 px-6 py-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold transition-all shadow-lg disabled:opacity-50"
-                >
-                  <CheckCircle className="w-6 h-6" />
-                  Complete Job
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Completion Form Modal */}
-        {showCompletionForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Complete Job & Submit Data</h2>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Work Performed *</label>
-                  <textarea
-                    required
-                    value={completionData.work_performed}
-                    onChange={(e) => setCompletionData({ ...completionData, work_performed: e.target.value })}
-                    rows={4}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900"
-                    placeholder="Describe the work completed..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Materials Used</label>
-                  <textarea
-                    value={completionData.materials_used}
-                    onChange={(e) => setCompletionData({ ...completionData, materials_used: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900"
-                    placeholder="List materials used..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Equipment Used</label>
-                  <textarea
-                    value={completionData.equipment_used}
-                    onChange={(e) => setCompletionData({ ...completionData, equipment_used: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900"
-                    placeholder="List equipment used..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
-                  <textarea
-                    value={completionData.operator_notes}
-                    onChange={(e) => setCompletionData({ ...completionData, operator_notes: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900"
-                    placeholder="Any additional notes..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Issues Encountered</label>
-                  <textarea
-                    value={completionData.issues_encountered}
-                    onChange={(e) => setCompletionData({ ...completionData, issues_encountered: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors text-gray-900"
-                    placeholder="Any problems or issues..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Customer Satisfaction</label>
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setCompletionData({ ...completionData, customer_satisfied: true })}
-                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
-                        completionData.customer_satisfied
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      Satisfied
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCompletionData({ ...completionData, customer_satisfied: false })}
-                      className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
-                        !completionData.customer_satisfied
-                          ? 'bg-red-500 text-white'
-                          : 'bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      Not Satisfied
-                    </button>
-                  </div>
-                </div>
+        {/* Job Location Card */}
+        {(job.address || job.location) && (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-6 h-6 text-red-600" />
               </div>
-
-              <div className="flex gap-4 mt-6">
-                <button
-                  onClick={() => setShowCompletionForm(false)}
-                  className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 font-semibold transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitCompletion}
-                  disabled={statusLoading || !completionData.work_performed}
-                  className="flex-1 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold transition-colors shadow-lg disabled:opacity-50"
-                >
-                  {statusLoading ? 'Submitting...' : 'Submit & Complete'}
-                </button>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-gray-800 mb-1">Location</h3>
+                <p className="text-base text-gray-700 font-medium">{job.address || job.location}</p>
               </div>
             </div>
+            {job.address && (
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors border border-blue-200"
+              >
+                <MapPin className="w-4 h-4" /> Open in Maps
+              </a>
+            )}
           </div>
         )}
 
-        {/* Job Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Basic Info */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Job Information</h2>
+        {/* Site Contact Card */}
+        {(job.foreman_name || job.customer_contact || job.site_contact_phone) && (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Phone className="w-5 h-5 text-green-600" />
+              <h3 className="text-base font-bold text-gray-800">Site Contact</h3>
+            </div>
             <div className="space-y-3">
-              <div>
-                <p className="text-sm text-gray-500">Customer</p>
-                <p className="font-bold text-gray-900">{job.customer_name}</p>
-                {job.customer_contact && (
-                  <p className="text-sm text-gray-600">{job.customer_contact}</p>
-                )}
-              </div>
-
-              <div>
-                <p className="text-sm text-gray-500">Job Type</p>
-                <p className="font-bold text-gray-900">{job.job_type}</p>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="font-bold text-gray-900">{job.location}</p>
-                  <p className="text-sm text-gray-600">{job.address}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Scheduled</p>
-                  <p className="font-bold text-gray-900">
-                    {formatDate(job.scheduled_date)}
-                    {job.arrival_time && <span className="text-gray-600"> at {job.arrival_time}</span>}
-                  </p>
-                </div>
-              </div>
-
-              {job.estimated_hours && (
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="text-sm text-gray-500">Estimated Duration</p>
-                    <p className="font-bold text-gray-900">{job.estimated_hours} hours</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Contact Info */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Contact Information</h2>
-            <div className="space-y-4">
               {job.foreman_name && (
-                <div>
-                  <p className="text-sm text-gray-500">Foreman</p>
-                  <p className="font-bold text-gray-900">{job.foreman_name}</p>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="text-xs text-gray-500 font-semibold uppercase">Contact</p>
+                    <p className="text-base font-bold text-gray-900">{job.foreman_name}</p>
+                  </div>
                   {job.foreman_phone && (
-                    <a href={`tel:${job.foreman_phone}`} className="text-blue-600 hover:underline">
-                      {job.foreman_phone}
+                    <a href={`tel:${job.foreman_phone}`} className="flex items-center gap-1.5 px-4 py-2.5 bg-green-500 text-white rounded-xl text-sm font-bold hover:bg-green-600 transition-colors">
+                      <Phone className="w-4 h-4" /> Call
                     </a>
                   )}
                 </div>
               )}
-
-              {job.salesman_name && (
-                <div>
-                  <p className="text-sm text-gray-500">Salesman</p>
-                  <p className="font-bold text-gray-900">{job.salesman_name}</p>
+              {job.site_contact_phone && !job.foreman_phone && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="text-xs text-gray-500 font-semibold uppercase">Site Phone</p>
+                    <p className="text-base font-bold text-gray-900">{job.site_contact_phone}</p>
+                  </div>
+                  <a href={`tel:${job.site_contact_phone}`} className="flex items-center gap-1.5 px-4 py-2.5 bg-green-500 text-white rounded-xl text-sm font-bold hover:bg-green-600 transition-colors">
+                    <Phone className="w-4 h-4" /> Call
+                  </a>
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Crew Info - Bigger cards */}
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-blue-600" />
+            <h3 className="text-base font-bold text-gray-800">Crew</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+              <div className="w-11 h-11 bg-blue-500 text-white rounded-full flex items-center justify-center text-base font-bold flex-shrink-0">
+                {(job.operator_name || 'O')[0].toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider">Operator</p>
+                <p className="text-base font-bold text-gray-900 truncate">{job.operator_name || 'Unassigned'}</p>
+              </div>
+            </div>
+            {job.helper_name && (
+              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                <div className="w-11 h-11 bg-emerald-500 text-white rounded-full flex items-center justify-center text-base font-bold flex-shrink-0">
+                  {job.helper_name[0].toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wider">Team Member</p>
+                  <p className="text-base font-bold text-gray-900 truncate">{job.helper_name}</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Description */}
-        {job.description && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Job Description</h2>
-            <p className="text-gray-700 whitespace-pre-wrap">{job.description}</p>
-          </div>
-        )}
-
-        {/* Time Tracking */}
-        {(job.route_started_at || job.work_started_at || job.work_completed_at) && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Time Tracking</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {job.route_started_at && (
+        {/* Work Details Panel - Bigger text */}
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+          <button
+            onClick={() => setWorkDetailsOpen(!workDetailsOpen)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              <span className="text-base font-bold text-gray-800">Work Details</span>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${workDetailsOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {workDetailsOpen && (
+            <div className="px-5 pb-5 space-y-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="px-4 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-base font-bold">
+                  {job.job_type}
+                </span>
+                {job.estimated_hours && (
+                  <span className="text-base text-gray-500">Est. {job.estimated_hours} hrs</span>
+                )}
+                {job.po_number && (
+                  <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">PO: {job.po_number}</span>
+                )}
+              </div>
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {job.description || 'No description provided'}
+                </p>
+              </div>
+              {/* Scope Details (quantities) */}
+              {job.scope_details && Object.keys(job.scope_details).length > 0 && (
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Route Started</p>
-                  <p className="font-bold text-gray-900">{formatDateTime(job.route_started_at)}</p>
+                  <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Scope Quantities</p>
+                  <ScopeDetailsDisplay scopeDetails={job.scope_details} />
                 </div>
               )}
-
-              {job.work_started_at && (
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Work Started</p>
-                  <p className="font-bold text-gray-900">{formatDateTime(job.work_started_at)}</p>
-                </div>
+              {/* Scope Reference Photos */}
+              {job.scope_photo_urls && job.scope_photo_urls.length > 0 && (
+                <PhotoViewer photos={job.scope_photo_urls} label="Scope Reference Photos" />
               )}
-
-              {job.work_completed_at && (
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Work Completed</p>
-                  <p className="font-bold text-gray-900">{formatDateTime(job.work_completed_at)}</p>
-                </div>
+              {/* Site Compliance Attachments */}
+              {job.site_compliance?.attachment_urls && job.site_compliance.attachment_urls.length > 0 && (
+                <PhotoViewer photos={job.site_compliance.attachment_urls} label="Compliance Documents" />
               )}
-
-              {job.drive_hours > 0 && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                  <p className="text-sm text-blue-600 font-semibold mb-1">Drive Time</p>
-                  <p className="text-2xl font-bold text-blue-800">{job.drive_hours.toFixed(2)} hrs</p>
-                </div>
-              )}
-
-              {job.production_hours > 0 && (
-                <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
-                  <p className="text-sm text-green-600 font-semibold mb-1">Production Time</p>
-                  <p className="text-2xl font-bold text-green-800">{job.production_hours.toFixed(2)} hrs</p>
-                </div>
-              )}
-
-              {job.total_hours > 0 && (
-                <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                  <p className="text-sm text-purple-600 font-semibold mb-1">Total Time</p>
-                  <p className="text-2xl font-bold text-purple-800">{job.total_hours.toFixed(2)} hrs</p>
+              {(job.salesman_name || job.created_by_name) && (
+                <div className="flex items-center gap-2 text-base text-gray-600">
+                  <User className="w-4 h-4" />
+                  <span>Submitted by: <strong>{job.salesman_name || job.created_by_name}</strong></span>
                 </div>
               )}
             </div>
+          )}
+        </div>
+
+        {/* Equipment Confirmation Panel */}
+        {unifiedItems.length > 0 && (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+            <button
+              onClick={() => setEquipmentOpen(!equipmentOpen)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-green-600" />
+                <span className="text-base font-bold text-gray-800">Equipment Confirmation</span>
+                {!equipmentAlreadyConfirmed && !isCompleted && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                    canStartRoute ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {canStartRoute ? 'Ready' : 'Confirm All'}
+                  </span>
+                )}
+              </div>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${equipmentOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {equipmentOpen && (
+              <div className="px-5 pb-5">
+                <UnifiedEquipmentPanel
+                  equipmentSelections={job.equipment_selections}
+                  equipmentNeeded={allEquipment}
+                  mandatoryEquipment={mandatoryItems}
+                  specialEquipment={job.special_equipment}
+                  checkedItems={checkedItems}
+                  onToggle={toggleEquipment}
+                  disabled={isCompleted || equipmentAlreadyConfirmed}
+                />
+              </div>
+            )}
           </div>
         )}
+
+        {/* Team Member Work Log (for helpers/team members only) */}
+        {jobIsHelper && !isCompleted && (
+          <HelperWorkLog
+            jobId={job.id}
+            jobNumber={job.job_number}
+            customerName={job.customer_name}
+            jobTitle={job.title}
+            job={job}
+          />
+        )}
+
+        {/* Completed job: show helper description as collapsible */}
+        {jobIsHelper && isCompleted && (
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200 p-4">
+            <HelperWorkLog
+              jobId={job.id}
+              jobNumber={job.job_number}
+              customerName={job.customer_name}
+              jobTitle={job.title}
+              job={job}
+            />
+          </div>
+        )}
+
+        {/* Admin Documents & Photos - Prominent section */}
+        {adminDocs.length > 0 && (
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl shadow-xl border-2 border-indigo-200 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Paperclip className="w-5 h-5 text-indigo-600" />
+              <h3 className="text-base font-bold text-indigo-900">Job Documents & Photos</h3>
+              <span className="text-xs px-2 py-0.5 bg-indigo-500 text-white rounded-full font-bold">
+                {adminDocs.length}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {adminDocs.map(doc => renderDocCard(doc, false))}
+            </div>
+          </div>
+        )}
+
+        {/* Operator Documents - Collapsible upload section */}
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+          <button
+            onClick={() => setDocsOpen(!docsOpen)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Upload className="w-5 h-5 text-indigo-600" />
+              <span className="text-base font-bold text-gray-800">My Uploads</span>
+              {operatorDocs.length > 0 && (
+                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-semibold">
+                  {operatorDocs.length}
+                </span>
+              )}
+            </div>
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${docsOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {docsOpen && (
+            <div className="px-5 pb-5 space-y-3">
+              {/* Operator docs list */}
+              {operatorDocs.length > 0 && (
+                <div className="space-y-3">
+                  {operatorDocs.map(doc => renderDocCard(doc, true))}
+                </div>
+              )}
+
+              {/* Upload toggle */}
+              {!showUploadForm ? (
+                <button
+                  onClick={() => setShowUploadForm(true)}
+                  className="w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                >
+                  <Upload className="w-4 h-4" /> Upload Document or Photo
+                </button>
+              ) : (
+                <div className="space-y-2 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <select
+                    value={docCategory}
+                    onChange={e => setDocCategory(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="site_photo">Site Photo</option>
+                    <option value="before_after">Before / After</option>
+                    <option value="permit">Permit</option>
+                    <option value="customer_doc">Customer Document</option>
+                    <option value="scope">Scope of Work</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={docNotes}
+                    onChange={e => setDocNotes(e.target.value)}
+                    placeholder="Notes (optional)"
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-semibold cursor-pointer hover:bg-indigo-100 transition-all ${uploadingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    {uploadingDoc ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+                    ) : (
+                      <><Upload className="w-4 h-4" /> Tap to select file</>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={uploadingDoc}
+                    />
+                  </label>
+                  <button
+                    onClick={() => setShowUploadForm(false)}
+                    className="w-full text-sm text-gray-500 hover:text-gray-700 py-1"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        {!isCompleted && !isOnHold && !jobIsHelper && (
+          <div className="pt-2">
+            {isInProgress ? (
+              <button
+                onClick={handleContinueJob}
+                className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
+              >
+                <PlayCircle className="w-6 h-6" />
+                {job.status === 'in_route' ? 'Continue to Jobsite' : 'Continue Work'}
+              </button>
+            ) : (
+              <button
+                onClick={handleStartRoute}
+                disabled={!canStartRoute || startingRoute}
+                className={`w-full py-5 rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3 ${
+                  canStartRoute
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                {startingRoute ? (
+                  <><Loader2 className="w-6 h-6 animate-spin" /> Starting...</>
+                ) : canStartRoute ? (
+                  <><PlayCircle className="w-6 h-6" /> Start In Route</>
+                ) : (
+                  <><Wrench className="w-6 h-6" /> Complete Required Equipment First</>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Resume On-Hold Job */}
+        {isOnHold && !jobIsHelper && (
+          <div className="pt-2">
+            <button
+              onClick={handleResumeJob}
+              className="w-full py-5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
+            >
+              <PlayCircle className="w-6 h-6" />
+              Resume This Job
+            </button>
+          </div>
+        )}
+
+        {/* View completed job details */}
+        {isCompleted && (
+          <div className="pt-2">
+            <button
+              onClick={handleViewCompleted}
+              className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold text-base transition-all flex items-center justify-center gap-2"
+            >
+              <FileText className="w-5 h-5" /> View Work Performed
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
   );

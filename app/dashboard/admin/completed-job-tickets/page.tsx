@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -46,10 +48,10 @@ export default function CompletedJobTicketsPage() {
       }
 
       // Check admin role from localStorage to avoid RLS recursion
-      const userStr = localStorage.getItem('pontifex-user');
+      const userStr = localStorage.getItem('patriot-user');
       if (userStr) {
         const user = JSON.parse(userStr);
-        if (user.role !== 'admin') {
+        if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(user.role)) {
           router.push('/dashboard');
         }
       }
@@ -60,7 +62,6 @@ export default function CompletedJobTicketsPage() {
 
   const loadCompletedJobs = async () => {
     try {
-      console.log('Loading completed job tickets...');
       const { data, error } = await supabase
         .from('job_orders')
         .select('*')
@@ -73,7 +74,6 @@ export default function CompletedJobTicketsPage() {
         throw error;
       }
 
-      console.log('Loaded completed jobs:', data?.length || 0);
       setJobs(data || []);
     } catch (error: any) {
       // Only log if there's an actual error message
@@ -98,7 +98,7 @@ export default function CompletedJobTicketsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600 font-medium">Loading completed jobs...</p>
@@ -108,9 +108,9 @@ export default function CompletedJobTicketsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="backdrop-blur-xl bg-white/90 border-b border-gray-200 sticky top-0 z-50 shadow-lg">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

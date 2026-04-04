@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/silica-plan/save
  * Save silica exposure control plan PDF to job ticket (without emailing customer)
@@ -5,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,7 +83,8 @@ export async function POST(request: NextRequest) {
       publicUrl = urlResult.data.publicUrl;
     }
 
-    // Save silica plan record to database
+    // Save silica plan record to database (with tenant scope)
+    const tenantId = await getTenantId(user.id);
     const silicaPlanRecord: any = {
       job_order_id: jobId,
       employee_name: formData.employeeName,
@@ -104,6 +108,7 @@ export async function POST(request: NextRequest) {
       // Store PDF as base64 in database as fallback
       silicaPlanRecord.pdf_base64 = pdfBase64;
     }
+    if (tenantId) silicaPlanRecord.tenant_id = tenantId;
 
     // Try to save silica plan record — table may not exist yet
     let silicaPlanId = null;

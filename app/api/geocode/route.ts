@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(geocodeUrl, {
       headers: {
-        'User-Agent': 'PontifexIndustries/1.0 (operator-platform)',
+        'User-Agent': 'PatriotConcreteCutting/1.0 (operator-platform)',
       },
     });
 

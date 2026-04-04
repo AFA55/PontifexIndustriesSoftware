@@ -18,8 +18,8 @@ export default function Navigation() {
 
   const navLinks = [
     { label: 'Features', href: '#features' },
-    { label: 'How It Works', href: '#how-it-works' },
-    { label: 'ROI', href: '#roi' },
+    { label: 'vs DSM & CenPoint', href: '#comparison' },
+    { label: 'Architecture', href: '#architecture' },
   ];
 
   return (
@@ -59,10 +59,16 @@ export default function Navigation() {
                 </a>
               ))}
               <a
-                href="#demo"
+                href="/request-demo"
                 className="px-5 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all duration-300 hover:scale-105"
               >
-                Contact Us
+                Request Demo
+              </a>
+              <a
+                href="/company"
+                className="px-5 py-2 rounded-lg font-semibold text-sm text-zinc-400 hover:text-white border border-white/10 hover:border-white/20 transition-all duration-300"
+              >
+                Enter Platform
               </a>
             </div>
 
@@ -96,11 +102,18 @@ export default function Navigation() {
                 </a>
               ))}
               <a
-                href="#demo"
+                href="/request-demo"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="block px-4 py-3 mt-2 text-center bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold rounded-xl shadow-lg"
               >
-                Contact Us
+                Request Demo
+              </a>
+              <a
+                href="/company"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block px-4 py-3 mt-1 text-center text-zinc-400 font-medium rounded-xl border border-white/10"
+              >
+                Enter Platform
               </a>
             </div>
           </motion.div>

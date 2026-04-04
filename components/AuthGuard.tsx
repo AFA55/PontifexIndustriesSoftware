@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+type RoleType = 'admin' | 'operator' | 'apprentice' | 'shop_manager';
+
 interface AuthGuardProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'operator' | 'apprentice';
+  requiredRole?: RoleType | RoleType[];
 }
 
 export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
@@ -51,7 +53,8 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
 
       // Check if user has required role
       if (requiredRole) {
-        const hasPermission = profile.role === requiredRole || profile.role === 'admin';
+        const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+        const hasPermission = roles.includes(profile.role as RoleType) || profile.role === 'admin';
         if (!hasPermission) {
           console.log('❌ Insufficient permissions');
           // Redirect to appropriate dashboard based on role

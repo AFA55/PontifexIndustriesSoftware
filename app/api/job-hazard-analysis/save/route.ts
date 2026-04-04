@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: POST /api/job-hazard-analysis/save
  * Save Job Hazard Analysis PDF to job documents
@@ -5,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 import jsPDF from 'jspdf';
 
 export async function POST(request: NextRequest) {
@@ -41,6 +44,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SECURITY: Verify the job belongs to the user's tenant before saving
+    const tenantId = await getTenantId(user.id);
+    if (tenantId) {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
+    }
+
     // Generate PDF
     const pdf = new jsPDF();
     let yPos = 20;
@@ -51,7 +68,7 @@ export async function POST(request: NextRequest) {
     yPos += 10;
 
     pdf.setFontSize(12);
-    pdf.text('Pontifex Industries', 105, yPos, { align: 'center' });
+    pdf.text('Patriot Concrete Cutting', 105, yPos, { align: 'center' });
     yPos += 15;
 
     // Job Information

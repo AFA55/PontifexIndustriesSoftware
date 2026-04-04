@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -52,6 +54,14 @@ interface JobData {
   operator_notes: string | null;
   admin_operator_rating: number | null;
   admin_feedback: string | null;
+  // Multi-day / scope fields
+  estimated_cost: number | null;
+  scope_details: Record<string, any> | null;
+  is_multi_day: boolean;
+  total_days_worked: number;
+  end_date: string | null;
+  job_type: string | null;
+  equipment_needed: string[] | null;
 }
 
 export default function CompletedJobDetailsPage() {
@@ -85,10 +95,10 @@ export default function CompletedJobDetailsPage() {
         return;
       }
 
-      const userStr = localStorage.getItem('pontifex-user');
+      const userStr = localStorage.getItem('patriot-user');
       if (userStr) {
         const user = JSON.parse(userStr);
-        if (user.role !== 'admin') {
+        if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(user.role)) {
           router.push('/dashboard');
         }
       }
@@ -120,7 +130,7 @@ export default function CompletedJobDetailsPage() {
             setOperatorName(profile.full_name);
           }
         } catch (err) {
-          console.log('Could not load operator name');
+          // silent
         }
       }
 
@@ -132,10 +142,23 @@ export default function CompletedJobDetailsPage() {
 
       setStandbyLogs(standbyData || []);
 
-      const savedWork = localStorage.getItem(`work-performed-${jobId}`);
-      if (savedWork) {
-        const parsed = JSON.parse(savedWork);
-        setWorkPerformed(parsed.items || []);
+      // Fetch work items from database (primary source, not localStorage)
+      const { data: workItemsData } = await supabase
+        .from('work_items')
+        .select('*')
+        .eq('job_order_id', jobId)
+        .order('day_number', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (workItemsData && workItemsData.length > 0) {
+        setWorkPerformed(workItemsData);
+      } else {
+        // Fallback to localStorage only if DB has nothing
+        const savedWork = localStorage.getItem(`work-performed-${jobId}`);
+        if (savedWork) {
+          const parsed = JSON.parse(savedWork);
+          setWorkPerformed(parsed.items || []);
+        }
       }
 
       const { data: docsData } = await supabase
@@ -195,6 +218,14 @@ export default function CompletedJobDetailsPage() {
 
   const calculateTotalTime = () => {
     if (!job) return 0;
+
+    // For multi-day jobs, sum hours from all daily logs
+    if (dailyLogs.length > 0) {
+      const totalFromLogs = dailyLogs.reduce((sum, log) => sum + Number(log.hours_worked || 0), 0);
+      if (totalFromLogs > 0) return totalFromLogs;
+    }
+
+    // Fallback: single-day calculation from timestamps
     const startTime = job.arrival_time || job.scheduled_date;
     if (!startTime || !job.completion_signed_at) return 0;
 
@@ -238,7 +269,7 @@ export default function CompletedJobDetailsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600 font-medium">Loading job details...</p>
@@ -249,7 +280,7 @@ export default function CompletedJobDetailsPage() {
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Job Not Found</h2>
@@ -267,7 +298,7 @@ export default function CompletedJobDetailsPage() {
   const standbyCost = calculateStandbyCost();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -536,26 +567,91 @@ export default function CompletedJobDetailsPage() {
             Work Details
           </h2>
 
+          {/* Project Summary for Multi-Day Jobs */}
+          {dailyLogs.length > 1 && (
+            <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200 mb-4">
+              <h3 className="font-bold text-gray-900 mb-2">Project Summary</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-gray-500 text-xs font-semibold">Total Days</p>
+                  <p className="text-indigo-700 font-bold text-lg">{dailyLogs.length}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs font-semibold">Total Hours</p>
+                  <p className="text-indigo-700 font-bold text-lg">
+                    {dailyLogs.reduce((sum: number, log: any) => sum + Number(log.hours_worked || 0), 0).toFixed(1)}h
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs font-semibold">Work Items</p>
+                  <p className="text-indigo-700 font-bold text-lg">{workPerformed.length}</p>
+                </div>
+                {job.estimated_cost && (
+                  <div>
+                    <p className="text-gray-500 text-xs font-semibold">Quoted</p>
+                    <p className="text-emerald-700 font-bold text-lg">${Number(job.estimated_cost).toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
               <h3 className="font-bold text-gray-900 mb-3">Original Scope</h3>
               <p className="text-gray-700 whitespace-pre-wrap text-sm">
                 {job.description || job.scope_of_work || 'No description provided'}
               </p>
+              {/* Show structured scope details if available */}
+              {job.scope_details && Object.keys(job.scope_details).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">Scope Breakdown</p>
+                  {Object.entries(job.scope_details).map(([key, val]: [string, any]) => (
+                    <div key={key} className="mb-2">
+                      <p className="text-xs font-semibold text-gray-700">{key.replace(/_/g, ' ')}</p>
+                      {typeof val === 'object' && val !== null ? (
+                        <div className="ml-2 text-xs text-gray-600">
+                          {Object.entries(val).map(([k, v]) => (
+                            <span key={k} className="inline-block mr-3">
+                              {k}: <strong>{String(v)}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-600 ml-2">{String(val)}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="bg-green-50 rounded-lg p-4 border border-green-200">
               <h3 className="font-bold text-gray-900 mb-3">Work Performed</h3>
               {workPerformed.length > 0 ? (
                 <ul className="space-y-2">
-                  {workPerformed.map((item, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                      <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span>
-                        {item.name} {item.quantity > 1 ? `(x${item.quantity})` : ''}
-                      </span>
-                    </li>
-                  ))}
+                  {workPerformed.map((item, idx) => {
+                    // Handle both DB format (work_type) and localStorage format (name)
+                    const itemName = item.work_type || item.name || 'Work Item';
+                    const qty = item.quantity || 1;
+                    const dayNum = item.day_number;
+                    return (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                        <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="flex-1">
+                          {itemName} {qty > 1 ? `(x${qty})` : ''}
+                          {item.core_quantity ? ` - ${item.core_quantity} cores` : ''}
+                          {item.linear_feet_cut ? ` - ${item.linear_feet_cut} LF` : ''}
+                          {item.notes ? ` - ${item.notes}` : ''}
+                        </span>
+                        {dayNum && dayNum > 0 && (
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold flex-shrink-0">
+                            Day {dayNum}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className="text-gray-500 italic text-sm">No detailed work log available</p>
@@ -563,6 +659,39 @@ export default function CompletedJobDetailsPage() {
             </div>
           </div>
         </div>
+
+        {/* Daily Progress (Multi-day jobs) */}
+        {dailyLogs.length > 1 && (
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-purple-600" />
+              Daily Progress ({dailyLogs.length} days)
+            </h2>
+            <div className="space-y-3">
+              {dailyLogs.map((log, i) => (
+                <div key={i} className="flex items-center justify-between bg-purple-50 rounded-lg px-4 py-3 border border-purple-200">
+                  <div>
+                    <p className="font-bold text-gray-900 text-sm">
+                      Day {log.day_number || (i + 1)} — {new Date(log.log_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </p>
+                    {log.notes && (
+                      <p className="text-xs text-gray-500 mt-0.5">{log.notes}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-purple-700">{Number(log.hours_worked || 0).toFixed(1)}h</p>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between bg-purple-100 rounded-lg px-4 py-3 border-2 border-purple-300 font-bold">
+                <span className="text-gray-900">Total Project Hours</span>
+                <span className="text-purple-800 text-lg">
+                  {dailyLogs.reduce((sum, log) => sum + Number(log.hours_worked || 0), 0).toFixed(1)}h
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Ratings Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

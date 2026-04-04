@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
@@ -86,14 +88,6 @@ export default function RequestTimeOffPage() {
     setError(null);
 
     try {
-      // Mock API call
-      console.log('Time Off Request:', {
-        ...formData,
-        requestedBy: user?.name || 'Demo Operator',
-        requestDate: new Date().toISOString(),
-        days: calculateDays()
-      });
-
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1500));
 

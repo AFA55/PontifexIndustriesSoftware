@@ -1,8 +1,10 @@
-node_modules/
-.next/
+*.log
+.DS_Store.claude/worktrees/
+.claude/worktrees/
 .env
+.env*.local
+.env.development
 .env.local
 .env.production
-.env.development
-*.log
-.DS_Store
+.next/
+node_modules/

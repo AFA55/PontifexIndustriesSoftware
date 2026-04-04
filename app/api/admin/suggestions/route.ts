@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET/POST /api/admin/suggestions
  * Manage autocomplete suggestions for job titles, company names, and general contractors
@@ -5,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 // GET: Fetch suggestions
 export async function GET(request: NextRequest) {
@@ -44,13 +47,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager', 'salesman'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view suggestions' },
         { status: 403 }
       );
     }
+
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
 
     // Get type from query params (job_titles, company_names, general_contractors, or locations)
     const { searchParams } = new URL(request.url);
@@ -65,12 +71,16 @@ export async function GET(request: NextRequest) {
 
     // Special handling for locations - fetch from job_orders
     if (type === 'locations') {
-      const { data: locations, error: fetchError } = await supabaseAdmin
+      let locQuery = supabaseAdmin
         .from('job_orders')
         .select('location')
         .not('location', 'is', null)
         .order('created_at', { ascending: false })
         .limit(100);
+      if (tenantId) {
+        locQuery = locQuery.eq('tenant_id', tenantId);
+      }
+      const { data: locations, error: fetchError } = await locQuery;
 
       if (fetchError) {
         console.error('Error fetching location suggestions:', fetchError);
@@ -126,12 +136,16 @@ export async function GET(request: NextRequest) {
 
     const field = fieldMap[table];
 
-    // Fetch suggestions
-    const { data: suggestions, error: fetchError } = await supabaseAdmin
+    // Fetch suggestions (scoped to tenant)
+    let suggestionsQuery = supabaseAdmin
       .from(table)
       .select(field)
       .order('usage_count', { ascending: false })
       .limit(20);
+    if (tenantId) {
+      suggestionsQuery = suggestionsQuery.eq('tenant_id', tenantId);
+    }
+    const { data: suggestions, error: fetchError } = await suggestionsQuery;
 
     if (fetchError) {
       console.error(`Error fetching ${type} suggestions:`, fetchError);
@@ -203,6 +217,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
     // Parse request body
     const body = await request.json();
     const { type, value } = body;
@@ -245,12 +262,15 @@ export async function POST(request: NextRequest) {
 
     const field = fieldMap[table];
 
-    // Check if it already exists
-    const { data: existing } = await supabaseAdmin
+    // Check if it already exists (scoped to tenant)
+    let existingQuery = supabaseAdmin
       .from(table)
       .select('id, usage_count')
-      .ilike(field, value)
-      .maybeSingle();
+      .ilike(field, value);
+    if (tenantId) {
+      existingQuery = existingQuery.eq('tenant_id', tenantId);
+    }
+    const { data: existing } = await existingQuery.maybeSingle();
 
     if (existing) {
       // Update usage count and last used date
@@ -279,10 +299,10 @@ export async function POST(request: NextRequest) {
         { status: 200 }
       );
     } else {
-      // Insert new entry
+      // Insert new entry (with tenant_id)
       const { data: inserted, error: insertError } = await supabaseAdmin
         .from(table)
-        .insert({ [field]: value })
+        .insert({ [field]: value, tenant_id: tenantId || null })
         .select()
         .single();
 

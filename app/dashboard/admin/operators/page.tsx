@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -58,7 +60,7 @@ export default function OperatorsMonitoringPage() {
       return;
     }
 
-    if (currentUser.role !== 'admin') {
+    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(currentUser.role)) {
       router.push('/dashboard');
       return;
     }
@@ -85,7 +87,7 @@ export default function OperatorsMonitoringPage() {
       if (!session) {
         console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
         localStorage.removeItem('supabase-user');
-        localStorage.removeItem('pontifex-user');
+        localStorage.removeItem('patriot-user');
         window.location.href = '/login';
         return;
       }
@@ -164,7 +166,7 @@ export default function OperatorsMonitoringPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-md">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-md">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

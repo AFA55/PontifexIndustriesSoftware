@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 /**
  * API Route: GET /api/admin/operator-profiles
  * Get all operator profiles with analytics data
@@ -8,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,21 +49,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is admin
-    if (profile.role !== 'admin') {
+    // Check if user is admin (any elevated role)
+    if (!['admin', 'super_admin', 'operations_manager', 'supervisor'].includes(profile.role)) {
       return NextResponse.json(
         { error: 'Only administrators can view operator profiles' },
         { status: 403 }
       );
     }
 
+    // Resolve tenant scope
+    const tenantId = await getTenantId(user.id);
+
     // Get all operators with their profile data
-    const { data: operators, error: operatorsError } = await supabaseAdmin
+    let operatorsQuery = supabaseAdmin
       .from('profiles')
       .select('*')
       .in('role', ['operator', 'apprentice'])
       .eq('active', true)
       .order('full_name');
+    if (tenantId) {
+      operatorsQuery = operatorsQuery.eq('tenant_id', tenantId);
+    }
+    const { data: operators, error: operatorsError } = await operatorsQuery;
 
     if (operatorsError) {
       console.error('Error fetching operators:', operatorsError);

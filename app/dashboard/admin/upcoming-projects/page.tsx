@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -248,7 +250,7 @@ export default function UpcomingProjectsBoard() {
   const weekDays = getNext7Days();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-slate-100">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="container mx-auto px-4 py-4">
@@ -263,7 +265,7 @@ export default function UpcomingProjectsBoard() {
                 </svg>
               </Link>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-900 to-red-800 bg-clip-text text-transparent flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                   <span className="text-3xl">📅</span>
                   Upcoming Projects Board
                 </h1>

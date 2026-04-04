@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmail } from '@/lib/email';
@@ -45,14 +47,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user is admin
+    // Check if user is admin (any elevated role)
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if (!['admin', 'super_admin', 'operations_manager'].includes(profile?.role || '')) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - Admin access required' },
         { status: 403 }
@@ -250,7 +252,7 @@ async function sendScheduleEmail(schedule: OperatorSchedule, scheduled_date: str
         <!-- Footer -->
         <div style="text-align: center; margin-top: 24px; color: #94a3b8; font-size: 12px;">
           <p style="margin: 0;">
-            This is an automated message from Pontifex Industries.<br>
+            This is an automated message from Patriot Concrete Cutting.<br>
             Do not reply to this email.
           </p>
         </div>
@@ -289,7 +291,7 @@ Important Reminders:
 - Notify dispatch of any delays or issues
 
 ---
-This is an automated message from Pontifex Industries.
+This is an automated message from Patriot Concrete Cutting.
 Do not reply to this email.
   `;
 
