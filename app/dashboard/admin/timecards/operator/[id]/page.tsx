@@ -525,7 +525,7 @@ function OperatorTimecardDetailPageInner() {
   if (!loading && fetchError) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
             <Link
               href="/dashboard/admin/timecards"
@@ -566,7 +566,7 @@ function OperatorTimecardDetailPageInner() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ── Header ─────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <Link

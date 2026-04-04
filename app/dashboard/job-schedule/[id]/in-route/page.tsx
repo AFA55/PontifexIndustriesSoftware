@@ -288,7 +288,7 @@ export default function InRoutePage() {
         />
       )}
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white sticky top-0 z-50 shadow-lg">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white sticky top-0 z-10 shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center flex-shrink-0">
