@@ -27,7 +27,9 @@ export async function POST(request: NextRequest) {
       email: string;
       name: string;
       role: string;
-      adminType?: string;
+      phone_number?: string | null;
+      date_of_birth?: string | null;
+      adminType?: string | null;
       initialFlags?: Record<string, boolean>;
     };
 
@@ -64,27 +66,60 @@ export async function POST(request: NextRequest) {
     let token: string;
 
     if (existingInv) {
-      // Re-use the existing token
+      // Re-use the existing token (update metadata in case role/name changed)
       token = existingInv.token;
+      await supabaseAdmin
+        .from('user_invitations')
+        .update({
+          role:          body.role,
+          admin_type:    body.adminType ?? null,
+          initial_flags: body.initialFlags ?? {},
+          invited_name:  body.name.trim(),
+          phone_number:  body.phone_number ?? null,
+          date_of_birth: body.date_of_birth ?? null,
+        })
+        .eq('id', existingInv.id);
     } else {
       // Create a new invitation token
       token = Buffer.from(`${Date.now()}-${Math.random()}-${body.email}`).toString('base64url').substring(0, 48);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       const { error: insertError } = await supabaseAdmin.from('user_invitations').insert({
-        tenant_id: auth.tenantId,
-        email: body.email.trim().toLowerCase(),
-        role: body.role,
-        admin_type: body.adminType || null,
-        invited_by: auth.userId,
+        tenant_id:     auth.tenantId,
+        email:         body.email.trim().toLowerCase(),
+        role:          body.role,
+        admin_type:    body.adminType ?? null,
+        invited_by:    auth.userId,
+        invited_name:  body.name.trim(),
+        phone_number:  body.phone_number ?? null,
+        date_of_birth: body.date_of_birth ?? null,
         token,
-        expires_at: expiresAt,
-        initial_flags: body.initialFlags || {},
+        expires_at:    expiresAt,
+        initial_flags: body.initialFlags ?? {},
       });
 
       if (insertError) {
-        console.error('[invite] Error inserting invitation:', insertError);
-        return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 });
+        // Gracefully handle missing columns by falling back without optional fields
+        if (insertError.code === '42703') {
+          // Column doesn't exist yet — insert without new optional fields
+          const { error: fallbackError } = await supabaseAdmin.from('user_invitations').insert({
+            tenant_id:     auth.tenantId,
+            email:         body.email.trim().toLowerCase(),
+            role:          body.role,
+            admin_type:    body.adminType ?? null,
+            invited_by:    auth.userId,
+            token,
+            expires_at:    expiresAt,
+            initial_flags: body.initialFlags ?? {},
+          });
+          if (fallbackError) {
+            console.error('[invite] Fallback insert error:', fallbackError);
+            return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 });
+          }
+        } else {
+          console.error('[invite] Error inserting invitation:', insertError);
+          return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 });
+        }
       }
     }
 
@@ -118,7 +153,7 @@ export async function POST(request: NextRequest) {
       </p>
 
       <a href="${setupUrl}" style="display: block; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; text-decoration: none; border-radius: 8px; padding: 14px 28px; text-align: center; font-weight: 600; font-size: 16px; margin-bottom: 16px;">
-        Complete Account Setup →
+        Complete Account Setup &rarr;
       </a>
 
       <p style="margin: 0; color: #6b7280; font-size: 12px; text-align: center;">
@@ -129,16 +164,16 @@ export async function POST(request: NextRequest) {
     <div style="background: #1a1a2e; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
       <h3 style="margin: 0 0 16px; font-size: 14px; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.05em;">What happens next</h3>
       <div style="color: #d1d5db; font-size: 14px; line-height: 2;">
-        <div>📸 &nbsp;Add your profile photo</div>
-        <div>📋 &nbsp;Review and sign the platform agreement</div>
-        <div>✅ &nbsp;Confirm your communication preferences</div>
-        <div>🚀 &nbsp;Access your dashboard</div>
+        <div>Add your profile photo</div>
+        <div>Review and sign the platform agreement</div>
+        <div>Confirm your communication preferences</div>
+        <div>Access your dashboard</div>
       </div>
     </div>
 
     <p style="color: #4b5563; font-size: 12px; text-align: center; line-height: 1.6;">
       If you weren't expecting this invitation, you can safely ignore this email.<br>
-      © ${new Date().getFullYear()} ${tenantName} — Powered by Pontifex Platform
+      &copy; ${new Date().getFullYear()} ${tenantName} &mdash; Powered by Pontifex Platform
     </p>
   </div>
 </body>
@@ -151,7 +186,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, message: 'Invitation sent successfully' });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[invite] Unexpected error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
