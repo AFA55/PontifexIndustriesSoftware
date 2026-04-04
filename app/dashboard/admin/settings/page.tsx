@@ -506,6 +506,31 @@ export default function SettingsPage() {
           </div>
 
           {/* ══════════════════════════════════════════════
+              DATA BACKUPS
+             ══════════════════════════════════════════════ */}
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-6 py-4 text-white">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
+                Data Backups
+              </h2>
+              <p className="text-violet-100 text-sm mt-1">Export and protect your customer and contact data</p>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Download a CSV backup of all your customer contacts any time. Daily database backups
+                run automatically — your data is always safe and exportable.
+              </p>
+              <Link
+                href="/dashboard/admin/settings/backups"
+                className="block w-full text-center px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-sm"
+              >
+                Manage Backups →
+              </Link>
+            </div>
+          </div>
+
+          {/* ══════════════════════════════════════════════
               OPERATOR SKILL LEVELS (super_admin only)
              ══════════════════════════════════════════════ */}
           {isSuperAdmin && (
