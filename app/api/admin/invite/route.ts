@@ -11,7 +11,7 @@ import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const getResend = () => new Resend(process.env.RESEND_API_KEY || 're_placeholder');
 
 export async function POST(request: NextRequest) {
   try {
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     const companyCode = tenant?.company_code || '';
 
     // Send invitation email
-    const { error: emailError } = await resend.emails.send({
+    const { error: emailError } = await getResend().emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'noreply@admin.pontifexindustries.com',
       to: body.email.trim(),
       subject: `You're invited to join ${tenantName}`,
