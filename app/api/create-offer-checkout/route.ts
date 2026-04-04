@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_placeholder', {
   apiVersion: '2026-03-25.dahlia',
 });
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       // No body or invalid JSON — that's fine
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
       line_items: [
