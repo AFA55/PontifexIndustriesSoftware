@@ -564,8 +564,8 @@ function TimecardPage() {
         </div>
 
         {/* ── Weekly Summary Cards ─────────────────────── */}
-        <div className="grid grid-cols-3 gap-4 mb-5">
-          <div className="col-span-3 sm:col-span-1 bg-purple-600 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
+          <div className="col-span-2 sm:col-span-1 bg-purple-600 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={15} className="text-blue-200" />
@@ -685,12 +685,12 @@ function TimecardPage() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50/80 border-b border-gray-100">
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Date</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Clock In</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Clock Out</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hours</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Category</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">In</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Out</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hrs</th>
+                    <th className="hidden sm:table-cell px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Category</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -704,30 +704,30 @@ function TimecardPage() {
                           isMandatoryOT ? 'border-l-[3px] border-l-red-400' : 'border-l-[3px] border-l-transparent'
                         }`}
                       >
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-sm font-medium text-gray-700">{formatDate(entry.date)}</span>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span className="text-xs font-medium text-gray-700">{formatDate(entry.date)}</span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-sm font-medium text-gray-700 tabular-nums">{formatTime(entry.clock_in_time)}</span>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span className="text-xs font-medium text-gray-700 tabular-nums">{formatTime(entry.clock_in_time)}</span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-3 py-3 whitespace-nowrap">
                           {entry.clock_out_time ? (
-                            <span className="text-sm font-medium text-gray-700 tabular-nums">{formatTime(entry.clock_out_time)}</span>
+                            <span className="text-xs font-medium text-gray-700 tabular-nums">{formatTime(entry.clock_out_time)}</span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
                               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                              Active
+                              <span className="hidden sm:inline">Active</span>
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-3 py-3 whitespace-nowrap">
                           {entry.total_hours !== null ? (
-                            <span className="text-sm font-bold tabular-nums text-gray-800">{entry.total_hours.toFixed(2)}</span>
+                            <span className="text-xs font-bold tabular-nums text-gray-800">{entry.total_hours.toFixed(2)}</span>
                           ) : (
-                            <span className="text-sm text-gray-300">&mdash;</span>
+                            <span className="text-xs text-gray-300">&mdash;</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="hidden sm:table-cell px-3 py-3">
                           <div className="flex flex-wrap gap-1">
                             {badges.length > 0 ? badges.map((badge, bidx) => (
                               <span key={bidx} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${badge.color}`}>
@@ -738,16 +738,16 @@ function TimecardPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-3 py-3 whitespace-nowrap">
                           {entry.is_approved ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
                               <CheckCircle size={10} />
-                              Approved
+                              <span className="hidden sm:inline">Approved</span>
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
                               <Clock size={10} />
-                              Pending
+                              <span className="hidden sm:inline">Pending</span>
                             </span>
                           )}
                         </td>
