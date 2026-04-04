@@ -9,7 +9,7 @@ import {
   ArrowLeft, Users, UserPlus, Search, Shield, Crown,
   Star, Briefcase, User, Settings, X,
   AlertTriangle, CheckCircle2, Mail, Phone, Calendar,
-  Loader2, ChevronRight, Activity, Clock, UserCheck,
+  Loader2, ChevronRight, Activity, Clock, UserCheck, Pencil,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
@@ -237,6 +237,109 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
   );
 }
 
+// ─── EditableDateRow ──────────────────────────────────────────────────────────
+
+function EditableDateRow({
+  icon: Icon,
+  label,
+  value,
+  onSave,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | null | undefined;
+  onSave: (isoDate: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const startEditing = () => {
+    // Convert display date to YYYY-MM-DD for the input
+    let iso = '';
+    if (value) {
+      try {
+        const d = new Date(value);
+        if (!isNaN(d.getTime())) {
+          iso = d.toISOString().split('T')[0];
+        }
+      } catch { /* ignore */ }
+    }
+    setInputVal(iso);
+    setEditing(true);
+    setSaved(false);
+  };
+
+  const handleSave = async () => {
+    if (!inputVal) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      await onSave(inputVal);
+      setSaved(true);
+      setEditing(false);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave();
+    if (e.key === 'Escape') setEditing(false);
+  };
+
+  return (
+    <div className="flex items-start gap-3">
+      <Icon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={inputVal}
+              onChange={e => setInputVal(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoFocus
+              className="text-sm border border-violet-400 rounded-md px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-violet-500/30 text-gray-900"
+            />
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="text-xs font-semibold px-2 py-0.5 bg-violet-600 hover:bg-violet-700 text-white rounded-md disabled:opacity-50 transition-colors"
+            >
+              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 group/date">
+            <p className="text-sm text-gray-700">{value ? formatDate(value) : '—'}</p>
+            <button
+              onClick={startEditing}
+              className="opacity-0 group-hover/date:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-100"
+              title="Edit hire date"
+            >
+              <Pencil className="w-3 h-3 text-gray-400 hover:text-violet-500 transition-colors" />
+            </button>
+            {saved && (
+              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-0.5">
+                <CheckCircle2 className="w-3 h-3" /> Saved
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── ActionButton (for quick actions) ────────────────────────────────────────
 
 function ActionButton({
@@ -276,7 +379,13 @@ function ActionButton({
 
 // ─── Role-Specific Profile Info ───────────────────────────────────────────────
 
-function ProfileInfoSection({ member }: { member: TeamMember }) {
+function ProfileInfoSection({
+  member,
+  onSaveHireDate,
+}: {
+  member: TeamMember;
+  onSaveHireDate: (isoDate: string) => Promise<void>;
+}) {
   const phone = member.phone_number || member.phone;
 
   // super_admin: name, email, DOB, join date
@@ -296,7 +405,7 @@ function ProfileInfoSection({ member }: { member: TeamMember }) {
       <div className="space-y-3">
         <InfoRow icon={Mail} label="Email" value={member.email} />
         {phone && <InfoRow icon={Phone} label="Phone" value={phone} />}
-        <InfoRow icon={Calendar} label="Hire Date" value={formatDate(member.hire_date)} />
+        <EditableDateRow icon={Calendar} label="Hire Date" value={member.hire_date} onSave={onSaveHireDate} />
         <InfoRow icon={Clock} label="Next Review" value={formatDate(member.next_review_date)} />
       </div>
     );
@@ -309,7 +418,7 @@ function ProfileInfoSection({ member }: { member: TeamMember }) {
       {phone && <InfoRow icon={Phone} label="Phone" value={phone} />}
       <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(member.date_of_birth)} />
       {member.nickname && <InfoRow icon={User} label="Nickname" value={member.nickname} />}
-      <InfoRow icon={Clock} label="Member Since" value={formatDate(member.created_at)} />
+      <EditableDateRow icon={Clock} label="Hire Date" value={member.hire_date} onSave={onSaveHireDate} />
     </div>
   );
 }
@@ -358,6 +467,7 @@ function MemberDetailPanel({
   onGrantSuperAdmin,
   onToggleActive,
   getAuthHeaders,
+  onHireDateSaved,
 }: {
   member: TeamMember;
   isSuperAdmin: boolean;
@@ -366,10 +476,23 @@ function MemberDetailPanel({
   onGrantSuperAdmin: (member: TeamMember) => void;
   onToggleActive: (member: TeamMember) => void;
   getAuthHeaders: () => Promise<Record<string, string>>;
+  onHireDateSaved: (memberId: string, isoDate: string) => void;
 }) {
   const [tab, setTab] = useState<DetailTab>('info');
   const [flags, setFlags] = useState<Partial<UserFeatureFlags> | null>(null);
   const [loadingFlags, setLoadingFlags] = useState(false);
+
+  const handleSaveHireDate = async (isoDate: string) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/admin/profiles/${member.id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ hire_date: isoDate }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to save hire date');
+    onHireDateSaved(member.id, isoDate);
+  };
 
   useEffect(() => {
     // Reset tab when member changes
@@ -450,7 +573,7 @@ function MemberDetailPanel({
             {/* Profile Info */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Profile Info</h3>
-              <ProfileInfoSection member={member} />
+              <ProfileInfoSection member={member} onSaveHireDate={handleSaveHireDate} />
             </div>
 
             {/* Quick Actions */}
@@ -824,6 +947,10 @@ export default function TeamProfilesPage() {
                 onGrantSuperAdmin={setGrantTarget}
                 onToggleActive={handleToggleActive}
                 getAuthHeaders={getAuthHeaders}
+                onHireDateSaved={(memberId, isoDate) => {
+                  setMembers(prev => prev.map(m => m.id === memberId ? { ...m, hire_date: isoDate } : m));
+                  setSelectedMember(prev => prev && prev.id === memberId ? { ...prev, hire_date: isoDate } : prev);
+                }}
               />
             </div>
           )}
