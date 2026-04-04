@@ -1,8 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Building2, Loader2, User, DollarSign, MapPin, FileText, CreditCard } from 'lucide-react';
+import { X, Building2, Loader2, User, DollarSign, MapPin, FileText, CreditCard, Plus, Users } from 'lucide-react';
 import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
+
+interface AdditionalContact {
+  name: string;
+  phone: string;
+  type: 'on_site' | 'billing' | 'other';
+}
 
 interface CustomerFormProps {
   customer?: {
@@ -27,6 +33,8 @@ interface CustomerFormProps {
   } | null;
   onSubmit: (data: Record<string, any>) => Promise<void>;
   onClose: () => void;
+  showAdditionalContacts?: boolean;
+  defaultCompanyName?: string;
 }
 
 const CUSTOMER_TYPES = [
@@ -61,14 +69,14 @@ const PAYMENT_METHODS = [
   { value: 'other', label: 'Other' },
 ];
 
-export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFormProps) {
+export default function CustomerForm({ customer, onSubmit, onClose, showAdditionalContacts = true, defaultCompanyName }: CustomerFormProps) {
   const isEdit = !!customer?.id;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { isLoaded } = useGoogleMaps();
 
   const [form, setForm] = useState({
-    company_name: customer?.name || '',
+    company_name: customer?.name || defaultCompanyName || '',
     primary_contact_name: customer?.primary_contact_name || '',
     primary_contact_email: customer?.primary_contact_email || '',
     primary_contact_phone: customer?.primary_contact_phone || '',
@@ -86,6 +94,14 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
     website: customer?.website || '',
     notes: customer?.notes || '',
   });
+
+  // Additional contacts state
+  const [additionalContacts, setAdditionalContacts] = useState<AdditionalContact[]>([]);
+
+  const addContact = () => setAdditionalContacts(prev => [...prev, { name: '', phone: '', type: 'on_site' }]);
+  const removeContact = (idx: number) => setAdditionalContacts(prev => prev.filter((_, i) => i !== idx));
+  const updateContact = (idx: number, field: keyof AdditionalContact, value: string) =>
+    setAdditionalContacts(prev => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
 
   // Google Places autocomplete state
   const [addressInputValue, setAddressInputValue] = useState(customer?.address || '');
@@ -174,7 +190,8 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
     setLoading(true);
     setError('');
     try {
-      await onSubmit(form);
+      const validContacts = additionalContacts.filter(c => c.name.trim());
+      await onSubmit({ ...form, additional_contacts: validContacts.length > 0 ? validContacts : undefined });
     } catch (err: any) {
       setError(err.message || 'Failed to save customer');
     } finally {
@@ -288,6 +305,89 @@ export default function CustomerForm({ customer, onSubmit, onClose }: CustomerFo
               </div>
             </div>
           </div>
+
+          {/* Additional Contacts Section */}
+          {showAdditionalContacts && (
+            <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                  <h3 className="text-sm font-bold text-gray-900">Additional Contacts</h3>
+                  <span className="text-[10px] text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">Optional</span>
+                </div>
+              </div>
+
+              {additionalContacts.length > 0 && (
+                <div className="space-y-3">
+                  {additionalContacts.map((contact, idx) => (
+                    <div key={idx} className="bg-white border border-indigo-200 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Contact {idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeContact(idx)}
+                          className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                          aria-label="Remove contact"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className={labelClass}>Contact Name</label>
+                          <input
+                            type="text"
+                            className={inputClass}
+                            placeholder="Full name"
+                            value={contact.name}
+                            onChange={e => updateContact(idx, 'name', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Phone</label>
+                          <input
+                            type="tel"
+                            className={inputClass}
+                            placeholder="(555) 123-4567"
+                            value={contact.phone}
+                            onChange={e => updateContact(idx, 'phone', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Contact Type</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {[
+                            { value: 'on_site', label: 'On-Site Contact', activeClass: 'bg-amber-100 border-amber-400 text-amber-700', inactiveClass: 'bg-white border-gray-300 text-gray-600 hover:border-amber-400' },
+                            { value: 'billing', label: 'Billing Contact', activeClass: 'bg-emerald-100 border-emerald-400 text-emerald-700', inactiveClass: 'bg-white border-gray-300 text-gray-600 hover:border-emerald-400' },
+                            { value: 'other', label: 'Other', activeClass: 'bg-gray-200 border-gray-500 text-gray-700', inactiveClass: 'bg-white border-gray-300 text-gray-600 hover:border-gray-500' },
+                          ].map(opt => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => updateContact(idx, 'type', opt.value)}
+                              className={`px-3 py-1.5 text-xs font-bold border rounded-lg transition-all ${contact.type === opt.value ? opt.activeClass : opt.inactiveClass}`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={addContact}
+                className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-indigo-300 rounded-xl text-sm font-bold text-indigo-600 hover:bg-indigo-100 hover:border-indigo-400 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                {additionalContacts.length === 0 ? 'Add a Contact' : 'Add Another Contact'}
+              </button>
+            </div>
+          )}
 
           {/* Payment & Billing Section */}
           <div className={sectionClass}>

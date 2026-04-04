@@ -126,6 +126,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create customer" }, { status: 500 });
     }
 
+    // Insert additional contacts if provided
+    if (body.additional_contacts && Array.isArray(body.additional_contacts) && body.additional_contacts.length > 0) {
+      const contactRows = body.additional_contacts
+        .filter((c: any) => c.name?.trim())
+        .map((c: any) => ({
+          customer_id: customer.id,
+          name: c.name.trim(),
+          phone: c.phone || null,
+          role: c.type === 'on_site' ? 'site_contact' : c.type === 'billing' ? 'billing' : 'other',
+          is_billing_contact: c.type === 'billing',
+          tenant_id: tenantId || null,
+        }));
+      if (contactRows.length > 0) {
+        // Fire-and-forget — don't fail the whole request if contacts insert fails
+        Promise.resolve(
+          supabaseAdmin.from('customer_contacts').insert(contactRows)
+        ).catch(() => {});
+      }
+    }
+
     return NextResponse.json({ success: true, data: customer }, { status: 201 });
   } catch (error) {
     console.error('Unexpected error in customers POST:', error);

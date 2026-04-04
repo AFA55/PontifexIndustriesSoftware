@@ -21,6 +21,7 @@ import { CustomerAutocomplete } from '@/components/ui/CustomerAutocomplete';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { VoiceMicButton } from '@/components/ui/VoiceMicButton';
 import AISmartFillModal from './_components/AISmartFillModal';
+import CustomerForm from '../customers/_components/CustomerForm';
 // Equipment presets no longer displayed as grid; now using SERVICE_EQUIPMENT config
 import PhotoUploader from '@/components/PhotoUploader';
 import SmartCombobox, { ContactCombobox } from '@/components/SmartCombobox';
@@ -582,8 +583,7 @@ export default function ScheduleFormPage() {
 
   // New Customer modal state
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
-  const [newCustomerData, setNewCustomerData] = useState({ company_name: '', primary_contact_name: '', primary_contact_phone: '', primary_contact_email: '', address: '', city: '', state: '', zip: '', notes: '' });
-  const [newCustomerSaving, setNewCustomerSaving] = useState(false);
+  const [newCustomerDefaultName, setNewCustomerDefaultName] = useState('');
   // CRM customers list (for step 1 selection)
   const [crmCustomers, setCrmCustomers] = useState<{ id: string; company_name: string; primary_contact_name: string | null; primary_contact_phone: string | null; address: string | null }[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -960,62 +960,43 @@ export default function ScheduleFormPage() {
   }, [updateForm]);
 
   // ── Create new customer handler ────────────────────────────
-  const handleCreateCustomer = async () => {
-    if (!newCustomerData.company_name.trim()) return;
-    setNewCustomerSaving(true);
-    try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session.session) return;
-      const res = await fetch('/api/admin/customers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.session.access_token}`,
-        },
-        body: JSON.stringify({
-          company_name: newCustomerData.company_name.trim(),
-          name: newCustomerData.company_name.trim(),
-          primary_contact_name: newCustomerData.primary_contact_name || null,
-          primary_contact_phone: newCustomerData.primary_contact_phone || null,
-          primary_contact_email: newCustomerData.primary_contact_email || null,
-          address: newCustomerData.address || null,
-          city: newCustomerData.city || null,
-          state: newCustomerData.state || null,
-          zip: newCustomerData.zip || null,
-          notes: newCustomerData.notes || null,
-        }),
+  // Accepts the data object from CustomerForm's onSubmit callback
+  const handleCreateCustomer = async (data: Record<string, any>) => {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session) throw new Error('Not authenticated');
+    const res = await fetch('/api/admin/customers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.session.access_token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (res.ok && result.data) {
+      const created = result.data;
+      // Add to CRM list
+      setCrmCustomers(prev => [{
+        id: created.id,
+        company_name: created.company_name || created.name || data.company_name,
+        primary_contact_name: created.primary_contact_name || data.primary_contact_name || null,
+        primary_contact_phone: created.primary_contact_phone || data.primary_contact_phone || null,
+        address: created.address || data.address || null,
+      }, ...prev]);
+      // Select the new customer
+      updateForm({
+        contractor_name: created.company_name || created.name || data.company_name,
+        customer_id: created.id,
+        site_contact: data.primary_contact_name || '',
+        contact_phone: data.primary_contact_phone || '',
+        site_address: data.address ? `${data.address}${data.city ? ', ' + data.city : ''}${data.state ? ', ' + data.state : ''}${data.zip ? ' ' + data.zip : ''}` : '',
       });
-      const result = await res.json();
-      if (res.ok && result.data) {
-        const created = result.data;
-        // Add to CRM list
-        setCrmCustomers(prev => [{
-          id: created.id,
-          company_name: created.company_name || created.name || newCustomerData.company_name,
-          primary_contact_name: created.primary_contact_name || newCustomerData.primary_contact_name || null,
-          primary_contact_phone: created.primary_contact_phone || newCustomerData.primary_contact_phone || null,
-          address: created.address || newCustomerData.address || null,
-        }, ...prev]);
-        // Select the new customer
-        updateForm({
-          contractor_name: created.company_name || created.name || newCustomerData.company_name,
-          customer_id: created.id,
-          site_contact: newCustomerData.primary_contact_name || '',
-          contact_phone: newCustomerData.primary_contact_phone || '',
-          site_address: newCustomerData.address ? `${newCustomerData.address}${newCustomerData.city ? ', ' + newCustomerData.city : ''}${newCustomerData.state ? ', ' + newCustomerData.state : ''}${newCustomerData.zip ? ' ' + newCustomerData.zip : ''}` : '',
-        });
-        // New customer has no history yet — clear any stale history state
-        setCustomerPONumbers([]);
-        setCustomerContacts([]);
-        setShowNewCustomerModal(false);
-        setNewCustomerData({ company_name: '', primary_contact_name: '', primary_contact_phone: '', primary_contact_email: '', address: '', city: '', state: '', zip: '', notes: '' });
-      } else {
-        setError(result.error || 'Failed to create customer');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create customer');
-    } finally {
-      setNewCustomerSaving(false);
+      // New customer has no history yet — clear any stale history state
+      setCustomerPONumbers([]);
+      setCustomerContacts([]);
+      setShowNewCustomerModal(false);
+    } else {
+      throw new Error(result.error || 'Failed to create customer');
     }
   };
 
@@ -1543,7 +1524,7 @@ export default function ScheduleFormPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setNewCustomerData(d => ({ ...d, company_name: customerSearch }));
+                          setNewCustomerDefaultName(customerSearch);
                           setShowNewCustomerModal(true);
                         }}
                         className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-semibold"
@@ -3602,127 +3583,12 @@ export default function ScheduleFormPage() {
       {/* NEW CUSTOMER MODAL                                          */}
       {/* ══════════════════════════════════════════════════════════ */}
       {showNewCustomerModal && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowNewCustomerModal(false)} />
-          <div className="relative mt-8 sm:mt-16 mx-4 w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
-            <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Plus size={20} className="text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">New Customer</h3>
-                  <p className="text-xs text-blue-200">Add to your customer database</p>
-                </div>
-              </div>
-              <button onClick={() => setShowNewCustomerModal(false)} className="w-9 h-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors">
-                <X size={18} className="text-white" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div>
-                <Label required>Company / Customer Name</Label>
-                <InputField
-                  icon={Building2}
-                  placeholder="e.g. ABC General Contractors"
-                  value={newCustomerData.company_name}
-                  onChange={e => setNewCustomerData(d => ({ ...d, company_name: e.target.value }))}
-                  autoFocus
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label>Primary Contact Name</Label>
-                  <InputField
-                    icon={UserIcon}
-                    placeholder="Contact person"
-                    value={newCustomerData.primary_contact_name}
-                    onChange={e => setNewCustomerData(d => ({ ...d, primary_contact_name: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>Contact Phone</Label>
-                  <InputField
-                    icon={Phone}
-                    type="tel"
-                    placeholder="(555) 123-4567"
-                    value={newCustomerData.primary_contact_phone}
-                    onChange={e => setNewCustomerData(d => ({ ...d, primary_contact_phone: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Contact Email</Label>
-                <InputField
-                  placeholder="email@company.com"
-                  type="email"
-                  value={newCustomerData.primary_contact_email}
-                  onChange={e => setNewCustomerData(d => ({ ...d, primary_contact_email: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Street Address</Label>
-                <InputField
-                  icon={MapPin}
-                  placeholder="123 Main St"
-                  value={newCustomerData.address}
-                  onChange={e => setNewCustomerData(d => ({ ...d, address: e.target.value }))}
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label>City</Label>
-                  <InputField
-                    placeholder="City"
-                    value={newCustomerData.city}
-                    onChange={e => setNewCustomerData(d => ({ ...d, city: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>State</Label>
-                  <InputField
-                    placeholder="AZ"
-                    value={newCustomerData.state}
-                    onChange={e => setNewCustomerData(d => ({ ...d, state: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>ZIP</Label>
-                  <InputField
-                    placeholder="85001"
-                    value={newCustomerData.zip}
-                    onChange={e => setNewCustomerData(d => ({ ...d, zip: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Notes</Label>
-                <TextArea
-                  rows={3}
-                  placeholder="Any notes about this customer (optional)"
-                  value={newCustomerData.notes}
-                  onChange={e => setNewCustomerData(d => ({ ...d, notes: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowNewCustomerModal(false)}
-                className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateCustomer}
-                disabled={!newCustomerData.company_name.trim() || newCustomerSaving}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-semibold shadow-md disabled:opacity-50 transition-all"
-              >
-                {newCustomerSaving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                {newCustomerSaving ? 'Creating...' : 'Create Customer'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CustomerForm
+          onSubmit={handleCreateCustomer}
+          onClose={() => { setShowNewCustomerModal(false); setNewCustomerDefaultName(''); }}
+          showAdditionalContacts={true}
+          defaultCompanyName={newCustomerDefaultName}
+        />
       )}
 
       {/* ══════════════════════════════════════════════════════════ */}

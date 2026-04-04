@@ -165,34 +165,34 @@ function AddFacilityModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Facility Name *</label>
               <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" placeholder="e.g., Intel D1X Fab" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="e.g., Intel D1X Fab" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
               <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" placeholder="Street address" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="Street address" />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                 <input type="text" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
                 <input type="text" value={form.state} onChange={e => setForm({ ...form, state: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" maxLength={2} placeholder="OR" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={2} placeholder="OR" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
                 <input type="text" value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" maxLength={10} />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={10} />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Special Requirements</label>
               <textarea value={form.special_requirements} onChange={e => setForm({ ...form, special_requirements: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2}
                 placeholder="PPE requirements, site rules, etc." />
             </div>
             <div className="flex items-center gap-6">
@@ -214,7 +214,7 @@ function AddFacilityModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
@@ -294,34 +294,34 @@ function EditFacilityModal({ facility, onClose, onSaved }: { facility: Facility;
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Facility Name *</label>
               <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
               <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                 <input type="text" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
                 <input type="text" value={form.state} onChange={e => setForm({ ...form, state: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" maxLength={2} />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={2} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
                 <input type="text" value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" maxLength={10} />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={10} />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Special Requirements</label>
               <textarea value={form.special_requirements} onChange={e => setForm({ ...form, special_requirements: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
             </div>
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -342,7 +342,7 @@ function EditFacilityModal({ facility, onClose, onSaved }: { facility: Facility;
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
@@ -432,7 +432,7 @@ function AddBadgeModal({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Operator *</label>
               <select value={form.operator_id} onChange={e => setForm({ ...form, operator_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400">
                 <option value="">Select operator...</option>
                 {operators.map(op => (
                   <option key={op.id} value={op.id}>{op.full_name} ({op.email})</option>
@@ -442,7 +442,7 @@ function AddBadgeModal({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Facility *</label>
               <select value={form.facility_id} onChange={e => setForm({ ...form, facility_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400">
                 <option value="">Select facility...</option>
                 {facilities.map(f => (
                   <option key={f.id} value={f.id}>{f.name}</option>
@@ -452,24 +452,24 @@ function AddBadgeModal({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Badge Number</label>
               <input type="text" value={form.badge_number} onChange={e => setForm({ ...form, badge_number: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" placeholder="e.g., B-12345" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="e.g., B-12345" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Issued Date</label>
                 <input type="date" value={form.issued_date} onChange={e => setForm({ ...form, issued_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
                 <input type="date" value={form.expiry_date} onChange={e => setForm({ ...form, expiry_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" rows={2} />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">

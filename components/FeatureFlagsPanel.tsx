@@ -41,7 +41,7 @@ const FLAG_GROUPS = [
     icon: '👁️',
     flags: [
       { key: 'can_view_active_jobs', label: 'Active Jobs Tab', desc: 'View the Active Jobs dashboard section' },
-      { key: 'can_view_all_jobs', label: 'View All Jobs', desc: 'See all company jobs (vs. only their own)' },
+      { key: 'can_view_all_jobs', label: 'View All Jobs', desc: 'See all company jobs (vs. only jobs assigned to them)' },
       { key: 'can_view_completed_jobs', label: 'Completed Jobs', desc: 'Access the Completed Jobs section' },
     ],
   },
@@ -57,7 +57,7 @@ const FLAG_GROUPS = [
   },
   {
     label: 'Tools',
-    icon: '🔧',
+    icon: '🛠️',
     flags: [
       { key: 'can_view_facilities', label: 'Facilities', desc: 'Manage facilities and badges' },
       { key: 'can_view_nfc_tags', label: 'NFC Tags', desc: 'Manage NFC tag assignments' },
@@ -85,24 +85,35 @@ const FLAG_GROUPS = [
 
 const ADMIN_TYPE_PRESETS: Record<string, Partial<UserFeatureFlags>> = {
   sales_admin: {
+    // Sales people see only their own assigned jobs by default (can_view_all_jobs: false)
     can_create_schedule_forms: true, can_view_schedule_board: true, can_request_schedule_changes: true,
-    can_view_active_jobs: true, can_view_completed_jobs: true, can_view_customers: true,
-    can_view_personal_metrics: true, can_view_personal_hours: true,
+    can_view_active_jobs: true, can_view_all_jobs: false, can_view_completed_jobs: true,
+    can_view_customers: true, can_view_personal_metrics: true, can_view_personal_hours: true,
   },
-  ops_admin: {
+  operations_admin: {
     can_create_schedule_forms: true, can_view_schedule_board: true, can_edit_schedule_board: true,
     can_request_schedule_changes: true, can_view_active_jobs: true, can_view_all_jobs: true,
     can_view_completed_jobs: true, can_view_timecards: true, can_view_customers: true,
     can_view_facilities: true, can_manage_team: true, can_view_personal_metrics: true, can_view_personal_hours: true,
   },
-  finance_admin: {
-    can_view_active_jobs: true, can_view_all_jobs: true, can_view_completed_jobs: true,
-    can_view_timecards: true, can_view_invoicing: true, can_view_analytics: true,
-    can_view_customers: true, can_view_personal_metrics: true,
+  admin: {
+    can_create_schedule_forms: true, can_view_schedule_board: true, can_edit_schedule_board: true,
+    can_request_schedule_changes: true, can_view_active_jobs: true, can_view_all_jobs: true,
+    can_view_completed_jobs: true, can_view_timecards: true, can_view_customers: true,
+    can_view_invoicing: true, can_view_analytics: true, can_view_facilities: true,
+    can_view_nfc_tags: true, can_view_form_builder: true, can_manage_team: true,
+    can_manage_settings: true, can_view_personal_metrics: true, can_view_personal_hours: true,
   },
-  field_admin: {
-    can_create_schedule_forms: true, can_view_schedule_board: true, can_request_schedule_changes: true,
-    can_view_active_jobs: true, can_view_personal_metrics: true, can_view_personal_hours: true,
+  operator: {
+    // Can work their jobs, clock in/out, view their timecard, submit work, complete jobs
+    // Cannot access admin panel, schedule board, customers, invoicing, analytics, team management
+    can_request_schedule_changes: false, can_view_active_jobs: true, can_view_all_jobs: false,
+    can_view_timecards: true, can_view_personal_hours: true, can_view_personal_metrics: true,
+  },
+  team_member: {
+    // Most restricted — only my-jobs and timecard
+    can_view_active_jobs: true, can_view_all_jobs: false,
+    can_view_personal_hours: true, can_view_personal_metrics: false,
   },
 };
 
@@ -163,12 +174,13 @@ export default function FeatureFlagsPanel({ userId, initialFlags, onSave, readOn
       {!readOnly && (
         <div>
           <label className="text-sm text-gray-400 mb-3 block font-medium">Quick Preset</label>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {[
-              { key: 'sales_admin', label: '💼 Sales Admin', desc: 'Schedule + customers' },
-              { key: 'ops_admin', label: '⚙️ Ops Admin', desc: 'Full ops access' },
-              { key: 'finance_admin', label: '💰 Finance Admin', desc: 'Billing + timecards' },
-              { key: 'field_admin', label: '🏗️ Field Admin', desc: 'Jobs + schedule' },
+              { key: 'sales_admin', label: 'Sales Admin', desc: 'Schedule + assigned jobs + customers' },
+              { key: 'operations_admin', label: 'Operations Admin', desc: 'Full ops access + team management' },
+              { key: 'admin', label: 'Admin', desc: 'Full admin access across all modules' },
+              { key: 'operator', label: 'Operator', desc: 'Own jobs, clock in/out, timecard, work submission' },
+              { key: 'team_member', label: 'Team Member', desc: 'My jobs and timecard only' },
             ].map(preset => (
               <button key={preset.key} onClick={() => applyPreset(preset.key)}
                 className={`p-3 rounded-xl border text-left transition-all ${
@@ -188,8 +200,8 @@ export default function FeatureFlagsPanel({ userId, initialFlags, onSave, readOn
       {/* Feature toggle groups */}
       {FLAG_GROUPS.map(group => (
         <div key={group.label} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-          <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
-            <span>{group.icon}</span> {group.label}
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">
+            {group.label}
           </h3>
           <div className="space-y-3">
             {group.flags.map(flag => (
@@ -213,13 +225,20 @@ export default function FeatureFlagsPanel({ userId, initialFlags, onSave, readOn
               </div>
             ))}
           </div>
+          {group.label === 'Job Visibility' && (
+            <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-700/50">
+              {flags.can_view_all_jobs
+                ? 'This user can view all company jobs.'
+                : 'This user can only view jobs assigned to them.'}
+            </p>
+          )}
         </div>
       ))}
 
       {!readOnly && (
         <button onClick={handleSave} disabled={saving}
           className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl py-3 font-semibold transition-colors flex items-center justify-center gap-2">
-          {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : saved ? '✓ Saved!' : <><Save className="w-4 h-4" /> Save Permissions</>}
+          {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : saved ? 'Saved!' : <><Save className="w-4 h-4" /> Save Permissions</>}
         </button>
       )}
     </div>
