@@ -620,6 +620,18 @@ export default function ScheduleFormPage() {
     email: string | null;
     job_count: number;
   }>>([]);
+  const [customerSiteAddresses, setCustomerSiteAddresses] = useState<Array<{
+    id: string;
+    address: string;
+    location_name: string | null;
+    use_count: number;
+    last_used_at: string;
+  }>>([]);
+  const [customerProjectNames, setCustomerProjectNames] = useState<Array<{
+    project_name: string;
+    last_used: string;
+    job_count: number;
+  }>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Schedule preview state
@@ -793,9 +805,11 @@ export default function ScheduleFormPage() {
       if (!session) return;
       const headers = { Authorization: `Bearer ${session.access_token}` };
 
-      const [poRes, contactRes] = await Promise.all([
+      const [poRes, contactRes, siteAddrRes, projectNamesRes] = await Promise.all([
         fetch(`/api/admin/customers/${customerId}/po-numbers`, { headers }),
         fetch(`/api/admin/customers/${customerId}/site-contacts`, { headers }),
+        fetch(`/api/admin/customers/${customerId}/site-addresses`, { headers }),
+        fetch(`/api/admin/customers/${customerId}/project-names`, { headers }),
       ]);
 
       if (poRes.ok) {
@@ -810,6 +824,14 @@ export default function ScheduleFormPage() {
           email: c.email || null,
           job_count: c.job_count || 0,
         })));
+      }
+      if (siteAddrRes.ok) {
+        const json = await siteAddrRes.json();
+        setCustomerSiteAddresses(json.data || []);
+      }
+      if (projectNamesRes.ok) {
+        const json = await projectNamesRes.json();
+        setCustomerProjectNames(json.data || []);
       }
     } catch {
       // silently fail — dropdowns just show empty
@@ -858,14 +880,15 @@ export default function ScheduleFormPage() {
     updateForm({
       contractor_name: customer.company_name,
       customer_id: customer.id,
-      site_address: customer.address || '',
       site_contact: '',
       contact_phone: '',
     });
     setShowCustomerDropdown(false);
-    // Clear and fetch customer history (PO numbers + site contacts from past jobs)
+    // Clear and fetch customer history (PO numbers + site contacts + site addresses + project names from past jobs)
     setCustomerPONumbers([]);
     setCustomerContacts([]);
+    setCustomerSiteAddresses([]);
+    setCustomerProjectNames([]);
     fetchCustomerHistory(customer.id);
     // Fetch CRM contacts for this customer
     const { data: session } = await supabase.auth.getSession();
@@ -989,11 +1012,12 @@ export default function ScheduleFormPage() {
         customer_id: created.id,
         site_contact: data.primary_contact_name || '',
         contact_phone: data.primary_contact_phone || '',
-        site_address: data.address ? `${data.address}${data.city ? ', ' + data.city : ''}${data.state ? ', ' + data.state : ''}${data.zip ? ' ' + data.zip : ''}` : '',
       });
       // New customer has no history yet — clear any stale history state
       setCustomerPONumbers([]);
       setCustomerContacts([]);
+      setCustomerSiteAddresses([]);
+      setCustomerProjectNames([]);
       setShowNewCustomerModal(false);
     } else {
       throw new Error(result.error || 'Failed to create customer');
@@ -1343,6 +1367,15 @@ export default function ScheduleFormPage() {
         } catch {}
       }
 
+      // Fire-and-forget: save site address to customer history
+      if (form.customer_id && form.site_address) {
+        fetch(`/api/admin/customers/${form.customer_id}/site-addresses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.session.access_token}` },
+          body: JSON.stringify({ address: form.site_address }),
+        }).catch(() => {});
+      }
+
       // Fire-and-forget: save contact info for autocomplete
       if (form.contractor_name.trim()) {
         const { data: sessionForContacts } = await supabase.auth.getSession();
@@ -1659,12 +1692,18 @@ export default function ScheduleFormPage() {
 
             {/* Project Name (replaces location name as primary) */}
             <div>
-              <Label>Project Name</Label>
-              <InputField
-                icon={Clipboard}
-                placeholder="e.g. Building A Renovation, Phase 2 Demo..."
+              <SmartCombobox
+                label="Project Name"
+                placeholder="Select or enter project name"
+                options={customerProjectNames.map(p => ({
+                  value: p.project_name,
+                  label: p.project_name,
+                  sublabel: `Used ${p.job_count} time${p.job_count !== 1 ? 's' : ''}`,
+                }))}
                 value={form.project_name}
-                onChange={e => updateForm({ project_name: e.target.value })}
+                onChange={(val) => updateForm({ project_name: val })}
+                onAddNew={(val) => updateForm({ project_name: val })}
+                loading={historyLoading}
               />
               <p className="text-xs text-slate-400 mt-1">Groups multiple jobs at the same site. If existing project, it will auto-populate address.</p>
             </div>
@@ -1710,10 +1749,24 @@ export default function ScheduleFormPage() {
             {/* Site Address */}
             <div>
               <Label>Site Address</Label>
+              {customerSiteAddresses.length > 0 && (
+                <SmartCombobox
+                  label=""
+                  placeholder="Select a past site address..."
+                  options={customerSiteAddresses.map(sa => ({
+                    value: sa.address,
+                    label: sa.address,
+                    sublabel: sa.location_name ? `${sa.location_name} · Used ${sa.use_count}×` : `Used ${sa.use_count}×`,
+                  }))}
+                  value={form.site_address}
+                  onChange={(val) => updateForm({ site_address: val })}
+                  className="mb-2"
+                />
+              )}
               <GoogleAddressAutocomplete
                 value={form.site_address}
                 onChange={(address) => updateForm({ site_address: address })}
-                placeholder="Start typing an address..."
+                placeholder="Or type a new address..."
               />
             </div>
 
