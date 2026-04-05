@@ -190,23 +190,29 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
   const activeConditions = conditionFlags.filter(c => c.active);
   const warningConditions = conditionFlags.filter(c => c.active && c.warning);
 
-  // Build recommended equipment from equipment_selections
-  const recommendedEquipment: { scope: string; items: { label: string; value: string }[] }[] = [];
+  // Build a flat list of ALL equipment: custom-typed (equipment_needed) + predefined grid (equipment_selections)
+  const allEquipmentItems: { label: string; qty?: string; source: 'custom' | 'selection' }[] = [];
+
+  // Add custom-typed equipment from equipment_needed
+  for (const eq of (job.equipment_needed || [])) {
+    allEquipmentItems.push({ label: eq, source: 'custom' });
+  }
+
+  // Add predefined grid items from equipment_selections
   if (job.equipment_selections) {
-    for (const [scope, selections] of Object.entries(job.equipment_selections)) {
-      const items: { label: string; value: string }[] = [];
+    for (const [, selections] of Object.entries(job.equipment_selections as Record<string, Record<string, string>>)) {
       for (const [key, val] of Object.entries(selections)) {
-        if (val && val !== 'no' && val !== 'false' && val !== '0') {
-          const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-          const displayVal = val === 'yes' || val === 'true' ? '✓' : val;
-          items.push({ label, value: displayVal });
-        }
-      }
-      if (items.length > 0) {
-        recommendedEquipment.push({ scope, items });
+        if (!val || val === 'no' || val === 'false' || val === '0' || key === '_sub') continue;
+        // Convert snake_case key to Title Case for display
+        const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const qty = val !== 'yes' && val !== 'true' ? val : undefined;
+        allEquipmentItems.push({ label, qty, source: 'selection' });
       }
     }
   }
+
+  // Keep recommendedEquipment as empty (no longer used separately)
+  const recommendedEquipment: { scope: string; items: { label: string; value: string }[] }[] = [];
 
   return (
     <>
@@ -305,7 +311,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                   <Wrench className="w-4 h-4 text-indigo-600" />
                   <span className="text-sm font-bold text-indigo-900">Equipment</span>
                   <span className="text-[10px] px-1.5 py-0.5 bg-indigo-200 text-indigo-700 rounded-full font-bold">
-                    {job.equipment_needed.length + recommendedEquipment.reduce((sum, s) => sum + s.items.length, 0)} items
+                    {allEquipmentItems.length} items
                   </span>
                 </div>
                 {expandedSections.equipment ? <ChevronUp className="w-4 h-4 text-indigo-500" /> : <ChevronDown className="w-4 h-4 text-indigo-500" />}
@@ -313,39 +319,21 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
               {expandedSections.equipment && (
                 <div className="px-4 pb-3 space-y-3">
-                  {/* Typed/Selected Equipment */}
-                  {job.equipment_needed.length > 0 && (
+                  {allEquipmentItems.length > 0 ? (
                     <div>
-                      <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">Selected Equipment</div>
+                      <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">All Equipment</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {job.equipment_needed.map(eq => (
-                          <span key={eq} className="px-2.5 py-1 bg-white rounded-lg text-xs text-indigo-700 font-semibold border border-indigo-200 flex items-center gap-1">
-                            <Wrench className="w-3 h-3" />{getDisplayName(eq)}
+                        {allEquipmentItems.map((item, idx) => (
+                          <span key={idx} className="px-2.5 py-1 bg-white rounded-lg text-xs text-indigo-700 font-semibold border border-indigo-200 flex items-center gap-1">
+                            <Wrench className="w-3 h-3" />
+                            {item.label}
+                            {item.qty && <span className="text-indigo-500 font-bold ml-0.5">×{item.qty}</span>}
                           </span>
                         ))}
                       </div>
                     </div>
-                  )}
-
-                  {/* Recommended Equipment from Selections */}
-                  {recommendedEquipment.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">Recommended Equipment</div>
-                      {recommendedEquipment.map(({ scope, items }) => (
-                        <div key={scope} className="mb-2">
-                          <div className="text-[10px] font-semibold text-indigo-400 mb-1">{scope}</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {items.map(item => (
-                              <span key={item.label} className="px-2.5 py-1 bg-emerald-50 rounded-lg text-xs text-emerald-700 font-semibold border border-emerald-200 flex items-center gap-1">
-                                <Package className="w-3 h-3" />
-                                {item.label}
-                                {item.value !== '✓' && <span className="text-emerald-500 font-bold ml-0.5">({item.value})</span>}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  ) : (
+                    <p className="text-xs text-indigo-400 italic">No equipment specified</p>
                   )}
 
                   {/* Special equipment */}
@@ -353,7 +341,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                     <div>
                       <div className="text-[10px] font-bold text-amber-500 uppercase mb-1.5">Special Equipment</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {job.special_equipment.map(eq => (
+                        {job.special_equipment.map((eq: string) => (
                           <span key={eq} className="px-2.5 py-1 bg-amber-50 rounded-lg text-xs text-amber-700 font-semibold border border-amber-200">
                             {eq}
                           </span>

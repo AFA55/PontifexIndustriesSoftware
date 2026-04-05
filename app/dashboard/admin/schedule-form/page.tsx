@@ -50,6 +50,7 @@ const SERVICE_TYPES = [
   { code: 'HFCD', label: 'High Frequency Core Drilling', gradient: 'from-blue-500 to-indigo-600', lightBg: 'bg-blue-50 border-blue-200 text-blue-700' },
   { code: 'HCD', label: 'Hydraulic Core Drilling', gradient: 'from-teal-500 to-cyan-600', lightBg: 'bg-teal-50 border-teal-200 text-teal-700' },
   { code: 'DFS', label: 'Diesel Floor Sawing', gradient: 'from-violet-500 to-purple-600', lightBg: 'bg-violet-50 border-violet-200 text-violet-700' },
+  { code: 'EFS', label: 'Electric Floor Sawing', gradient: 'from-green-500 to-emerald-600', lightBg: 'bg-green-50 border-green-200 text-green-700' },
   { code: 'WS/TS', label: 'Wall/Track Sawing', gradient: 'from-orange-500 to-red-500', lightBg: 'bg-orange-50 border-orange-200 text-orange-700' },
   { code: 'CS', label: 'Chain Sawing', gradient: 'from-amber-500 to-orange-600', lightBg: 'bg-amber-50 border-amber-200 text-amber-700' },
   { code: 'HHS/PS', label: 'Handheld / Push Sawing', gradient: 'from-emerald-500 to-teal-600', lightBg: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
@@ -61,7 +62,7 @@ const SERVICE_TYPES = [
 ];
 
 // Service types that support flexible input modes (linear vs areas)
-const FLEXIBLE_SCOPE_TYPES = ['WS/TS', 'DFS', 'HHS/PS'];
+const FLEXIBLE_SCOPE_TYPES = ['WS/TS', 'DFS', 'EFS', 'HHS/PS'];
 
 // Equipment presets config moved to SERVICE_EQUIPMENT
 
@@ -94,6 +95,14 @@ const SCOPE_FIELDS: Record<string, ScopeConfig> = {
   },
   'DFS': {
     label: 'Floor Sawing Details',
+    hasDynamicCuts: true,
+    hasDynamicAreas: true,
+    fields: [],
+    altLabel: 'Areas + Thickness',
+    altFields: [],
+  },
+  'EFS': {
+    label: 'Electric Floor Sawing Details',
     hasDynamicCuts: true,
     hasDynamicAreas: true,
     fields: [],
@@ -220,6 +229,17 @@ const SERVICE_EQUIPMENT: Record<string, ServiceEquipConfig> = {
       { id: 'backup_saw', label: 'Backup Saw', type: 'toggle' },
       { id: 'chalk_line', label: 'Chalk Line', type: 'toggle' },
       { id: 'clear_spray', label: 'Clear Spray', type: 'toggle' },
+    ],
+  },
+  'EFS': {
+    items: [
+      { id: 'slurry_drums', label: 'Slurry Drums', type: 'qty' },
+      { id: 'extra_vacuum_head', label: 'Extra Vacuum Head', type: 'toggle' },
+      { id: 'backup_saw', label: 'Backup Saw', type: 'toggle' },
+      { id: 'chalk_line', label: 'Chalk Line', type: 'toggle' },
+      { id: 'clear_spray', label: 'Clear Spray', type: 'toggle' },
+      { id: 'extension_cord', label: 'Extension Cord', type: 'toggle' },
+      { id: 'gfci', label: 'GFCI', type: 'toggle' },
     ],
   },
   'WS/TS': {
@@ -557,6 +577,119 @@ function SectionCard({ children, className = '' }: { children: React.ReactNode; 
 }
 
 // ══════════════════════════════════════════════════════════════
+// ── Create Facility Modal ─────────────────────────────────────
+function CreateFacilityModal({ onClose, onSaved }: { onClose: () => void; onSaved: (data: { name: string; address?: string; city?: string; state?: string; zip?: string; special_requirements?: string; orientation_required?: boolean; badging_required?: boolean; notes?: string }) => Promise<void> }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [facilityForm, setFacilityForm] = useState({
+    name: '', address: '', city: '', state: '', zip: '',
+    special_requirements: '', orientation_required: false, badging_required: false, notes: '',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!facilityForm.name.trim()) { setError('Facility name is required'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await onSaved(facilityForm);
+      onClose();
+    } catch {
+      setError('Failed to create facility');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]" onClick={onClose} />
+      <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between p-5 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-purple-600" />
+              Add Facility
+            </h2>
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+          <form onSubmit={handleSubmit} className="p-5 space-y-4">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Facility Name *</label>
+              <input type="text" value={facilityForm.name} onChange={e => setFacilityForm({ ...facilityForm, name: e.target.value })}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="e.g., Intel D1X Fab" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <input type="text" value={facilityForm.address} onChange={e => setFacilityForm({ ...facilityForm, address: e.target.value })}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="Street address" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <input type="text" value={facilityForm.city} onChange={e => setFacilityForm({ ...facilityForm, city: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <input type="text" value={facilityForm.state} onChange={e => setFacilityForm({ ...facilityForm, state: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={2} placeholder="OR" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                <input type="text" value={facilityForm.zip} onChange={e => setFacilityForm({ ...facilityForm, zip: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={10} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Special Requirements</label>
+              <textarea value={facilityForm.special_requirements} onChange={e => setFacilityForm({ ...facilityForm, special_requirements: e.target.value })}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2}
+                placeholder="PPE requirements, site rules, etc." />
+            </div>
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <button type="button" onClick={() => setFacilityForm({ ...facilityForm, orientation_required: !facilityForm.orientation_required })}
+                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.orientation_required ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${facilityForm.orientation_required ? 'translate-x-4' : ''}`} />
+                </button>
+                <span className="text-sm text-gray-700">Orientation Required</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <button type="button" onClick={() => setFacilityForm({ ...facilityForm, badging_required: !facilityForm.badging_required })}
+                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.badging_required ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${facilityForm.badging_required ? 'translate-x-4' : ''}`} />
+                </button>
+                <span className="text-sm text-gray-700">Badging Required</span>
+              </label>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea value={facilityForm.notes} onChange={e => setFacilityForm({ ...facilityForm, notes: e.target.value })}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+                Cancel
+              </button>
+              <button type="submit" disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving ? 'Creating...' : 'Create Facility'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════
 export default function ScheduleFormPage() {
@@ -1025,8 +1158,7 @@ export default function ScheduleFormPage() {
   };
 
   // ── Create facility handler ──────────────────────────────────
-  const handleCreateFacility = async () => {
-    if (!form.facility_name.trim()) return;
+  const handleCreateFacility = async (facilityData: { name: string; address?: string; city?: string; state?: string; zip?: string; special_requirements?: string; orientation_required?: boolean; badging_required?: boolean; notes?: string }) => {
     try {
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) return;
@@ -1036,15 +1168,12 @@ export default function ScheduleFormPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.session.access_token}`,
         },
-        body: JSON.stringify({
-          name: form.facility_name.trim(),
-          special_requirements: form.facility_requirements || null,
-        }),
+        body: JSON.stringify(facilityData),
       });
       const result = await res.json();
       if (res.ok && result.data) {
         setFacilities(prev => [...prev, result.data]);
-        updateForm({ facility_id: result.data.id });
+        updateForm({ facility_id: result.data.id, facility_name: facilityData.name });
         setShowCreateFacility(false);
       }
     } catch {}
@@ -3025,7 +3154,7 @@ export default function ScheduleFormPage() {
               )}
 
               {/* Create new facility */}
-              {!showCreateFacility ? (
+              {!showCreateFacility && (
                 <button
                   type="button"
                   onClick={() => setShowCreateFacility(true)}
@@ -3034,42 +3163,6 @@ export default function ScheduleFormPage() {
                   <Plus size={16} />
                   Create New Facility Compliance Document
                 </button>
-              ) : (
-                <div className="space-y-3 p-4 bg-blue-50/50 border border-blue-200 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-bold text-blue-800">New Facility</p>
-                    <button type="button" onClick={() => setShowCreateFacility(false)} className="text-slate-400 hover:text-slate-600">
-                      <X size={16} />
-                    </button>
-                  </div>
-                  <div>
-                    <Label required>Facility Name</Label>
-                    <InputField
-                      icon={Building2}
-                      placeholder="e.g. Intel Chandler Campus"
-                      value={form.facility_name}
-                      onChange={e => updateForm({ facility_name: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Special Requirements</Label>
-                    <TextArea
-                      rows={4}
-                      placeholder="e.g. TWIC badge required, must complete 4-hour safety orientation, no cell phones past gate 3..."
-                      value={form.facility_requirements}
-                      onChange={e => updateForm({ facility_requirements: e.target.value })}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCreateFacility}
-                    disabled={!form.facility_name.trim()}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all"
-                  >
-                    <Check size={16} />
-                    Save Facility
-                  </button>
-                </div>
               )}
             </SectionCard>
 
@@ -3911,6 +4004,14 @@ export default function ScheduleFormPage() {
         <AISmartFillModal
           onApply={handleAISmartFill}
           onClose={() => setShowAISmartFill(false)}
+        />
+      )}
+
+      {/* ═══ CREATE FACILITY MODAL ═══ */}
+      {showCreateFacility && (
+        <CreateFacilityModal
+          onClose={() => setShowCreateFacility(false)}
+          onSaved={handleCreateFacility}
         />
       )}
     </div>
