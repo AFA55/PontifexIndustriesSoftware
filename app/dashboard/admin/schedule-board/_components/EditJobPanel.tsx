@@ -37,7 +37,7 @@ interface EditJobPanelProps {
   busyOperators: Record<string, string>;
   busyHelpers: Record<string, string>;
   operatorSkillMap?: Record<string, number | null>;
-  onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string }) => void;
+  onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; estimated_cost?: number; jobsite_conditions?: string }) => void;
   onClose: () => void;
   onViewNotes: () => void;
   onMakeWillCall?: () => void;
@@ -64,6 +64,13 @@ export default function EditJobPanel({
   const [poNumber, setPoNumber] = useState(job.po_number || '');
   const [hasChanges, setHasChanges] = useState(false);
   const [printingPdf, setPrintingPdf] = useState(false);
+
+  // ─── Extended edit state (super_admin fields) ───
+  const [editedCustomerName, setEditedCustomerName] = useState(job.customer_name || '');
+  const [editedLocation, setEditedLocation] = useState(job.location || '');
+  const [editedAddress, setEditedAddress] = useState(job.address || '');
+  const [editedEstimatedCost, setEditedEstimatedCost] = useState<string>('');
+  const [editedJobsiteConditions, setEditedJobsiteConditions] = useState('');
 
   // ─── Contact state ───
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -112,6 +119,12 @@ export default function EditJobPanel({
           if (json.data.equipment_needed?.length > 0 && equipment.length === 0) {
             setEquipment(json.data.equipment_needed);
           }
+          // Populate extended edit fields from full data
+          if (json.data.customer_name) setEditedCustomerName(json.data.customer_name as string);
+          if (json.data.location_name) setEditedLocation(json.data.location_name as string);
+          if (json.data.site_address) setEditedAddress(json.data.site_address as string);
+          if (json.data.estimated_cost != null) setEditedEstimatedCost(String(json.data.estimated_cost));
+          if (json.data.jobsite_conditions) setEditedJobsiteConditions(json.data.jobsite_conditions as string);
         }
       }
 
@@ -390,15 +403,50 @@ export default function EditJobPanel({
                   <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm uppercase tracking-wide">
                     <Building2 className="w-4 h-4 text-purple-500" /> Job Information
                   </h3>
-                  {location && (
-                    <div className="flex items-start gap-2 text-sm">
-                      <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="font-medium text-gray-900">{location}</p>
-                        {address && <p className="text-xs text-gray-500">{address}</p>}
-                      </div>
+
+                  {/* Customer name */}
+                  {canEdit ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">CUSTOMER NAME</label>
+                      <input type="text" value={editedCustomerName}
+                        onChange={e => { setEditedCustomerName(e.target.value); markChanged(); }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
                     </div>
+                  ) : (
+                    <p className="font-semibold text-gray-900 text-sm">{editedCustomerName}</p>
                   )}
+
+                  {/* Location + Address */}
+                  {canEdit ? (
+                    <>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 mb-1">PROJECT / LOCATION NAME</label>
+                        <input type="text" value={editedLocation}
+                          onChange={e => { setEditedLocation(e.target.value); markChanged(); }}
+                          placeholder="e.g. Downtown Office Tower"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 mb-1">SITE ADDRESS</label>
+                        <input type="text" value={editedAddress}
+                          onChange={e => { setEditedAddress(e.target.value); markChanged(); }}
+                          placeholder="123 Main St, City, State"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                      </div>
+                    </>
+                  ) : (
+                    (editedLocation || editedAddress) && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          {editedLocation && <p className="font-medium text-gray-900">{editedLocation}</p>}
+                          {editedAddress && <p className="text-xs text-gray-500">{editedAddress}</p>}
+                        </div>
+                      </div>
+                    )
+                  )}
+
+                  {/* Scope of Work */}
                   {canEdit ? (
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">SCOPE OF WORK</label>
@@ -410,6 +458,21 @@ export default function EditJobPanel({
                       <p className="text-sm text-gray-600 italic border-l-2 border-gray-300 pl-3">{description}</p>
                     )
                   )}
+
+                  {/* Jobsite Conditions */}
+                  {canEdit ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">WORK CONDITIONS / JOBSITE NOTES</label>
+                      <textarea value={editedJobsiteConditions} onChange={e => { setEditedJobsiteConditions(e.target.value); markChanged(); }}
+                        rows={2} placeholder="Any special jobsite conditions or access requirements..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white resize-none focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                    </div>
+                  ) : (
+                    editedJobsiteConditions && (
+                      <p className="text-sm text-gray-600 italic border-l-2 border-amber-300 pl-3">{editedJobsiteConditions}</p>
+                    )
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">PO #</label>
@@ -420,20 +483,34 @@ export default function EditJobPanel({
                         <p className="text-sm text-gray-900 font-medium">{poNumber || '--'}</p>
                       )}
                     </div>
-                    {job.difficulty_rating && (
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">DIFFICULTY</label>
-                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-bold ${
-                          job.difficulty_rating >= 7 ? 'bg-red-100 text-red-700' :
-                          job.difficulty_rating >= 4 ? 'bg-amber-100 text-amber-700' :
-                          'bg-green-100 text-green-700'
-                        }`}>
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                          {job.difficulty_rating}/10
-                        </div>
-                      </div>
-                    )}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">ESTIMATED COST</label>
+                      {canEdit ? (
+                        <input type="number" value={editedEstimatedCost} min={0} step={0.01}
+                          onChange={e => { setEditedEstimatedCost(e.target.value); markChanged(); }}
+                          placeholder="0.00"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                      ) : (
+                        <p className="text-sm text-gray-900 font-medium">
+                          {editedEstimatedCost ? `$${parseFloat(editedEstimatedCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '--'}
+                        </p>
+                      )}
+                    </div>
                   </div>
+
+                  {job.difficulty_rating && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">DIFFICULTY</label>
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-bold ${
+                        job.difficulty_rating >= 7 ? 'bg-red-100 text-red-700' :
+                        job.difficulty_rating >= 4 ? 'bg-amber-100 text-amber-700' :
+                        'bg-green-100 text-green-700'
+                      }`}>
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {job.difficulty_rating}/10
+                      </div>
+                    </div>
+                  )}
                 </section>
 
                 {/* Site Contact */}
@@ -761,6 +838,11 @@ export default function EditJobPanel({
                 newHelperName: selectedHelper || null,
                 customer_contact: selectedContact || undefined,
                 site_contact_phone: selectedContactPhone || undefined,
+                customer_name: editedCustomerName || undefined,
+                location: editedLocation || undefined,
+                address: editedAddress || undefined,
+                estimated_cost: editedEstimatedCost ? parseFloat(editedEstimatedCost) : undefined,
+                jobsite_conditions: editedJobsiteConditions || undefined,
               })}
               disabled={!hasChanges}
               className="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">

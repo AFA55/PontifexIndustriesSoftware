@@ -571,24 +571,24 @@ export default function ScheduleBoardPage() {
   // ═══ FETCH WEEK DATA (for weekly view) ═══
   const fetchWeekData = useCallback(async (startDate: string) => {
     try {
-      // Calculate Mon-Fri of the week containing startDate
+      // Calculate Mon-Sun of the week containing startDate
       const d = parseLocalDate(startDate);
       const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ...
       const monday = new Date(d);
       monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-      const friday = new Date(monday);
-      friday.setDate(monday.getDate() + 4);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
 
       const monStr = toDateString(monday);
-      const friStr = toDateString(friday);
+      const sunStr = toDateString(sunday);
 
-      const res = await apiFetch(`/api/admin/schedule-board?startDate=${monStr}&endDate=${friStr}`);
+      const res = await apiFetch(`/api/admin/schedule-board?startDate=${monStr}&endDate=${sunStr}`);
       if (!res.ok) return;
       const json = await res.json();
 
       // Group all jobs by date
       const byDate: Record<string, JobCardData[]> = {};
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 7; i++) {
         const dt = new Date(monday);
         dt.setDate(monday.getDate() + i);
         byDate[toDateString(dt)] = [];
@@ -1138,7 +1138,7 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Edit Job: Save ---
-  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null }) => {
+  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; estimated_cost?: number; jobsite_conditions?: string }) => {
     if (!editTarget) return;
     const { job, rowIndex: currentRowIdx } = editTarget;
     const newOpName = updates.newOperatorName;
@@ -1151,7 +1151,17 @@ export default function ScheduleBoardPage() {
     const apiPayload: Record<string, unknown> = {};
     if (jobUpdates.arrival_time !== undefined) apiPayload.arrival_time = jobUpdates.arrival_time;
     if (jobUpdates.scheduled_date !== undefined) apiPayload.scheduled_date = jobUpdates.scheduled_date;
+    if (jobUpdates.end_date !== undefined) apiPayload.end_date = jobUpdates.end_date;
     if (jobUpdates.description !== undefined) apiPayload.description = jobUpdates.description;
+    if (jobUpdates.po_number !== undefined) apiPayload.po_number = jobUpdates.po_number;
+    if (jobUpdates.equipment_needed !== undefined) apiPayload.equipment_needed = jobUpdates.equipment_needed;
+    if (jobUpdates.customer_name !== undefined) apiPayload.customer_name = jobUpdates.customer_name;
+    if (jobUpdates.location !== undefined) apiPayload.location_name = jobUpdates.location;
+    if (jobUpdates.address !== undefined) apiPayload.site_address = jobUpdates.address;
+    if (updates.customer_contact !== undefined) apiPayload.customer_contact = updates.customer_contact;
+    if (updates.site_contact_phone !== undefined) apiPayload.site_contact_phone = updates.site_contact_phone;
+    if (updates.estimated_cost !== undefined) apiPayload.estimated_cost = updates.estimated_cost;
+    if (updates.jobsite_conditions !== undefined) apiPayload.jobsite_conditions = updates.jobsite_conditions;
 
     const currentOp = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.operator : null;
     const operatorChanged = newOpName !== undefined && newOpName !== currentOp;
@@ -1773,7 +1783,7 @@ export default function ScheduleBoardPage() {
       {viewMode === 'week' && boardViewMode !== 'crew-grid' && (
         <div className="container mx-auto px-4 md:px-6 pb-6">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-x-auto">
-            <div className="grid grid-cols-1 md:grid-cols-5 divide-x divide-gray-200 min-w-0 md:min-w-[800px]">
+            <div className="grid grid-cols-1 md:grid-cols-7 divide-x divide-gray-200 min-w-0 md:min-w-[1000px]">
               {Object.entries(weekData).sort(([a], [b]) => a.localeCompare(b)).map(([date, jobs]) => {
                 const d = parseLocalDate(date);
                 const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
