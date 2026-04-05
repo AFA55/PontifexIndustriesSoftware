@@ -5,7 +5,8 @@ import {
   X, Calendar, MapPin, Wrench, CheckCircle, DollarSign,
   AlertTriangle, XCircle, Loader2, ArrowRight, CalendarDays,
   Gauge, Droplets, Zap, Shield, HardHat, Wind, Scissors,
-  ChevronDown, ChevronUp, Package, ClipboardList, Info, FileText
+  ChevronDown, ChevronUp, Package, ClipboardList, Info, FileText,
+  User, Hash, Clock
 } from 'lucide-react';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { getDisplayName } from '@/lib/equipment-map';
@@ -53,8 +54,8 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
   const [findingNext, setFindingNext] = useState(false);
   const [warningAcknowledged, setWarningAcknowledged] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    conditions: false,
-    compliance: false,
+    conditions: true,
+    compliance: true,
     equipment: true,
   });
 
@@ -190,23 +191,29 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
   const activeConditions = conditionFlags.filter(c => c.active);
   const warningConditions = conditionFlags.filter(c => c.active && c.warning);
 
-  // Build recommended equipment from equipment_selections
-  const recommendedEquipment: { scope: string; items: { label: string; value: string }[] }[] = [];
+  // Build a flat list of ALL equipment: custom-typed (equipment_needed) + predefined grid (equipment_selections)
+  const allEquipmentItems: { label: string; qty?: string; source: 'custom' | 'selection' }[] = [];
+
+  // Add custom-typed equipment from equipment_needed
+  for (const eq of (job.equipment_needed || [])) {
+    allEquipmentItems.push({ label: eq, source: 'custom' });
+  }
+
+  // Add predefined grid items from equipment_selections
   if (job.equipment_selections) {
-    for (const [scope, selections] of Object.entries(job.equipment_selections)) {
-      const items: { label: string; value: string }[] = [];
+    for (const [, selections] of Object.entries(job.equipment_selections as Record<string, Record<string, string>>)) {
       for (const [key, val] of Object.entries(selections)) {
-        if (val && val !== 'no' && val !== 'false' && val !== '0') {
-          const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-          const displayVal = val === 'yes' || val === 'true' ? '✓' : val;
-          items.push({ label, value: displayVal });
-        }
-      }
-      if (items.length > 0) {
-        recommendedEquipment.push({ scope, items });
+        if (!val || val === 'no' || val === 'false' || val === '0' || key === '_sub') continue;
+        // Convert snake_case key to Title Case for display
+        const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const qty = val !== 'yes' && val !== 'true' ? val : undefined;
+        allEquipmentItems.push({ label, qty, source: 'selection' });
       }
     }
   }
+
+  // Keep recommendedEquipment as empty (no longer used separately)
+  const recommendedEquipment: { scope: string; items: { label: string; value: string }[] }[] = [];
 
   return (
     <>
@@ -268,6 +275,134 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
               )}
             </div>
 
+            {/* ── Jobsite Info ── */}
+            {(job.address || job.contact_phone || job.po_number || job.project_name) && (
+              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2.5">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Jobsite Info</div>
+
+                {job.project_name && (
+                  <div className="flex items-start gap-2.5">
+                    <ClipboardList className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">Project</div>
+                      <div className="text-sm font-semibold text-slate-800">{job.project_name}</div>
+                    </div>
+                  </div>
+                )}
+
+                {job.address && (
+                  <div className="flex items-start gap-2.5">
+                    <MapPin className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">Site Address</div>
+                      <div className="text-sm font-semibold text-slate-800">{job.address}</div>
+                    </div>
+                  </div>
+                )}
+
+                {job.site_contact && (
+                  <div className="flex items-start gap-2.5">
+                    <User className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">Site Contact</div>
+                      <div className="text-sm font-semibold text-slate-800">
+                        {job.site_contact}
+                        {job.contact_phone && <span className="text-slate-500 font-normal ml-1.5">· {job.contact_phone}</span>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!job.site_contact && job.contact_phone && (
+                  <div className="flex items-start gap-2.5">
+                    <User className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">Site Contact Phone</div>
+                      <div className="text-sm font-semibold text-slate-800">{job.contact_phone}</div>
+                    </div>
+                  </div>
+                )}
+
+                {job.po_number && (
+                  <div className="flex items-start gap-2.5">
+                    <Hash className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">PO Number</div>
+                      <div className="text-sm font-semibold text-slate-800">{job.po_number}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Site Compliance (prominent) ── */}
+            {job.site_compliance && (job.site_compliance.orientation_required || job.site_compliance.badging_required || job.site_compliance.special_instructions) && (
+              <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 space-y-2.5">
+                <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5" />
+                  Site Compliance Requirements
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {job.site_compliance.orientation_required && (
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-800 rounded-lg text-xs font-bold border border-orange-200">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Orientation Required
+                      {job.site_compliance.orientation_datetime && (
+                        <span className="font-normal ml-0.5 text-orange-600">
+                          · {new Date(job.site_compliance.orientation_datetime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  {job.site_compliance.badging_required && (
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-lg text-xs font-bold border border-purple-200">
+                      <Shield className="w-3.5 h-3.5" />
+                      Badging Required
+                      {job.site_compliance.badging_type && <span className="font-normal ml-0.5 text-purple-600">· {job.site_compliance.badging_type}</span>}
+                    </span>
+                  )}
+                </div>
+
+                {job.site_compliance.special_instructions && (
+                  <div className="bg-amber-100/60 rounded-lg p-3 text-xs text-amber-900 font-medium border border-amber-200">
+                    <span className="font-bold text-amber-700 block mb-0.5">Special Instructions:</span>
+                    {job.site_compliance.special_instructions}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Scheduling Details ── */}
+            {job.scheduling_flexibility && (job.scheduling_flexibility.special_arrival || job.scheduling_flexibility.outside_hours || job.scheduling_flexibility.can_work_weekends) && (
+              <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 space-y-2">
+                <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  Scheduling Notes
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {job.scheduling_flexibility.special_arrival && (
+                    <span className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-lg text-xs font-bold border border-blue-200 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      Special Arrival
+                      {job.scheduling_flexibility.special_arrival_time && (
+                        <span className="font-normal ml-0.5 text-blue-600">· {job.scheduling_flexibility.special_arrival_time}</span>
+                      )}
+                    </span>
+                  )}
+                  {job.scheduling_flexibility.outside_hours && (
+                    <span className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-lg text-xs font-bold border border-blue-200">
+                      Outside Hours
+                      {job.scheduling_flexibility.outside_hours_details && <span className="font-normal ml-0.5 text-blue-600">· {job.scheduling_flexibility.outside_hours_details}</span>}
+                    </span>
+                  )}
+                  {job.scheduling_flexibility.can_work_weekends && (
+                    <span className="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-xs font-bold border border-green-200">Can Work Weekends</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ── Difficulty Rating ── */}
             {job.difficulty_rating && (
               <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
@@ -305,7 +440,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                   <Wrench className="w-4 h-4 text-indigo-600" />
                   <span className="text-sm font-bold text-indigo-900">Equipment</span>
                   <span className="text-[10px] px-1.5 py-0.5 bg-indigo-200 text-indigo-700 rounded-full font-bold">
-                    {job.equipment_needed.length + recommendedEquipment.reduce((sum, s) => sum + s.items.length, 0)} items
+                    {allEquipmentItems.length} items
                   </span>
                 </div>
                 {expandedSections.equipment ? <ChevronUp className="w-4 h-4 text-indigo-500" /> : <ChevronDown className="w-4 h-4 text-indigo-500" />}
@@ -313,39 +448,21 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
               {expandedSections.equipment && (
                 <div className="px-4 pb-3 space-y-3">
-                  {/* Typed/Selected Equipment */}
-                  {job.equipment_needed.length > 0 && (
+                  {allEquipmentItems.length > 0 ? (
                     <div>
-                      <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">Selected Equipment</div>
+                      <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">All Equipment</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {job.equipment_needed.map(eq => (
-                          <span key={eq} className="px-2.5 py-1 bg-white rounded-lg text-xs text-indigo-700 font-semibold border border-indigo-200 flex items-center gap-1">
-                            <Wrench className="w-3 h-3" />{getDisplayName(eq)}
+                        {allEquipmentItems.map((item, idx) => (
+                          <span key={idx} className="px-2.5 py-1 bg-white rounded-lg text-xs text-indigo-700 font-semibold border border-indigo-200 flex items-center gap-1">
+                            <Wrench className="w-3 h-3" />
+                            {item.label}
+                            {item.qty && <span className="text-indigo-500 font-bold ml-0.5">×{item.qty}</span>}
                           </span>
                         ))}
                       </div>
                     </div>
-                  )}
-
-                  {/* Recommended Equipment from Selections */}
-                  {recommendedEquipment.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">Recommended Equipment</div>
-                      {recommendedEquipment.map(({ scope, items }) => (
-                        <div key={scope} className="mb-2">
-                          <div className="text-[10px] font-semibold text-indigo-400 mb-1">{scope}</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {items.map(item => (
-                              <span key={item.label} className="px-2.5 py-1 bg-emerald-50 rounded-lg text-xs text-emerald-700 font-semibold border border-emerald-200 flex items-center gap-1">
-                                <Package className="w-3 h-3" />
-                                {item.label}
-                                {item.value !== '✓' && <span className="text-emerald-500 font-bold ml-0.5">({item.value})</span>}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  ) : (
+                    <p className="text-xs text-indigo-400 italic">No equipment specified</p>
                   )}
 
                   {/* Special equipment */}
@@ -353,7 +470,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                     <div>
                       <div className="text-[10px] font-bold text-amber-500 uppercase mb-1.5">Special Equipment</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {job.special_equipment.map(eq => (
+                        {job.special_equipment.map((eq: string) => (
                           <span key={eq} className="px-2.5 py-1 bg-amber-50 rounded-lg text-xs text-amber-700 font-semibold border border-amber-200">
                             {eq}
                           </span>

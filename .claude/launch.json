@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "pontifex-dev",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev"],
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "PATH=/usr/local/bin:/opt/homebrew/bin:$PATH npx next dev"],
       "port": 3000,
       "autoPort": true
     }
