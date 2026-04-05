@@ -206,12 +206,13 @@ export default function MyJobsPage() {
     fetchShopTicket();
   }, [fetchShopTicket]);
 
-  // Realtime subscription: auto-refresh when admin pushes a schedule update
+  // Realtime subscription + polling fallback: auto-refresh when admin updates schedule
   useEffect(() => {
     if (!userId) return;
 
+    // 1. Supabase realtime — fires instantly when admin hits "Update Schedule"
     const channel = supabase
-      .channel('schedule-updates')
+      .channel(`schedule-updates-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -221,18 +222,24 @@ export default function MyJobsPage() {
           filter: `recipient_id=eq.${userId}`,
         },
         (payload) => {
-          if (payload.new && (payload.new as any).type === 'schedule_updated') {
+          const type = payload.new && (payload.new as any).type;
+          if (type === 'schedule_updated' || type === 'job_assigned') {
             fetchJobs(selectedDate);
             setScheduleUpdatedBanner(true);
-            // Auto-dismiss banner after 8 seconds
             setTimeout(() => setScheduleUpdatedBanner(false), 8000);
           }
         }
       )
       .subscribe();
 
+    // 2. Polling fallback every 30 seconds — catches any missed realtime events
+    const pollInterval = setInterval(() => {
+      fetchJobs(selectedDate);
+    }, 30000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, [userId, selectedDate, fetchJobs]);
 
