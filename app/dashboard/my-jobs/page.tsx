@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle, PauseCircle, PlayCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle, PauseCircle, PlayCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DayNavigator from './_components/DayNavigator';
 import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
@@ -33,6 +33,7 @@ export default function MyJobsPage() {
   const [activeShopTicket, setActiveShopTicket] = useState<any>(null);
   const [completingShop, setCompletingShop] = useState(false);
   const [shopDescription, setShopDescription] = useState('');
+  const [scheduleUpdatedBanner, setScheduleUpdatedBanner] = useState(false);
 
   const isHelper = userRole === 'apprentice';
 
@@ -205,6 +206,35 @@ export default function MyJobsPage() {
     fetchShopTicket();
   }, [fetchShopTicket]);
 
+  // Realtime subscription: auto-refresh when admin pushes a schedule update
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('schedule-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'schedule_notifications',
+          filter: `recipient_id=eq.${userId}`,
+        },
+        (payload) => {
+          if (payload.new && (payload.new as any).type === 'schedule_updated') {
+            fetchJobs(selectedDate);
+            setScheduleUpdatedBanner(true);
+            // Auto-dismiss banner after 8 seconds
+            setTimeout(() => setScheduleUpdatedBanner(false), 8000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, selectedDate, fetchJobs]);
 
   if (loading && jobs.length === 0) {
     return (
@@ -252,6 +282,21 @@ export default function MyJobsPage() {
       <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
         {/* Notification Banner */}
         <NotificationBanner />
+
+        {/* Schedule Updated Banner */}
+        {scheduleUpdatedBanner && (
+          <div className="mb-4 flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl px-4 py-3 shadow-sm">
+            <RefreshCw className="w-4 h-4 text-blue-500 shrink-0" />
+            <span className="text-sm font-medium flex-1">Your schedule was updated — jobs have been refreshed.</span>
+            <button
+              onClick={() => setScheduleUpdatedBanner(false)}
+              className="text-blue-400 hover:text-blue-600 transition-colors"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Continuing Projects (on_hold / in_progress from past dates) */}
         {continuingProjects.length > 0 && (

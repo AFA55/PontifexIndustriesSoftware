@@ -7,7 +7,7 @@ import {
   Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
   UserCheck, UserX, Eye, FolderOpen, Timer, Loader2, Settings, Search, X,
-  Megaphone, CheckCircle2, Sparkles, Zap, Brain
+  Megaphone, CheckCircle2, Sparkles, Zap, Brain, RefreshCw
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
@@ -211,6 +211,9 @@ export default function ScheduleBoardPage() {
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [dispatchLoading, setDispatchLoading] = useState(false);
   const [dispatchInfo, setDispatchInfo] = useState<{ total: number; dispatched: number; undispatched: number } | null>(null);
+
+  // Update schedule state
+  const [updatingSchedule, setUpdatingSchedule] = useState(false);
 
   // Modal states
   const [approvalTarget, setApprovalTarget] = useState<PendingJob | null>(null);
@@ -567,6 +570,25 @@ export default function ScheduleBoardPage() {
       setLoading(false);
     }
   }, [addToast, capacityMaxSlots]);
+
+  // ═══ UPDATE SCHEDULE (re-push to operators) ═══
+  const handleUpdateSchedule = useCallback(async () => {
+    setUpdatingSchedule(true);
+    try {
+      const res = await apiFetch('/api/admin/schedule-board/update-schedule', {
+        method: 'POST',
+        body: JSON.stringify({ date: selectedDate }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to update schedule');
+      addToast('success', 'Schedule Updated', `${json.data?.operatorsNotified || 0} operators notified of changes`);
+      fetchScheduleData(selectedDate);
+    } catch (err: any) {
+      addToast('error', 'Update Failed', err.message);
+    } finally {
+      setUpdatingSchedule(false);
+    }
+  }, [selectedDate, addToast, fetchScheduleData]);
 
   // ═══ FETCH WEEK DATA (for weekly view) ═══
   const fetchWeekData = useCallback(async (startDate: string) => {
@@ -1582,6 +1604,18 @@ export default function ScheduleBoardPage() {
                     className="px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
                   >
                     <Plus className="w-4 h-4" /> Quick Add
+                  </button>
+                  <button
+                    onClick={handleUpdateSchedule}
+                    disabled={updatingSchedule}
+                    className="px-3 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Re-push schedule changes to operators"
+                  >
+                    {updatingSchedule ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</>
+                    ) : (
+                      <><RefreshCw className="w-4 h-4" /> Update Schedule</>
+                    )}
                   </button>
                   <button
                     onClick={() => {
