@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   X, Calendar, Clock, MapPin, Wrench, Phone, FileText, Edit3, Save, Trash2,
   AlertTriangle, MessageSquare, ChevronRight, Plus, Users, Printer, Loader2,
-  Copy, Upload, User, Mail, Building2, ChevronDown, Check, Paperclip
+  Copy, Upload, User, Mail, Building2, ChevronDown, Check, Paperclip, Send
 } from 'lucide-react';
 import type { JobCardData } from './JobCard';
 import { EQUIPMENT_ABBREVIATIONS, getDisplayName } from '@/lib/equipment-map';
@@ -30,6 +30,7 @@ interface JobDocument {
 interface EditJobPanelProps {
   job: JobCardData;
   canEdit: boolean;
+  userRole?: string;
   allOperators: string[];
   allHelpers: string[];
   currentOperatorName: string | null;
@@ -38,6 +39,7 @@ interface EditJobPanelProps {
   busyHelpers: Record<string, string>;
   operatorSkillMap?: Record<string, number | null>;
   onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string }) => void;
+  onChangeRequestSuccess?: () => void;
   onClose: () => void;
   onViewNotes: () => void;
   onMakeWillCall?: () => void;
@@ -47,11 +49,13 @@ interface EditJobPanelProps {
 }
 
 export default function EditJobPanel({
-  job, canEdit, allOperators, allHelpers,
+  job, canEdit, userRole, allOperators, allHelpers,
   currentOperatorName, currentHelperName,
   busyOperators, busyHelpers, operatorSkillMap,
-  onSave, onClose, onViewNotes, onMakeWillCall, onRemoveFromSchedule, onDuplicate, onRefresh,
+  onSave, onChangeRequestSuccess, onClose, onViewNotes, onMakeWillCall, onRemoveFromSchedule, onDuplicate, onRefresh,
 }: EditJobPanelProps) {
+  // Roles that submit change requests instead of saving directly
+  const isChangeRequestRole = userRole === 'admin' || userRole === 'salesman';
   // ─── Core edit state ───
   const [scheduledDate, setScheduledDate] = useState(job.scheduled_date || '');
   const [arrivalTime, setArrivalTime] = useState(job.arrival_time || '');
@@ -88,7 +92,68 @@ export default function EditJobPanel({
   // ─── Active tab ───
   const [activeTab, setActiveTab] = useState<'details' | 'documents'>('details');
 
+  // ─── Change request state (admin/salesman) ───
+  const [showChangeRequestConfirm, setShowChangeRequestConfirm] = useState(false);
+  const [submittingChangeRequest, setSubmittingChangeRequest] = useState(false);
+  const [changeRequestToast, setChangeRequestToast] = useState<string | null>(null);
+
   const markChanged = () => setHasChanges(true);
+
+  // ─── Change request handler (for admin/salesman roles) ───
+  const handleSubmitChangeRequest = async () => {
+    setSubmittingChangeRequest(true);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Build human-readable summary of changes
+      const changes: string[] = [];
+      if (poNumber !== (job.po_number || '')) changes.push(`PO# changed from '${job.po_number || '—'}' to '${poNumber}'`);
+      if (scheduledDate !== (job.scheduled_date || '')) changes.push(`Start date changed to ${scheduledDate}`);
+      if (endDate !== (job.end_date || '')) changes.push(`End date changed to ${endDate}`);
+      if (arrivalTime !== (job.arrival_time || '')) changes.push(`Arrival time changed to ${arrivalTime}`);
+      if (description !== (job.description || '')) changes.push('Scope of work updated');
+      if (selectedOperator !== (currentOperatorName || '')) changes.push(`Operator changed to ${selectedOperator || 'unassigned'}`);
+      if (selectedContact !== ((fullData?.customer_contact as string) || '')) changes.push(`Contact changed to ${selectedContact}`);
+
+      const content = changes.length > 0
+        ? `Change request: ${changes.join(', ')}`
+        : 'Change request submitted (no specific fields listed)';
+
+      const metadata = {
+        requested_changes: {
+          po_number: poNumber !== (job.po_number || '') ? { from: job.po_number, to: poNumber } : undefined,
+          scheduled_date: scheduledDate !== (job.scheduled_date || '') ? { from: job.scheduled_date, to: scheduledDate } : undefined,
+          end_date: endDate !== (job.end_date || '') ? { from: job.end_date, to: endDate } : undefined,
+          arrival_time: arrivalTime !== (job.arrival_time || '') ? { from: job.arrival_time, to: arrivalTime } : undefined,
+          description: description !== (job.description || '') ? { from: job.description, to: description } : undefined,
+          operator: selectedOperator !== (currentOperatorName || '') ? { from: currentOperatorName, to: selectedOperator } : undefined,
+          customer_contact: selectedContact !== ((fullData?.customer_contact as string) || '') ? { from: fullData?.customer_contact, to: selectedContact } : undefined,
+        },
+      };
+
+      const res = await fetch(`/api/job-orders/${job.id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ content, noteType: 'change_request', metadata }),
+      });
+
+      if (res.ok) {
+        setShowChangeRequestConfirm(false);
+        setChangeRequestToast('Change request submitted for supervisor review');
+        setTimeout(() => {
+          setChangeRequestToast(null);
+          if (onChangeRequestSuccess) onChangeRequestSuccess();
+          onClose();
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Failed to submit change request:', err);
+    } finally {
+      setSubmittingChangeRequest(false);
+    }
+  };
 
   // ─── Load full job data + contacts ───
   useEffect(() => {
@@ -742,34 +807,83 @@ export default function EditJobPanel({
         </div>
 
         {/* Footer */}
-        {canEdit && (
+        {(canEdit || isChangeRequestRole) && (
           <div className="border-t border-gray-200 px-6 py-4 flex items-center gap-3 bg-gray-50 flex-shrink-0">
             <button onClick={onClose}
               className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-sm transition-all">
               Cancel
             </button>
+            {isChangeRequestRole && (
+              <span className="text-xs text-amber-600 font-semibold bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                Changes will be submitted for supervisor approval
+              </span>
+            )}
             <div className="flex-1" />
-            <button
-              onClick={() => onSave({
-                scheduled_date: scheduledDate,
-                end_date: endDate || null,
-                arrival_time: arrivalTime || null,
-                equipment_needed: equipment,
-                description: description || null,
-                po_number: poNumber || null,
-                newOperatorName: selectedOperator || null,
-                newHelperName: selectedHelper || null,
-                customer_contact: selectedContact || undefined,
-                site_contact_phone: selectedContactPhone || undefined,
-              })}
-              disabled={!hasChanges}
-              className="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-              <Save className="w-4 h-4" />
-              Save Changes
-            </button>
+            {isChangeRequestRole ? (
+              <button
+                onClick={() => setShowChangeRequestConfirm(true)}
+                disabled={!hasChanges}
+                className="px-8 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                <Send className="w-4 h-4" />
+                Submit Change Request
+              </button>
+            ) : (
+              <button
+                onClick={() => onSave({
+                  scheduled_date: scheduledDate,
+                  end_date: endDate || null,
+                  arrival_time: arrivalTime || null,
+                  equipment_needed: equipment,
+                  description: description || null,
+                  po_number: poNumber || null,
+                  newOperatorName: selectedOperator || null,
+                  newHelperName: selectedHelper || null,
+                  customer_contact: selectedContact || undefined,
+                  site_contact_phone: selectedContactPhone || undefined,
+                })}
+                disabled={!hasChanges}
+                className="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                <Save className="w-4 h-4" />
+                Save Changes
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Change Request Confirmation Modal */}
+      {showChangeRequestConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Submit Change Request?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Your changes will be submitted to a supervisor for review. The job will not be modified until approved.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowChangeRequestConfirm(false)}
+                className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitChangeRequest}
+                disabled={submittingChangeRequest}
+                className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                {submittingChangeRequest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Confirm & Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success toast for change request */}
+      {changeRequestToast && (
+        <div className="fixed bottom-6 right-6 z-[110] bg-amber-500 text-white px-5 py-3 rounded-xl shadow-xl font-semibold text-sm flex items-center gap-2">
+          <Check className="w-4 h-4" />
+          {changeRequestToast}
+        </div>
+      )}
     </>
   );
 }
