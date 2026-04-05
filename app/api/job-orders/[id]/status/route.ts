@@ -76,9 +76,11 @@ async function updateJobStatus(
       .eq('id', user.id)
       .single();
 
-    // Check permissions: operator can only update their own jobs, admin roles can update any
+    // Check permissions: operator/helper can update their own jobs, admin roles can update any
     const adminRoles = ['admin', 'super_admin', 'operations_manager'];
-    if (!adminRoles.includes(profile?.role || '') && existingJob.assigned_to !== user.id) {
+    const isAssignedOperator = existingJob.assigned_to === user.id;
+    const isAssignedHelper = existingJob.helper_assigned_to === user.id;
+    if (!adminRoles.includes(profile?.role || '') && !isAssignedOperator && !isAssignedHelper) {
       return NextResponse.json(
         { error: 'You can only update jobs assigned to you' },
         { status: 403 }
