@@ -1034,10 +1034,16 @@ export default function ScheduleBoardPage() {
     return -1;
   };
 
-  const proceedWithAssignment = async (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null) => {
-    const operatorName = rowAssignments[rowIndex]?.operator;
+  const proceedWithAssignment = async (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null, explicitOperatorName?: string) => {
+    const operatorName = explicitOperatorName ?? rowAssignments[rowIndex]?.operator;
     const operatorId = operatorName ? operatorIdMap[operatorName] : null;
     const helperId = helperName ? helperIdMap[helperName] : null;
+
+    if (!operatorId && operatorName) {
+      console.warn('operatorIdMap missing entry for:', operatorName, 'map:', operatorIdMap);
+      addToast('error', 'Assignment Failed', `Operator "${operatorName}" not found in crew roster. Please refresh the page.`);
+      return;
+    }
 
     try {
       const res = await apiFetch('/api/admin/schedule-board/assign', {
@@ -1068,7 +1074,7 @@ export default function ScheduleBoardPage() {
       [rowIndex]: [...(prev[rowIndex] || []), assignedJob],
     }));
 
-    const opName = rowAssignments[rowIndex]?.operator || 'Operator';
+    const opName = operatorName || 'Operator';
     addToast('success', `${job.customer_name} → ${opName}`, 'Operator assigned successfully');
   };
 
@@ -1108,14 +1114,14 @@ export default function ScheduleBoardPage() {
       return;
     }
 
-    proceedWithAssignment(targetRow, job, source, helperName);
+    proceedWithAssignment(targetRow, job, source, helperName, operatorName);
     setAssignTarget(null);
   };
 
   const handleConflictAddSecondJob = () => {
     if (!conflictData) return;
     const { targetRowIndex, newJob, newJobSource, helperName } = conflictData;
-    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName);
+    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName, conflictData.personName);
     setConflictData(null);
   };
 
@@ -1137,7 +1143,7 @@ export default function ScheduleBoardPage() {
       setOperatorJobs(prev => ({ ...prev, [targetRowIndex]: [] }));
     }
 
-    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName);
+    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName, conflictData.personName);
     setConflictData(null);
   };
 
