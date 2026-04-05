@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 4, 2026 (Session 2) | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
+**Date:** April 5, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
 
 ---
 
@@ -7,16 +7,49 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `aba3bee0` — "fix: E2E workflow smoke test — remove blocking role check + harden tenant filter"
+- **Last commit:** `b38401d2` — "merge: tender-dirac worktree — Approve Job modal full details + EFS + storage buckets + customer site addresses"
 - **Pushed to origin** ✅
-- **Build:** PASSING (0 errors, compiled successfully)
+- **Build:** PASSING (0 errors, 70 pages)
 
-### Recent Commits (This Session — April 4 Session 2)
+### Recent Commits (This Session — April 5, 2026)
 ```
-aba3bee0 fix: E2E workflow smoke test — remove blocking role check + harden tenant filter
-c3a6b846 docs: update handoff — April 4 session (5 UI fixes, timecards 500 fix, stale cache notes)
-e47bbfe3 fix: add tenant_id + approval_status to timecards_with_users view
+b38401d2 merge: tender-dirac worktree — all April 5 features
+f5cb63ec feat: enhance Approve Job modal with full jobsite details, compliance, and scheduling info
+24f91054 feat: remove Payment & Billing section from CustomerForm
 ```
+
+---
+
+## WHAT WAS DONE (April 5, 2026 — tender-dirac worktree)
+
+### Customer Data Persistence
+- New table `customer_site_addresses` — upsert by address string, tracks `use_count` + `last_used_at`
+- New API routes: `GET/POST /api/admin/customers/[id]/site-addresses` and `GET /api/admin/customers/[id]/project-names`
+- Schedule form: SmartCombobox dropdowns for past site addresses and project names; fire-and-forget save on submit
+- **Site address no longer auto-fills from customer office address** (they are separate locations)
+
+### Photo/Document Upload Fix
+- Created 4 Supabase Storage buckets: `jobsite-area-docs`, `scope-photos`, `site-compliance-docs`, `job-photos`
+- RLS policies: authenticated upload + public read + authenticated delete
+- `PhotoUploader.tsx` now shows actual Supabase error message on failure
+
+### EFS — Electric Floor Sawing
+- Added `EFS` to `SERVICE_TYPES`, `FLEXIBLE_SCOPE_TYPES`, `SCOPE_FIELDS`, `SERVICE_EQUIPMENT` in schedule form
+- Green/emerald color scheme, same structure as DFS, plus Extension Cord and GFCI items
+- Added EFS to `lib/equipment-map.ts` EQUIPMENT_PRESETS
+
+### Compliance Documents Modal
+- Replaced inline expansion with a proper overlay `CreateFacilityModal` component in schedule form Step 6
+- Matches the AddFacilityModal design from the Facilities admin page (uniform UX)
+
+### Approve Job Modal — Full Details
+- Rebuilt `schedule_board_view` (migration `20260405000003`) to expose all missing fields
+- Extended `PendingJob` interface with: `po_number`, `site_contact`, `contact_phone`, `project_name`, `scheduling_flexibility`
+- Unified equipment list: merges `equipment_needed[]` + active `equipment_selections` dict items into one flat list
+- Added 3 new sections (all expanded by default):
+  - **Jobsite Info** (slate): project name, site address, site contact + phone, PO number
+  - **Site Compliance Requirements** (amber): orientation datetime, badging type, special instructions
+  - **Scheduling Notes** (blue): special arrival time, outside hours details, weekend availability
 
 ---
 
