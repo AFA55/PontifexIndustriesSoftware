@@ -1234,9 +1234,11 @@ export default function ScheduleBoardPage() {
 
   // --- Change Request (success callback — modal handles the API call) ---
   const handleChangeRequestSuccess = () => {
-    if (!changeRequestTarget) return;
+    // May be called from ChangeRequestModal (changeRequestTarget set) or EditJobPanel (editTarget set)
+    const targetJob = changeRequestTarget || editTarget?.job;
+    if (!targetJob) return;
 
-    const jobId = changeRequestTarget.id;
+    const jobId = targetJob.id;
     const updateJobInPlace = (jobs: JobCardData[]) =>
       jobs.map(j => j.id === jobId ? { ...j, change_requests_count: j.change_requests_count + 1 } : j);
 
@@ -1247,8 +1249,11 @@ export default function ScheduleBoardPage() {
       }
     }
 
-    addToast('success', 'Change Request Submitted', `${changeRequestTarget.customer_name} — Supervisor will review`);
-    setChangeRequestTarget(null);
+    if (changeRequestTarget) {
+      addToast('success', 'Change Request Submitted', `${targetJob.customer_name} — Supervisor will review`);
+      setChangeRequestTarget(null);
+    }
+    // If called from EditJobPanel, the panel handles its own toast/close
   };
 
   // --- Notes (from API) ---
@@ -1843,12 +1848,12 @@ export default function ScheduleBoardPage() {
         </div>
       )}
 
-      {/* ═══ READ-ONLY BANNER (view-only admins) ════════════════════════ */}
-      {!canEdit && (
+      {/* ═══ CHANGE REQUEST BANNER (admin/salesman) ════════════════════════ */}
+      {!canEdit && (userRole === 'admin' || userRole === 'salesman') && (
         <div className="container mx-auto px-4 md:px-6 pb-2">
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-sm text-amber-300 flex items-center gap-2">
-            <span>👁️</span>
-            <span>You have view-only access. Click any job to request a change.</span>
+            <span>✏️</span>
+            <span>Click any job to edit fields — changes will be submitted for supervisor approval.</span>
           </div>
         </div>
       )}
@@ -1872,7 +1877,7 @@ export default function ScheduleBoardPage() {
                 allHelpers={allHelpersList}
                 busyOperators={busyOperators}
                 busyHelpers={busyHelpers}
-                onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setChangeRequestTarget(job)}
+                onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setEditTarget({ job, rowIndex: idx })}
                 onRequestChange={(job) => setChangeRequestTarget(job)}
                 onViewNotes={(job) => handleViewNotes(job)}
                 onPreviewJob={(job) => setPreviewJob({ job, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
@@ -1894,7 +1899,7 @@ export default function ScheduleBoardPage() {
             timeOffMap={timeOffMap}
             canDrag={canEdit}
             canEdit={canEdit}
-            onEditJob={(job, rowIndex) => canEdit ? setEditTarget({ job, rowIndex }) : setChangeRequestTarget(job)}
+            onEditJob={(job, rowIndex) => setEditTarget({ job, rowIndex: rowIndex ?? null })}
             onRequestChange={(job) => setChangeRequestTarget(job)}
             onViewNotes={(job) => handleViewNotes(job)}
             onPreviewJob={(job) => setPreviewJob({ job })}
@@ -2012,7 +2017,8 @@ export default function ScheduleBoardPage() {
       {editTarget && (
         <EditJobPanel
           job={editTarget.job}
-          canEdit={canEdit}
+          canEdit={canEdit || userRole === 'admin' || userRole === 'salesman'}
+          userRole={userRole}
           allOperators={allOperatorsList}
           allHelpers={allHelpersList}
           currentOperatorName={editTarget.rowIndex !== null ? rowAssignments[editTarget.rowIndex]?.operator ?? null : null}
@@ -2021,10 +2027,11 @@ export default function ScheduleBoardPage() {
           busyHelpers={busyHelpers}
           operatorSkillMap={operatorSkillMap}
           onSave={handleEditSave}
+          onChangeRequestSuccess={handleChangeRequestSuccess}
           onClose={() => setEditTarget(null)}
           onViewNotes={() => { setEditTarget(null); handleViewNotes(editTarget.job); }}
-          onMakeWillCall={handleMakeWillCall}
-          onRemoveFromSchedule={handleRemoveFromSchedule}
+          onMakeWillCall={canEdit ? handleMakeWillCall : undefined}
+          onRemoveFromSchedule={canEdit ? handleRemoveFromSchedule : undefined}
         />
       )}
       {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSuccess={handleChangeRequestSuccess} onClose={() => setChangeRequestTarget(null)} />}
