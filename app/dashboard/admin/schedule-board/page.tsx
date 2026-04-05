@@ -1437,10 +1437,24 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Row dropdown: change operator (with conflict detection) ---
-  const handleChangeRowOperator = (rowIndex: number, newOperator: string | null) => {
+  const handleChangeRowOperator = async (rowIndex: number, newOperator: string | null) => {
     if (!newOperator) {
-      // Clearing operator — no conflict possible
-      setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, operator: newOperator } : r));
+      // Clearing operator — unassign all jobs in this row from the DB first
+      const rowJobs = operatorJobs[rowIndex] || [];
+      for (const j of rowJobs) {
+        try {
+          await apiFetch('/api/admin/schedule-board/assign', {
+            method: 'POST',
+            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null }),
+          });
+        } catch { /* continue */ }
+      }
+      // Move jobs back to unassigned pool
+      if (rowJobs.length > 0) {
+        setUnassignedJobs(prev => [...prev, ...rowJobs.map(j => ({ ...j, helper_names: [] }))]);
+        setOperatorJobs(prev => ({ ...prev, [rowIndex]: [] }));
+      }
+      setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { operator: null, helper: null } : r));
       return;
     }
 
@@ -1506,7 +1520,22 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Row dropdown: change helper ---
-  const handleChangeRowHelper = (rowIndex: number, newHelper: string | null) => {
+  const handleChangeRowHelper = async (rowIndex: number, newHelper: string | null) => {
+    const operatorName = rowAssignments[rowIndex]?.operator;
+    const operatorId = operatorName ? operatorIdMap[operatorName] : null;
+    const newHelperId = newHelper ? helperIdMap[newHelper] : null;
+
+    // Persist helper change to DB for all jobs in this row
+    const rowJobs = operatorJobs[rowIndex] || [];
+    for (const j of rowJobs) {
+      try {
+        await apiFetch('/api/admin/schedule-board/assign', {
+          method: 'POST',
+          body: JSON.stringify({ jobOrderId: j.id, operatorId: operatorId || null, helperId: newHelperId }),
+        });
+      } catch { /* continue */ }
+    }
+
     setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, helper: newHelper } : r));
   };
 
