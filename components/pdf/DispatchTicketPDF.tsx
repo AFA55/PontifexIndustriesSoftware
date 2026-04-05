@@ -274,12 +274,6 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                   <Text style={s.fieldLabel}>Time</Text>
                   <Text style={s.fieldValueBold}>{job.arrival_time || '—'}</Text>
                 </View>
-                {job.end_date && (
-                  <View style={s.fieldRow}>
-                    <Text style={s.fieldLabel}>End Date</Text>
-                    <Text style={s.fieldValue}>{formatDate(job.end_date)}</Text>
-                  </View>
-                )}
                 <View style={s.fieldRow}>
                   <Text style={s.fieldLabel}>Cust Name</Text>
                   <Text style={s.fieldValueBold}>{job.customer_name}</Text>
@@ -312,12 +306,6 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                   <Text style={s.fieldLabel}>Quoted By</Text>
                   <Text style={s.fieldValue}>{job.salesman_name || '—'}</Text>
                 </View>
-                {job.estimated_cost && (
-                  <View style={s.fieldRow}>
-                    <Text style={s.fieldLabel}>Est. Cost</Text>
-                    <Text style={s.fieldValueBold}>${Number(job.estimated_cost).toLocaleString()}</Text>
-                  </View>
-                )}
                 {job.estimated_hours && (
                   <View style={s.fieldRow}>
                     <Text style={s.fieldLabel}>Est. Hours</Text>
@@ -362,20 +350,6 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
               </View>
             )}
 
-            {/* Difficulty */}
-            {difficulty > 0 && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2, marginBottom: 4 }}>
-                <Text style={{ fontSize: 7, fontWeight: 'bold', color: '#64748B' }}>DIFFICULTY: {difficulty}/10</Text>
-                <View style={{ flexDirection: 'row', gap: 1.5 }}>
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <View key={i} style={{
-                      width: 12, height: 6, borderRadius: 1,
-                      backgroundColor: i >= difficulty ? '#E2E8F0' : difficulty <= 3 ? '#10B981' : difficulty <= 6 ? '#F59E0B' : '#EF4444',
-                    }} />
-                  ))}
-                </View>
-              </View>
-            )}
           </View>
 
           {/* ── COLUMN 2: Work Conditions ── */}
@@ -514,19 +488,6 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
           ))}
         </View>
 
-        {/* ═══ SIGNATURE ═══ */}
-        <View style={s.footer}>
-          <View style={s.sigBox}>
-            <Text style={s.sigLabel}>Operator Signature</Text>
-          </View>
-          <View style={s.sigBox}>
-            <Text style={s.sigLabel}>Customer / Site Contact Signature</Text>
-          </View>
-          <View style={{ width: 100 }}>
-            <Text style={s.sigLabel}>Date</Text>
-            <View style={{ borderBottom: '1 solid #94A3B8', paddingBottom: 16, marginTop: 3 }} />
-          </View>
-        </View>
 
       </Page>
     </Document>
