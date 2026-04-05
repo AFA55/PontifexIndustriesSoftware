@@ -527,6 +527,12 @@ export default function ScheduleBoardPage() {
         missing_info_flagged: j.missing_info_flagged || false,
         missing_info_items: j.missing_info_items || [],
         missing_info_note: j.missing_info_note || null,
+        po_number: j.po_number || null,
+        site_contact: null,
+        contact_phone: j.site_contact_phone || null,
+        project_name: j.project_name || null,
+        location_name: null,
+        scheduling_flexibility: j.scheduling_flexibility || null,
       }));
       const willCall = (json.data?.willCall || []).map(toJobCard);
 
