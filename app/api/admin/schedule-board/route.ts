@@ -36,12 +36,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (date) {
-      query = query.eq('scheduled_date', date);
+      // Show a job on a given date if it starts on or before that date
+      // AND has no end_date OR its end_date is on or after that date.
+      // This makes multi-day jobs appear on every day in their span.
+      query = query.lte('scheduled_date', date).or(`end_date.is.null,end_date.gte.${date}`);
     } else if (startDate && endDate) {
       query = query.gte('scheduled_date', startDate).lte('scheduled_date', endDate);
     } else {
       const today = new Date().toISOString().split('T')[0];
-      query = query.eq('scheduled_date', today);
+      query = query.lte('scheduled_date', today).or(`end_date.is.null,end_date.gte.${today}`);
     }
 
     const { data: jobs, error } = await query;

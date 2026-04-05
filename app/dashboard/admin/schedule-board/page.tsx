@@ -31,7 +31,6 @@ import type { JobCardData } from './_components/JobCard';
 import type { PendingJob } from './_components/PendingQueueSidebar';
 import type { ToastData } from './_components/Toast';
 import type { NoteData } from './_components/NotesDrawer';
-import JobPreviewPanel from './_components/JobPreviewPanel';
 import JobDetailView from './_components/JobDetailView';
 import DndBoardWrapper from './_components/DndBoardWrapper';
 import OperatorRowView from './_components/OperatorRowView';
@@ -221,7 +220,6 @@ export default function ScheduleBoardPage() {
   const [notesTarget, setNotesTarget] = useState<JobCardData | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
-  const [previewJob, setPreviewJob] = useState<{ job: JobCardData; operatorName?: string | null; helperName?: string | null } | null>(null);
   const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null } | null>(null);
 
   // ═══ AI AUTO-SCHEDULE STATE ═══
@@ -1881,7 +1879,7 @@ export default function ScheduleBoardPage() {
                 onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setChangeRequestTarget(job)}
                 onRequestChange={(job) => setChangeRequestTarget(job)}
                 onViewNotes={(job) => handleViewNotes(job)}
-                onPreviewJob={(job) => setPreviewJob({ job, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
+                onPreviewJob={(job) => setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
                 onAssignJob={() => handleAssignToAvailableOperator(idx)}
                 onChangeOperator={(name) => handleChangeRowOperator(idx, name)}
                 onChangeHelper={(name) => handleChangeRowHelper(idx, name)}
@@ -1903,7 +1901,7 @@ export default function ScheduleBoardPage() {
             onEditJob={(job, rowIndex) => canEdit ? setEditTarget({ job, rowIndex }) : setChangeRequestTarget(job)}
             onRequestChange={(job) => setChangeRequestTarget(job)}
             onViewNotes={(job) => handleViewNotes(job)}
-            onPreviewJob={(job) => setPreviewJob({ job })}
+            onPreviewJob={(job) => setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null })}
           />
         )}
 
@@ -2159,16 +2157,6 @@ export default function ScheduleBoardPage() {
           onAddSecondJob={handleRowConflictAddSecond}
           onMoveToJob={handleRowConflictMove}
           onClose={() => setRowChangeConflict(null)}
-        />
-      )}
-
-      {/* ═══ JOB PREVIEW PANEL ════════════════════════════════════════ */}
-      {previewJob && (
-        <JobPreviewPanel
-          job={previewJob.job}
-          operatorName={previewJob.operatorName}
-          helperName={previewJob.helperName}
-          onClose={() => setPreviewJob(null)}
         />
       )}
 
