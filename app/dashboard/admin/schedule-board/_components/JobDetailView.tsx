@@ -616,42 +616,146 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                         </p>
                       ) : null}
                       {d?.scope_details && Object.keys(d.scope_details).length > 0 && (
-                        <div className="border border-gray-200 rounded-lg overflow-hidden">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="bg-gray-50">
-                                <th className="text-left px-3 py-2 text-xs font-bold text-gray-500 uppercase">Item</th>
-                                <th className="text-left px-3 py-2 text-xs font-bold text-gray-500 uppercase">Details</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {Object.entries(d.scope_details).map(([key, val], i) => {
-                                const formatScopeValue = (v: any): string => {
-                                  if (Array.isArray(v)) {
-                                    return v.map((item: any) => {
-                                      if (item.qty && item.bit_size && item.depth) {
-                                        return `${item.qty}x ${item.bit_size}" @ ${item.depth}" deep`;
-                                      }
-                                      return Object.entries(item).map(([k2, v2]) => `${k2.replace(/_/g, ' ')}: ${v2}`).join(', ');
-                                    }).join(' | ');
-                                  }
-                                  if (typeof v === 'object' && v !== null) {
-                                    return Object.entries(v as Record<string, any>)
-                                      .filter(([, v2]) => v2 !== null && v2 !== undefined && v2 !== '' && v2 !== false)
-                                      .map(([k2, v2]) => `${k2.replace(/_/g, ' ')}: ${v2}`)
-                                      .join(', ');
-                                  }
-                                  return String(v ?? '--');
-                                };
-                                return (
-                                  <tr key={key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                                    <td className="px-3 py-2 text-gray-700 font-medium capitalize">{key.replace(/_/g, ' ')}</td>
-                                    <td className="px-3 py-2 text-gray-900">{formatScopeValue(val)}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
+                        <div className="space-y-4">
+                          {Object.entries(d.scope_details).map(([serviceKey, serviceVal]) => {
+                            // Friendly service type labels
+                            const SERVICE_LABELS: Record<string, string> = {
+                              DFS: 'DFS — Floor Sawing',
+                              WFS: 'WFS — Wall Sawing',
+                              Core: 'Core — Core Drilling',
+                              Demo: 'Demo — Demolition',
+                              GPR: 'GPR — Ground Penetrating Radar',
+                              Removal: 'Removal — Concrete Removal',
+                              EFS: 'EFS — Electric Floor Sawing',
+                            };
+                            const serviceLabel = SERVICE_LABELS[serviceKey] ?? serviceKey;
+                            const fields = typeof serviceVal === 'object' && serviceVal !== null
+                              ? (serviceVal as Record<string, any>)
+                              : {};
+
+                            // Parse JSON strings stored in fields (e.g., cuts, holes arrays)
+                            const parseMaybeJson = (v: any): any => {
+                              if (typeof v === 'string') {
+                                try { return JSON.parse(v); } catch { return v; }
+                              }
+                              return v;
+                            };
+
+                            // Helper: title-case a snake_case key
+                            const humanize = (s: string) =>
+                              s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+                            // Detect cuts array (sawing)
+                            const cutsRaw = parseMaybeJson(fields.cuts);
+                            const cutsArr = Array.isArray(cutsRaw) ? cutsRaw : null;
+
+                            // Detect holes array (core drilling)
+                            const holesRaw = parseMaybeJson(fields.holes);
+                            const holesArr = Array.isArray(holesRaw) ? holesRaw : null;
+
+                            // Remaining text fields (description, method, equipment, etc.)
+                            const textFields = Object.entries(fields).filter(
+                              ([k]) => k !== 'cuts' && k !== 'holes'
+                            );
+
+                            return (
+                              <div key={serviceKey} className="rounded-lg border border-gray-200 overflow-hidden">
+                                {/* Service header */}
+                                <div className="px-3 py-2 bg-emerald-50 border-b border-gray-200">
+                                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">{serviceLabel}</span>
+                                </div>
+
+                                <div className="px-3 py-2 space-y-3">
+                                  {/* Cuts table */}
+                                  {cutsArr && cutsArr.length > 0 && (
+                                    <div>
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className="text-gray-500 border-b border-gray-200">
+                                            <th className="text-left py-1 pr-3 font-bold uppercase"># Cuts</th>
+                                            <th className="text-left py-1 pr-3 font-bold uppercase">Linear Feet</th>
+                                            <th className="text-left py-1 font-bold uppercase">Depth</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {cutsArr.map((cut: any, ci: number) => (
+                                            <tr key={ci} className="border-b border-gray-100 last:border-0">
+                                              <td className="py-1.5 pr-3 text-gray-900 font-semibold">
+                                                {cut.num_cuts ? Number(cut.num_cuts).toLocaleString() : '--'}
+                                              </td>
+                                              <td className="py-1.5 pr-3 text-gray-900">
+                                                {cut.linear_feet ? Number(cut.linear_feet).toLocaleString() : '--'}
+                                              </td>
+                                              <td className="py-1.5 text-gray-900">
+                                                {cut.depth ? `${cut.depth}"` : '--'}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+
+                                  {/* Holes table */}
+                                  {holesArr && holesArr.length > 0 && (
+                                    <div>
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className="text-gray-500 border-b border-gray-200">
+                                            <th className="text-left py-1 pr-3 font-bold uppercase">Qty</th>
+                                            <th className="text-left py-1 pr-3 font-bold uppercase">Diameter</th>
+                                            <th className="text-left py-1 font-bold uppercase">Depth</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {holesArr.map((hole: any, hi: number) => (
+                                            <tr key={hi} className="border-b border-gray-100 last:border-0">
+                                              <td className="py-1.5 pr-3 text-gray-900 font-semibold">{hole.qty || '--'}</td>
+                                              <td className="py-1.5 pr-3 text-gray-900">
+                                                {hole.bit_size ? `${hole.bit_size}"` : '--'}
+                                              </td>
+                                              <td className="py-1.5 text-gray-900">
+                                                {hole.depth ? `${hole.depth}"` : '--'}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+
+                                  {/* Text fields (method, equipment, description, etc.) */}
+                                  {textFields.length > 0 && (
+                                    <div className="space-y-1">
+                                      {textFields.map(([k, v]) => {
+                                        if (v === null || v === undefined || v === '' || v === false) return null;
+                                        // Format comma-separated values as title-cased list
+                                        const formatVal = (raw: any): string => {
+                                          if (typeof raw === 'boolean') return raw ? 'Yes' : 'No';
+                                          const str = String(raw);
+                                          if (str.includes(',')) {
+                                            return str.split(',').map(s => humanize(s.trim())).join(', ');
+                                          }
+                                          return humanize(str);
+                                        };
+                                        return (
+                                          <div key={k} className="flex gap-2 text-xs">
+                                            <span className="text-gray-500 font-semibold min-w-[80px]">{humanize(k)}:</span>
+                                            <span className="text-gray-900">{formatVal(v)}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {/* No content fallback */}
+                                  {!cutsArr && !holesArr && textFields.length === 0 && (
+                                    <p className="text-xs text-gray-400 italic">No details recorded</p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </>
