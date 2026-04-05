@@ -281,10 +281,20 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
   const handleStartEdit = () => {
     if (!fullData) return;
     setEditFields({
+      // Job Information
+      customer_name: fullData.customer_name || job.customer_name || '',
+      customer_contact: fullData.customer_contact || '',
+      site_contact_phone: fullData.site_contact_phone || fullData.foreman_phone || '',
+      location: fullData.location || job.location || '',
+      address: fullData.address || job.address || '',
+      estimated_cost: fullData.estimated_cost ? String(fullData.estimated_cost) : '',
+      salesman_name: fullData.salesman_name || '',
+      po_number: fullData.po_number || '',
+      // Schedule
       scheduled_date: fullData.scheduled_date || '',
       end_date: fullData.end_date || '',
       arrival_time: fullData.arrival_time || '',
-      po_number: fullData.po_number || '',
+      // Content
       description: fullData.description || '',
       additional_info: fullData.additional_info || '',
     });
@@ -529,23 +539,53 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                     onToggle={() => toggleSection('jobInfo')}
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
-                      <FieldRow label="Customer" value={d?.customer_name || job.customer_name} bold />
-                      <FieldRow label="Contact" value={d?.customer_contact} />
-                      <FieldRow label="Phone" value={d?.site_contact_phone || d?.foreman_phone} />
+                      {isEditing ? (
+                        <EditFieldRow label="Customer" value={editFields.customer_name} onChange={(v) => setEditFields(f => ({ ...f, customer_name: v }))} />
+                      ) : (
+                        <FieldRow label="Customer" value={d?.customer_name || job.customer_name} bold />
+                      )}
+                      {isEditing ? (
+                        <EditFieldRow label="Contact" value={editFields.customer_contact} onChange={(v) => setEditFields(f => ({ ...f, customer_contact: v }))} />
+                      ) : (
+                        <FieldRow label="Contact" value={d?.customer_contact} />
+                      )}
+                      {isEditing ? (
+                        <EditFieldRow label="Phone" value={editFields.site_contact_phone} onChange={(v) => setEditFields(f => ({ ...f, site_contact_phone: v }))} />
+                      ) : (
+                        <FieldRow label="Phone" value={d?.site_contact_phone || d?.foreman_phone} />
+                      )}
                       {isEditing ? (
                         <EditFieldRow label="PO #" value={editFields.po_number} onChange={(v) => setEditFields(f => ({ ...f, po_number: v }))} />
                       ) : (
                         <FieldRow label="PO #" value={d?.po_number || job.po_number} />
                       )}
-                      <FieldRow label="Location" value={d?.location || job.location} bold />
-                      <FieldRow label="Quoted By" value={d?.salesman_name} />
-                      {(d?.address && d.address !== d.location) && (
-                        <div className="sm:col-span-2">
-                          <FieldRow label="Address" value={d.address} />
-                        </div>
+                      {isEditing ? (
+                        <EditFieldRow label="Location" value={editFields.location} onChange={(v) => setEditFields(f => ({ ...f, location: v }))} />
+                      ) : (
+                        <FieldRow label="Location" value={d?.location || job.location} bold />
                       )}
-                      {d?.estimated_cost && (
-                        <FieldRow label="Estimated Cost" value={formatCurrency(Number(d.estimated_cost))} bold />
+                      {isEditing ? (
+                        <EditFieldRow label="Quoted By" value={editFields.salesman_name} onChange={(v) => setEditFields(f => ({ ...f, salesman_name: v }))} />
+                      ) : (
+                        <FieldRow label="Quoted By" value={d?.salesman_name} />
+                      )}
+                      {isEditing ? (
+                        <div className="sm:col-span-2">
+                          <EditFieldRow label="Address" value={editFields.address} onChange={(v) => setEditFields(f => ({ ...f, address: v }))} />
+                        </div>
+                      ) : (
+                        (d?.address && d.address !== d.location) && (
+                          <div className="sm:col-span-2">
+                            <FieldRow label="Address" value={d.address} />
+                          </div>
+                        )
+                      )}
+                      {isEditing ? (
+                        <EditFieldRow label="Estimated Cost" value={editFields.estimated_cost} onChange={(v) => setEditFields(f => ({ ...f, estimated_cost: v }))} type="number" />
+                      ) : (
+                        d?.estimated_cost && (
+                          <FieldRow label="Estimated Cost" value={formatCurrency(Number(d.estimated_cost))} bold />
+                        )
                       )}
                       {d?.estimated_hours && (
                         <FieldRow label="Est. Hours" value={`${d.estimated_hours}h`} />
