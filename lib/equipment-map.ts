@@ -29,6 +29,7 @@ export const EQUIPMENT_PRESETS: EquipmentPreset[] = [
   { abbrev: 'WS',     full: 'Wall Saw',                       gradient: 'from-violet-500 to-purple-600' },
   { abbrev: 'GPP',    full: 'Gas Power Pack',                 gradient: 'from-amber-500 to-orange-600' },
   { abbrev: 'DFS',    full: 'Diesel Floor Saw',               gradient: 'from-cyan-500 to-blue-600' },
+  { abbrev: 'EFS',    full: 'Electric Floor Saw',            gradient: 'from-green-500 to-emerald-600' },
   { abbrev: 'ECD',    full: 'Electric Core Drill',            gradient: 'from-rose-500 to-pink-600' },
   { abbrev: 'HCD',    full: 'Hydraulic Core Drill',           gradient: 'from-red-500 to-rose-600' },
   { abbrev: 'CS',     full: 'Chain Saw',                      gradient: 'from-amber-500 to-yellow-600' },
