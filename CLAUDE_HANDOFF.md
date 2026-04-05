@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 5, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
+**Date:** April 5, 2026 (Session 2) | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
 
 ---
 
@@ -7,16 +7,48 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `b38401d2` — "merge: tender-dirac worktree — Approve Job modal full details + EFS + storage buckets + customer site addresses"
+- **Last commit:** `9d337ed7` — "merge: agent-abdb6df8 — fix operator my-jobs server error, dispatch flow audit, RLS"
 - **Pushed to origin** ✅
 - **Build:** PASSING (0 errors, 70 pages)
 
-### Recent Commits (This Session — April 5, 2026)
+### Recent Commits (This Session — April 5, 2026 Session 2)
 ```
+9d337ed7 merge: agent-abdb6df8 — fix operator my-jobs server error + dispatch audit + RLS
+575f8ae8 fix: operator my-jobs server error, dispatch flow audit, RLS for operators
 b38401d2 merge: tender-dirac worktree — all April 5 features
 f5cb63ec feat: enhance Approve Job modal with full jobsite details, compliance, and scheduling info
 24f91054 feat: remove Payment & Billing section from CustomerForm
 ```
+
+---
+
+## WHAT WAS DONE (April 5, 2026 Session 2 — agent-abdb6df8 worktree)
+
+### Operator Flow Audit + Bug Fixes
+
+**Root cause of "Experiencing server issues - reconnecting...":**
+The `active_job_orders` DB view was created in migration `20260317` (before multi-tenant was added in `20260328`). The `/api/job-orders` route called `.eq('tenant_id', tenantId)` on the view, but `tenant_id` was never included in the view → PostgREST returned HTTP 400/500 → `NetworkMonitor.tsx` counted 3+ failures → showed the server issues banner on every operator page load.
+
+**Migration `20260405000010_fix_operator_job_rls.sql` (applied to Supabase):**
+- Rebuilt `active_job_orders` view with all missing fields: `tenant_id`, `on_hold`, `on_hold_reason`, `pause_reason` (aliased from `on_hold_reason` for UI compatibility), `project_name`
+- Added `operator_can_view_own_jobs` RLS policy on `job_orders`: operators/apprentices can SELECT rows where `assigned_to = auth.uid()` OR `helper_assigned_to = auth.uid()`
+- Admins/managers see all jobs via JWT metadata role check
+- Ensured `job_orders` has RLS enabled
+
+**`/api/job-orders/route.ts`:**
+- Added `include_helper_jobs` param: when true, uses `.or('assigned_to.eq.UID,helper_assigned_to.eq.UID')` instead of just `assigned_to` filter
+- Added `date_from`/`date_to` params for the 7-day lookahead used by my-jobs page
+- Returns `user_role` in both single-job and list responses (used by my-jobs to set `isHelper` state)
+- Fixed single-job auth check: now allows access if `helper_assigned_to === user.id` (was blocked for helpers)
+
+**`/api/job-orders/[id]/status/route.ts`:**
+- Fixed permission check: helpers (apprentices) assigned to a job can now update its status (was returning 403 for `helper_assigned_to` users)
+
+**Dispatch flow verified clean (no bugs found):**
+- Admin `POST /api/admin/schedule-board/dispatch` → sets `dispatched_at` + status `assigned` + sends in-app notifications + SMS ✅
+- Operators see dispatched jobs via `/api/job-orders` (now fixed with tenant_id) ✅
+- Status transitions `assigned → in_route → in_progress → completed` all work via the status API ✅
+- Clock-in via NFC or manual uses `/api/time-clock` (separate route, not affected) ✅
 
 ---
 
@@ -135,6 +167,8 @@ Three parallel agents ran simultaneously. All changes landed in commit `aba3bee0
 - [ ] **Patriot logo**: Upload logo file to `tenant_branding.logo_url` (no file provided yet)
 - [ ] **Production prep**: Verify Vercel env vars all set (see list below)
 - [ ] **Go live**: Merge `feature/schedule-board-v2` → `main` after manual test passes
+
+> **The operator "server issues" banner is now fixed.** The `active_job_orders` view now has `tenant_id`. Operator page loads should work cleanly. Recommend doing a manual smoke test: log in as an operator, check `/dashboard/my-jobs` — should show dispatched jobs with no server error banner.
 
 ---
 
