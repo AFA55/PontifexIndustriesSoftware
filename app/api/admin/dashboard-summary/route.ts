@@ -44,40 +44,38 @@ async function getJobsToday(
   try {
     const today = todayISO();
 
+    // Use schedule_board_view so we get operator_name, helper_name, and all rich fields
     let query = supabaseAdmin
-      .from('job_orders')
+      .from('schedule_board_view')
       .select(`
         id,
         job_number,
         arrival_time,
         customer_name,
         assigned_to,
-        status
+        helper_assigned_to,
+        operator_name,
+        helper_name,
+        status,
+        job_type,
+        location,
+        address,
+        equipment_needed,
+        equipment_selections,
+        is_will_call,
+        scheduled_date,
+        end_date,
+        scheduled_end_date
       `)
       .eq('tenant_id', tenantId)
       .eq('scheduled_date', today)
-      .is('deleted_at', null)
-      .order('arrival_time', { ascending: true })
+      .order('arrival_time', { ascending: true, nullsFirst: false })
+      .order('customer_name', { ascending: true })
       .limit(20);
 
-    // Personal scope: only jobs this user is assigned to OR created by them
+    // Personal scope: only jobs this user is assigned to
     if (opts.isPersonal) {
-      query = supabaseAdmin
-        .from('job_orders')
-        .select(`
-          id,
-          job_number,
-          arrival_time,
-          customer_name,
-          assigned_to,
-          status
-        `)
-        .eq('tenant_id', tenantId)
-        .eq('scheduled_date', today)
-        .is('deleted_at', null)
-        .or(`assigned_to.eq.${opts.targetUserId},created_by.eq.${opts.targetUserId}`)
-        .order('arrival_time', { ascending: true })
-        .limit(20);
+      query = query.or(`assigned_to.eq.${opts.targetUserId},helper_assigned_to.eq.${opts.targetUserId}`);
     }
 
     const { data: jobs, error } = await query;
@@ -87,31 +85,56 @@ async function getJobsToday(
       return { count: 0, jobs: [] };
     }
 
-    // Collect unique operator ids and fetch names in one round-trip
-    const operatorIds = [...new Set((jobs ?? []).map((j) => j.assigned_to).filter(Boolean))];
-
-    let operatorMap: Record<string, string> = {};
-    if (operatorIds.length > 0) {
-      const { data: profiles } = await supabaseAdmin
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', operatorIds);
-
-      if (profiles) {
-        for (const p of profiles) {
-          operatorMap[p.id] = p.full_name;
-        }
+    const mapped = (jobs ?? []).map((j) => {
+      // Parse equipment from equipment_needed (comma-separated string) or equipment_selections (JSON)
+      let equipment: string[] = [];
+      if (j.equipment_needed) {
+        equipment = String(j.equipment_needed).split(',').map((s: string) => s.trim()).filter(Boolean);
+      } else if (j.equipment_selections) {
+        try {
+          const sel = typeof j.equipment_selections === 'string'
+            ? JSON.parse(j.equipment_selections)
+            : j.equipment_selections;
+          if (Array.isArray(sel)) {
+            equipment = sel.map((e: any) => (typeof e === 'string' ? e : e?.name ?? '')).filter(Boolean);
+          }
+        } catch { /* ignore parse error */ }
       }
-    }
 
-    const mapped = (jobs ?? []).map((j) => ({
-      id: j.id,
-      job_number: j.job_number,
-      scheduled_time: j.arrival_time ?? null,
-      customer_name: j.customer_name,
-      operator_name: j.assigned_to ? (operatorMap[j.assigned_to] ?? null) : null,
-      status: j.status,
-    }));
+      // Determine multi-day: compare end_date vs scheduled_date
+      let is_multi_day = false;
+      let day_number: number | null = null;
+      let total_days: number | null = null;
+      const endDate = j.end_date ?? j.scheduled_end_date ?? null;
+      if (endDate && j.scheduled_date && endDate > j.scheduled_date) {
+        is_multi_day = true;
+        const start = new Date(j.scheduled_date);
+        const end = new Date(endDate);
+        const diffMs = end.getTime() - start.getTime();
+        total_days = Math.round(diffMs / 86400000) + 1;
+        // day_number: today relative to start
+        const todayDate = new Date(today);
+        const diffFromStart = todayDate.getTime() - start.getTime();
+        day_number = Math.floor(diffFromStart / 86400000) + 1;
+      }
+
+      return {
+        id: j.id,
+        job_number: j.job_number,
+        scheduled_time: j.arrival_time ?? null,
+        customer_name: j.customer_name,
+        operator_name: j.operator_name ?? null,
+        helper_name: j.helper_name ?? null,
+        status: j.status,
+        job_type: j.job_type ?? null,
+        location: j.location ?? j.address ?? null,
+        equipment,
+        is_will_call: !!j.is_will_call,
+        is_multi_day,
+        day_number,
+        total_days,
+      };
+    });
 
     return { count: mapped.length, jobs: mapped };
   } catch (err: any) {
