@@ -70,8 +70,14 @@ export default function PhotoUploader({
           .upload(filePath, file);
 
         if (uploadError) {
-          console.error('Upload error:', uploadError);
-          setError('Upload failed. Please try again.');
+          console.error('Upload error details:', {
+            message: uploadError.message,
+            bucket,
+            filePath,
+            fileType: file.type,
+            fileSize: file.size,
+          });
+          setError(`Upload failed: ${uploadError.message || 'Please try again.'}`);
           continue;
         }
 
