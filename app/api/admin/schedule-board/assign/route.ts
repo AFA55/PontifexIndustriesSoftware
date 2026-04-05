@@ -8,14 +8,14 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { logAuditEvent } from '@/lib/audit';
 import { logApiError } from '@/lib/error-logger';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireSuperAdmin(request);
+    const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
