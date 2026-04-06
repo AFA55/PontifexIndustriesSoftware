@@ -297,6 +297,10 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
       // Content
       description: fullData.description || '',
       additional_info: fullData.additional_info || '',
+      directions: fullData.directions || '',
+      // JSON objects (deep clone)
+      jobsite_conditions: fullData.jobsite_conditions ? JSON.parse(JSON.stringify(fullData.jobsite_conditions)) : {},
+      site_compliance: fullData.site_compliance ? JSON.parse(JSON.stringify(fullData.site_compliance)) : {},
     });
     setIsEditing(true);
   };
@@ -856,80 +860,232 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                   </SectionCard>
 
                   {/* ---- Work Conditions ---- */}
-                  {conditions && conditionFlags.some(c => c.active) && (
+                  {((conditions && conditionFlags.some(c => c.active)) || isEditing) && (
                     <SectionCard
                       title="Work Conditions"
                       icon={<ClipboardList className="w-4 h-4 text-amber-600" />}
                       headerColor="bg-amber-50 border-amber-200"
-                      badge={`${conditionFlags.filter(c => c.active).length} active`}
+                      badge={isEditing ? 'Editing' : `${conditionFlags.filter(c => c.active).length} active`}
                       expanded={expandedSections.conditions}
                       onToggle={() => toggleSection('conditions')}
                     >
-                      <>
-                        {conditions.inside_outside ? (
-                          <div className="mb-2 text-xs font-bold text-gray-600 uppercase">
-                            Work Area: <span className="text-gray-900">{String(conditions.inside_outside)}</span>
-                          </div>
-                        ) : null}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {conditionFlags.filter(c => c.active).map(cond => (
-                            <div
-                              key={cond.label}
-                              className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold ${
-                                cond.warning
-                                  ? 'bg-red-50 text-red-700 border border-red-200'
-                                  : 'bg-white text-gray-700 border border-gray-200'
-                              }`}
+                      {isEditing ? (
+                        <div className="space-y-3">
+                          {/* Work Area selector */}
+                          <div className="flex items-center gap-3">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase w-24 flex-shrink-0">Work Area</label>
+                            <select
+                              value={editFields.jobsite_conditions?.inside_outside || ''}
+                              onChange={(e) => setEditFields(f => ({ ...f, jobsite_conditions: { ...f.jobsite_conditions, inside_outside: e.target.value } }))}
+                              className="flex-1 px-2 py-1.5 rounded-lg border-2 border-amber-300 focus:border-amber-500 text-sm text-gray-900 bg-amber-50/30"
                             >
-                              <span>{cond.label}</span>
-                              {cond.detail && <span className="text-[10px] opacity-75 ml-1">{cond.detail}</span>}
-                            </div>
-                          ))}
+                              <option value="">Not specified</option>
+                              <option value="Inside">Inside</option>
+                              <option value="Outside">Outside</option>
+                              <option value="Both">Both</option>
+                            </select>
+                          </div>
+                          {/* Condition toggles */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {[
+                              { key: 'water_available', label: 'Water Available', footageKey: 'water_available_ft' },
+                              { key: 'electricity_available', label: 'Power Available', footageKey: 'electricity_available_ft' },
+                              { key: 'cord_480', label: '480 Cord Req\'d', footageKey: 'cord_480_ft', warning: true },
+                              { key: 'hyd_hose', label: 'Hyd Hose', footageKey: 'hyd_hose_ft' },
+                              { key: 'water_control', label: 'Vac Water' },
+                              { key: 'plastic_needed', label: 'Hang Poly' },
+                              { key: 'clean_up_required', label: 'Cleanup Required' },
+                              { key: 'overcutting_allowed', label: 'Overcutting OK' },
+                              { key: 'high_work', label: 'High Work', footageKey: 'high_work_ft', warning: true },
+                              { key: 'scaffolding_provided', label: 'Scaffold/Lift Avail' },
+                              { key: 'manpower_provided', label: 'Manpower Provided' },
+                              { key: 'proper_ventilation', label: 'Proper Ventilation' },
+                            ].map((cond) => {
+                              const isChecked = !!editFields.jobsite_conditions?.[cond.key];
+                              return (
+                                <label
+                                  key={cond.key}
+                                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                                    isChecked
+                                      ? (cond.warning ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300')
+                                      : 'bg-white border-gray-200 hover:border-amber-200'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => setEditFields(f => ({
+                                      ...f,
+                                      jobsite_conditions: { ...f.jobsite_conditions, [cond.key]: e.target.checked }
+                                    }))}
+                                    className="accent-amber-500"
+                                  />
+                                  <span className={`text-xs font-semibold flex-1 ${cond.warning ? 'text-red-700' : 'text-gray-700'}`}>
+                                    {cond.label}
+                                  </span>
+                                  {cond.footageKey && isChecked && (
+                                    <input
+                                      type="number"
+                                      value={editFields.jobsite_conditions?.[cond.footageKey] || ''}
+                                      onChange={(e) => setEditFields(f => ({
+                                        ...f,
+                                        jobsite_conditions: { ...f.jobsite_conditions, [cond.footageKey!]: e.target.value }
+                                      }))}
+                                      className="w-16 px-1.5 py-0.5 text-xs border-2 border-amber-300 rounded text-gray-900 focus:border-amber-500"
+                                      placeholder="ft"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  )}
+                                </label>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </>
+                      ) : (
+                        <>
+                          {conditions?.inside_outside ? (
+                            <div className="mb-2 text-xs font-bold text-gray-600 uppercase">
+                              Work Area: <span className="text-gray-900">{String(conditions.inside_outside)}</span>
+                            </div>
+                          ) : null}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {conditionFlags.filter(c => c.active).map(cond => (
+                              <div
+                                key={cond.label}
+                                className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold ${
+                                  cond.warning
+                                    ? 'bg-red-50 text-red-700 border border-red-200'
+                                    : 'bg-white text-gray-700 border border-gray-200'
+                                }`}
+                              >
+                                <span>{cond.label}</span>
+                                {cond.detail && <span className="text-[10px] opacity-75 ml-1">{cond.detail}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </SectionCard>
                   )}
 
                   {/* ---- Site Compliance ---- */}
-                  {compliance && (compliance.orientation_required || compliance.badging_required || compliance.special_instructions) && (
+                  {((compliance && (compliance.orientation_required || compliance.badging_required || compliance.special_instructions)) || isEditing) && (
                     <SectionCard
                       title="Site Compliance"
                       icon={<Shield className="w-4 h-4 text-blue-600" />}
                       headerColor="bg-blue-50 border-blue-200"
-                      badge="Required"
+                      badge={isEditing ? 'Editing' : 'Required'}
                       expanded={expandedSections.compliance}
                       onToggle={() => toggleSection('compliance')}
                     >
-                      <div className="space-y-2">
-                        {compliance.orientation_required ? (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+                      {isEditing ? (
+                        <div className="space-y-3">
+                          {/* Orientation toggle */}
+                          <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors bg-white border-gray-200 hover:border-blue-300">
+                            <input
+                              type="checkbox"
+                              checked={!!editFields.site_compliance?.orientation_required}
+                              onChange={(e) => setEditFields(f => ({
+                                ...f,
+                                site_compliance: { ...f.site_compliance, orientation_required: e.target.checked }
+                              }))}
+                              className="accent-blue-600"
+                            />
                             <HardHat className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-semibold text-gray-800">Orientation Required</span>
+                          </label>
+                          {editFields.site_compliance?.orientation_required && (
                             <div>
-                              <div className="text-xs font-bold text-blue-900">Orientation Required</div>
-                              {compliance.orientation_datetime ? (
-                                <div className="text-[10px] text-blue-600">{new Date(String(compliance.orientation_datetime)).toLocaleString()}</div>
-                              ) : null}
+                              <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Orientation Date/Time</label>
+                              <input
+                                type="datetime-local"
+                                value={editFields.site_compliance?.orientation_datetime || ''}
+                                onChange={(e) => setEditFields(f => ({
+                                  ...f,
+                                  site_compliance: { ...f.site_compliance, orientation_datetime: e.target.value }
+                                }))}
+                                className="w-full px-3 py-1.5 rounded-lg border-2 border-blue-300 focus:border-blue-500 text-sm text-gray-900"
+                              />
                             </div>
-                          </div>
-                        ) : null}
-                        {compliance.badging_required ? (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+                          )}
+
+                          {/* Badging toggle */}
+                          <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors bg-white border-gray-200 hover:border-blue-300">
+                            <input
+                              type="checkbox"
+                              checked={!!editFields.site_compliance?.badging_required}
+                              onChange={(e) => setEditFields(f => ({
+                                ...f,
+                                site_compliance: { ...f.site_compliance, badging_required: e.target.checked }
+                              }))}
+                              className="accent-blue-600"
+                            />
                             <Shield className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-semibold text-gray-800">Badging Required</span>
+                          </label>
+                          {editFields.site_compliance?.badging_required && (
                             <div>
-                              <div className="text-xs font-bold text-blue-900">Badging Required</div>
-                              {compliance.badging_type ? (
-                                <div className="text-[10px] text-blue-600">{String(compliance.badging_type)}</div>
-                              ) : null}
+                              <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Badge Type</label>
+                              <input
+                                type="text"
+                                value={editFields.site_compliance?.badging_type || ''}
+                                onChange={(e) => setEditFields(f => ({
+                                  ...f,
+                                  site_compliance: { ...f.site_compliance, badging_type: e.target.value }
+                                }))}
+                                className="w-full px-3 py-1.5 rounded-lg border-2 border-blue-300 focus:border-blue-500 text-sm text-gray-900"
+                                placeholder="e.g. TWIC, site badge..."
+                              />
                             </div>
+                          )}
+
+                          {/* Special instructions */}
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Special Instructions</label>
+                            <textarea
+                              value={editFields.site_compliance?.special_instructions || ''}
+                              onChange={(e) => setEditFields(f => ({
+                                ...f,
+                                site_compliance: { ...f.site_compliance, special_instructions: e.target.value }
+                              }))}
+                              className="w-full px-3 py-2 rounded-lg border-2 border-blue-300 focus:border-blue-500 text-sm text-gray-900"
+                              rows={3}
+                              placeholder="Any special site instructions..."
+                            />
                           </div>
-                        ) : null}
-                        {compliance.special_instructions ? (
-                          <div className="px-3 py-2 bg-white rounded-lg border border-blue-200">
-                            <div className="text-[10px] font-bold text-blue-500 uppercase mb-1">Special Instructions</div>
-                            <p className="text-xs text-blue-900">{String(compliance.special_instructions)}</p>
-                          </div>
-                        ) : null}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {compliance?.orientation_required ? (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+                              <HardHat className="w-4 h-4 text-blue-600" />
+                              <div>
+                                <div className="text-xs font-bold text-blue-900">Orientation Required</div>
+                                {compliance.orientation_datetime ? (
+                                  <div className="text-[10px] text-blue-600">{new Date(String(compliance.orientation_datetime)).toLocaleString()}</div>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : null}
+                          {compliance?.badging_required ? (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+                              <Shield className="w-4 h-4 text-blue-600" />
+                              <div>
+                                <div className="text-xs font-bold text-blue-900">Badging Required</div>
+                                {compliance.badging_type ? (
+                                  <div className="text-[10px] text-blue-600">{String(compliance.badging_type)}</div>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : null}
+                          {compliance?.special_instructions ? (
+                            <div className="px-3 py-2 bg-white rounded-lg border border-blue-200">
+                              <div className="text-[10px] font-bold text-blue-500 uppercase mb-1">Special Instructions</div>
+                              <p className="text-xs text-blue-900">{String(compliance.special_instructions)}</p>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
                     </SectionCard>
                   )}
 
@@ -988,7 +1144,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                   )}
 
                   {/* ---- Additional Notes ---- */}
-                  {(d?.additional_info || d?.directions) && (
+                  {(d?.additional_info || d?.directions || isEditing) && (
                     <SectionCard
                       title="Additional Notes"
                       icon={<FileText className="w-4 h-4 text-gray-500" />}
@@ -998,14 +1154,27 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                     >
                       <>
                         {isEditing ? (
-                          <div className="mb-3">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Additional Info</label>
-                            <textarea
-                              value={editFields.additional_info}
-                              onChange={(e) => setEditFields(f => ({ ...f, additional_info: e.target.value }))}
-                              className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900"
-                              rows={3}
-                            />
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Additional Info</label>
+                              <textarea
+                                value={editFields.additional_info}
+                                onChange={(e) => setEditFields(f => ({ ...f, additional_info: e.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900"
+                                rows={3}
+                                placeholder="Additional job notes..."
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Directions</label>
+                              <textarea
+                                value={editFields.directions}
+                                onChange={(e) => setEditFields(f => ({ ...f, directions: e.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900"
+                                rows={3}
+                                placeholder="Directions to the job site..."
+                              />
+                            </div>
                           </div>
                         ) : (
                           <>
@@ -1015,13 +1184,13 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{d.additional_info}</p>
                               </div>
                             )}
+                            {d?.directions && (
+                              <div>
+                                <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Directions</div>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{d.directions}</p>
+                              </div>
+                            )}
                           </>
-                        )}
-                        {d?.directions && (
-                          <div>
-                            <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Directions</div>
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{d.directions}</p>
-                          </div>
                         )}
                       </>
                     </SectionCard>

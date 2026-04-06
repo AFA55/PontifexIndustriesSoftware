@@ -3,13 +3,14 @@ export const dynamic = 'force-dynamic';
 /**
  * API Route: /api/job-orders/[id]
  * GET    — authenticated; fetch a single job order
+ * PATCH  — schedule board access; update editable fields
  * DELETE — admin only; delete a job order
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
-import { requireAuth } from '@/lib/api-auth';
+import { requireAuth, requireScheduleBoardAccess } from '@/lib/api-auth';
 
 export async function GET(
   request: NextRequest,
@@ -26,6 +27,60 @@ export async function GET(
       .eq('tenant_id', auth.tenantId)
       .single();
     if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ success: true, data });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireScheduleBoardAccess(request);
+    if (!auth.authorized) return auth.response;
+
+    const { id } = await params;
+    const body = await request.json();
+
+    // Allowlist of updatable fields
+    const ALLOWED_FIELDS = [
+      'customer_name', 'customer_contact', 'site_contact_phone', 'foreman_phone',
+      'address', 'location', 'estimated_cost', 'po_number', 'salesman_name',
+      'scheduled_date', 'end_date', 'arrival_time', 'description', 'additional_info',
+      'directions', 'jobsite_conditions', 'site_compliance', 'job_type', 'is_will_call',
+    ];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateData: Record<string, any> = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (key in body) updateData[key] = body[key];
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    }
+
+    // Coerce estimated_cost to float
+    if ('estimated_cost' in updateData && updateData.estimated_cost !== null && updateData.estimated_cost !== '') {
+      updateData.estimated_cost = parseFloat(String(updateData.estimated_cost));
+    } else if (updateData.estimated_cost === '') {
+      updateData.estimated_cost = null;
+    }
+
+    updateData.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabaseAdmin
+      .from('job_orders')
+      .update(updateData)
+      .eq('id', id)
+      .eq('tenant_id', auth.tenantId)
+      .select()
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
     return NextResponse.json({ success: true, data });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
