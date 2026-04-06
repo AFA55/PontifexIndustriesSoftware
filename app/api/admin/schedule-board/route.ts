@@ -54,6 +54,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch schedule data' }, { status: 500 });
     }
 
+    // 1b. Overlay per-day assignments when viewing a single date
+    // This ensures multi-day jobs show the operator assigned to THAT specific day,
+    // not the job_orders.assigned_to which reflects the first-ever assignment.
+    if (date && jobs && jobs.length > 0) {
+      let dailyQuery = supabaseAdmin
+        .from('job_daily_assignments')
+        .select('job_order_id, operator_id, helper_id, operator_name, helper_name')
+        .eq('assignment_date', date);
+      if (tenantId) { dailyQuery = dailyQuery.eq('tenant_id', tenantId); }
+      const { data: dailyAssignments } = await dailyQuery;
+
+      if (dailyAssignments && dailyAssignments.length > 0) {
+        const dailyMap = new Map(dailyAssignments.map(a => [a.job_order_id, a]));
+        for (const job of jobs) {
+          const da = dailyMap.get(job.id);
+          if (da) {
+            // operator_id / helper_id may be null (explicit unassign for this day)
+            job.assigned_to = da.operator_id !== undefined ? da.operator_id : job.assigned_to;
+            job.helper_id = da.helper_id !== undefined ? da.helper_id : job.helper_id;
+            if (da.operator_name !== undefined) job.operator_name = da.operator_name;
+            if (da.helper_name !== undefined) job.helper_name = da.helper_name;
+          }
+        }
+      }
+    }
+
     // 2. Fetch ALL pending_approval jobs (not date-filtered — global queue)
     let pendingQuery = supabaseAdmin
       .from('schedule_board_view')

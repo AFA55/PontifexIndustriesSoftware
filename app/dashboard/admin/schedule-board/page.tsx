@@ -831,6 +831,7 @@ export default function ScheduleBoardPage() {
           jobOrderId: jobId,
           operatorId: targetOperatorId || null,
           helperId: targetHelperId || null,
+          assignment_date: selectedDate,
         }),
       });
 
@@ -1072,7 +1073,7 @@ export default function ScheduleBoardPage() {
     try {
       const res = await apiFetch('/api/admin/schedule-board/assign', {
         method: 'POST',
-        body: JSON.stringify({ jobOrderId: job.id, operatorId, helperId }),
+        body: JSON.stringify({ jobOrderId: job.id, operatorId, helperId, assignment_date: selectedDate }),
       });
       if (!res.ok) throw new Error('Failed to assign');
     } catch {
@@ -1159,7 +1160,7 @@ export default function ScheduleBoardPage() {
         try {
           await apiFetch('/api/admin/schedule-board/assign', {
             method: 'POST',
-            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null }),
+            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate }),
           });
         } catch { /* continue */ }
       }
@@ -1447,7 +1448,7 @@ export default function ScheduleBoardPage() {
         try {
           await apiFetch('/api/admin/schedule-board/assign', {
             method: 'POST',
-            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null }),
+            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate }),
           });
         } catch { /* continue */ }
       }
@@ -1491,7 +1492,7 @@ export default function ScheduleBoardPage() {
       try {
         await apiFetch('/api/admin/schedule-board/assign', {
           method: 'POST',
-          body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null }),
+          body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate }),
         });
       } catch { /* continue */ }
     }
@@ -1533,7 +1534,7 @@ export default function ScheduleBoardPage() {
       try {
         await apiFetch('/api/admin/schedule-board/assign', {
           method: 'POST',
-          body: JSON.stringify({ jobOrderId: j.id, operatorId: operatorId || null, helperId: newHelperId }),
+          body: JSON.stringify({ jobOrderId: j.id, operatorId: operatorId || null, helperId: newHelperId, assignment_date: selectedDate }),
         });
       } catch { /* continue */ }
     }
