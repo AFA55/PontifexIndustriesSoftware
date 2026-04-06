@@ -1350,11 +1350,11 @@ export default function ScheduleFormPage() {
         setSchedulePreviewData(allJobs);
       }
 
-      // Fetch all operators
+      // Fetch operators and team members separately
       const { data: operators } = await supabase
         .from('profiles')
         .select('id, full_name, role')
-        .in('role', ['operator', 'apprentice'])
+        .in('role', ['operator', 'apprentice', 'shop_manager'])
         .order('full_name');
 
       setSchedulePreviewOperators(operators || []);
@@ -3860,15 +3860,25 @@ export default function ScheduleFormPage() {
                               </div>
                             ) : (
                               <div className="space-y-1">
-                                {dayJobs.slice(0, 3).map((job: any, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className="px-1.5 py-1 rounded-md bg-gradient-to-r from-slate-700 to-slate-800 text-[9px] text-white font-medium truncate"
-                                    title={`${job.customer_name || 'Job'} — ${job.job_type || ''}`}
-                                  >
-                                    {job.customer_name?.split(' ')[0] || 'Job'}
-                                  </div>
-                                ))}
+                                {dayJobs.slice(0, 3).map((job: any, idx: number) => {
+                                  const isAssigned = !!job.assigned_to;
+                                  const isPending = job.status === 'pending_approval';
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`px-1.5 py-1 rounded-md text-[9px] font-medium truncate ${
+                                        isPending
+                                          ? 'bg-yellow-400/80 text-yellow-900'
+                                          : isAssigned
+                                            ? 'bg-gradient-to-r from-slate-700 to-slate-800 text-white'
+                                            : 'bg-gradient-to-r from-orange-400 to-amber-500 text-white'
+                                      }`}
+                                      title={`${job.customer_name || 'Job'} — ${isAssigned ? 'Assigned' : 'Unassigned'}`}
+                                    >
+                                      {job.customer_name?.split(' ')[0] || 'Job'}
+                                    </div>
+                                  );
+                                })}
                                 {dayJobs.length > 3 && (
                                   <p className="text-[9px] text-slate-500 text-center font-semibold">+{dayJobs.length - 3} more</p>
                                 )}
@@ -3881,95 +3891,125 @@ export default function ScheduleFormPage() {
                   </div>
 
                   {/* ── Talent Pool ────────────────────────────── */}
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <Users size={15} className="text-indigo-600" />
-                      Talent Pool — Operator Availability
-                    </h4>
-                    {schedulePreviewOperators.length === 0 ? (
-                      <p className="text-sm text-slate-400 italic">No operators found.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {schedulePreviewOperators.map((op: any) => {
-                          // Count how many jobs this operator is assigned to in the preview week
-                          const assignedJobs = schedulePreviewData.filter(j =>
-                            j.assigned_operators?.some((a: any) =>
-                              a.operator_id === op.id || a.id === op.id
-                            )
-                          );
-                          const assignedCount = assignedJobs.length;
-                          const isFree = assignedCount === 0;
+                  {(() => {
+                    const operators = schedulePreviewOperators.filter((op: any) => op.role === 'operator' || op.role === 'shop_manager');
+                    const teamMembers = schedulePreviewOperators.filter((op: any) => op.role === 'apprentice');
 
-                          return (
-                            <div
-                              key={op.id}
-                              className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
-                                isFree
-                                  ? 'bg-emerald-50/60 border-emerald-200'
-                                  : assignedCount >= 5
-                                    ? 'bg-red-50/60 border-red-200'
-                                    : 'bg-amber-50/60 border-amber-200'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white ${
-                                  isFree
-                                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
-                                    : assignedCount >= 5
-                                      ? 'bg-gradient-to-br from-red-500 to-rose-600'
-                                      : 'bg-gradient-to-br from-amber-500 to-orange-600'
-                                }`}>
-                                  {op.full_name?.charAt(0)?.toUpperCase() || '?'}
-                                </div>
-                                <div>
-                                  <p className="text-sm font-bold text-slate-800">{op.full_name || 'Unknown'}</p>
-                                  <p className="text-[10px] text-slate-500 uppercase font-semibold">{op.role}</p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                {isFree ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
-                                    <CheckCircle size={12} />
-                                    Available
-                                  </span>
-                                ) : (
-                                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                                    assignedCount >= 5
-                                      ? 'bg-red-100 text-red-700'
-                                      : 'bg-amber-100 text-amber-700'
-                                  }`}>
-                                    {assignedCount} job{assignedCount !== 1 ? 's' : ''}
-                                  </span>
-                                )}
-                              </div>
+                    // A person is "busy" this week if any job in the range has them as assigned_to or helper_id
+                    const assignedIds = new Set<string>();
+                    for (const j of schedulePreviewData) {
+                      if (j.assigned_to) assignedIds.add(j.assigned_to);
+                      if (j.helper_id) assignedIds.add(j.helper_id);
+                    }
+
+                    const renderPerson = (op: any) => {
+                      const isBusy = assignedIds.has(op.id);
+                      // Count jobs for this person
+                      const jobCount = schedulePreviewData.filter(j => j.assigned_to === op.id || j.helper_id === op.id).length;
+                      return (
+                        <div
+                          key={op.id}
+                          className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
+                            !isBusy
+                              ? 'bg-emerald-50/60 border-emerald-200'
+                              : jobCount >= 5
+                                ? 'bg-red-50/60 border-red-200'
+                                : 'bg-amber-50/60 border-amber-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white ${
+                              !isBusy
+                                ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                                : jobCount >= 5
+                                  ? 'bg-gradient-to-br from-red-500 to-rose-600'
+                                  : 'bg-gradient-to-br from-amber-500 to-orange-600'
+                            }`}>
+                              {op.full_name?.charAt(0)?.toUpperCase() || '?'}
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{op.full_name || 'Unknown'}</p>
+                              <p className="text-[10px] text-slate-500 uppercase font-semibold">
+                                {op.role === 'apprentice' ? 'Team Member' : op.role === 'shop_manager' ? 'Shop Manager' : 'Operator'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {!isBusy ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                <CheckCircle size={12} />
+                                Available
+                              </span>
+                            ) : (
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                                jobCount >= 5 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {jobCount} job{jobCount !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    };
 
-                  {/* ── Summary Stats ──────────────────────────── */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
-                      <p className="text-2xl font-bold text-blue-700">{schedulePreviewData.length}</p>
-                      <p className="text-[10px] font-semibold text-blue-500 uppercase">Jobs This Week</p>
-                    </div>
-                    <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-200">
-                      <p className="text-2xl font-bold text-emerald-700">
-                        {schedulePreviewOperators.filter(op =>
-                          !schedulePreviewData.some(j =>
-                            j.assigned_operators?.some((a: any) => a.operator_id === op.id || a.id === op.id)
-                          )
-                        ).length}
-                      </p>
-                      <p className="text-[10px] font-semibold text-emerald-500 uppercase">Available Operators</p>
-                    </div>
-                    <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
-                      <p className="text-2xl font-bold text-slate-700">{schedulePreviewOperators.length}</p>
-                      <p className="text-[10px] font-semibold text-slate-500 uppercase">Total Crew</p>
-                    </div>
-                  </div>
+                    return (
+                      <>
+                        {/* Operators */}
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <Users size={15} className="text-indigo-600" />
+                            Operators
+                            <span className="text-[10px] px-1.5 py-0.5 bg-indigo-100 text-indigo-600 rounded-full font-bold">{operators.length}</span>
+                          </h4>
+                          {operators.length === 0 ? (
+                            <p className="text-sm text-slate-400 italic">No operators found.</p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {operators.map(renderPerson)}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Team Members */}
+                        {teamMembers.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                              <Users size={15} className="text-purple-600" />
+                              Team Members / Helpers
+                              <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded-full font-bold">{teamMembers.length}</span>
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {teamMembers.map(renderPerson)}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Summary Stats ── */}
+                        <div className="grid grid-cols-4 gap-3">
+                          <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
+                            <p className="text-2xl font-bold text-blue-700">
+                              {new Set(schedulePreviewData.filter(j => !j.is_will_call && j.status !== 'pending_approval').map((j: any) => j.id)).size}
+                            </p>
+                            <p className="text-[10px] font-semibold text-blue-500 uppercase">Jobs This Week</p>
+                          </div>
+                          <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-200">
+                            <p className="text-2xl font-bold text-emerald-700">
+                              {operators.filter(op => !assignedIds.has(op.id)).length}
+                            </p>
+                            <p className="text-[10px] font-semibold text-emerald-500 uppercase">Free Operators</p>
+                          </div>
+                          <div className="bg-indigo-50 rounded-xl p-3 text-center border border-indigo-200">
+                            <p className="text-2xl font-bold text-indigo-700">{operators.length}</p>
+                            <p className="text-[10px] font-semibold text-indigo-500 uppercase">Operators</p>
+                          </div>
+                          <div className="bg-purple-50 rounded-xl p-3 text-center border border-purple-200">
+                            <p className="text-2xl font-bold text-purple-700">{teamMembers.length}</p>
+                            <p className="text-[10px] font-semibold text-purple-500 uppercase">Team Members</p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </>
               )}
             </div>
