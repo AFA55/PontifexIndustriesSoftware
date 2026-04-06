@@ -90,7 +90,7 @@ async function apiFetch(url: string, opts?: RequestInit) {
 }
 
 // ─── Convert API job to JobCardData ──────────────────────────────────────
-function toJobCard(job: any): JobCardData {
+function toJobCard(job: any, viewDate?: string): JobCardData {
   return {
     id: job.id,
     job_number: job.job_number,
@@ -109,18 +109,20 @@ function toJobCard(job: any): JobCardData {
     change_requests_count: job.pending_change_requests_count || 0,
     helper_names: job.helper_name ? [job.helper_name] : [],
     po_number: job.po_number || null,
-    day_label: computeDayLabel(job),
+    day_label: computeDayLabel(job, viewDate),
     status: job.status || null,
   };
 }
 
-function computeDayLabel(job: any): string | undefined {
+function computeDayLabel(job: any, viewDate?: string): string | undefined {
   if (!job.scheduled_date || !job.end_date) return undefined;
+  if (job.scheduled_date === job.end_date) return undefined; // single-day job
   const start = parseLocalDate(job.scheduled_date);
   const end = parseLocalDate(job.end_date);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const currentDay = Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  // Use the date currently being viewed on the board, not today's real date
+  const current = viewDate ? parseLocalDate(viewDate) : (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+  const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const currentDay = Math.round((current.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   if (currentDay >= 1 && currentDay <= totalDays) return `Day ${currentDay} of ${totalDays}`;
   return undefined;
 }
@@ -257,16 +259,16 @@ export default function ScheduleBoardPage() {
     } catch { /* ignore */ }
   }, []);
 
-  const handleDispatchJobs = useCallback(async (targetDate: string, force = false) => {
+  const handleDispatchJobs = useCallback(async (targetDate: string) => {
     setDispatchLoading(true);
     try {
       const res = await apiFetch('/api/admin/schedule-board/dispatch', {
         method: 'POST',
-        body: JSON.stringify({ target_date: targetDate, force }),
+        body: JSON.stringify({ target_date: targetDate }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
-        addToast('success', force ? 'Tickets Re-pushed' : 'Jobs Dispatched', json.message);
+        addToast('success', 'Tickets Dispatched', json.message);
         setShowDispatchModal(false);
         fetchDispatchStatus(targetDate);
       } else {
@@ -502,7 +504,7 @@ export default function ScheduleBoardPage() {
       }
       const json = await res.json();
 
-      const unassigned = (json.data?.unassigned || []).map(toJobCard);
+      const unassigned = (json.data?.unassigned || []).map((j: any) => toJobCard(j, date));
       const pending = (json.data?.pending || []).map((j: any) => ({
         id: j.id,
         job_number: j.job_number,
@@ -535,7 +537,7 @@ export default function ScheduleBoardPage() {
         location_name: null,
         scheduling_flexibility: j.scheduling_flexibility || null,
       }));
-      const willCall = (json.data?.willCall || []).map(toJobCard);
+      const willCall = (json.data?.willCall || []).map((j: any) => toJobCard(j, date));
 
       // Group assigned jobs by operator name into rows
       const newRows: { operator: string | null; helper: string | null }[] = [];
@@ -547,7 +549,7 @@ export default function ScheduleBoardPage() {
         if (!operatorGrouped.has(opName)) {
           operatorGrouped.set(opName, { jobs: [], helperName: rawJob.helper_name || null });
         }
-        operatorGrouped.get(opName)!.jobs.push(toJobCard(rawJob));
+        operatorGrouped.get(opName)!.jobs.push(toJobCard(rawJob, date));
       }
 
       let rowIdx = 0;
@@ -1679,8 +1681,8 @@ export default function ScheduleBoardPage() {
                     className="relative px-3 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
                   >
                     <Megaphone className="w-4 h-4" /> Push Tickets
-                    {dispatchInfo && dispatchInfo.undispatched > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex items-center justify-center">{dispatchInfo.undispatched}</span>
+                    {dispatchInfo && dispatchInfo.total > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex items-center justify-center">{dispatchInfo.total}</span>
                     )}
                   </button>
                 </>
@@ -2318,35 +2320,27 @@ export default function ScheduleBoardPage() {
               <div className="p-5 space-y-4">
                 {dispatchInfo ? (
                   <>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="text-center p-3 bg-gray-50 rounded-xl">
-                        <div className="text-2xl font-bold text-gray-900">{dispatchInfo.total}</div>
-                        <div className="text-xs text-gray-500 font-medium">Total Jobs</div>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-xl border border-green-200">
-                        <div className="text-2xl font-bold text-green-700">{dispatchInfo.dispatched}</div>
-                        <div className="text-xs text-green-600 font-medium">Dispatched</div>
-                      </div>
-                      <div className="text-center p-3 bg-orange-50 rounded-xl border border-orange-200">
-                        <div className="text-2xl font-bold text-orange-700">{dispatchInfo.undispatched}</div>
-                        <div className="text-xs text-orange-600 font-medium">Ready to Push</div>
+                    <div className="flex justify-center">
+                      <div className="text-center p-4 bg-gray-50 rounded-xl min-w-[120px]">
+                        <div className="text-3xl font-bold text-gray-900">{dispatchInfo.total}</div>
+                        <div className="text-xs text-gray-500 font-medium mt-1">Assigned Jobs</div>
                       </div>
                     </div>
 
-                    {dispatchInfo.undispatched === 0 ? (
-                      <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
-                        <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0" />
+                    {dispatchInfo.total === 0 ? (
+                      <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                        <AlertCircle className="w-6 h-6 text-gray-400 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-bold text-green-800">All jobs dispatched for today!</p>
-                          <p className="text-xs text-green-600">All assigned jobs for this date have been pushed to operators. For multi-day jobs, you can re-push below.</p>
+                          <p className="text-sm font-bold text-gray-700">No assigned jobs for this date</p>
+                          <p className="text-xs text-gray-500">Assign operators to jobs on the board first.</p>
                         </div>
                       </div>
                     ) : (
                       <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-xl">
-                        <AlertCircle className="w-6 h-6 text-orange-600 flex-shrink-0" />
+                        <Megaphone className="w-6 h-6 text-orange-600 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-bold text-orange-800">{dispatchInfo.undispatched} job(s) ready to dispatch</p>
-                          <p className="text-xs text-orange-600">This will notify all assigned operators and helpers.</p>
+                          <p className="text-sm font-bold text-orange-800">{dispatchInfo.total} job(s) will be dispatched</p>
+                          <p className="text-xs text-orange-600">All assigned operators and helpers will be notified.</p>
                         </div>
                       </div>
                     )}
@@ -2365,32 +2359,17 @@ export default function ScheduleBoardPage() {
                   >
                     Cancel
                   </button>
-                  {dispatchInfo && dispatchInfo.undispatched === 0 && dispatchInfo.total > 0 ? (
-                    // All dispatched today — offer re-push for multi-day jobs
-                    <button
-                      onClick={() => handleDispatchJobs(selectedDate, true)}
-                      disabled={dispatchLoading}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {dispatchLoading ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Re-pushing...</>
-                      ) : (
-                        <><RefreshCw className="w-4 h-4" /> Re-push All {dispatchInfo.total} Tickets</>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleDispatchJobs(selectedDate)}
-                      disabled={dispatchLoading || !dispatchInfo || dispatchInfo.undispatched === 0}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {dispatchLoading ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Dispatching...</>
-                      ) : (
-                        <><Megaphone className="w-4 h-4" /> Push {dispatchInfo?.undispatched || 0} Tickets</>
-                      )}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleDispatchJobs(selectedDate)}
+                    disabled={dispatchLoading || !dispatchInfo || dispatchInfo.total === 0}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {dispatchLoading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Dispatching...</>
+                    ) : (
+                      <><Megaphone className="w-4 h-4" /> Push {dispatchInfo?.total || 0} Tickets</>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
