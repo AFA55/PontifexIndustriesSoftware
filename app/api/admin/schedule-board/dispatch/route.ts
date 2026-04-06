@@ -10,6 +10,15 @@ import { sendSMS, formatPhoneNumber } from '@/lib/sms';
  * POST /api/admin/schedule-board/dispatch
  * Push job tickets for a target date — dispatches all assigned jobs
  * and sends in-app notifications to operators and helpers.
+ *
+ * Body: { target_date: 'YYYY-MM-DD', force?: boolean }
+ * - force: if true, re-dispatches already-dispatched jobs (for multi-day re-push)
+ *
+ * Multi-day job support:
+ * - Jobs are queried by date range (scheduled_date <= target_date AND end_date >= target_date)
+ * - dispatched_at is set only on first push (not overwritten on re-push)
+ * - Per-day dispatch status is tracked via schedule_notifications (type='dispatched', metadata.dispatch_date)
+ * - A job is considered "undispatched for today" if no dispatched notification exists for target_date
  */
 export async function POST(request: NextRequest) {
   const auth = await requireScheduleBoardAccess(request);
@@ -43,6 +52,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const targetDate = body.target_date;
+    const force = body.force === true; // re-push already-dispatched jobs
 
     if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
       return NextResponse.json(
@@ -51,14 +61,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Find all dispatchable jobs for the target date
+    // 1. Find all assigned jobs active on the target date (single-day AND multi-day)
+    //    A job is active on targetDate if: scheduled_date <= targetDate AND (end_date IS NULL OR end_date >= targetDate)
     const { data: jobs, error: fetchError } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, customer_name, location, job_type, assigned_to, helper_assigned_to, arrival_time, scheduled_date')
-      .eq('scheduled_date', targetDate)
+      .select('id, job_number, customer_name, location, job_type, assigned_to, helper_assigned_to, arrival_time, scheduled_date, end_date, dispatched_at')
       .not('assigned_to', 'is', null)
-      .in('status', ['scheduled', 'assigned'])
-      .is('dispatched_at', null)
+      .lte('scheduled_date', targetDate)
+      .or(`end_date.is.null,end_date.gte.${targetDate}`)
+      .in('status', ['scheduled', 'assigned', 'in_progress'])
       .is('deleted_at', null);
 
     if (fetchError) {
@@ -75,22 +86,68 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. Batch update: set dispatched_at and ensure status is 'assigned'
-    const jobIds = jobs.map(j => j.id);
-    const { error: updateError } = await supabaseAdmin
-      .from('job_orders')
-      .update({
-        dispatched_at: new Date().toISOString(),
-        status: 'assigned',
-      })
-      .in('id', jobIds);
+    const allJobIds = jobs.map(j => j.id);
 
-    if (updateError) {
-      console.error('Error dispatching jobs:', updateError);
-      return NextResponse.json({ error: 'Failed to dispatch jobs.' }, { status: 500 });
+    // 2. Check which jobs have already been dispatched TODAY (per-day notification check)
+    //    A job is "already dispatched for today" if a dispatched notification exists with dispatch_date = targetDate
+    const { data: existingNotifs } = await supabaseAdmin
+      .from('schedule_notifications')
+      .select('job_order_id, recipient_id')
+      .in('job_order_id', allJobIds)
+      .eq('type', 'dispatched')
+      .contains('metadata', { dispatch_date: targetDate });
+
+    // Build a set of "job_id|recipient_id" combos already notified today
+    const alreadyNotifiedToday = new Set<string>();
+    (existingNotifs || []).forEach(n => {
+      if (n.job_order_id && n.recipient_id) {
+        alreadyNotifiedToday.add(`${n.job_order_id}|${n.recipient_id}`);
+      }
+    });
+
+    // If force=false, only dispatch jobs NOT yet notified today
+    // If force=true, re-push all (for "Update Schedule" style re-notification)
+    const jobsToDispatch = force
+      ? jobs
+      : jobs.filter(j => {
+          const opKey = `${j.id}|${j.assigned_to}`;
+          const helpKey = `${j.id}|${j.helper_assigned_to}`;
+          // Include if operator or helper hasn't been notified today yet
+          const opNotified = j.assigned_to ? alreadyNotifiedToday.has(opKey) : true;
+          const helpNotified = j.helper_assigned_to ? alreadyNotifiedToday.has(helpKey) : true;
+          return !opNotified || !helpNotified;
+        });
+
+    if (jobsToDispatch.length === 0) {
+      return NextResponse.json({
+        success: true,
+        dispatched_count: 0,
+        notification_count: 0,
+        message: 'All jobs for this date have already been dispatched today.',
+      });
     }
 
-    // 3. Create notifications for operators and helpers
+    // 3. Set dispatched_at on first-time dispatches (don't overwrite existing dispatched_at)
+    const firstTimeDispatchIds = jobsToDispatch
+      .filter(j => j.dispatched_at === null)
+      .map(j => j.id);
+
+    if (firstTimeDispatchIds.length > 0) {
+      const { error: updateError } = await supabaseAdmin
+        .from('job_orders')
+        .update({
+          dispatched_at: new Date().toISOString(),
+          status: 'assigned',
+        })
+        .in('id', firstTimeDispatchIds);
+
+      if (updateError) {
+        console.error('Error dispatching jobs:', updateError);
+        return NextResponse.json({ error: 'Failed to dispatch jobs.' }, { status: 500 });
+      }
+    }
+
+    // 4. Create notifications for operators and helpers
     const notifications: {
       recipient_id: string;
       job_order_id: string;
@@ -102,7 +159,7 @@ export async function POST(request: NextRequest) {
 
     // Get operator/helper names for notification messages
     const allUserIds = new Set<string>();
-    jobs.forEach(j => {
+    jobsToDispatch.forEach(j => {
       if (j.assigned_to) allUserIds.add(j.assigned_to);
       if (j.helper_assigned_to) allUserIds.add(j.helper_assigned_to);
     });
@@ -125,42 +182,59 @@ export async function POST(request: NextRequest) {
       day: 'numeric',
     });
 
-    for (const job of jobs) {
-      // Notification for operator
+    // Determine if this is a re-push (for multi-day jobs already dispatched on a prior day)
+    const isReDispatch = force || jobsToDispatch.some(j => j.dispatched_at !== null);
+    const notifTitle = isReDispatch ? 'Job Ticket Updated' : 'Job Ticket Dispatched';
+
+    for (const job of jobsToDispatch) {
+      // Determine multi-day label
+      const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
+
+      // Notification for operator (only if not already notified today, or force=true)
       if (job.assigned_to) {
-        notifications.push({
-          recipient_id: job.assigned_to,
-          job_order_id: job.id,
-          type: 'dispatched',
-          title: 'Job Ticket Dispatched',
-          message: `You have been assigned to ${job.customer_name} at ${job.location} on ${formattedDate}.`,
-          metadata: {
-            job_number: job.job_number,
-            customer_name: job.customer_name,
-            location: job.location,
-            job_type: job.job_type,
-            arrival_time: job.arrival_time,
-          },
-        });
+        const opKey = `${job.id}|${job.assigned_to}`;
+        if (force || !alreadyNotifiedToday.has(opKey)) {
+          notifications.push({
+            recipient_id: job.assigned_to,
+            job_order_id: job.id,
+            type: 'dispatched',
+            title: notifTitle,
+            message: `You have been assigned to ${job.customer_name} at ${job.location} on ${formattedDate}.${isMultiDay ? ' (Multi-day job)' : ''}`,
+            metadata: {
+              job_number: job.job_number,
+              customer_name: job.customer_name,
+              location: job.location,
+              job_type: job.job_type,
+              arrival_time: job.arrival_time,
+              dispatch_date: targetDate,
+              is_multi_day: isMultiDay,
+            },
+          });
+        }
       }
 
-      // Notification for helper
+      // Notification for helper (only if not already notified today, or force=true)
       if (job.helper_assigned_to) {
-        notifications.push({
-          recipient_id: job.helper_assigned_to,
-          job_order_id: job.id,
-          type: 'dispatched',
-          title: 'Job Ticket Dispatched',
-          message: `You have been assigned as helper for ${job.customer_name} at ${job.location} on ${formattedDate}.`,
-          metadata: {
-            job_number: job.job_number,
-            customer_name: job.customer_name,
-            location: job.location,
-            job_type: job.job_type,
-            arrival_time: job.arrival_time,
-            is_helper: true,
-          },
-        });
+        const helpKey = `${job.id}|${job.helper_assigned_to}`;
+        if (force || !alreadyNotifiedToday.has(helpKey)) {
+          notifications.push({
+            recipient_id: job.helper_assigned_to,
+            job_order_id: job.id,
+            type: 'dispatched',
+            title: notifTitle,
+            message: `You have been assigned as helper for ${job.customer_name} at ${job.location} on ${formattedDate}.${isMultiDay ? ' (Multi-day job)' : ''}`,
+            metadata: {
+              job_number: job.job_number,
+              customer_name: job.customer_name,
+              location: job.location,
+              job_type: job.job_type,
+              arrival_time: job.arrival_time,
+              dispatch_date: targetDate,
+              is_helper: true,
+              is_multi_day: isMultiDay,
+            },
+          });
+        }
       }
     }
 
@@ -179,11 +253,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Fire-and-forget SMS to operators/helpers who have a phone number
+    // 5. Fire-and-forget SMS to operators/helpers who have a phone number
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
     const smsPromises: Promise<any>[] = [];
 
-    for (const job of jobs) {
+    for (const job of jobsToDispatch) {
+      const opKey = `${job.id}|${job.assigned_to}`;
+      const helpKey = `${job.id}|${job.helper_assigned_to}`;
+
       const formatTime = (t: string | null) => {
         if (!t) return '';
         const [h, m] = t.split(':');
@@ -205,13 +282,13 @@ export async function POST(request: NextRequest) {
         return lines.join('\n');
       };
 
-      if (job.assigned_to && phoneMap.has(job.assigned_to)) {
+      if (job.assigned_to && phoneMap.has(job.assigned_to) && (force || !alreadyNotifiedToday.has(opKey))) {
         smsPromises.push(
           sendSMS({ to: phoneMap.get(job.assigned_to)!, message: buildMsg('operator'), jobId: job.id })
             .catch(e => console.error(`SMS failed for operator ${job.assigned_to}:`, e))
         );
       }
-      if (job.helper_assigned_to && phoneMap.has(job.helper_assigned_to)) {
+      if (job.helper_assigned_to && phoneMap.has(job.helper_assigned_to) && (force || !alreadyNotifiedToday.has(helpKey))) {
         smsPromises.push(
           sendSMS({ to: phoneMap.get(job.helper_assigned_to)!, message: buildMsg('helper'), jobId: job.id })
             .catch(e => console.error(`SMS failed for helper ${job.helper_assigned_to}:`, e))
@@ -224,10 +301,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      dispatched_count: jobIds.length,
+      dispatched_count: jobsToDispatch.length,
       notification_count: notificationCount,
       sms_attempted: smsPromises.length,
-      message: `Dispatched ${jobIds.length} job(s) for ${formattedDate}. ${notificationCount} notification(s) sent.`,
+      message: `Dispatched ${jobsToDispatch.length} job(s) for ${formattedDate}. ${notificationCount} notification(s) sent.`,
     });
   } catch (error) {
     console.error('Dispatch error:', error);
@@ -238,6 +315,11 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/admin/schedule-board/dispatch?date=YYYY-MM-DD
  * Check dispatch status for a given date (how many jobs are dispatched vs undispatched).
+ *
+ * Multi-day job support:
+ * - Queries by date range so multi-day jobs spanning the date are included
+ * - "Undispatched" means no dispatched notification has been sent for THIS date (dispatch_date in metadata)
+ * - This allows day 2+ pushes to show correctly
  */
 export async function GET(request: NextRequest) {
   const auth = await requireScheduleBoardAccess(request);
@@ -251,28 +333,67 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Query jobs active on targetDate (single-day and multi-day)
     const { data: jobs, error } = await supabaseAdmin
       .from('job_orders')
-      .select('id, dispatched_at, assigned_to, status, customer_name')
-      .eq('scheduled_date', targetDate)
+      .select('id, dispatched_at, assigned_to, helper_assigned_to, status, customer_name, scheduled_date, end_date')
       .not('assigned_to', 'is', null)
       .is('deleted_at', null)
+      .lte('scheduled_date', targetDate)
+      .or(`end_date.is.null,end_date.gte.${targetDate}`)
       .in('status', ['scheduled', 'assigned', 'in_route', 'in_progress']);
 
     if (error) {
       return NextResponse.json({ error: 'Failed to check dispatch status.' }, { status: 500 });
     }
 
-    const total = jobs?.length || 0;
-    const dispatched = jobs?.filter(j => j.dispatched_at !== null).length || 0;
+    const jobList = jobs || [];
+    const total = jobList.length;
+
+    if (total === 0) {
+      return NextResponse.json({
+        success: true,
+        date: targetDate,
+        total: 0,
+        dispatched: 0,
+        undispatched: 0,
+        ar_warnings: [],
+      });
+    }
+
+    const jobIds = jobList.map(j => j.id);
+
+    // Check per-day dispatch status via notifications
+    // A job is "dispatched for today" if a dispatched notification exists with dispatch_date = targetDate
+    const { data: todayNotifs } = await supabaseAdmin
+      .from('schedule_notifications')
+      .select('job_order_id')
+      .in('job_order_id', jobIds)
+      .eq('type', 'dispatched')
+      .contains('metadata', { dispatch_date: targetDate });
+
+    // Build set of job IDs that have been dispatched for today
+    const dispatchedTodayJobIds = new Set<string>(
+      (todayNotifs || []).map(n => n.job_order_id).filter(Boolean)
+    );
+
+    // For backward compatibility: also count jobs dispatched via the old method (dispatched_at set, single-day job on targetDate)
+    // A single-day job (end_date = scheduled_date OR end_date is null) with dispatched_at set counts as dispatched for today
+    jobList.forEach(j => {
+      const isSingleDay = !j.end_date || j.end_date === j.scheduled_date;
+      if (isSingleDay && j.dispatched_at !== null && j.scheduled_date === targetDate) {
+        dispatchedTodayJobIds.add(j.id);
+      }
+    });
+
+    const dispatched = dispatchedTodayJobIds.size;
     const undispatched = total - dispatched;
 
     // Check AR: find overdue balances for customers being dispatched
-    const customerNames = [...new Set((jobs || []).map(j => j.customer_name).filter(Boolean))];
+    const customerNames = [...new Set(jobList.map(j => j.customer_name).filter(Boolean))];
     let arWarnings: { customer_name: string; balance_due: number; days_overdue: number }[] = [];
 
     if (customerNames.length > 0) {
-      const today = new Date().toISOString().split('T')[0];
       const { data: overdueInvoices } = await supabaseAdmin
         .from('invoices')
         .select('customer_name, balance_due, due_date')

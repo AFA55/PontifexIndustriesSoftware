@@ -86,22 +86,61 @@ export async function POST(request: NextRequest) {
     const notificationTitle = `Schedule Updated for ${date}`;
     const notificationMessage = `Your schedule has been updated. Please review your jobs for ${formattedDate}.`;
 
-    // Collect unique recipient IDs
-    const recipientSet = new Set<string>();
+    // Collect per-job notifications (not just unique recipients) so operators see which job was updated
+    // Also insert a dispatched-type notification so per-day dispatch tracking reflects this update
+    const notifications: {
+      recipient_id: string;
+      job_order_id?: string;
+      type: string;
+      title: string;
+      message: string;
+      metadata: Record<string, unknown>;
+    }[] = [];
+
     for (const job of jobs) {
-      if (job.assigned_to) recipientSet.add(job.assigned_to);
-      if (job.helper_assigned_to) recipientSet.add(job.helper_assigned_to);
+      if (job.assigned_to) {
+        // schedule_updated notification
+        notifications.push({
+          recipient_id: job.assigned_to,
+          job_order_id: job.id,
+          type: 'schedule_updated',
+          title: notificationTitle,
+          message: `Your job at ${job.location} for ${job.customer_name} has been updated for ${formattedDate}.`,
+          metadata: { date, formatted_date: formattedDate, job_number: job.job_number, dispatch_date: date },
+        });
+        // Also insert a dispatched-type notification so per-day dispatch status is tracked
+        notifications.push({
+          recipient_id: job.assigned_to,
+          job_order_id: job.id,
+          type: 'dispatched',
+          title: 'Job Ticket Updated',
+          message: `Your job at ${job.location} for ${job.customer_name} has been updated for ${formattedDate}.`,
+          metadata: { date, formatted_date: formattedDate, job_number: job.job_number, dispatch_date: date, via_update_schedule: true },
+        });
+      }
+      if (job.helper_assigned_to) {
+        notifications.push({
+          recipient_id: job.helper_assigned_to,
+          job_order_id: job.id,
+          type: 'schedule_updated',
+          title: notificationTitle,
+          message: `Your helper assignment at ${job.location} for ${job.customer_name} has been updated for ${formattedDate}.`,
+          metadata: { date, formatted_date: formattedDate, job_number: job.job_number, dispatch_date: date, is_helper: true },
+        });
+        notifications.push({
+          recipient_id: job.helper_assigned_to,
+          job_order_id: job.id,
+          type: 'dispatched',
+          title: 'Job Ticket Updated',
+          message: `Your helper assignment at ${job.location} for ${job.customer_name} has been updated for ${formattedDate}.`,
+          metadata: { date, formatted_date: formattedDate, job_number: job.job_number, dispatch_date: date, via_update_schedule: true, is_helper: true },
+        });
+      }
     }
 
-    const notifications = Array.from(recipientSet).map(recipientId => ({
-      recipient_id: recipientId,
-      type: 'schedule_updated',
-      title: notificationTitle,
-      message: notificationMessage,
-      metadata: { date, formatted_date: formattedDate, job_count: jobs.length },
-    }));
-
-    let operatorsNotified = 0;
+    // Count unique recipients for the response message
+    const uniqueRecipients = new Set(notifications.map(n => n.recipient_id)).size;
+    let operatorsNotified = uniqueRecipients;
 
     if (notifications.length > 0) {
       // Fire-and-forget pattern — don't block on notification insert
@@ -112,11 +151,7 @@ export async function POST(request: NextRequest) {
           .select('id')
       ).then(({ data, error }) => {
         if (error) console.error('Error inserting schedule_updated notifications:', error);
-        else operatorsNotified = data?.length || 0;
       }).catch(() => {});
-
-      // For the response, use the count we prepared (all will be inserted)
-      operatorsNotified = notifications.length;
     }
 
     return NextResponse.json({

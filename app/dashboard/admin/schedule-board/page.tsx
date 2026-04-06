@@ -257,16 +257,16 @@ export default function ScheduleBoardPage() {
     } catch { /* ignore */ }
   }, []);
 
-  const handleDispatchJobs = useCallback(async (targetDate: string) => {
+  const handleDispatchJobs = useCallback(async (targetDate: string, force = false) => {
     setDispatchLoading(true);
     try {
       const res = await apiFetch('/api/admin/schedule-board/dispatch', {
         method: 'POST',
-        body: JSON.stringify({ target_date: targetDate }),
+        body: JSON.stringify({ target_date: targetDate, force }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
-        addToast('success', 'Jobs Dispatched', json.message);
+        addToast('success', force ? 'Tickets Re-pushed' : 'Jobs Dispatched', json.message);
         setShowDispatchModal(false);
         fetchDispatchStatus(targetDate);
       } else {
@@ -2337,8 +2337,8 @@ export default function ScheduleBoardPage() {
                       <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
                         <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-bold text-green-800">All jobs dispatched!</p>
-                          <p className="text-xs text-green-600">All assigned jobs for this date have been pushed to operators.</p>
+                          <p className="text-sm font-bold text-green-800">All jobs dispatched for today!</p>
+                          <p className="text-xs text-green-600">All assigned jobs for this date have been pushed to operators. For multi-day jobs, you can re-push below.</p>
                         </div>
                       </div>
                     ) : (
@@ -2365,17 +2365,32 @@ export default function ScheduleBoardPage() {
                   >
                     Cancel
                   </button>
-                  <button
-                    onClick={() => handleDispatchJobs(selectedDate)}
-                    disabled={dispatchLoading || !dispatchInfo || dispatchInfo.undispatched === 0}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {dispatchLoading ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Dispatching...</>
-                    ) : (
-                      <><Megaphone className="w-4 h-4" /> Push {dispatchInfo?.undispatched || 0} Tickets</>
-                    )}
-                  </button>
+                  {dispatchInfo && dispatchInfo.undispatched === 0 && dispatchInfo.total > 0 ? (
+                    // All dispatched today — offer re-push for multi-day jobs
+                    <button
+                      onClick={() => handleDispatchJobs(selectedDate, true)}
+                      disabled={dispatchLoading}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {dispatchLoading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Re-pushing...</>
+                      ) : (
+                        <><RefreshCw className="w-4 h-4" /> Re-push All {dispatchInfo.total} Tickets</>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleDispatchJobs(selectedDate)}
+                      disabled={dispatchLoading || !dispatchInfo || dispatchInfo.undispatched === 0}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {dispatchLoading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Dispatching...</>
+                      ) : (
+                        <><Megaphone className="w-4 h-4" /> Push {dispatchInfo?.undispatched || 0} Tickets</>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
