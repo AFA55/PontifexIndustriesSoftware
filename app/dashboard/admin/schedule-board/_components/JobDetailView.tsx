@@ -5,8 +5,10 @@ import {
   X, Printer, Edit3, MapPin, Wrench, Clock, Calendar, Users, FileText,
   Droplets, Zap, Shield, HardHat, Wind, Scissors, Package, ClipboardList,
   AlertTriangle, Gauge, Phone, DollarSign, ChevronDown, ChevronUp,
-  Loader2, ExternalLink, Info, MessageSquare, Send, Save, XCircle, History
+  Loader2, ExternalLink, Info, MessageSquare, Send, Save, XCircle, History,
+  Trash2, Plus
 } from 'lucide-react';
+import { EQUIPMENT_PRESETS } from '@/lib/equipment-map';
 import type { JobCardData } from './JobCard';
 import { getDisplayName } from '@/lib/equipment-map';
 
@@ -280,6 +282,18 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
 
   const handleStartEdit = () => {
     if (!fullData) return;
+
+    // Parse scope_details: convert JSON strings (cuts, holes) to arrays for easy editing
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsedScope: Record<string, any> = {};
+    for (const [svc, data] of Object.entries(fullData.scope_details || {})) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = { ...(data as any) };
+      if (typeof d.cuts === 'string') { try { d.cuts = JSON.parse(d.cuts); } catch { d.cuts = []; } }
+      if (typeof d.holes === 'string') { try { d.holes = JSON.parse(d.holes); } catch { d.holes = []; } }
+      parsedScope[svc] = d;
+    }
+
     setEditFields({
       // Job Information
       customer_name: fullData.customer_name || job.customer_name || '',
@@ -301,6 +315,10 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
       // JSON objects (deep clone)
       jobsite_conditions: fullData.jobsite_conditions ? JSON.parse(JSON.stringify(fullData.jobsite_conditions)) : {},
       site_compliance: fullData.site_compliance ? JSON.parse(JSON.stringify(fullData.site_compliance)) : {},
+      // Scope & Equipment
+      scope_details: parsedScope,
+      equipment_needed: fullData.equipment_needed ? [...fullData.equipment_needed] : [],
+      equipment_rentals: fullData.equipment_rentals ? [...fullData.equipment_rentals] : [],
     });
     setIsEditing(true);
   };
@@ -314,10 +332,23 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
     setSaving(true);
     try {
       const token = await getToken();
+
+      // Stringify cuts/holes arrays back to JSON strings before sending
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const scopeToSave: Record<string, any> = { ...editFields.scope_details };
+      for (const [svc, data] of Object.entries(scopeToSave)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const d = data as any;
+        if (Array.isArray(d.cuts)) scopeToSave[svc] = { ...d, cuts: JSON.stringify(d.cuts) };
+        if (Array.isArray(d.holes)) scopeToSave[svc] = { ...d, holes: JSON.stringify(d.holes) };
+      }
+
+      const body = { ...editFields, scope_details: scopeToSave };
+
       const res = await fetch(`/api/job-orders/${job.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(editFields),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         const json = await res.json();
@@ -645,162 +676,172 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                   >
                     <>
                       {isEditing ? (
-                        <div className="mb-3">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Description</label>
-                          <textarea
-                            value={editFields.description}
-                            onChange={(e) => setEditFields(f => ({ ...f, description: e.target.value }))}
-                            className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900"
-                            rows={3}
-                          />
-                        </div>
-                      ) : (d?.description || job.description) ? (
-                        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed mb-3">
-                          {d?.description || job.description}
-                        </p>
-                      ) : null}
-                      {d?.scope_details && Object.keys(d.scope_details).length > 0 && (
-                        <div className="space-y-4">
-                          {Object.entries(d.scope_details).map(([serviceKey, serviceVal]) => {
-                            // Friendly service type labels
-                            const SERVICE_LABELS: Record<string, string> = {
-                              DFS: 'DFS — Floor Sawing',
-                              WFS: 'WFS — Wall Sawing',
-                              Core: 'Core — Core Drilling',
-                              Demo: 'Demo — Demolition',
-                              GPR: 'GPR — Ground Penetrating Radar',
-                              Removal: 'Removal — Concrete Removal',
-                              EFS: 'EFS — Electric Floor Sawing',
-                            };
-                            const serviceLabel = SERVICE_LABELS[serviceKey] ?? serviceKey;
-                            const fields = typeof serviceVal === 'object' && serviceVal !== null
-                              ? (serviceVal as Record<string, any>)
-                              : {};
+                        <ScopeEditor
+                          description={editFields.description || ''}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          scopeDetails={editFields.scope_details || {}}
+                          onDescriptionChange={(v) => setEditFields(f => ({ ...f, description: v }))}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          onScopeChange={(s: Record<string, any>) => setEditFields(f => ({ ...f, scope_details: s }))}
+                        />
+                      ) : (
+                        <>
+                          {(d?.description || job.description) ? (
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed mb-3">
+                              {d?.description || job.description}
+                            </p>
+                          ) : null}
+                          {d?.scope_details && Object.keys(d.scope_details).length > 0 && (
+                            <div className="space-y-4">
+                              {Object.entries(d.scope_details).map(([serviceKey, serviceVal]) => {
+                                // Friendly service type labels
+                                const SERVICE_LABELS: Record<string, string> = {
+                                  DFS: 'DFS — Floor Sawing',
+                                  WFS: 'WFS — Wall Sawing',
+                                  Core: 'Core — Core Drilling',
+                                  Demo: 'Demo — Demolition',
+                                  GPR: 'GPR — Ground Penetrating Radar',
+                                  Removal: 'Removal — Concrete Removal',
+                                  EFS: 'EFS — Electric Floor Sawing',
+                                };
+                                const serviceLabel = SERVICE_LABELS[serviceKey] ?? serviceKey;
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                const fields = typeof serviceVal === 'object' && serviceVal !== null
+                                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                  ? (serviceVal as Record<string, any>)
+                                  : {};
 
-                            // Parse JSON strings stored in fields (e.g., cuts, holes arrays)
-                            const parseMaybeJson = (v: any): any => {
-                              if (typeof v === 'string') {
-                                try { return JSON.parse(v); } catch { return v; }
-                              }
-                              return v;
-                            };
+                                // Parse JSON strings stored in fields (e.g., cuts, holes arrays)
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                const parseMaybeJson = (v: any): any => {
+                                  if (typeof v === 'string') {
+                                    try { return JSON.parse(v); } catch { return v; }
+                                  }
+                                  return v;
+                                };
 
-                            // Helper: title-case a snake_case key
-                            const humanize = (s: string) =>
-                              s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                // Helper: title-case a snake_case key
+                                const humanize = (s: string) =>
+                                  s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-                            // Detect cuts array (sawing)
-                            const cutsRaw = parseMaybeJson(fields.cuts);
-                            const cutsArr = Array.isArray(cutsRaw) ? cutsRaw : null;
+                                // Detect cuts array (sawing)
+                                const cutsRaw = parseMaybeJson(fields.cuts);
+                                const cutsArr = Array.isArray(cutsRaw) ? cutsRaw : null;
 
-                            // Detect holes array (core drilling)
-                            const holesRaw = parseMaybeJson(fields.holes);
-                            const holesArr = Array.isArray(holesRaw) ? holesRaw : null;
+                                // Detect holes array (core drilling)
+                                const holesRaw = parseMaybeJson(fields.holes);
+                                const holesArr = Array.isArray(holesRaw) ? holesRaw : null;
 
-                            // Remaining text fields (description, method, equipment, etc.)
-                            const textFields = Object.entries(fields).filter(
-                              ([k]) => k !== 'cuts' && k !== 'holes'
-                            );
+                                // Remaining text fields (description, method, equipment, etc.)
+                                const textFields = Object.entries(fields).filter(
+                                  ([k]) => k !== 'cuts' && k !== 'holes'
+                                );
 
-                            return (
-                              <div key={serviceKey} className="rounded-lg border border-gray-200 overflow-hidden">
-                                {/* Service header */}
-                                <div className="px-3 py-2 bg-emerald-50 border-b border-gray-200">
-                                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">{serviceLabel}</span>
-                                </div>
-
-                                <div className="px-3 py-2 space-y-3">
-                                  {/* Cuts table */}
-                                  {cutsArr && cutsArr.length > 0 && (
-                                    <div>
-                                      <table className="w-full text-xs">
-                                        <thead>
-                                          <tr className="text-gray-500 border-b border-gray-200">
-                                            <th className="text-left py-1 pr-3 font-bold uppercase"># Cuts</th>
-                                            <th className="text-left py-1 pr-3 font-bold uppercase">Linear Feet</th>
-                                            <th className="text-left py-1 font-bold uppercase">Depth</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {cutsArr.map((cut: any, ci: number) => (
-                                            <tr key={ci} className="border-b border-gray-100 last:border-0">
-                                              <td className="py-1.5 pr-3 text-gray-900 font-semibold">
-                                                {cut.num_cuts ? Number(cut.num_cuts).toLocaleString() : '--'}
-                                              </td>
-                                              <td className="py-1.5 pr-3 text-gray-900">
-                                                {cut.linear_feet ? Number(cut.linear_feet).toLocaleString() : '--'}
-                                              </td>
-                                              <td className="py-1.5 text-gray-900">
-                                                {cut.depth ? `${cut.depth}"` : '--'}
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
+                                return (
+                                  <div key={serviceKey} className="rounded-lg border border-gray-200 overflow-hidden">
+                                    {/* Service header */}
+                                    <div className="px-3 py-2 bg-emerald-50 border-b border-gray-200">
+                                      <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">{serviceLabel}</span>
                                     </div>
-                                  )}
 
-                                  {/* Holes table */}
-                                  {holesArr && holesArr.length > 0 && (
-                                    <div>
-                                      <table className="w-full text-xs">
-                                        <thead>
-                                          <tr className="text-gray-500 border-b border-gray-200">
-                                            <th className="text-left py-1 pr-3 font-bold uppercase">Qty</th>
-                                            <th className="text-left py-1 pr-3 font-bold uppercase">Diameter</th>
-                                            <th className="text-left py-1 font-bold uppercase">Depth</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {holesArr.map((hole: any, hi: number) => (
-                                            <tr key={hi} className="border-b border-gray-100 last:border-0">
-                                              <td className="py-1.5 pr-3 text-gray-900 font-semibold">{hole.qty || '--'}</td>
-                                              <td className="py-1.5 pr-3 text-gray-900">
-                                                {hole.bit_size ? `${hole.bit_size}"` : '--'}
-                                              </td>
-                                              <td className="py-1.5 text-gray-900">
-                                                {hole.depth ? `${hole.depth}"` : '--'}
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
+                                    <div className="px-3 py-2 space-y-3">
+                                      {/* Cuts table */}
+                                      {cutsArr && cutsArr.length > 0 && (
+                                        <div>
+                                          <table className="w-full text-xs">
+                                            <thead>
+                                              <tr className="text-gray-500 border-b border-gray-200">
+                                                <th className="text-left py-1 pr-3 font-bold uppercase"># Cuts</th>
+                                                <th className="text-left py-1 pr-3 font-bold uppercase">Linear Feet</th>
+                                                <th className="text-left py-1 font-bold uppercase">Depth</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                              {cutsArr.map((cut: any, ci: number) => (
+                                                <tr key={ci} className="border-b border-gray-100 last:border-0">
+                                                  <td className="py-1.5 pr-3 text-gray-900 font-semibold">
+                                                    {cut.num_cuts ? Number(cut.num_cuts).toLocaleString() : '--'}
+                                                  </td>
+                                                  <td className="py-1.5 pr-3 text-gray-900">
+                                                    {cut.linear_feet ? Number(cut.linear_feet).toLocaleString() : '--'}
+                                                  </td>
+                                                  <td className="py-1.5 text-gray-900">
+                                                    {cut.depth ? `${cut.depth}"` : '--'}
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+
+                                      {/* Holes table */}
+                                      {holesArr && holesArr.length > 0 && (
+                                        <div>
+                                          <table className="w-full text-xs">
+                                            <thead>
+                                              <tr className="text-gray-500 border-b border-gray-200">
+                                                <th className="text-left py-1 pr-3 font-bold uppercase">Qty</th>
+                                                <th className="text-left py-1 pr-3 font-bold uppercase">Diameter</th>
+                                                <th className="text-left py-1 font-bold uppercase">Depth</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                              {holesArr.map((hole: any, hi: number) => (
+                                                <tr key={hi} className="border-b border-gray-100 last:border-0">
+                                                  <td className="py-1.5 pr-3 text-gray-900 font-semibold">{hole.qty || '--'}</td>
+                                                  <td className="py-1.5 pr-3 text-gray-900">
+                                                    {hole.bit_size ? `${hole.bit_size}"` : '--'}
+                                                  </td>
+                                                  <td className="py-1.5 text-gray-900">
+                                                    {hole.depth ? `${hole.depth}"` : '--'}
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+
+                                      {/* Text fields (method, equipment, description, etc.) */}
+                                      {textFields.length > 0 && (
+                                        <div className="space-y-1">
+                                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                          {textFields.map(([k, v]: [string, any]) => {
+                                            if (v === null || v === undefined || v === '' || v === false) return null;
+                                            // Format comma-separated values as title-cased list
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            const formatVal = (raw: any): string => {
+                                              if (typeof raw === 'boolean') return raw ? 'Yes' : 'No';
+                                              const str = String(raw);
+                                              if (str.includes(',')) {
+                                                return str.split(',').map(s => humanize(s.trim())).join(', ');
+                                              }
+                                              return humanize(str);
+                                            };
+                                            return (
+                                              <div key={k} className="flex gap-2 text-xs">
+                                                <span className="text-gray-500 font-semibold min-w-[80px]">{humanize(k)}:</span>
+                                                <span className="text-gray-900">{formatVal(v)}</span>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+
+                                      {/* No content fallback */}
+                                      {!cutsArr && !holesArr && textFields.length === 0 && (
+                                        <p className="text-xs text-gray-400 italic">No details recorded</p>
+                                      )}
                                     </div>
-                                  )}
-
-                                  {/* Text fields (method, equipment, description, etc.) */}
-                                  {textFields.length > 0 && (
-                                    <div className="space-y-1">
-                                      {textFields.map(([k, v]) => {
-                                        if (v === null || v === undefined || v === '' || v === false) return null;
-                                        // Format comma-separated values as title-cased list
-                                        const formatVal = (raw: any): string => {
-                                          if (typeof raw === 'boolean') return raw ? 'Yes' : 'No';
-                                          const str = String(raw);
-                                          if (str.includes(',')) {
-                                            return str.split(',').map(s => humanize(s.trim())).join(', ');
-                                          }
-                                          return humanize(str);
-                                        };
-                                        return (
-                                          <div key={k} className="flex gap-2 text-xs">
-                                            <span className="text-gray-500 font-semibold min-w-[80px]">{humanize(k)}:</span>
-                                            <span className="text-gray-900">{formatVal(v)}</span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-
-                                  {/* No content fallback */}
-                                  {!cutsArr && !holesArr && textFields.length === 0 && (
-                                    <p className="text-xs text-gray-400 italic">No details recorded</p>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
                       )}
                     </>
                   </SectionCard>
@@ -810,51 +851,62 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                     title="Equipment"
                     icon={<Wrench className="w-4 h-4 text-indigo-600" />}
                     headerColor="bg-indigo-50 border-indigo-200"
-                    badge={`${(d?.equipment_needed || job.equipment_needed || []).length + equipItems.length} items`}
+                    badge={isEditing ? 'Editing' : `${(d?.equipment_needed || job.equipment_needed || []).length + equipItems.length} items`}
                     expanded={expandedSections.equipment}
                     onToggle={() => toggleSection('equipment')}
                   >
                     <>
-                      {/* Selected equipment */}
-                      <div className="flex flex-wrap gap-1.5 mb-3">
-                        {(d?.equipment_needed || job.equipment_needed || []).map((eq: string) => (
-                          <span key={eq} className="px-3 py-1.5 bg-indigo-50 rounded-lg text-xs text-indigo-700 font-semibold border border-indigo-200 flex items-center gap-1">
-                            <Wrench className="w-3 h-3" /> {getDisplayName(eq)}
-                          </span>
-                        ))}
-                        {(d?.equipment_needed || job.equipment_needed || []).length === 0 && (
-                          <span className="text-sm text-gray-400 italic">No equipment specified</span>
-                        )}
-                      </div>
-
-                      {/* Equipment selections (recommended) */}
-                      {equipItems.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">Recommended Equipment</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {equipItems.map((item, i) => (
-                              <span key={i} className="px-2.5 py-1 bg-emerald-50 rounded-lg text-xs text-emerald-700 font-semibold border border-emerald-200 flex items-center gap-1">
-                                <Package className="w-3 h-3" />
-                                {item.label}
-                                {item.value && <span className="text-emerald-500 font-bold ml-0.5">({item.value})</span>}
+                      {isEditing ? (
+                        <EquipmentEditor
+                          equipmentNeeded={editFields.equipment_needed || []}
+                          equipmentRentals={editFields.equipment_rentals || []}
+                          onEquipmentNeededChange={(eq: string[]) => setEditFields(f => ({ ...f, equipment_needed: eq }))}
+                          onEquipmentRentalsChange={(eq: string[]) => setEditFields(f => ({ ...f, equipment_rentals: eq }))}
+                        />
+                      ) : (
+                        <>
+                          {/* Selected equipment */}
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {(d?.equipment_needed || job.equipment_needed || []).map((eq: string) => (
+                              <span key={eq} className="px-3 py-1.5 bg-indigo-50 rounded-lg text-xs text-indigo-700 font-semibold border border-indigo-200 flex items-center gap-1">
+                                <Wrench className="w-3 h-3" /> {getDisplayName(eq)}
                               </span>
                             ))}
+                            {(d?.equipment_needed || job.equipment_needed || []).length === 0 && (
+                              <span className="text-sm text-gray-400 italic">No equipment specified</span>
+                            )}
                           </div>
-                        </div>
-                      )}
 
-                      {/* Rentals */}
-                      {d?.equipment_rentals && d.equipment_rentals.length > 0 && (
-                        <div className="mt-3">
-                          <div className="text-[10px] font-bold text-red-500 uppercase mb-1.5">Rentals</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {d.equipment_rentals.map((eq: string, i: number) => (
-                              <span key={i} className="px-2.5 py-1 bg-red-50 rounded-lg text-xs text-red-700 font-semibold border border-red-200">
-                                {eq}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+                          {/* Equipment selections (recommended) */}
+                          {equipItems.length > 0 && (
+                            <div>
+                              <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">Recommended Equipment</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {equipItems.map((item, i) => (
+                                  <span key={i} className="px-2.5 py-1 bg-emerald-50 rounded-lg text-xs text-emerald-700 font-semibold border border-emerald-200 flex items-center gap-1">
+                                    <Package className="w-3 h-3" />
+                                    {item.label}
+                                    {item.value && <span className="text-emerald-500 font-bold ml-0.5">({item.value})</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Rentals */}
+                          {d?.equipment_rentals && d.equipment_rentals.length > 0 && (
+                            <div className="mt-3">
+                              <div className="text-[10px] font-bold text-red-500 uppercase mb-1.5">Rentals</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {d.equipment_rentals.map((eq: string, i: number) => (
+                                  <span key={i} className="px-2.5 py-1 bg-red-50 rounded-lg text-xs text-red-700 font-semibold border border-red-200">
+                                    {eq}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </>
                   </SectionCard>
@@ -1324,6 +1376,452 @@ function EditFieldRow({ label, value, onChange, type = 'text' }: { label: string
         onChange={(e) => onChange(e.target.value)}
         className="flex-1 px-2 py-1 rounded-lg border-2 border-purple-300 focus:border-purple-500 focus:ring-1 focus:ring-purple-200 text-sm font-medium text-gray-900 bg-purple-50/30"
       />
+    </div>
+  );
+}
+
+// ── Scope of Work Editor ──
+const ALL_SERVICE_TYPES = ['DFS', 'WFS', 'Core', 'Demo', 'GPR', 'Removal', 'EFS'] as const;
+type ServiceType = (typeof ALL_SERVICE_TYPES)[number];
+
+const SERVICE_LABELS: Record<string, string> = {
+  DFS: 'DFS — Floor Sawing',
+  WFS: 'WFS — Wall Sawing',
+  Core: 'Core — Core Drilling',
+  Demo: 'Demo — Demolition',
+  GPR: 'GPR — Ground Penetrating Radar',
+  Removal: 'Removal — Concrete Removal',
+  EFS: 'EFS — Electric Floor Sawing',
+};
+
+// Services that use a cuts table
+const SAW_SERVICES: ServiceType[] = ['DFS', 'WFS', 'EFS'];
+// Services that use a holes table
+const DRILL_SERVICES: ServiceType[] = ['Core'];
+
+function ScopeEditor({
+  description,
+  scopeDetails,
+  onDescriptionChange,
+  onScopeChange,
+}: {
+  description: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  scopeDetails: Record<string, any>;
+  onDescriptionChange: (v: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onScopeChange: (s: Record<string, any>) => void;
+}) {
+  const activeServices = Object.keys(scopeDetails) as ServiceType[];
+
+  const addService = (svc: ServiceType) => {
+    if (scopeDetails[svc]) return;
+    const newScope = { ...scopeDetails };
+    if (SAW_SERVICES.includes(svc)) {
+      newScope[svc] = { cuts: [{ num_cuts: '', linear_feet: '', depth: '' }] };
+    } else if (DRILL_SERVICES.includes(svc)) {
+      newScope[svc] = { holes: [{ qty: '', bit_size: '', depth: '' }] };
+    } else {
+      newScope[svc] = { description: '' };
+    }
+    onScopeChange(newScope);
+  };
+
+  const removeService = (svc: string) => {
+    const newScope = { ...scopeDetails };
+    delete newScope[svc];
+    onScopeChange(newScope);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateServiceField = (svc: string, field: string, value: any) => {
+    onScopeChange({ ...scopeDetails, [svc]: { ...scopeDetails[svc], [field]: value } });
+  };
+
+  const addCutRow = (svc: string) => {
+    const cuts = [...(scopeDetails[svc]?.cuts || []), { num_cuts: '', linear_feet: '', depth: '' }];
+    updateServiceField(svc, 'cuts', cuts);
+  };
+
+  const removeCutRow = (svc: string, idx: number) => {
+    const cuts = (scopeDetails[svc]?.cuts || []).filter((_: unknown, i: number) => i !== idx);
+    updateServiceField(svc, 'cuts', cuts);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateCutRow = (svc: string, idx: number, field: string, value: any) => {
+    const cuts = [...(scopeDetails[svc]?.cuts || [])];
+    cuts[idx] = { ...cuts[idx], [field]: value };
+    updateServiceField(svc, 'cuts', cuts);
+  };
+
+  const addHoleRow = (svc: string) => {
+    const holes = [...(scopeDetails[svc]?.holes || []), { qty: '', bit_size: '', depth: '' }];
+    updateServiceField(svc, 'holes', holes);
+  };
+
+  const removeHoleRow = (svc: string, idx: number) => {
+    const holes = (scopeDetails[svc]?.holes || []).filter((_: unknown, i: number) => i !== idx);
+    updateServiceField(svc, 'holes', holes);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateHoleRow = (svc: string, idx: number, field: string, value: any) => {
+    const holes = [...(scopeDetails[svc]?.holes || [])];
+    holes[idx] = { ...holes[idx], [field]: value };
+    updateServiceField(svc, 'holes', holes);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Description */}
+      <div>
+        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Description</label>
+        <textarea
+          value={description}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900"
+          rows={3}
+        />
+      </div>
+
+      {/* Service type toggles */}
+      <div>
+        <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">Service Types</label>
+        <div className="flex flex-wrap gap-1.5">
+          {ALL_SERVICE_TYPES.map((svc) => {
+            const isActive = !!scopeDetails[svc];
+            return (
+              <button
+                key={svc}
+                type="button"
+                onClick={() => isActive ? removeService(svc) : addService(svc)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                  isActive
+                    ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-emerald-400 hover:text-emerald-700'
+                }`}
+              >
+                {svc}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Per-service editors */}
+      {activeServices.map((svc) => {
+        const svcData = scopeDetails[svc] || {};
+        const isSawing = SAW_SERVICES.includes(svc as ServiceType);
+        const isDrilling = DRILL_SERVICES.includes(svc as ServiceType);
+
+        return (
+          <div key={svc} className="rounded-lg border border-emerald-200 overflow-hidden">
+            {/* Service header */}
+            <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
+                {SERVICE_LABELS[svc] ?? svc}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeService(svc)}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+                title={`Remove ${svc}`}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="px-3 py-3 space-y-3">
+              {/* Sawing: cuts table */}
+              {isSawing && (
+                <div>
+                  <div className="text-[10px] font-bold text-gray-400 uppercase mb-1.5">Cuts</div>
+                  <table className="w-full text-xs mb-2">
+                    <thead>
+                      <tr className="text-gray-500 border-b border-gray-200">
+                        <th className="text-left py-1 pr-2 font-bold uppercase"># Cuts</th>
+                        <th className="text-left py-1 pr-2 font-bold uppercase">Linear Feet</th>
+                        <th className="text-left py-1 pr-2 font-bold uppercase">Depth</th>
+                        <th className="w-6" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(svcData.cuts || []).map((cut: any, ci: number) => (
+                        <tr key={ci} className="border-b border-gray-100 last:border-0">
+                          <td className="py-1 pr-2">
+                            <input
+                              type="number"
+                              value={cut.num_cuts}
+                              onChange={(e) => updateCutRow(svc, ci, 'num_cuts', e.target.value)}
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <input
+                              type="number"
+                              value={cut.linear_feet}
+                              onChange={(e) => updateCutRow(svc, ci, 'linear_feet', e.target.value)}
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <input
+                              type="text"
+                              value={cut.depth}
+                              onChange={(e) => updateCutRow(svc, ci, 'depth', e.target.value)}
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              placeholder='e.g. 6"'
+                            />
+                          </td>
+                          <td className="py-1">
+                            <button
+                              type="button"
+                              onClick={() => removeCutRow(svc, ci)}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <button
+                    type="button"
+                    onClick={() => addCutRow(svc)}
+                    className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-semibold"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Cut
+                  </button>
+                </div>
+              )}
+
+              {/* Drilling: holes table */}
+              {isDrilling && (
+                <div>
+                  <div className="text-[10px] font-bold text-gray-400 uppercase mb-1.5">Holes</div>
+                  <table className="w-full text-xs mb-2">
+                    <thead>
+                      <tr className="text-gray-500 border-b border-gray-200">
+                        <th className="text-left py-1 pr-2 font-bold uppercase">Qty</th>
+                        <th className="text-left py-1 pr-2 font-bold uppercase">Diameter</th>
+                        <th className="text-left py-1 pr-2 font-bold uppercase">Depth</th>
+                        <th className="w-6" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(svcData.holes || []).map((hole: any, hi: number) => (
+                        <tr key={hi} className="border-b border-gray-100 last:border-0">
+                          <td className="py-1 pr-2">
+                            <input
+                              type="number"
+                              value={hole.qty}
+                              onChange={(e) => updateHoleRow(svc, hi, 'qty', e.target.value)}
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <input
+                              type="text"
+                              value={hole.bit_size}
+                              onChange={(e) => updateHoleRow(svc, hi, 'bit_size', e.target.value)}
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              placeholder='e.g. 4"'
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <input
+                              type="text"
+                              value={hole.depth}
+                              onChange={(e) => updateHoleRow(svc, hi, 'depth', e.target.value)}
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              placeholder='e.g. 8"'
+                            />
+                          </td>
+                          <td className="py-1">
+                            <button
+                              type="button"
+                              onClick={() => removeHoleRow(svc, hi)}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <button
+                    type="button"
+                    onClick={() => addHoleRow(svc)}
+                    className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-semibold"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Hole
+                  </button>
+                </div>
+              )}
+
+              {/* Text-only services: description + optional method */}
+              {!isSawing && !isDrilling && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Description</label>
+                    <textarea
+                      value={svcData.description || ''}
+                      onChange={(e) => updateServiceField(svc, 'description', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                      rows={2}
+                      placeholder={`${svc} details...`}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Method (optional)</label>
+                    <input
+                      type="text"
+                      value={svcData.method || ''}
+                      onChange={(e) => updateServiceField(svc, 'method', e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                      placeholder="e.g. flat_sawing, wire_sawing..."
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Equipment Editor ──
+function EquipmentEditor({
+  equipmentNeeded,
+  equipmentRentals,
+  onEquipmentNeededChange,
+  onEquipmentRentalsChange,
+}: {
+  equipmentNeeded: string[];
+  equipmentRentals: string[];
+  onEquipmentNeededChange: (eq: string[]) => void;
+  onEquipmentRentalsChange: (eq: string[]) => void;
+}) {
+  const [rentalInput, setRentalInput] = useState('');
+
+  const removeEquipment = (abbrev: string) => {
+    onEquipmentNeededChange(equipmentNeeded.filter(e => e !== abbrev));
+  };
+
+  const addEquipment = (abbrev: string) => {
+    if (!abbrev || equipmentNeeded.includes(abbrev)) return;
+    onEquipmentNeededChange([...equipmentNeeded, abbrev]);
+  };
+
+  const addRental = () => {
+    const trimmed = rentalInput.trim();
+    if (!trimmed || equipmentRentals.includes(trimmed)) return;
+    onEquipmentRentalsChange([...equipmentRentals, trimmed]);
+    setRentalInput('');
+  };
+
+  const removeRental = (rental: string) => {
+    onEquipmentRentalsChange(equipmentRentals.filter(r => r !== rental));
+  };
+
+  const availableToAdd = EQUIPMENT_PRESETS.filter(p => !equipmentNeeded.includes(p.abbrev));
+
+  return (
+    <div className="space-y-4">
+      {/* Current equipment with remove buttons */}
+      <div>
+        <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">Equipment Needed</label>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {equipmentNeeded.map((eq) => (
+            <span
+              key={eq}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 rounded-lg text-xs text-indigo-700 font-semibold border border-indigo-200"
+            >
+              <Wrench className="w-3 h-3" />
+              {getDisplayName(eq)}
+              <button
+                type="button"
+                onClick={() => removeEquipment(eq)}
+                className="text-indigo-400 hover:text-red-500 transition-colors ml-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+          {equipmentNeeded.length === 0 && (
+            <span className="text-xs text-gray-400 italic">No equipment selected</span>
+          )}
+        </div>
+
+        {/* Add equipment dropdown */}
+        {availableToAdd.length > 0 && (
+          <div className="flex items-center gap-2">
+            <select
+              defaultValue=""
+              onChange={(e) => { addEquipment(e.target.value); e.target.value = ''; }}
+              className="flex-1 px-2 py-1.5 rounded-lg border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900 bg-white"
+            >
+              <option value="" disabled>+ Add equipment...</option>
+              {availableToAdd.map(p => (
+                <option key={p.abbrev} value={p.abbrev}>{p.abbrev} — {p.full}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Rentals */}
+      <div>
+        <label className="text-[10px] font-bold text-red-500 uppercase mb-2 block">Equipment Rentals</label>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {equipmentRentals.map((rental) => (
+            <span
+              key={rental}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 rounded-lg text-xs text-red-700 font-semibold border border-red-200"
+            >
+              {rental}
+              <button
+                type="button"
+                onClick={() => removeRental(rental)}
+                className="text-red-400 hover:text-red-600 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+          {equipmentRentals.length === 0 && (
+            <span className="text-xs text-gray-400 italic">No rentals</span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={rentalInput}
+            onChange={(e) => setRentalInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addRental())}
+            placeholder="e.g. Scissor Lift, Generator..."
+            className="flex-1 px-2 py-1.5 rounded-lg border-2 border-red-200 focus:border-red-400 text-xs text-gray-900"
+          />
+          <button
+            type="button"
+            onClick={addRental}
+            disabled={!rentalInput.trim()}
+            className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1"
+          >
+            <Plus className="w-3 h-3" /> Add
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

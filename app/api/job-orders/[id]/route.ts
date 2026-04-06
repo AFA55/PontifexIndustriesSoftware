@@ -50,6 +50,7 @@ export async function PATCH(
       'address', 'location', 'estimated_cost', 'po_number', 'salesman_name',
       'scheduled_date', 'end_date', 'arrival_time', 'description', 'additional_info',
       'directions', 'jobsite_conditions', 'site_compliance', 'job_type', 'is_will_call',
+      'scope_details', 'equipment_needed', 'equipment_rentals',
     ];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
