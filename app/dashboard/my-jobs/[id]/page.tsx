@@ -62,10 +62,15 @@ export default function JobDetailPage() {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [workDetailsOpen, setWorkDetailsOpen] = useState(true);
   const [equipmentOpen, setEquipmentOpen] = useState(true);
+  const [contactOpen, setContactOpen] = useState(true);
+  const [crewOpen, setCrewOpen] = useState(true);
+  const [conditionsOpen, setConditionsOpen] = useState(true);
+  const [complianceOpen, setComplianceOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(true);
 
   // Documents state
   const [documents, setDocuments] = useState<any[]>([]);
-  const [docsOpen, setDocsOpen] = useState(true); // Open by default now
+  const [docsOpen, setDocsOpen] = useState(false); // collapsed by default
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docCategory, setDocCategory] = useState('other');
   const [docNotes, setDocNotes] = useState('');
@@ -466,6 +471,87 @@ export default function JobDetailPage() {
 
       <div className="container mx-auto px-4 py-5 max-w-lg space-y-4">
 
+        {/* ── IN-ROUTE SIMPLIFIED VIEW ───────────────────────── */}
+        {job.status === 'in_route' && (
+          <>
+            {/* Location */}
+            {(job.address || job.location) && (
+              <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-bold text-gray-800 mb-1">Job Location</h3>
+                    <p className="text-base text-gray-700 font-medium">{job.address || job.location}</p>
+                  </div>
+                </div>
+                {job.address && (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl text-base font-bold hover:bg-blue-700 transition-colors shadow"
+                  >
+                    <MapPin className="w-5 h-5" /> Open in Maps
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Site Contact */}
+            {(job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
+              <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Phone className="w-5 h-5 text-green-600" />
+                  <h3 className="text-base font-bold text-gray-800">Site Contact</h3>
+                </div>
+                <div className="space-y-3">
+                  {(job.foreman_name || job.customer_contact) && (
+                    <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
+                      <div>
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Contact</p>
+                        <p className="text-lg font-bold text-gray-900">{job.foreman_name || job.customer_contact}</p>
+                      </div>
+                      {(job.foreman_phone || job.site_contact_phone) && (
+                        <a href={`tel:${job.foreman_phone || job.site_contact_phone}`}
+                          className="flex items-center gap-2 px-5 py-3 bg-green-500 text-white rounded-xl text-sm font-bold hover:bg-green-600 transition-colors shadow-md">
+                          <Phone className="w-4 h-4" /> Call
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {!(job.foreman_name || job.customer_contact) && (job.site_contact_phone || job.foreman_phone) && (
+                    <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
+                      <div>
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Site Phone</p>
+                        <p className="text-lg font-bold text-gray-900">{job.site_contact_phone || job.foreman_phone}</p>
+                      </div>
+                      <a href={`tel:${job.site_contact_phone || job.foreman_phone}`}
+                        className="flex items-center gap-2 px-5 py-3 bg-green-500 text-white rounded-xl text-sm font-bold hover:bg-green-600 transition-colors shadow-md">
+                        <Phone className="w-4 h-4" /> Call
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Arrived CTA */}
+            <div className="pt-2 pb-6">
+              <button
+                onClick={() => router.push(`/dashboard/my-jobs/${job.id}/jobsite`)}
+                className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3"
+              >
+                <CheckCircle2 className="w-6 h-6" /> Arrived — Start In Progress
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── FULL JOB VIEW (not in_route) ─────────────────────── */}
+        {job.status !== 'in_route' && <>
+
         {/* Equipment already confirmed banner */}
         {equipmentAlreadyConfirmed && (
           <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-4 py-3 rounded-xl text-base font-semibold flex items-center gap-2">
@@ -554,11 +640,18 @@ export default function JobDetailPage() {
 
         {/* Site Contact Card — always show any available contact info */}
         {(job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Phone className="w-5 h-5 text-green-600" />
-              <h3 className="text-base font-bold text-gray-800">Site Contact</h3>
-            </div>
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 overflow-hidden">
+            <button
+              onClick={() => setContactOpen(!contactOpen)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Phone className="w-5 h-5 text-green-600" />
+                <span className="text-base font-bold text-gray-800">Site Contact</span>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${contactOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {contactOpen && <div className="px-5 pb-5 space-y-3">
             <div className="space-y-3">
               {/* Primary contact name row */}
               {(job.foreman_name || job.customer_contact) && (
@@ -615,15 +708,23 @@ export default function JobDetailPage() {
                 </div>
               )}
             </div>
+            </div>}
           </div>
         )}
 
-        {/* Crew Info - Bigger cards */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-blue-600" />
-            <h3 className="text-base font-bold text-gray-800">Crew</h3>
-          </div>
+        {/* Crew Info - collapsible */}
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+          <button
+            onClick={() => setCrewOpen(!crewOpen)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-600" />
+              <span className="text-base font-bold text-gray-800">Crew</span>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${crewOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {crewOpen && <div className="px-5 pb-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
               <div className="w-11 h-11 bg-blue-500 text-white rounded-full flex items-center justify-center text-base font-bold flex-shrink-0">
@@ -646,6 +747,7 @@ export default function JobDetailPage() {
               </div>
             )}
           </div>
+          </div>}
         </div>
 
         {/* Work Details Panel - Bigger text */}
@@ -703,89 +805,106 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        {/* Jobsite Conditions */}
+        {/* Jobsite Conditions — collapsible */}
         {hasConditions && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-amber-200/60 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
-              <h3 className="text-base font-bold text-gray-800">Jobsite Conditions</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {filledConditions.map(([key, value]) => {
-                const displayValue = typeof value === 'boolean'
-                  ? 'Yes'
-                  : String(value);
-                const label = conditionLabels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                const isWarning = key === 'cord_480' || key === 'high_work';
-                return (
-                  <div
-                    key={key}
-                    className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm ${
-                      isWarning
-                        ? 'bg-red-50 border-red-200'
-                        : 'bg-amber-50 border-amber-100'
-                    }`}
-                  >
-                    <span className={`font-semibold ${isWarning ? 'text-red-700' : 'text-gray-700'}`}>{label}</span>
-                    <span className={`font-bold ml-2 ${isWarning ? 'text-red-900' : 'text-gray-900'}`}>{displayValue}</span>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-amber-200/60 overflow-hidden">
+            <button
+              onClick={() => setConditionsOpen(!conditionsOpen)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                <span className="text-base font-bold text-gray-800">Jobsite Conditions</span>
+                <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold">{filledConditions.length}</span>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${conditionsOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {conditionsOpen && (
+              <div className="px-5 pb-5">
+                <div className="grid grid-cols-2 gap-2">
+                  {filledConditions.map(([key, value]) => {
+                    const displayValue = typeof value === 'boolean' ? 'Yes' : String(value);
+                    const label = conditionLabels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    const isWarning = key === 'cord_480' || key === 'high_work';
+                    return (
+                      <div key={key} className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm ${isWarning ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-100'}`}>
+                        <span className={`font-semibold ${isWarning ? 'text-red-700' : 'text-gray-700'}`}>{label}</span>
+                        <span className={`font-bold ml-2 ${isWarning ? 'text-red-900' : 'text-gray-900'}`}>{displayValue}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Site Compliance */}
+        {/* Site Compliance — collapsible */}
         {hasCompliance && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-indigo-200/60 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Shield className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-base font-bold text-gray-800">Site Compliance</h3>
-            </div>
-            <div className="space-y-2">
-              {filledCompliance.map(([key, value]) => {
-                const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                const displayValue = typeof value === 'boolean'
-                  ? (value ? 'Required' : 'Not Required')
-                  : String(value);
-                return (
-                  <div key={key} className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                    <span className="text-sm font-semibold text-indigo-800">{label}</span>
-                    <span className="text-sm font-bold text-indigo-900 ml-2">{displayValue}</span>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-indigo-200/60 overflow-hidden">
+            <button
+              onClick={() => setComplianceOpen(!complianceOpen)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-indigo-600" />
+                <span className="text-base font-bold text-gray-800">Site Compliance</span>
+                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-bold">Required</span>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${complianceOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {complianceOpen && (
+              <div className="px-5 pb-5 space-y-2">
+                {filledCompliance.map(([key, value]) => {
+                  const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                  const displayValue = typeof value === 'boolean' ? (value ? 'Required' : 'Not Required') : String(value);
+                  return (
+                    <div key={key} className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                      <span className="text-sm font-semibold text-indigo-800">{label}</span>
+                      <span className="text-sm font-bold text-indigo-900 ml-2">{displayValue}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Additional Notes & Directions */}
+        {/* Additional Notes & Directions — collapsible */}
         {hasAdditionalNotes && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-purple-200/60 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <FileText className="w-5 h-5 text-purple-600" />
-              <h3 className="text-base font-bold text-gray-800">Additional Notes</h3>
-            </div>
-            <div className="space-y-3">
-              {job.additional_info && (
-                <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-                  <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Notes</p>
-                  <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.additional_info}</p>
-                </div>
-              )}
-              {job.directions && (
-                <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                  <p className="text-xs text-blue-600 font-semibold uppercase mb-1">Directions</p>
-                  <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.directions}</p>
-                </div>
-              )}
-              {job.special_equipment_notes && (
-                <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-                  <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Special Equipment Notes</p>
-                  <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.special_equipment_notes}</p>
-                </div>
-              )}
-            </div>
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-purple-200/60 overflow-hidden">
+            <button
+              onClick={() => setNotesOpen(!notesOpen)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-purple-600" />
+                <span className="text-base font-bold text-gray-800">Additional Notes</span>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${notesOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {notesOpen && (
+              <div className="px-5 pb-5 space-y-3">
+                {job.additional_info && (
+                  <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
+                    <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Notes</p>
+                    <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.additional_info}</p>
+                  </div>
+                )}
+                {job.directions && (
+                  <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <p className="text-xs text-blue-600 font-semibold uppercase mb-1">Directions</p>
+                    <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.directions}</p>
+                  </div>
+                )}
+                {job.special_equipment_notes && (
+                  <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
+                    <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Special Equipment Notes</p>
+                    <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.special_equipment_notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1004,6 +1123,8 @@ export default function JobDetailPage() {
             </button>
           </div>
         )}
+
+        </> /* end full job view */}
 
       </div>
     </div>
