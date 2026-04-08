@@ -20,12 +20,13 @@ export async function GET(
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
     const { id } = await params;
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('job_orders')
       .select('*, profiles!job_orders_assigned_to_fkey(full_name, role)')
-      .eq('id', id)
-      .eq('tenant_id', auth.tenantId)
-      .single();
+      .eq('id', id);
+    // Only apply tenant filter if tenantId is set (super_admin may have none)
+    if (auth.tenantId) query = query.eq('tenant_id', auth.tenantId);
+    const { data, error } = await query.single();
     if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json({ success: true, data });
   } catch {
