@@ -53,7 +53,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         completion_approved_at,
         completion_rejected_at,
         completion_rejection_notes,
-        profiles!job_orders_assigned_to_fkey(full_name)
+        assigned_to
       `)
       .eq('id', jobId);
     // Only filter by tenant if tenantId is set (super_admin may have none)
@@ -62,6 +62,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    // ── 1b. Fetch operator profile separately (assigned_to may ref auth.users) ──
+    let operatorProfile: { full_name: string } | null = null;
+    if (job.assigned_to) {
+      const { data: opProf } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', job.assigned_to)
+        .maybeSingle();
+      operatorProfile = opProf;
     }
 
     // ── 2. Fetch scope items ────────────────────────────────────────────────
@@ -248,7 +259,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           notes: (job as any).notes ?? null,
           internal_notes: (job as any).internal_notes ?? null,
           assigned_to: job.assigned_to ?? null,
-          operator_name: (job.profiles as any)?.full_name ?? null,
+          operator_name: operatorProfile?.full_name ?? null,
           helper_name: null,
           completion_submitted_at: job.completion_submitted_at,
           completion_requested_at: completionRequest?.submitted_at ?? job.completion_submitted_at ?? null,
