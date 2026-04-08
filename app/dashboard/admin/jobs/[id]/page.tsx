@@ -370,26 +370,26 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
         apiFetch(`/api/job-orders/${jobId}/work-items`),
       ]);
 
-      // Summary — scope + progress + completion
-      if (summaryRes.ok) {
-        const s = await summaryRes.json();
-        setScopeProgress(s.data?.scope?.items || []);
-        setOverallPct(s.data?.scope?.overall_pct || 0);
-        setProgressByDate(s.data?.progress?.by_date || []);
-        setCompletionReq(s.data?.completion_request || null);
-        // Merge operator_name from summary into job if full job doesn't have it
-        if (s.data?.job?.operator_name) {
-          setJob(prev => prev ? { ...prev, operator_name: s.data.job.operator_name } : prev);
-        }
-      } else if (summaryRes.status === 404) {
-        setPageError('Job not found.');
-        return;
+      // Parse all responses in parallel
+      const [summaryJson, fullJobJson, notesJson, workItemsJson] = await Promise.all([
+        summaryRes.ok ? summaryRes.json() : null,
+        fullJobRes.ok ? fullJobRes.json() : null,
+        notesRes.ok ? notesRes.json() : null,
+        workItemsRes.ok ? workItemsRes.json() : null,
+      ]);
+
+      // Summary — scope + progress + completion (best-effort)
+      if (summaryJson) {
+        setScopeProgress(summaryJson.data?.scope?.items || []);
+        setOverallPct(summaryJson.data?.scope?.overall_pct || 0);
+        setProgressByDate(summaryJson.data?.progress?.by_date || []);
+        setCompletionReq(summaryJson.data?.completion_request || null);
       }
 
-      // Full job — all fields
-      if (fullJobRes.ok) {
-        const fj = await fullJobRes.json();
-        const d = fj.data;
+      // Full job — authoritative source for all job fields
+      if (fullJobJson) {
+        const d = fullJobJson.data;
+        const summaryOperatorName = summaryJson?.data?.job?.operator_name || null;
         setJob({
           id: d.id,
           job_number: d.job_number,
@@ -424,7 +424,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
           jobsite_conditions: d.jobsite_conditions,
           site_compliance: d.site_compliance,
           salesman_name: d.salesman_name,
-          operator_name: d.profiles?.full_name || null,
+          operator_name: d.profiles?.full_name || summaryOperatorName || null,
           helper_name: null,
           assigned_to: d.assigned_to,
           completion_submitted_at: d.completion_submitted_at,
@@ -433,19 +433,16 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
           completion_rejection_notes: d.completion_rejection_notes,
           created_at: d.created_at,
         });
+      } else {
+        // Full job fetch failed — truly not found or no access
+        setPageError('Job not found or you do not have access.');
       }
 
       // Notes
-      if (notesRes.ok) {
-        const n = await notesRes.json();
-        setNotes(n.data || []);
-      }
+      if (notesJson) setNotes(notesJson.data || []);
 
       // Work items
-      if (workItemsRes.ok) {
-        const wi = await workItemsRes.json();
-        setWorkItems(wi.data || []);
-      }
+      if (workItemsJson) setWorkItems(workItemsJson.data || []);
     } catch {
       setPageError('Network error loading job.');
     }
