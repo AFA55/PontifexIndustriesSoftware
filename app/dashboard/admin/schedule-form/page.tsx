@@ -992,6 +992,44 @@ export default function ScheduleFormPage() {
     setError('');
   }, []);
 
+  // Pre-fill from customer page "Add Job" button
+  useEffect(() => {
+    const raw = localStorage.getItem('schedule-form-customer-prefill');
+    if (!raw) return;
+    try {
+      const prefill = JSON.parse(raw) as {
+        customer_id?: string;
+        customer_name?: string;
+        project_name?: string;
+        address?: string;
+        location?: string;
+        contact_name?: string;
+        contact_phone?: string;
+        equipment_needed?: string[];
+      };
+      localStorage.removeItem('schedule-form-customer-prefill');
+
+      const updates: Record<string, unknown> = {};
+      if (prefill.customer_name) updates.contractor_name = prefill.customer_name;
+      if (prefill.customer_id) updates.customer_id = prefill.customer_id;
+      if (prefill.project_name) updates.project_name = prefill.project_name;
+      if (prefill.address) updates.site_address = prefill.address;
+      if (prefill.location) updates.location_name = prefill.location;
+      if (prefill.contact_name) updates.site_contact = prefill.contact_name;
+      if (prefill.contact_phone) updates.contact_phone = prefill.contact_phone;
+      if (prefill.equipment_needed?.length) updates.equipment_needed = prefill.equipment_needed;
+
+      updateForm(updates as Partial<FormData>);
+
+      if (prefill.customer_id) {
+        fetchCustomerHistory(prefill.customer_id);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Filter customer suggestions as user types
   const handleCustomerChange = useCallback((value: string) => {
     updateForm({ contractor_name: value });

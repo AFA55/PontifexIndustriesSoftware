@@ -46,7 +46,7 @@ export async function GET(
     // Fetch job history
     const { data: jobs } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, title, job_type, status, scheduled_date, end_date, estimated_cost, created_at')
+      .select('id, job_number, title, job_type, status, scheduled_date, end_date, estimated_cost, created_at, project_name, address, location, contact_name, site_contact_phone, equipment_needed, description')
       .eq('customer_id', id)
       .order('scheduled_date', { ascending: false });
 
