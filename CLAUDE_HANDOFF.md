@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 5, 2026 (Session 2) | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
+**Date:** April 7, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
 
 ---
 
@@ -7,18 +7,46 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `9d337ed7` — "merge: agent-abdb6df8 — fix operator my-jobs server error, dispatch flow audit, RLS"
+- **Last commit:** `f63caed3` — "feat(operator): collapsible sections + simplified in-route view"
 - **Pushed to origin** ✅
-- **Build:** PASSING (0 errors, 70 pages)
+- **Build:** PASSING (0 errors)
+- **Dev server:** running on port 3001
 
-### Recent Commits (This Session — April 5, 2026 Session 2)
+### Recent Commits (April 7, 2026 session)
 ```
-9d337ed7 merge: agent-abdb6df8 — fix operator my-jobs server error + dispatch audit + RLS
-575f8ae8 fix: operator my-jobs server error, dispatch flow audit, RLS for operators
-b38401d2 merge: tender-dirac worktree — all April 5 features
-f5cb63ec feat: enhance Approve Job modal with full jobsite details, compliance, and scheduling info
-24f91054 feat: remove Payment & Billing section from CustomerForm
+f63caed3 feat(operator): collapsible sections + simplified in-route view
+4655a031 fix: operator job page — site contact always visible + conditions/compliance/notes on main page
+df09598b fix: Schedule Preview synced to real data — jobs show even if unassigned, operators/team members split
+d3730d30 fix: mic permission handling in AI Smart Fill — request permission, show professional denied UI
+7a8f436d feat: per-day assignment tracking via job_daily_assignments
+00a9084f feat: Scope of Work and Equipment fully editable in job modal
+54e40295 fix: push tickets works every day independently, day label shows correct day number
 ```
+
+---
+
+## WHAT WAS DONE (April 7, 2026 — Session Start)
+
+### Operator Job Detail Page Overhaul (`app/dashboard/my-jobs/[id]/page.tsx`)
+- **In-route simplified view**: when `job.status === 'in_route'`, page shows ONLY Location + Site Contact with Call button + "Arrived — Start In Progress" CTA; all other sections hidden
+- **Collapsible sections**: every section now has a toggle button with ChevronDown indicator:
+  - Site Contact (green)
+  - Crew (blue)
+  - Work Details (existing)
+  - Equipment (existing)
+  - Jobsite Conditions (amber)
+  - Site Compliance (indigo)
+  - Additional Notes (purple)
+  - Documents (collapsed by default)
+- Build: PASSING ✅, committed `f63caed3`, pushed to origin
+
+### Schedule Board Fixes (this session's worktree — tender-dirac)
+- All job ticket fields editable inline (Job Info, Work Conditions, Site Compliance, Notes, Scope, Equipment)
+- Push Tickets works every day independently for multi-day jobs
+- Day label shows correct "Day N of M" based on currently-viewed date
+- Per-day assignments via `job_daily_assignments` table — unassigning one day doesn't affect other days
+- Mic permission in AI Smart Fill: requests permission professionally, shows denied UI with instructions
+- Schedule Preview synced to real data: shows unassigned jobs, splits operators vs team members
 
 ---
 
@@ -173,10 +201,12 @@ Three parallel agents ran simultaneously. All changes landed in commit `aba3bee0
 ---
 
 ## NEXT SESSION PRIORITIES
-If another automated session runs before the manual test:
-1. **Patriot logo upload** — get the logo file path from user, update `tenant_branding` row
-2. **Vercel env vars check** — verify all 8 required vars are set in Vercel dashboard
-3. **Production DNS** — verify pontifexindustries.com points to Vercel
+1. **Manual UX smoke test** — schedule → dispatch → operator in-route → arrived → work performed → complete → invoice
+2. **Loading states & error handling audit** — remaining pages with no skeletons/spinners
+3. **Patriot logo upload** — get logo file, update `tenant_branding.logo_url`
+4. **Vercel env vars check** — verify all 8 required vars set in Vercel dashboard
+5. **Production DNS** — verify pontifexindustries.com → Vercel
+6. **Merge to main** — after manual test passes
 
 ---
 
