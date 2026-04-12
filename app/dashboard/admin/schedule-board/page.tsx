@@ -36,6 +36,7 @@ import DndBoardWrapper from './_components/DndBoardWrapper';
 import OperatorRowView from './_components/OperatorRowView';
 import ViewToggle from './_components/ViewToggle';
 import CrewScheduleGrid from './_components/CrewScheduleGrid';
+import CancelJobModal from './_components/CancelJobModal';
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
@@ -222,6 +223,7 @@ export default function ScheduleBoardPage() {
   const [assignTarget, setAssignTarget] = useState<{ job: JobCardData; source: 'unassigned' | 'willcall' } | null>(null);
   const [editTarget, setEditTarget] = useState<{ job: JobCardData; rowIndex: number | null } | null>(null);
   const [changeRequestTarget, setChangeRequestTarget] = useState<JobCardData | null>(null);
+  const [cancelJobTarget, setCancelJobTarget] = useState<JobCardData | null>(null);
   const [notesTarget, setNotesTarget] = useState<JobCardData | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
@@ -1381,6 +1383,35 @@ export default function ScheduleBoardPage() {
     }
   };
 
+  // ── Cancel job: reschedule or delete permanently ─────────────────────────
+  const handleRescheduleJob = async (jobId: string, newDate: string, reason?: string) => {
+    const notes = reason ? `Rescheduled: ${reason}` : undefined;
+    const res = await apiFetch(`/api/admin/job-orders/${jobId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        scheduled_date: newDate,
+        status: 'scheduled',
+        ...(notes ? { notes } : {}),
+      }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d?.error || 'Failed to reschedule');
+    }
+    addToast('success', 'Job Rescheduled', `Job moved to ${newDate}`);
+    fetchScheduleData(selectedDate);
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    const res = await apiFetch(`/api/admin/job-orders/${jobId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d?.error || 'Failed to delete job');
+    }
+    addToast('success', 'Job Deleted', 'Job has been permanently removed');
+    fetchScheduleData(selectedDate);
+  };
+
   const handleDeleteDailyNote = async (id: string) => {
     try {
       const res = await apiFetch(`/api/admin/daily-notes?id=${id}`, { method: 'DELETE' });
@@ -1966,6 +1997,7 @@ export default function ScheduleBoardPage() {
                 onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setEditTarget({ job, rowIndex: idx })}
                 onRequestChange={(job) => setChangeRequestTarget(job)}
                 onViewNotes={(job) => handleViewNotes(job)}
+                onRemoveJob={(job) => setCancelJobTarget(job)}
                 onPreviewJob={(job) => setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
                 onAssignJob={() => handleAssignToAvailableOperator(idx)}
                 onChangeOperator={(name) => handleChangeRowOperator(idx, name)}
@@ -2121,6 +2153,14 @@ export default function ScheduleBoardPage() {
         />
       )}
       {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSuccess={handleChangeRequestSuccess} onClose={() => setChangeRequestTarget(null)} />}
+      {cancelJobTarget && (
+        <CancelJobModal
+          job={cancelJobTarget}
+          onClose={() => setCancelJobTarget(null)}
+          onReschedule={handleRescheduleJob}
+          onDelete={handleDeleteJob}
+        />
+      )}
       {notesTarget && <NotesDrawer job={notesTarget} notes={jobNotes[notesTarget.id] || []} onAddNote={handleAddNote} onClose={() => setNotesTarget(null)} />}
       {showQuickAdd && <QuickAddModal salesmen={SALESMEN} onSubmit={handleQuickAdd} onClose={() => setShowQuickAdd(false)} />}
 
