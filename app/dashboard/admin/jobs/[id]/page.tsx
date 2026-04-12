@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import ChangeOrdersSection from '@/components/jobs/ChangeOrdersSection';
+import RelatedJobsSection from '@/components/jobs/RelatedJobsSection';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -916,6 +918,20 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
                 </Section>
               );
             })()}
+
+            {/* Change Orders */}
+            <ChangeOrdersSection
+              jobId={job.id}
+              jobStatus={job.status}
+              isAdmin={true}
+            />
+
+            {/* Related Jobs */}
+            <RelatedJobsSection
+              jobId={job.id}
+              jobNumber={job.job_number}
+              isAdmin={true}
+            />
           </div>
 
           {/* ──── RIGHT COLUMN (1/3) ────────────────────────────────────────── */}

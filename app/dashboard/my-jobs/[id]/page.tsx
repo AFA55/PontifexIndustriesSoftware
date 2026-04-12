@@ -79,6 +79,9 @@ export default function JobDetailPage() {
 
   const isHelper = userRole === 'apprentice';
 
+  // Recent approved change orders for scope-update banner
+  const [recentChangeOrders, setRecentChangeOrders] = useState<Array<{ id: string; version: number; scope_description: string; created_at: string }>>([]);
+
   const fetchJob = useCallback(async () => {
     setLoading(true);
     try {
@@ -135,10 +138,32 @@ export default function JobDetailPage() {
     }
   }, [jobId]);
 
+  const fetchChangeOrders = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/admin/jobs/${jobId}/change-orders`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const recent = (json.data || []).filter(
+          (co: { status: string; created_at: string }) =>
+            co.status === 'approved' && co.created_at >= sevenDaysAgo,
+        );
+        setRecentChangeOrders(recent);
+      }
+    } catch {
+      // silent
+    }
+  }, [jobId]);
+
   useEffect(() => {
     fetchJob();
     fetchDocuments();
-  }, [fetchJob, fetchDocuments]);
+    fetchChangeOrders();
+  }, [fetchJob, fetchDocuments, fetchChangeOrders]);
 
   const toggleEquipment = (item: string) => {
     setCheckedItems(prev => ({ ...prev, [item]: !prev[item] }));
@@ -594,6 +619,27 @@ export default function JobDetailPage() {
             <span className="text-sm px-3 py-1.5 bg-orange-500 text-white rounded-full font-bold">HIGH</span>
           )}
         </div>
+
+        {/* Scope Updated Banner — recent approved change orders */}
+        {recentChangeOrders.length > 0 && (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start gap-3 mb-3">
+              <AlertTriangle className="w-6 h-6 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-base font-bold text-amber-800">Scope has been updated on this job</p>
+                <p className="text-sm text-amber-700 mt-0.5">Review with your supervisor before proceeding</p>
+              </div>
+            </div>
+            <div className="space-y-2 pl-9">
+              {recentChangeOrders.map(co => (
+                <div key={co.id} className="bg-amber-100/70 rounded-xl px-3 py-2 border border-amber-200">
+                  <span className="text-xs font-bold text-amber-700 mr-2">v{co.version}</span>
+                  <span className="text-sm text-amber-900">{co.scope_description}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* On-Hold Banner */}
         {isOnHold && (
