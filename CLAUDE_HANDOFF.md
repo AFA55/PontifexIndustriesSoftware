@@ -7,263 +7,193 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `bfe56ac4` — "feat(customer-history): clickable job history panel with full job detail"
+- **Last commit:** `bf95ef6b` — "fix(customers): correct contact_name → customer_contact column reference"
 - **Pushed to origin** ✅
-- **Build:** PASSING (0 errors)
-- **Dev server:** running on port 3000
+- **Build:** PASSING (0 errors, TypeScript clean)
+- **Dev server:** `npm run dev` → port 3000
 
 ### Recent Commits (April 14, 2026 session)
 ```
+bf95ef6b fix(customers): correct contact_name → customer_contact column reference
+121ade2f docs: update CLAUDE_HANDOFF + sprint backlog for April 14 session
 bfe56ac4 feat(customer-history): clickable job history panel with full job detail
 d1bacf2c fix(delete-job): proper cascade cleanup + operator notification on job deletion
-f63caed3 feat(operator): collapsible sections + simplified in-route view
-4655a031 fix: operator job page — site contact always visible + conditions/compliance/notes on main page
-df09598b fix: Schedule Preview synced to real data — jobs show even if unassigned, operators/team members split
+f851422e feat: Remove from Schedule button inside job detail panel
+9121bd99 feat: project-grouped customer history + pre-filled Add Job flow
+56e03b17 feat: remove from schedule modal — reschedule or delete permanently
+ed7b7cf2 feat: change orders + new scope / continuation job system
 ```
 
 ---
 
-## WHAT WAS DONE (April 14, 2026 — This Session)
+## EVERYTHING BUILT THIS SESSION (April 14, 2026)
 
-### 1. Delete Job Cascade Fix (`app/api/admin/job-orders/[id]/route.ts`)
-- **Problem**: Deleting a job didn't notify the operator, left orphaned FK records (invoice_line_items would block delete), and job stayed visible on operator schedule
-- **Fix**: 4-step delete process:
-  1. Notify assigned operator + helper via `notifications` table (job_cancelled, priority: high)
-  2. Audit trail to `job_orders_history` (fire-and-forget)
-  3. Clean up all NO ACTION FK tables: delete `invoice_line_items`, nullify `timecards.job_order_id` + `pay_adjustments.job_order_id`, delete `operator_workflow_log/sessions/job_history`, unlink continuation jobs
-  4. Hard delete `job_orders` row with tenant scope
-- Job now disappears from operator's my-jobs list, customer profile, and all views on deletion
-
-### 2. Customer Project History — Clickable Job Detail Panel
+### 1. Change Orders System
 **New files:**
-- `app/api/admin/jobs/[id]/detail/route.ts` — Aggregates full job data in one API call:
-  - Full job_orders row
-  - Operator + helper profiles (UUID → full_name lookup)
-  - Scope items with computed `completed_qty` + `pct_complete` from `job_progress_entries`
-  - Timecards with operator names, totals (hours + labor cost)
-  - Job notes (excluding change_log type)
-  - Daily job logs
-  - `totals` block: total_hours, total_labor_cost, scope counts, overall_pct
-- `components/jobs/JobHistoryDetailPanel.tsx` — Slide-in right panel (52% desktop / full mobile):
-  - 4 tabs: Overview, Scope & Work, Hours & Crew, Notes
-  - Overview: crew cards with initials avatars, multi-day badge, description, star ratings if completed
-  - Scope & Work: progress bars per scope item (green ≥90%, amber ≥50%, red <50%)
-  - Hours & Crew: timecard rows with clock-in/out, labor cost summary, daily logs
-  - Notes: newest-first, author, type badge, Escape-to-close
+- `app/api/admin/jobs/[id]/change-orders/route.ts` — GET list + POST create
+- `app/api/admin/jobs/[id]/change-orders/[coId]/route.ts` — PATCH approve/reject + DELETE
+- `components/jobs/ChangeOrdersSection.tsx` — Amber/orange themed collapsible section on job detail page
+
+**What it does:** Admins can add scope additions to an in-progress job (e.g. "trench doubled"). Change orders have pending → approved/rejected flow. On approve, scope items are bulk-inserted into `job_scope_items` and operator gets notified. On reject, reason appended to notes.
+
+### 2. New Scope / Continuation Jobs
+**New files:**
+- `app/api/admin/jobs/[id]/new-scope/route.ts` — POST creates child job (pre-filled from parent, `parent_job_id` set, job number `QA-{year}-{6 digits}`)
+- `app/api/admin/jobs/[id]/related-jobs/route.ts` — GET returns `{ parent, continuations }`
+- `components/jobs/RelatedJobsSection.tsx` — Indigo themed section showing parent/child jobs + "Add New Scope" modal
+
+**What it does:** From any job detail page, create a continuation job for the same client/project. The new job is pre-filled (copies ~30 fields, excludes transient ones), linked via `parent_job_id`, and shows the "Continuation of JOB-XXXX" note.
+
+### 3. Delete Job from Schedule Board (with modal)
+**New files:**
+- `app/dashboard/admin/schedule-board/_components/CancelJobModal.tsx` — 2-step modal: reschedule vs delete
 
 **Modified:**
-- `app/dashboard/admin/customers/[id]/page.tsx`:
-  - Job rows now open detail panel instead of navigating away
-  - Selected row gets purple highlight ring
-  - `selectedJobId` state drives panel visibility
+- `JobCard.tsx` — trash icon on hover (only when canEdit + not completed)
+- `OperatorRow.tsx` — passes `onRemoveJob` down to JobCard
+- `JobDetailView.tsx` — red "Remove" button in header (only when not editing + not completed)
+- `schedule-board/page.tsx` — `cancelJobTarget` state, `handleRescheduleJob`, `handleDeleteJob` functions, CancelJobModal render
+
+**What it does:** Clicking trash on a job card OR the Remove button in the job detail panel opens a modal with two choices:
+- **Reschedule**: date picker + optional reason → PATCH job to new date
+- **Delete Permanently**: red confirmation → deletes job
+
+### 4. Delete Job Cascade (Full Cleanup)
+**Modified:** `app/api/admin/job-orders/[id]/route.ts` (DELETE handler)
+
+4-step process:
+1. Notify assigned operator + helper via `notifications` table (job_cancelled, priority: high)
+2. Audit trail to `job_orders_history` (fire-and-forget)
+3. FK cleanup before hard delete: delete `invoice_line_items`, nullify `timecards.job_order_id` + `pay_adjustments.job_order_id`, delete `operator_workflow_log/sessions/operator_job_history`, unlink continuation jobs
+4. Hard delete `job_orders` with tenant scope
+
+**Effect:** Job vanishes from operator's my-jobs list, customer profile, and all related views.
+
+### 5. Customer Project History — Grouped + Pre-filled Add Job
+**Modified:** `app/dashboard/admin/customers/[id]/page.tsx`
+
+- Jobs grouped by `project_name`, sorted newest first
+- Collapsible project folders with: active job count badge, total value, last date
+- "Add Job" button inside each folder → stores `schedule-form-customer-prefill` in localStorage → navigates to schedule form
+- Schedule form reads that key on mount and pre-fills: customer, project name, address, location, contact, equipment
+
+**Modified:** `app/dashboard/admin/schedule-form/page.tsx`
+- On mount: reads `schedule-form-customer-prefill` from localStorage, maps all fields, calls `fetchCustomerHistory`, clears key immediately
+
+### 6. Job History Detail Panel (Click-into from Customer Page)
+**New files:**
+- `app/api/admin/jobs/[id]/detail/route.ts` — Full aggregation endpoint returns: job row (`*`), operator + helper profiles (UUID→name), scope items with `completed_qty` + `pct_complete`, timecards with operator names, job notes, daily logs, totals block
+- `components/jobs/JobHistoryDetailPanel.tsx` — Slide-in right panel (52% desktop / full mobile)
+
+**Modified:** `app/dashboard/admin/customers/[id]/page.tsx`
+- Job rows open the panel instead of navigating away
+- Selected row highlighted with purple ring
+- `selectedJobId` state, Escape key closes panel
+
+**Panel tabs:**
+- **Overview** — Crew cards with initials avatars, multi-day badge, description, scope-of-work, star ratings if completed
+- **Scope & Work** — Progress bars per scope item (green ≥90%, amber ≥50%, red <50%)
+- **Hours & Crew** — Timecard rows with clock-in/out, labor cost summary, daily logs
+- **Notes** — Newest-first, author name, type badge
+
+### 7. Bug Fix: Customer Detail Showing 0 Jobs / $0
+**Root cause:** `job_orders` table has no column `contact_name` — it's `customer_contact`. The bad column name caused Supabase to error, `data` returned `null`, defaulted to `[]` → customer detail showed 0 jobs and $0 despite data existing.
+
+**Fixed in:**
+- `app/api/admin/customers/[id]/route.ts` — SELECT now uses `customer_contact`
+- `app/dashboard/admin/customers/[id]/page.tsx` — Job interface field renamed, `handleAddJobForProject` source field updated
+
+**QA verified on live DB:** 2 jobs return correctly, $26k revenue, 2 notes per job.
 
 ---
 
-## WHAT WAS DONE (April 7, 2026 — Session Start)
+## WHAT WAS DONE IN PREVIOUS SESSIONS
 
-### Operator Job Detail Page Overhaul (`app/dashboard/my-jobs/[id]/page.tsx`)
-- **In-route simplified view**: when `job.status === 'in_route'`, page shows ONLY Location + Site Contact with Call button + "Arrived — Start In Progress" CTA; all other sections hidden
-- **Collapsible sections**: every section now has a toggle button with ChevronDown indicator:
-  - Site Contact (green)
-  - Crew (blue)
-  - Work Details (existing)
-  - Equipment (existing)
-  - Jobsite Conditions (amber)
-  - Site Compliance (indigo)
-  - Additional Notes (purple)
-  - Documents (collapsed by default)
-- Build: PASSING ✅, committed `f63caed3`, pushed to origin
+### Session 9 (March 31) — Timecard System & Security ✅
+- Timecard system overhaul (DB, API, UI, NFC, GPS, segments)
+- Configurable break deduction
+- Operator timecard detail view
+- Team payroll overview (Mon-Sun grid, batch approve, export)
+- Notification system (in-app + email, auto-reminders)
+- NotificationBell on admin + operator dashboards
+- Security audit (NFC bypass, XSS, tenant isolation)
+- Restored all 230+ files from unmerged worktree branches
+- Fixed login (all 8 roles), RBAC, dashboard branding
 
-### Schedule Board Fixes (this session's worktree — tender-dirac)
-- All job ticket fields editable inline (Job Info, Work Conditions, Site Compliance, Notes, Scope, Equipment)
-- Push Tickets works every day independently for multi-day jobs
-- Day label shows correct "Day N of M" based on currently-viewed date
-- Per-day assignments via `job_daily_assignments` table — unassigning one day doesn't affect other days
-- Mic permission in AI Smart Fill: requests permission professionally, shows denied UI with instructions
-- Schedule Preview synced to real data: shows unassigned jobs, splits operators vs team members
+### Sessions 7-8 (March 28-29) — Multi-Tenant & Landing ✅
+- Multi-tenant architecture, white-label branding (BrandingProvider)
+- Debranded all Pontifex hardcodes
+- Landing page rebuild + Request Demo funnel
 
----
+### Sessions 4-6 (March 25-26) — Major Features ✅
+- Schedule board (operators, time-off, skill warnings, realtime colors, inline editing)
+- Schedule form redesign (customer-first, project name, smart contact dropdown)
+- Timecard + NFC system, Facilities & badging, Approval workflow
+- Customer portal (public signature, form builder, surveys)
+- Work-performed gate
 
-## WHAT WAS DONE (April 5, 2026 Session 2 — agent-abdb6df8 worktree)
-
-### Operator Flow Audit + Bug Fixes
-
-**Root cause of "Experiencing server issues - reconnecting...":**
-The `active_job_orders` DB view was created in migration `20260317` (before multi-tenant was added in `20260328`). The `/api/job-orders` route called `.eq('tenant_id', tenantId)` on the view, but `tenant_id` was never included in the view → PostgREST returned HTTP 400/500 → `NetworkMonitor.tsx` counted 3+ failures → showed the server issues banner on every operator page load.
-
-**Migration `20260405000010_fix_operator_job_rls.sql` (applied to Supabase):**
-- Rebuilt `active_job_orders` view with all missing fields: `tenant_id`, `on_hold`, `on_hold_reason`, `pause_reason` (aliased from `on_hold_reason` for UI compatibility), `project_name`
-- Added `operator_can_view_own_jobs` RLS policy on `job_orders`: operators/apprentices can SELECT rows where `assigned_to = auth.uid()` OR `helper_assigned_to = auth.uid()`
-- Admins/managers see all jobs via JWT metadata role check
-- Ensured `job_orders` has RLS enabled
-
-**`/api/job-orders/route.ts`:**
-- Added `include_helper_jobs` param: when true, uses `.or('assigned_to.eq.UID,helper_assigned_to.eq.UID')` instead of just `assigned_to` filter
-- Added `date_from`/`date_to` params for the 7-day lookahead used by my-jobs page
-- Returns `user_role` in both single-job and list responses (used by my-jobs to set `isHelper` state)
-- Fixed single-job auth check: now allows access if `helper_assigned_to === user.id` (was blocked for helpers)
-
-**`/api/job-orders/[id]/status/route.ts`:**
-- Fixed permission check: helpers (apprentices) assigned to a job can now update its status (was returning 403 for `helper_assigned_to` users)
-
-**Dispatch flow verified clean (no bugs found):**
-- Admin `POST /api/admin/schedule-board/dispatch` → sets `dispatched_at` + status `assigned` + sends in-app notifications + SMS ✅
-- Operators see dispatched jobs via `/api/job-orders` (now fixed with tenant_id) ✅
-- Status transitions `assigned → in_route → in_progress → completed` all work via the status API ✅
-- Clock-in via NFC or manual uses `/api/time-clock` (separate route, not affected) ✅
+### Session 7-April 7 — Operator & Schedule Board Fixes ✅
+- In-route simplified view (location + site contact only)
+- Collapsible sections on operator job detail page
+- Per-day assignments via `job_daily_assignments`
+- AI Smart Fill mic permission handling
+- Schedule Preview real data sync
 
 ---
 
-## WHAT WAS DONE (April 5, 2026 — tender-dirac worktree)
+## NEXT PRIORITIES (in order)
 
-### Customer Data Persistence
-- New table `customer_site_addresses` — upsert by address string, tracks `use_count` + `last_used_at`
-- New API routes: `GET/POST /api/admin/customers/[id]/site-addresses` and `GET /api/admin/customers/[id]/project-names`
-- Schedule form: SmartCombobox dropdowns for past site addresses and project names; fire-and-forget save on submit
-- **Site address no longer auto-fills from customer office address** (they are separate locations)
-
-### Photo/Document Upload Fix
-- Created 4 Supabase Storage buckets: `jobsite-area-docs`, `scope-photos`, `site-compliance-docs`, `job-photos`
-- RLS policies: authenticated upload + public read + authenticated delete
-- `PhotoUploader.tsx` now shows actual Supabase error message on failure
-
-### EFS — Electric Floor Sawing
-- Added `EFS` to `SERVICE_TYPES`, `FLEXIBLE_SCOPE_TYPES`, `SCOPE_FIELDS`, `SERVICE_EQUIPMENT` in schedule form
-- Green/emerald color scheme, same structure as DFS, plus Extension Cord and GFCI items
-- Added EFS to `lib/equipment-map.ts` EQUIPMENT_PRESETS
-
-### Compliance Documents Modal
-- Replaced inline expansion with a proper overlay `CreateFacilityModal` component in schedule form Step 6
-- Matches the AddFacilityModal design from the Facilities admin page (uniform UX)
-
-### Approve Job Modal — Full Details
-- Rebuilt `schedule_board_view` (migration `20260405000003`) to expose all missing fields
-- Extended `PendingJob` interface with: `po_number`, `site_contact`, `contact_phone`, `project_name`, `scheduling_flexibility`
-- Unified equipment list: merges `equipment_needed[]` + active `equipment_selections` dict items into one flat list
-- Added 3 new sections (all expanded by default):
-  - **Jobsite Info** (slate): project name, site address, site contact + phone, PO number
-  - **Site Compliance Requirements** (amber): orientation datetime, badging type, special instructions
-  - **Scheduling Notes** (blue): special arrival time, outside hours details, weekend availability
+1. **End-to-end workflow test** — manually walk: schedule → dispatch → operator accepts → in route → in progress → work performed → day complete → complete → invoice. Find and fix any broken steps.
+2. **Mobile responsive audit** — all operator pages on 375px viewport. Especially: my-jobs list, job detail, work-performed, day-complete.
+3. **Loading states & error handling** — pages that crash or show blank on bad API responses.
+4. **Patriot-specific assets** — upload Patriot Concrete Cutting logo, set brand colors (they use red/black/white). Update `tenant_branding` in DB for their tenant.
+5. **Reschedule notification** — when job date changes via PATCH, notify assigned operator (same pattern as job_cancelled notification).
+6. **Production deployment prep** — Vercel env vars, custom domain, SSL, verify all Supabase RLS policies for production load.
+7. **Merge `feature/schedule-board-v2` → `main`**
 
 ---
 
-## WHAT WAS DONE (This Session — April 4, 2026 — Parallel Agent Launch)
+## KEY FILES REFERENCE
 
-Three parallel agents ran simultaneously. All changes landed in commit `aba3bee0`.
-
-### Agent A — E2E Workflow Smoke Test
-
-**P0 Fix — `app/api/admin/schedule-form/route.ts`**
-- Removed a redundant manual role check that ran *after* `requireAdmin()`. The extra check only allowed `['admin', 'super_admin']`, so `operations_manager` users got a 403 when submitting the 8-step schedule form despite passing the auth guard.
-
-**P1 Fix — `app/api/jobs/[id]/completion-request/route.ts`**
-- `requireAuth()` returns `tenantId: profile.tenant_id || ''`. When tenant_id is null, the route was running `.eq('tenant_id', '')` which matched zero rows → 404 on every completion request.
-- Fix: conditional tenant filter (`if (tenantId) query = query.eq(...)`). Resolved tenant_id from the fetched job record for inserts/updates.
-
-**Files Audited (all clean besides the above):**
-- schedule-form API + UI, dispatch-pdf route, clock-in route, work-items route, status route, completion-request route, admin approval route, invoices create/patch, api-auth.ts
-
-### Agent B — Mobile Responsive Audit (Operator Pages, 375px)
-
-**Timecard page — `app/dashboard/timecard/page.tsx`**
-- Grid changed from `grid-cols-3` → `grid-cols-2 sm:grid-cols-3` (Total Hours card spans full width on mobile)
-- 6-column daily entries table: hid `Category` column with `hidden sm:table-cell`, shortened headers to In/Out/Hrs, reduced padding/font sizes for mobile
-
-**Work Performed page — `app/dashboard/job-schedule/[id]/work-performed/page.tsx`**
-- Header bar on mobile was overflowing: badge now only shown when items selected, button text shortened on mobile via `sm:hidden`/`hidden sm:inline`
-
-**Pages audited with no issues:** my-jobs list, my-jobs/[id] detail, jobsite view, day-complete
-
-### Agent C — Patriot Branding
-
-**DB — `tenant_branding` table (PATRIOT tenant)**
-- Updated from Pontifex purple palette to Patriot:
-  - `primary_color`: `#DC2626` (red)
-  - `primary_color_dark`: `#B91C1C`
-  - `secondary_color`: `#1E3A5F` (navy)
-  - `accent_color`: `#EF4444`
-  - `header_bg_color`: `#1E3A5F`
-  - `sidebar_bg_color`: `#0F1F33`
-  - `login_bg_gradient_from/to`: navy gradient
-  - `login_welcome_text`: "Welcome to Patriot"
-  - `login_subtitle`: "Concrete Cutting Management Software"
-
-**Code — `lib/branding-context.tsx`**
-- Updated `DEFAULT_BRANDING` fallback (shown on API failure) from Pontifex purple to Patriot red/navy colors
-
-**BrandingProvider API:** No bugs — queries correctly, handles missing rows gracefully.
-
-**Verified:** Login page shows "Welcome to Patriot" + "Concrete Cutting Management Software" ✅
+| Area | File |
+|------|------|
+| Schedule board | `app/dashboard/admin/schedule-board/page.tsx` |
+| Job detail (admin) | `app/dashboard/admin/jobs/[id]/page.tsx` |
+| Customer detail | `app/dashboard/admin/customers/[id]/page.tsx` |
+| Customer API | `app/api/admin/customers/[id]/route.ts` |
+| Job orders API | `app/api/admin/job-orders/[id]/route.ts` |
+| Job detail aggregation API | `app/api/admin/jobs/[id]/detail/route.ts` |
+| Change orders API | `app/api/admin/jobs/[id]/change-orders/route.ts` |
+| Job history panel | `components/jobs/JobHistoryDetailPanel.tsx` |
+| Change orders section | `components/jobs/ChangeOrdersSection.tsx` |
+| Related jobs section | `components/jobs/RelatedJobsSection.tsx` |
+| Cancel job modal | `app/dashboard/admin/schedule-board/_components/CancelJobModal.tsx` |
+| Schedule form | `app/dashboard/admin/schedule-form/page.tsx` |
+| Operator job detail | `app/dashboard/my-jobs/[id]/page.tsx` |
+| RBAC cards | `lib/rbac.ts` |
+| API auth helpers | `lib/api-auth.ts` |
+| Supabase admin client | `lib/supabase-admin.ts` |
 
 ---
 
-## FEATURE STATUS
+## IMPORTANT PATTERNS (for new Claude session)
 
-### Complete ✅
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Multi-tenant architecture | ✅ | Company code login, tenant_id on all tables |
-| White-label branding | ✅ | Patriot colors live in DB + code fallback |
-| Patriot branding colors | ✅ | Red #DC2626 + navy #1E3A5F in tenant_branding |
-| Light theme | ✅ | All admin/operator pages light, sidebar stays dark |
-| Schedule Board | ✅ | All operators view, time-off, editing, crew grid, notifications |
-| Schedule Form | ✅ | P0 role bug fixed — operations_manager can now create jobs |
-| Team Profiles | ✅ | Editable hire date, role-specific cards |
-| Feature Permissions | ✅ | No emojis, 5 clean presets, job visibility toggle |
-| Customer Management | ✅ | Multi-contact support, Google Maps autocomplete |
-| Facilities | ✅ | CRUD, badge tracking, visible modal inputs |
-| Timecards | ✅ | Full clock in/out, NFC, GPS, segments, approval |
-| Operator Skills | ✅ | 9 predefined + custom, 1-10 ratings, visual bars |
-| Capacity Settings | ✅ | Per-skill limits, difficulty threshold, crew size rules |
-| Active Jobs | ✅ | All admins see all jobs, "Coming Up" tab |
-| Notification System | ✅ | In-app + email, auto-reminders |
-| Analytics Dashboard | ✅ | 20 widgets, charts, commission tracking |
-| Billing & Invoicing | ✅ | Create, send, remind, QuickBooks CSV |
-| Security Audit | ✅ | NFC bypass, XSS, tenant isolation |
-| NFC Clock-In (Web API) | ✅ | NDEFReader, iOS PIN fallback, GPS remote mode |
-| E2E flow (code-level) | ✅ | All API routes audited, P0/P1 bugs fixed |
-| Mobile responsive (operator) | ✅ | Timecard + work-performed fixed at 375px |
-
-### Remaining — User Must Do Manually
-- [ ] **Manual UX test**: Create customer → create job → dispatch → operator clock-in → work performed → complete + signature → invoice → mark paid → approve timecard
-- [ ] **Patriot logo**: Upload logo file to `tenant_branding.logo_url` (no file provided yet)
-- [ ] **Production prep**: Verify Vercel env vars all set (see list below)
-- [ ] **Go live**: Merge `feature/schedule-board-v2` → `main` after manual test passes
-
-> **The operator "server issues" banner is now fixed.** The `active_job_orders` view now has `tenant_id`. Operator page loads should work cleanly. Recommend doing a manual smoke test: log in as an operator, check `/dashboard/my-jobs` — should show dispatched jobs with no server error banner.
+- **Auth in API routes:** `requireAdmin(request)` → check `auth.authorized` → `getTenantId(auth.userId)`
+- **Tenant scoping:** `if (tenantId) { query = query.eq('tenant_id', tenantId); }` — super_admin has null tenantId and sees all
+- **Fire-and-forget logging:** `Promise.resolve(supabaseAdmin.from('...').insert(...)).catch(() => {})`
+- **API response format:** `{ success: true, data: {...} }` or `{ error: 'message' }` with HTTP status
+- **Client auth:** `getCurrentUser()` from `lib/auth.ts`, role check in useEffect, redirect to `/login` if null
+- **Client fetching:** `apiFetch(url, opts)` helper that injects Bearer token from `supabase.auth.getSession()`
+- **Job numbers:** `JOB-{year}-{6 digits}` (schedule form) or `QA-{year}-{6 digits}` (quick add / continuation)
+- **Notifications:** Insert to `notifications` table with `type, title, message, job_id, user_id, tenant_id, priority, read: false`
+- **Column gotcha:** `job_orders.customer_contact` (NOT `contact_name`), `job_orders.foreman_name` (site contact display name)
 
 ---
 
-## NEXT SESSION PRIORITIES
-1. **Manual UX smoke test** — schedule → dispatch → operator in-route → arrived → work performed → complete → invoice
-2. **Loading states & error handling audit** — remaining pages with no skeletons/spinners
-3. **Patriot logo upload** — get logo file, update `tenant_branding.logo_url`
-4. **Vercel env vars check** — verify all 8 required vars set in Vercel dashboard
-5. **Production DNS** — verify pontifexindustries.com → Vercel
-6. **Merge to main** — after manual test passes
+## DB QUICK REFERENCE
 
----
-
-## KNOWN ISSUES / WATCH LIST
-- If changes don't appear on localhost: kill port 3000 with `lsof -ti:3000 | xargs kill -9`, delete `.next/`, restart preview server
-- If Vercel production seems stale: go to Cloudflare → Caching → Purge Everything
-- Worktrees do NOT inherit `.env.local` — copy from main repo when using parallel agents
-
----
-
-## INFRASTRUCTURE
-
-### Vercel
-- **Auto-deploy**: pushes to `feature/schedule-board-v2` trigger preview deploys
-- **Merges to `main`** trigger production at pontifexindustries.com
-- **Env vars required**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
-
-### Supabase
-- **Project ID**: `klatddoyncxidgqtcjnu`
-- **95+ tables**, all RLS enabled, JWT metadata for tenant isolation
-- **Branding updated**: `tenant_branding` for PATRIOT tenant now uses red/navy palette
-
-### Dev Server
-- Preview server managed via `preview_start` / `preview_stop` MCP tools
-- Config in `.claude/launch.json`
-- Commits require `export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"` prefix
+- **Supabase project:** `klatddoyncxidgqtcjnu`
+- **Tenant ID for Patriot/demo:** `ee3d8081-cec2-47f3-ac23-bdc0bb2d142d`
+- **Test customer ID:** `027ea971-8f34-4ad9-9fee-0e35441a88e8` (touch of tism construction, 2 jobs)
+- **Migrations:** `supabase/migrations/` (70+ files)
+- **RLS pattern:** `auth.jwt() -> 'user_metadata' ->> 'role'` for new tables

@@ -120,8 +120,14 @@ npm run build      # Production build check (must pass with 0 errors)
 - [x] Customer project history: grouped by project name with collapsible folders
 - [x] Job detail panel: click job row → slide-in panel with tabs (Overview, Scope, Hours, Notes)
 - [x] API GET /api/admin/jobs/[id]/detail — full job aggregation endpoint
+- [x] Bug fix: customer detail showing 0 jobs / $0 (wrong column name contact_name → customer_contact)
 
 ### Ongoing / As-Needed
-- [ ] SMS integration for signature request delivery
-- [ ] Schedule board performance optimization
+- [ ] End-to-end workflow test (schedule → dispatch → operator → complete → invoice)
+- [ ] Mobile responsive audit on all operator pages
+- [ ] Loading states & error handling audit
+- [ ] Patriot logo + brand colors in tenant_branding
 - [ ] Reschedule notification to operator when job date changes
+- [ ] SMS integration for signature request delivery
+- [ ] Production deployment prep (Vercel, custom domain, SSL)
+- [ ] Merge feature/schedule-board-v2 → main
