@@ -41,7 +41,7 @@ interface Job {
   project_name: string | null;
   address: string | null;
   location: string | null;
-  contact_name: string | null;
+  customer_contact: string | null;
   site_contact_phone: string | null;
   equipment_needed: string[] | null;
   description: string | null;
@@ -333,7 +333,7 @@ export default function CustomerDetailPage() {
       project_name: projectName === '(No Project Name)' ? '' : projectName,
       address: representativeJob?.address || customer!.address || '',
       location: representativeJob?.location || '',
-      contact_name: representativeJob?.contact_name || customer!.primary_contact_name || '',
+      contact_name: representativeJob?.customer_contact || customer!.primary_contact_name || '',
       contact_phone: representativeJob?.site_contact_phone || customer!.primary_contact_phone || '',
       equipment_needed: representativeJob?.equipment_needed || [],
     };
