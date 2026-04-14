@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 7, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
+**Date:** April 14, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
 
 ---
 
@@ -7,21 +7,55 @@
 
 ### Git Status
 - **Branch:** `feature/schedule-board-v2`
-- **Last commit:** `f63caed3` — "feat(operator): collapsible sections + simplified in-route view"
+- **Last commit:** `bfe56ac4` — "feat(customer-history): clickable job history panel with full job detail"
 - **Pushed to origin** ✅
 - **Build:** PASSING (0 errors)
-- **Dev server:** running on port 3001
+- **Dev server:** running on port 3000
 
-### Recent Commits (April 7, 2026 session)
+### Recent Commits (April 14, 2026 session)
 ```
+bfe56ac4 feat(customer-history): clickable job history panel with full job detail
+d1bacf2c fix(delete-job): proper cascade cleanup + operator notification on job deletion
 f63caed3 feat(operator): collapsible sections + simplified in-route view
 4655a031 fix: operator job page — site contact always visible + conditions/compliance/notes on main page
 df09598b fix: Schedule Preview synced to real data — jobs show even if unassigned, operators/team members split
-d3730d30 fix: mic permission handling in AI Smart Fill — request permission, show professional denied UI
-7a8f436d feat: per-day assignment tracking via job_daily_assignments
-00a9084f feat: Scope of Work and Equipment fully editable in job modal
-54e40295 fix: push tickets works every day independently, day label shows correct day number
 ```
+
+---
+
+## WHAT WAS DONE (April 14, 2026 — This Session)
+
+### 1. Delete Job Cascade Fix (`app/api/admin/job-orders/[id]/route.ts`)
+- **Problem**: Deleting a job didn't notify the operator, left orphaned FK records (invoice_line_items would block delete), and job stayed visible on operator schedule
+- **Fix**: 4-step delete process:
+  1. Notify assigned operator + helper via `notifications` table (job_cancelled, priority: high)
+  2. Audit trail to `job_orders_history` (fire-and-forget)
+  3. Clean up all NO ACTION FK tables: delete `invoice_line_items`, nullify `timecards.job_order_id` + `pay_adjustments.job_order_id`, delete `operator_workflow_log/sessions/job_history`, unlink continuation jobs
+  4. Hard delete `job_orders` row with tenant scope
+- Job now disappears from operator's my-jobs list, customer profile, and all views on deletion
+
+### 2. Customer Project History — Clickable Job Detail Panel
+**New files:**
+- `app/api/admin/jobs/[id]/detail/route.ts` — Aggregates full job data in one API call:
+  - Full job_orders row
+  - Operator + helper profiles (UUID → full_name lookup)
+  - Scope items with computed `completed_qty` + `pct_complete` from `job_progress_entries`
+  - Timecards with operator names, totals (hours + labor cost)
+  - Job notes (excluding change_log type)
+  - Daily job logs
+  - `totals` block: total_hours, total_labor_cost, scope counts, overall_pct
+- `components/jobs/JobHistoryDetailPanel.tsx` — Slide-in right panel (52% desktop / full mobile):
+  - 4 tabs: Overview, Scope & Work, Hours & Crew, Notes
+  - Overview: crew cards with initials avatars, multi-day badge, description, star ratings if completed
+  - Scope & Work: progress bars per scope item (green ≥90%, amber ≥50%, red <50%)
+  - Hours & Crew: timecard rows with clock-in/out, labor cost summary, daily logs
+  - Notes: newest-first, author, type badge, Escape-to-close
+
+**Modified:**
+- `app/dashboard/admin/customers/[id]/page.tsx`:
+  - Job rows now open detail panel instead of navigating away
+  - Selected row gets purple highlight ring
+  - `selectedJobId` state drives panel visibility
 
 ---
 

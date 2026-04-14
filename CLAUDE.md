@@ -112,6 +112,16 @@ npm run build      # Production build check (must pass with 0 errors)
 - [ ] Production deployment prep (env vars, custom domain, SSL)
 - [ ] Final build verification & merge to main
 
+### Session 10 — Schedule Board & Customer UX (April 14) ✅ COMPLETE
+- [x] Delete job cascade: operator notification + FK cleanup + hard delete
+- [x] Change orders system: scope additions on existing jobs (ChangeOrdersSection)
+- [x] New scope / continuation jobs: pre-filled child jobs (RelatedJobsSection)
+- [x] Schedule board delete modal: reschedule vs delete-permanently flow
+- [x] Customer project history: grouped by project name with collapsible folders
+- [x] Job detail panel: click job row → slide-in panel with tabs (Overview, Scope, Hours, Notes)
+- [x] API GET /api/admin/jobs/[id]/detail — full job aggregation endpoint
+
 ### Ongoing / As-Needed
 - [ ] SMS integration for signature request delivery
 - [ ] Schedule board performance optimization
+- [ ] Reschedule notification to operator when job date changes
