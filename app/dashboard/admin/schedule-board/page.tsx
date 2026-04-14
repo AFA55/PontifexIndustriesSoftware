@@ -2302,6 +2302,11 @@ export default function ScheduleBoardPage() {
             setJobDetailTarget(null);
             setEditTarget({ job: target.job, rowIndex: target.rowIndex });
           }}
+          onRemove={canEdit ? () => {
+            const target = jobDetailTarget;
+            setJobDetailTarget(null);
+            setCancelJobTarget(target.job);
+          } : undefined}
         />
       )}
 

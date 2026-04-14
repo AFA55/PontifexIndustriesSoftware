@@ -21,6 +21,7 @@ interface JobDetailViewProps {
   rowIndex: number | null;
   onClose: () => void;
   onEdit: () => void;
+  onRemove?: () => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,7 +178,7 @@ function StatusTimeline({ data }: { data: FullJobData }) {
   );
 }
 
-export default function JobDetailView({ job, operatorName, helperName, rowIndex, onClose, onEdit }: JobDetailViewProps) {
+export default function JobDetailView({ job, operatorName, helperName, rowIndex, onClose, onEdit, onRemove }: JobDetailViewProps) {
   const [fullData, setFullData] = useState<FullJobData | null>(null);
   const [loading, setLoading] = useState(true);
   const [printingPdf, setPrintingPdf] = useState(false);
@@ -486,6 +487,16 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                   >
                     <Edit3 className="w-4 h-4" />
                     <span className="hidden sm:inline">Edit</span>
+                  </button>
+                )}
+                {onRemove && !isEditing && job.status !== 'completed' && (
+                  <button
+                    onClick={() => { onClose(); onRemove(); }}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-red-500/80 hover:bg-red-600 rounded-xl text-sm font-bold transition-colors"
+                    title="Remove from Schedule"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Remove</span>
                   </button>
                 )}
                 <button
