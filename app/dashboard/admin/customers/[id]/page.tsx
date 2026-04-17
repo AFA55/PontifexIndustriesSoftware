@@ -15,7 +15,6 @@ import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import CustomerForm from '../_components/CustomerForm';
 import ContactForm from '../_components/ContactForm';
-import JobHistoryDetailPanel from '@/components/jobs/JobHistoryDetailPanel';
 
 interface Contact {
   id: string;
@@ -161,7 +160,6 @@ export default function CustomerDetailPage() {
   const [syncMessage, setSyncMessage] = useState('');
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
   const toggleProject = (name: string) => setExpandedProjects(prev => ({ ...prev, [name]: !prev[name] }));
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -583,8 +581,8 @@ export default function CustomerDetailPage() {
                                 {projectJobs.map((job, jIdx) => (
                                   <tr
                                     key={job.id}
-                                    className={`border-b border-gray-50 hover:bg-purple-50 cursor-pointer transition-colors ${jIdx === projectJobs.length - 1 ? 'border-0' : ''} ${selectedJobId === job.id ? 'bg-purple-50 ring-1 ring-purple-300' : ''}`}
-                                    onClick={() => setSelectedJobId(job.id)}
+                                    className={`border-b border-gray-50 hover:bg-purple-50 cursor-pointer transition-colors ${jIdx === projectJobs.length - 1 ? 'border-0' : ''}`}
+                                    onClick={() => router.push(`/dashboard/admin/active-jobs/${job.id}`)}
                                   >
                                     <td className="px-4 py-2.5 font-mono text-xs text-purple-600 font-semibold">{job.job_number}</td>
                                     <td className="px-4 py-2.5 text-gray-700 text-xs">{job.job_type || '--'}</td>
@@ -771,13 +769,6 @@ export default function CustomerDetailPage() {
         />
       )}
 
-      {/* Job History Detail Panel */}
-      {selectedJobId && (
-        <JobHistoryDetailPanel
-          jobId={selectedJobId}
-          onClose={() => setSelectedJobId(null)}
-        />
-      )}
     </div>
   );
 }
