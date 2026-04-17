@@ -10,7 +10,7 @@ import {
   User as UserIcon, FileText, Download,
   ChevronLeft, ChevronRight, AlertTriangle,
   Search, TrendingUp, Users, Loader2, Shield, Zap,
-  Bell, DollarSign, Coffee, Eye, ChevronDown
+  Bell, DollarSign, Coffee, Eye, ChevronDown, Moon, Settings, Save, X
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -117,6 +117,9 @@ export default function AdminTimecardsPage() {
   const [exportingPDF, setExportingPDF] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'no_entries'>('all');
+  const [showNightShiftSettings, setShowNightShiftSettings] = useState(false);
+  const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
+  const [savingNightShiftSettings, setSavingNightShiftSettings] = useState(false);
   const router = useRouter();
   const isRedirecting = useRef(false);
 
@@ -182,6 +185,44 @@ export default function AdminTimecardsPage() {
   useEffect(() => {
     if (user) fetchTeamSummary();
   }, [user, fetchTeamSummary]);
+
+  // ── Load night shift settings ──────────────────────────────
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from('timecard_settings_v2')
+        .select('night_shift_multiplier')
+        .limit(1)
+        .single();
+      if (data?.night_shift_multiplier) {
+        setNightShiftMultiplier(Number(data.night_shift_multiplier));
+      }
+    };
+    load().catch(() => {});
+  }, []);
+
+  const handleSaveNightShiftSettings = async () => {
+    setSavingNightShiftSettings(true);
+    try {
+      const { data: existing } = await supabase
+        .from('timecard_settings_v2')
+        .select('id')
+        .limit(1)
+        .single();
+
+      if (existing?.id) {
+        await supabase
+          .from('timecard_settings_v2')
+          .update({ night_shift_multiplier: nightShiftMultiplier })
+          .eq('id', existing.id);
+      }
+    } catch (err) {
+      console.error('Error saving night shift settings:', err);
+    } finally {
+      setSavingNightShiftSettings(false);
+      setShowNightShiftSettings(false);
+    }
+  };
 
   // ── Session token helper ───────────────────────────────────
   const getSessionToken = async (): Promise<string | null> => {
@@ -399,6 +440,15 @@ export default function AdminTimecardsPage() {
               <span className="hidden sm:inline">PDF</span>
             </button>
 
+            <button
+              onClick={() => setShowNightShiftSettings(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-white hover:bg-gray-50 text-gray-700 border border-gray-200"
+              title="Night Shift Settings"
+            >
+              <Moon size={14} className="text-purple-500" />
+              <span className="hidden sm:inline">Night Shift</span>
+            </button>
+
             <div className="hidden sm:flex items-center gap-2.5 pl-3 border-l border-gray-200">
               <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
                 {user?.name?.charAt(0) || 'A'}
@@ -407,6 +457,73 @@ export default function AdminTimecardsPage() {
           </div>
         </div>
       </header>
+
+      {/* ── Night Shift Settings Modal ───────────────────────── */}
+      {showNightShiftSettings && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full border border-gray-200">
+            <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <Moon size={16} className="text-purple-500" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Night Shift Settings</h3>
+                  <p className="text-[10px] text-gray-500">Configure premium pay multiplier</p>
+                </div>
+              </div>
+              <button onClick={() => setShowNightShiftSettings(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X size={16} className="text-gray-400" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Night Shift Multiplier
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1.0"
+                    max="3.0"
+                    step="0.05"
+                    value={nightShiftMultiplier}
+                    onChange={(e) => setNightShiftMultiplier(parseFloat(e.target.value) || 1.25)}
+                    className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 text-sm text-gray-900 transition-all"
+                  />
+                  <span className="text-sm font-bold text-gray-500">×</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Default 1.25 = 25% premium. Range: 1.0 – 3.0. Applied to night shift hours until the 40hr weekly threshold.
+                </p>
+              </div>
+
+              <div className="px-3 py-2.5 bg-purple-50 rounded-lg border border-purple-100">
+                <p className="text-[10px] text-purple-700">
+                  <strong>40hr Rule:</strong> Once an operator hits 40 total hours for the week, night shift premium stops and standard overtime (1.5×) applies instead.
+                </p>
+              </div>
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  onClick={() => setShowNightShiftSettings(false)}
+                  className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveNightShiftSettings}
+                  disabled={savingNightShiftSettings}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-semibold text-sm transition-all disabled:opacity-50"
+                >
+                  {savingNightShiftSettings ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-5">
         {/* ── Week Navigation ───────────────────────────── */}
