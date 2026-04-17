@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Zap } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import NotificationBell from '@/components/NotificationBell';
+import QuickAddModal from '@/components/ui/QuickAddModal';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
@@ -67,6 +68,7 @@ function HeaderAvatar({ user }: { user: User | null }) {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   useEffect(() => {
     setUser(getCurrentUser());
@@ -111,6 +113,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* Quick Add — secondary outlined button */}
+            <button
+              onClick={() => setQuickAddOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 hover:border-purple-300 transition-all"
+              title="Quick Add: placeholder a job on the schedule"
+            >
+              <Zap className="w-4 h-4" />
+              <span className="hidden sm:inline">Quick Add</span>
+            </button>
+
             {/* + New Job */}
             <button
               onClick={() => router.push('/dashboard/admin/schedule-form')}
@@ -126,6 +138,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* User avatar */}
             <HeaderAvatar user={user} />
           </div>
+
+          {/* Quick Add modal — rendered at layout level so it's available on all admin pages */}
+          <QuickAddModal isOpen={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
         </header>
 
         {/* ---------------------------------------------------------------- */}
