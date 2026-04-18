@@ -91,8 +91,7 @@ interface LaborRow {
 interface BillingMilestone {
   id: string;
   label: string;
-  percent_target: number;
-  status: 'pending' | 'triggered';
+  milestone_percent: number;
   triggered_at: string | null;
 }
 
@@ -140,6 +139,7 @@ function billingTypeBadge(type: string | null) {
     fixed: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Fixed Price' },
     cycle: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Cycle Billing' },
     'time_material': { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
+    'time_and_material': { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
     'tm': { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
   };
   const c = cfg[type.toLowerCase()] || { bg: 'bg-gray-100', text: 'text-gray-700', label: type };
@@ -311,7 +311,7 @@ export default function CompletedJobSummaryPage() {
           .from('billing_milestones')
           .select('*')
           .eq('job_order_id', jobId)
-          .order('percent_target', { ascending: true });
+          .order('milestone_percent', { ascending: true });
         setMilestones((ms || []) as BillingMilestone[]);
       } catch (_) {}
 
@@ -347,19 +347,14 @@ export default function CompletedJobSummaryPage() {
 
     const coresActual = workItems.reduce((s: number, i: any) => s + Number(i.core_quantity || 0), 0);
     const lfActual = workItems.reduce((s: number, i: any) => s + Number(i.linear_feet_cut || 0), 0);
-    const sfActual = workItems.reduce((s: number, i: any) => s + Number(i.sq_ft_cut || i.square_feet || 0), 0);
 
-    if (coresActual > 0 || expected.cores_drilled) {
-      const exp = Number(expected.cores_drilled || 0);
+    if (coresActual > 0 || expected.cores) {
+      const exp = Number(expected.cores || 0);
       metrics.push({ label: 'Cores Drilled', actual: coresActual, expected: exp, pct: exp > 0 ? (coresActual / exp) * 100 : 100 });
     }
-    if (lfActual > 0 || expected.linear_feet_cut) {
-      const exp = Number(expected.linear_feet_cut || 0);
+    if (lfActual > 0 || expected.linear_feet) {
+      const exp = Number(expected.linear_feet || 0);
       metrics.push({ label: 'Linear Feet Cut', actual: lfActual, expected: exp, pct: exp > 0 ? (lfActual / exp) * 100 : 100 });
-    }
-    if (sfActual > 0 || expected.sq_ft_cut) {
-      const exp = Number(expected.sq_ft_cut || 0);
-      metrics.push({ label: 'Sq Ft Cut', actual: sfActual, expected: exp, pct: exp > 0 ? (sfActual / exp) * 100 : 100 });
     }
 
     setScopeMetrics(metrics);
@@ -387,11 +382,11 @@ export default function CompletedJobSummaryPage() {
     try {
       const res = await apiFetch(`/api/admin/jobs/${jobId}/billing-milestones`, {
         method: 'POST',
-        body: JSON.stringify({ label: milestoneLabel.trim(), percent_target: Number(milestonePercent) }),
+        body: JSON.stringify({ label: milestoneLabel.trim(), milestone_percent: Number(milestonePercent) }),
       });
       if (res.ok) {
         const data = await res.json();
-        setMilestones(prev => [...prev, data.data].sort((a, b) => a.percent_target - b.percent_target));
+        setMilestones(prev => [...prev, data.data.milestone].sort((a, b) => a.milestone_percent - b.milestone_percent));
         setMilestoneLabel('');
         setMilestonePercent('');
         setShowMilestoneForm(false);
@@ -400,11 +395,11 @@ export default function CompletedJobSummaryPage() {
         // Fallback: add directly to Supabase
         const { data: ms } = await supabase
           .from('billing_milestones')
-          .insert({ job_order_id: jobId, label: milestoneLabel.trim(), percent_target: Number(milestonePercent), status: 'pending' })
+          .insert({ job_order_id: jobId, label: milestoneLabel.trim(), milestone_percent: Number(milestonePercent) })
           .select()
           .single();
         if (ms) {
-          setMilestones(prev => [...prev, ms as BillingMilestone].sort((a, b) => a.percent_target - b.percent_target));
+          setMilestones(prev => [...prev, ms as BillingMilestone].sort((a, b) => a.milestone_percent - b.milestone_percent));
           setMilestoneLabel('');
           setMilestonePercent('');
           setShowMilestoneForm(false);
@@ -423,15 +418,15 @@ export default function CompletedJobSummaryPage() {
     try {
       const res = await apiFetch(`/api/admin/billing-milestones/${msId}/trigger`, { method: 'POST' });
       if (res.ok) {
-        setMilestones(prev => prev.map(m => m.id === msId ? { ...m, status: 'triggered', triggered_at: new Date().toISOString() } : m));
+        setMilestones(prev => prev.map(m => m.id === msId ? { ...m, triggered_at: new Date().toISOString() } : m));
         setActionMsg({ type: 'success', text: 'Milestone triggered.' });
       } else {
         // Direct Supabase update fallback
         await supabase
           .from('billing_milestones')
-          .update({ status: 'triggered', triggered_at: new Date().toISOString() })
+          .update({ triggered_at: new Date().toISOString(), notification_sent: true, notified_at: new Date().toISOString() })
           .eq('id', msId);
-        setMilestones(prev => prev.map(m => m.id === msId ? { ...m, status: 'triggered', triggered_at: new Date().toISOString() } : m));
+        setMilestones(prev => prev.map(m => m.id === msId ? { ...m, triggered_at: new Date().toISOString() } : m));
         setActionMsg({ type: 'success', text: 'Milestone triggered.' });
       }
     } catch (_) {
@@ -826,20 +821,22 @@ export default function CompletedJobSummaryPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {milestones.map((ms) => (
+                {milestones.map((ms) => {
+                  const isTriggered = !!ms.triggered_at;
+                  return (
                   <div
                     key={ms.id}
                     className={`flex items-center justify-between p-4 rounded-lg border ${
-                      ms.status === 'triggered'
+                      isTriggered
                         ? 'bg-green-50 border-green-200'
                         : 'bg-gray-50 border-gray-200'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        ms.status === 'triggered' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                        isTriggered ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
                       }`}>
-                        {ms.percent_target}%
+                        {ms.milestone_percent}%
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">{ms.label}</p>
@@ -851,7 +848,7 @@ export default function CompletedJobSummaryPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {ms.status === 'triggered' ? (
+                      {isTriggered ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                           <CheckCircle className="w-3 h-3" />
                           Triggered
@@ -868,7 +865,8 @@ export default function CompletedJobSummaryPage() {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -29,26 +29,24 @@ async function calcScopePercent(jobId: string, tenantId: string): Promise<number
       .single(),
     supabaseAdmin
       .from('work_items')
-      .select('core_quantity, linear_feet_cut, square_feet_cut')
+      .select('core_quantity, linear_feet_cut')
       .eq('job_order_id', jobId)
       .eq('tenant_id', tenantId),
   ]);
 
-  const expectedScope = (jobRes.data?.expected_scope as any) || {};
+  const expectedScope = (jobRes.data?.expected_scope as Record<string, unknown>) || {};
   const items = itemsRes.data || [];
 
   const expectedCores = Number(expectedScope.cores || 0);
   const expectedLinear = Number(expectedScope.linear_feet || 0);
-  const expectedSquare = Number(expectedScope.square_feet || 0);
 
-  const totalExpected = expectedCores + expectedLinear + expectedSquare;
+  const totalExpected = expectedCores + expectedLinear;
   if (totalExpected === 0) return 0;
 
   const actualCores = items.reduce((s, i) => s + Number(i.core_quantity || 0), 0);
   const actualLinear = items.reduce((s, i) => s + Number(i.linear_feet_cut || 0), 0);
-  const actualSquare = items.reduce((s, i) => s + Number(i.square_feet_cut || 0), 0);
 
-  const totalActual = actualCores + actualLinear + actualSquare;
+  const totalActual = actualCores + actualLinear;
   return Math.min(100, (totalActual / totalExpected) * 100);
 }
 
@@ -118,11 +116,13 @@ function autoTriggerMilestones(
     (async () => {
       const currentPct = await calcScopePercent(jobId, tenantId);
 
-      const { data: untriggered } = await supabaseAdmin
+      let milestonesQuery = supabaseAdmin
         .from('billing_milestones')
         .select('id, milestone_percent, label, job_order_id')
         .eq('job_order_id', jobId)
         .is('triggered_at', null);
+      if (tenantId) milestonesQuery = milestonesQuery.eq('tenant_id', tenantId);
+      const { data: untriggered } = await milestonesQuery;
 
       if (!untriggered || untriggered.length === 0) return;
 
@@ -219,9 +219,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // ── Auto-trigger billing milestones (fire-and-forget, non-blocking) ────
-    if (tenantId) {
-      autoTriggerMilestones(jobId, tenantId, auth.userId);
-    }
+    autoTriggerMilestones(jobId, tenantId, auth.userId);
 
     // Fire-and-forget audit log
     Promise.resolve(
