@@ -2,6 +2,7 @@
 // Client-side hook to read current user's feature flags
 
 import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export interface UserFeatureFlags {
   can_create_schedule_forms: boolean;
@@ -70,6 +71,8 @@ export function useFeatureFlags(
       return;
     }
 
+    setLoading(true); // reset before every fetch so guards wait for fresh data
+
     // Super admins get all permissions — no DB lookup needed
     if (role === 'super_admin' || role === 'operations_manager') {
       setFlags(SUPER_ADMIN_FLAGS);
@@ -77,7 +80,13 @@ export function useFeatureFlags(
       return;
     }
 
-    fetch(`/api/admin/user-flags/${userId}`)
+    // Fetch the current session token via Supabase client (reliable across all storage modes)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const token = session?.access_token;
+      return fetch(`/api/admin/user-flags/${userId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    })
       .then((r) => r.json())
       .then((json) => {
         if (json.data) setFlags({ ...DEFAULT_FLAGS, ...json.data });

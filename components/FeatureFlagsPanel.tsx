@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Save, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export interface UserFeatureFlags {
   can_create_schedule_forms: boolean;
@@ -152,9 +153,14 @@ export default function FeatureFlagsPanel({ userId, initialFlags, onSave, readOn
   const handleSave = async () => {
     setSaving(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
       const res = await fetch(`/api/admin/user-flags/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(flags),
       });
       const json = await res.json();
