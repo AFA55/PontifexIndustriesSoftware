@@ -151,7 +151,7 @@ function billingTypeBadge(type: string | null) {
 }
 
 function StarDisplay({ rating, max = 5 }: { rating: number | null; max?: number }) {
-  if (!rating) return <span className="text-gray-400 text-sm">No rating</span>;
+  if (rating === null || rating === undefined) return <span className="text-gray-400 text-sm">No rating</span>;
   const normalized = max === 10 ? rating / 2 : rating;
   return (
     <div className="flex items-center gap-1">
@@ -752,7 +752,13 @@ export default function CompletedJobSummaryPage() {
           )}
         </div>
 
-        {/* ── Section 4: Cycle Billing Milestones (only if cycle) ───────────── */}
+        {/* ── Section 4: Cycle Billing Milestones ──────────────────────────── */}
+        {!isCycleBilling && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
+            <strong>Cycle billing not enabled.</strong> To use milestone-based billing for this job,{' '}
+            go to the <a href={`/dashboard/admin/jobs/${summary.id}`} className="underline">Job Detail page</a> and set Billing Type to &ldquo;Cycle Billing&rdquo;.
+          </div>
+        )}
         {isCycleBilling && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
@@ -869,7 +875,7 @@ export default function CompletedJobSummaryPage() {
         )}
 
         {/* ── Section 5: Customer Feedback ─────────────────────────────────── */}
-        {(summary.customer_overall_rating || summary.customer_cleanliness_rating || summary.customer_communication_rating || summary.customer_feedback_comments) && (
+        {(summary.customer_overall_rating !== null && summary.customer_overall_rating !== undefined || summary.customer_cleanliness_rating !== null && summary.customer_cleanliness_rating !== undefined || summary.customer_communication_rating !== null && summary.customer_communication_rating !== undefined || summary.customer_feedback_comments) && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
@@ -877,21 +883,21 @@ export default function CompletedJobSummaryPage() {
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-              {summary.customer_overall_rating && (
+              {summary.customer_overall_rating !== null && summary.customer_overall_rating !== undefined && (
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
                   <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Overall</p>
                   <p className="text-3xl font-bold text-gray-900 mb-2">{summary.customer_overall_rating}/10</p>
                   <StarDisplay rating={summary.customer_overall_rating} max={10} />
                 </div>
               )}
-              {summary.customer_cleanliness_rating && (
+              {summary.customer_cleanliness_rating !== null && summary.customer_cleanliness_rating !== undefined && (
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
                   <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Cleanliness</p>
                   <p className="text-3xl font-bold text-gray-900 mb-2">{summary.customer_cleanliness_rating}/10</p>
                   <StarDisplay rating={summary.customer_cleanliness_rating} max={10} />
                 </div>
               )}
-              {summary.customer_communication_rating && (
+              {summary.customer_communication_rating !== null && summary.customer_communication_rating !== undefined && (
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
                   <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Communication</p>
                   <p className="text-3xl font-bold text-gray-900 mb-2">{summary.customer_communication_rating}/10</p>
