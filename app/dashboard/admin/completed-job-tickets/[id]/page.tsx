@@ -5,208 +5,439 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import {
-  FileText, Star, Clock, DollarSign, User, MapPin, Trash2,
-  CheckCircle, Calendar, TrendingUp, AlertCircle, Download, Eye, X
+  ArrowLeft,
+  FileText,
+  Star,
+  Clock,
+  DollarSign,
+  User,
+  MapPin,
+  CheckCircle,
+  Calendar,
+  AlertCircle,
+  Download,
+  Eye,
+  X,
+  Plus,
+  Loader2,
+  Bell,
+  Receipt,
+  TrendingUp,
+  BarChart3,
+  Target,
+  Image as ImageIcon,
+  Milestone,
+  ChevronRight,
 } from 'lucide-react';
 
-interface JobData {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface CompletionSummary {
   id: string;
   job_number: string;
-  title: string;
-  customer: string;
+  title: string | null;
+  project_name: string | null;
   customer_name: string;
-  customer_contact: string;
-  customer_email: string;
-  job_location: string;
-  location: string;
-  address: string;
-  description: string;
-  scope_of_work: string;
-  assigned_to: string;
-  scheduled_date: string;
-  arrival_time: string;
-  shop_arrival_time: string;
-  completion_signed_at: string;
-  completion_signer_name: string;
+  customer_contact: string | null;
+  customer_email: string | null;
+  address: string | null;
+  location: string | null;
+  job_location: string | null;
+  scheduled_date: string | null;
+  completion_signed_at: string | null;
+  work_completed_at: string | null;
+  billing_type: string | null;
+  estimated_cost: number | null;
+  actual_cost: number | null;
+  expected_scope: Record<string, number> | null;
+  scope_details: Record<string, unknown> | null;
+  // Completion docs
+  liability_release_pdf_url: string | null;
+  liability_release_signed_by: string | null;
+  liability_release_signed_at: string | null;
+  work_order_pdf_url: string | null;
+  silica_plan_pdf_url: string | null;
+  completion_signer_name: string | null;
   contact_not_on_site: boolean;
-  foreman_name: string;
-  foreman_phone: string;
-  job_site_number: string;
-  po_number: string;
-  customer_job_number: string;
-  liability_release_signed_by: string;
-  liability_release_signed_at: string;
-  liability_release_pdf_url: string;
-  work_order_pdf_url: string;
-  silica_plan_pdf_url: string;
+  // Customer feedback
   customer_overall_rating: number | null;
   customer_cleanliness_rating: number | null;
   customer_communication_rating: number | null;
   customer_feedback_comments: string | null;
-  job_difficulty_rating: number | null;
-  job_access_rating: number | null;
-  job_difficulty_notes: string | null;
-  job_access_notes: string | null;
   feedback_submitted_at: string | null;
-  feedback_submitted_by: string | null;
-  operator_notes: string | null;
-  admin_operator_rating: number | null;
-  admin_feedback: string | null;
-  // Multi-day / scope fields
-  estimated_cost: number | null;
-  scope_details: Record<string, any> | null;
-  is_multi_day: boolean;
-  total_days_worked: number;
-  end_date: string | null;
-  job_type: string | null;
-  equipment_needed: string[] | null;
+  // Operator
+  assigned_to: string | null;
+  salesman_name: string | null;
+  salesman_id: string | null;
+  po_number: string | null;
+  foreman_name: string | null;
+  foreman_phone: string | null;
+  description: string | null;
+  scope_of_work: string | null;
 }
 
-export default function CompletedJobDetailsPage() {
+interface LaborRow {
+  operator_name: string;
+  date: string;
+  regular_hrs: number;
+  ot_hrs: number;
+  ns_hrs: number;
+  total: number;
+}
+
+interface BillingMilestone {
+  id: string;
+  label: string;
+  percent_target: number;
+  status: 'pending' | 'triggered';
+  triggered_at: string | null;
+}
+
+interface ScopeMetric {
+  label: string;
+  actual: number;
+  expected: number;
+  pct: number;
+}
+
+interface Photo {
+  id: string;
+  url: string;
+  caption: string | null;
+  uploaded_at: string;
+}
+
+// ─── Rates ────────────────────────────────────────────────────────────────────
+const RATE_REGULAR = 125;
+const RATE_OT = 187.5;
+const RATE_NS = 150;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+async function getToken() {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || '';
+}
+
+async function apiFetch(url: string, opts?: RequestInit) {
+  const token = await getToken();
+  return fetch(url, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...opts?.headers,
+    },
+  });
+}
+
+function billingTypeBadge(type: string | null) {
+  if (!type) return null;
+  const cfg: Record<string, { bg: string; text: string; label: string }> = {
+    fixed: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Fixed Price' },
+    cycle: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Cycle Billing' },
+    'time_material': { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
+    'tm': { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
+  };
+  const c = cfg[type.toLowerCase()] || { bg: 'bg-gray-100', text: 'text-gray-700', label: type };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${c.bg} ${c.text}`}>
+      {c.label}
+    </span>
+  );
+}
+
+function StarDisplay({ rating, max = 5 }: { rating: number | null; max?: number }) {
+  if (!rating) return <span className="text-gray-400 text-sm">No rating</span>;
+  const normalized = max === 10 ? rating / 2 : rating;
+  return (
+    <div className="flex items-center gap-1">
+      {[0, 1, 2, 3, 4].map(i => (
+        <Star
+          key={i}
+          className={`w-4 h-4 ${i < Math.floor(normalized) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+        />
+      ))}
+      <span className="ml-1 text-sm font-medium text-gray-600">{rating}/{max}</span>
+    </div>
+  );
+}
+
+function ProgressBar({ pct }: { pct: number }) {
+  const color = pct >= 100 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-400' : 'bg-red-500';
+  return (
+    <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+      <div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm animate-pulse">
+      <div className="h-5 bg-gray-200 rounded w-1/3 mb-4" />
+      <div className="space-y-3">
+        <div className="h-4 bg-gray-100 rounded" />
+        <div className="h-4 bg-gray-100 rounded w-3/4" />
+        <div className="h-4 bg-gray-100 rounded w-1/2" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function CompletedJobSummaryPage() {
   const router = useRouter();
   const params = useParams();
   const jobId = params.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
-  const [job, setJob] = useState<JobData | null>(null);
-  const [operatorName, setOperatorName] = useState('Unknown');
-  const [workPerformed, setWorkPerformed] = useState<any[]>([]);
-  const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
+  const [summary, setSummary] = useState<CompletionSummary | null>(null);
+  const [laborRows, setLaborRows] = useState<LaborRow[]>([]);
+  const [milestones, setMilestones] = useState<BillingMilestone[]>([]);
+  const [scopeMetrics, setScopeMetrics] = useState<ScopeMetric[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
-  const [dailyLogs, setDailyLogs] = useState<any[]>([]);
+
+  // PDF viewer
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const [currentPdfUrl, setCurrentPdfUrl] = useState('');
   const [currentPdfTitle, setCurrentPdfTitle] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Milestone form
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
+  const [milestoneLabel, setMilestoneLabel] = useState('');
+  const [milestonePercent, setMilestonePercent] = useState('');
+  const [savingMilestone, setSavingMilestone] = useState(false);
+
+  // Actions
+  const [notifying, setNotifying] = useState(false);
+  const [triggeringId, setTriggeringId] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
-    checkAuth();
-    loadJobDetails();
+    const user = getCurrentUser();
+    if (!user) { router.push('/login'); return; }
+    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(user.role)) {
+      router.push('/dashboard'); return;
+    }
+    loadData();
   }, [jobId]);
 
-  const checkAuth = async () => {
+  useEffect(() => {
+    if (actionMsg) {
+      const t = setTimeout(() => setActionMsg(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [actionMsg]);
+
+  const loadData = async () => {
+    setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
+      // Try the ALEX-built endpoint first; fall back to direct DB fetch
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/completion-summary`);
+      if (res.ok) {
+        const data = await res.json();
+        hydrate(data.data);
         return;
       }
+    } catch (_) {}
 
-      const userStr = localStorage.getItem('patriot-user');
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(user.role)) {
-          router.push('/dashboard');
-        }
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-    }
+    // Fallback: load directly from Supabase
+    await loadFromSupabase();
   };
 
-  const loadJobDetails = async () => {
+  const hydrate = (data: any) => {
+    setSummary(data.job || data);
+    setLaborRows(data.labor_rows || []);
+    setMilestones(data.billing_milestones || []);
+    buildScopeMetrics(data.job || data, data.work_items || []);
+    setPhotos(data.photos || []);
+    setDocuments(data.documents || []);
+    setLoading(false);
+  };
+
+  const loadFromSupabase = async () => {
     try {
-      const { data: jobData, error: jobError } = await supabase
+      const { data: job } = await supabase
         .from('job_orders')
         .select('*')
         .eq('id', jobId)
         .single();
 
-      if (jobError) throw jobError;
-      setJob(jobData);
+      if (!job) { setLoading(false); return; }
+      setSummary(job as CompletionSummary);
 
-      if (jobData.assigned_to) {
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', jobData.assigned_to)
-            .single();
-
-          if (profile) {
-            setOperatorName(profile.full_name);
-          }
-        } catch (err) {
-          // silent
-        }
-      }
-
-      const { data: standbyData } = await supabase
-        .from('standby_logs')
-        .select('*')
-        .eq('job_order_id', jobId)
-        .eq('status', 'completed');
-
-      setStandbyLogs(standbyData || []);
-
-      // Fetch work items from database (primary source, not localStorage)
-      const { data: workItemsData } = await supabase
+      // Work items for scope metrics
+      const { data: workItems } = await supabase
         .from('work_items')
         .select('*')
         .eq('job_order_id', jobId)
-        .order('day_number', { ascending: true })
-        .order('created_at', { ascending: true });
+        .order('day_number', { ascending: true });
 
-      if (workItemsData && workItemsData.length > 0) {
-        setWorkPerformed(workItemsData);
-      } else {
-        // Fallback to localStorage only if DB has nothing
-        const savedWork = localStorage.getItem(`work-performed-${jobId}`);
-        if (savedWork) {
-          const parsed = JSON.parse(savedWork);
-          setWorkPerformed(parsed.items || []);
-        }
+      buildScopeMetrics(job, workItems || []);
+
+      // Timecards for labor table
+      const { data: timecards } = await supabase
+        .from('timecards')
+        .select('*, profiles(full_name)')
+        .eq('job_order_id', jobId)
+        .order('clock_in', { ascending: true });
+
+      if (timecards) {
+        const rows: LaborRow[] = timecards.map((tc: any) => {
+          const reg = Number(tc.regular_hours || 0);
+          const ot = Number(tc.overtime_hours || 0);
+          const ns = Number(tc.night_shift_hours || 0);
+          return {
+            operator_name: tc.profiles?.full_name || 'Unknown',
+            date: tc.clock_in ? new Date(tc.clock_in).toLocaleDateString() : '--',
+            regular_hrs: reg,
+            ot_hrs: ot,
+            ns_hrs: ns,
+            total: reg + ot + ns,
+          };
+        });
+        setLaborRows(rows);
       }
 
-      const { data: docsData } = await supabase
+      // Billing milestones
+      try {
+        const { data: ms } = await supabase
+          .from('billing_milestones')
+          .select('*')
+          .eq('job_order_id', jobId)
+          .order('percent_target', { ascending: true });
+        setMilestones((ms || []) as BillingMilestone[]);
+      } catch (_) {}
+
+      // Documents
+      const { data: docs } = await supabase
         .from('pdf_documents')
         .select('*')
         .eq('job_id', jobId)
         .eq('is_latest', true)
         .order('generated_at', { ascending: false });
+      setDocuments(docs || []);
 
-      setDocuments(docsData || []);
+      // Photos from job_photos table (if exists)
+      try {
+        const { data: ph } = await supabase
+          .from('job_photos')
+          .select('*')
+          .eq('job_order_id', jobId)
+          .order('uploaded_at', { ascending: false });
+        setPhotos((ph || []) as Photo[]);
+      } catch (_) {}
 
-      const { data: dailyLogsData } = await supabase
-        .from('daily_job_logs')
-        .select('*')
-        .eq('job_order_id', jobId)
-        .order('log_date', { ascending: true });
-
-      setDailyLogs(dailyLogsData || []);
-
-    } catch (error) {
-      console.error('Error loading job details:', error);
+    } catch (err) {
+      console.error('Error loading job summary:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!job) return;
+  const buildScopeMetrics = (job: any, workItems: any[]) => {
+    const metrics: ScopeMetric[] = [];
+    const expected = job.expected_scope || {};
 
-    setDeleting(true);
+    const coresActual = workItems.reduce((s: number, i: any) => s + Number(i.core_quantity || 0), 0);
+    const lfActual = workItems.reduce((s: number, i: any) => s + Number(i.linear_feet_cut || 0), 0);
+    const sfActual = workItems.reduce((s: number, i: any) => s + Number(i.sq_ft_cut || i.square_feet || 0), 0);
+
+    if (coresActual > 0 || expected.cores_drilled) {
+      const exp = Number(expected.cores_drilled || 0);
+      metrics.push({ label: 'Cores Drilled', actual: coresActual, expected: exp, pct: exp > 0 ? (coresActual / exp) * 100 : 100 });
+    }
+    if (lfActual > 0 || expected.linear_feet_cut) {
+      const exp = Number(expected.linear_feet_cut || 0);
+      metrics.push({ label: 'Linear Feet Cut', actual: lfActual, expected: exp, pct: exp > 0 ? (lfActual / exp) * 100 : 100 });
+    }
+    if (sfActual > 0 || expected.sq_ft_cut) {
+      const exp = Number(expected.sq_ft_cut || 0);
+      metrics.push({ label: 'Sq Ft Cut', actual: sfActual, expected: exp, pct: exp > 0 ? (sfActual / exp) * 100 : 100 });
+    }
+
+    setScopeMetrics(metrics);
+  };
+
+  const handleNotifySalesperson = async () => {
+    setNotifying(true);
     try {
-      // Delete from job_orders table
-      const { error } = await supabase
-        .from('job_orders')
-        .delete()
-        .eq('id', jobId);
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/notify-salesperson`, { method: 'POST' });
+      if (res.ok) {
+        setActionMsg({ type: 'success', text: 'Salesperson notified successfully.' });
+      } else {
+        setActionMsg({ type: 'error', text: 'Failed to notify salesperson.' });
+      }
+    } catch (_) {
+      setActionMsg({ type: 'error', text: 'Failed to notify salesperson.' });
+    } finally {
+      setNotifying(false);
+    }
+  };
 
-      if (error) throw error;
+  const handleAddMilestone = async () => {
+    if (!milestoneLabel.trim() || !milestonePercent) return;
+    setSavingMilestone(true);
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/billing-milestones`, {
+        method: 'POST',
+        body: JSON.stringify({ label: milestoneLabel.trim(), percent_target: Number(milestonePercent) }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMilestones(prev => [...prev, data.data].sort((a, b) => a.percent_target - b.percent_target));
+        setMilestoneLabel('');
+        setMilestonePercent('');
+        setShowMilestoneForm(false);
+        setActionMsg({ type: 'success', text: 'Milestone added.' });
+      } else {
+        // Fallback: add directly to Supabase
+        const { data: ms } = await supabase
+          .from('billing_milestones')
+          .insert({ job_order_id: jobId, label: milestoneLabel.trim(), percent_target: Number(milestonePercent), status: 'pending' })
+          .select()
+          .single();
+        if (ms) {
+          setMilestones(prev => [...prev, ms as BillingMilestone].sort((a, b) => a.percent_target - b.percent_target));
+          setMilestoneLabel('');
+          setMilestonePercent('');
+          setShowMilestoneForm(false);
+          setActionMsg({ type: 'success', text: 'Milestone added.' });
+        }
+      }
+    } catch (_) {
+      setActionMsg({ type: 'error', text: 'Failed to add milestone.' });
+    } finally {
+      setSavingMilestone(false);
+    }
+  };
 
-      // Clear localStorage
-      localStorage.removeItem(`work-performed-${jobId}`);
-
-      // Redirect back to completed jobs list
-      router.push('/dashboard/admin/completed-job-tickets');
-    } catch (error) {
-      console.error('Error deleting job:', error);
-      alert('Failed to delete job. Please try again.');
-      setDeleting(false);
+  const handleTriggerMilestone = async (msId: string) => {
+    setTriggeringId(msId);
+    try {
+      const res = await apiFetch(`/api/admin/billing-milestones/${msId}/trigger`, { method: 'POST' });
+      if (res.ok) {
+        setMilestones(prev => prev.map(m => m.id === msId ? { ...m, status: 'triggered', triggered_at: new Date().toISOString() } : m));
+        setActionMsg({ type: 'success', text: 'Milestone triggered.' });
+      } else {
+        // Direct Supabase update fallback
+        await supabase
+          .from('billing_milestones')
+          .update({ status: 'triggered', triggered_at: new Date().toISOString() })
+          .eq('id', msId);
+        setMilestones(prev => prev.map(m => m.id === msId ? { ...m, status: 'triggered', triggered_at: new Date().toISOString() } : m));
+        setActionMsg({ type: 'success', text: 'Milestone triggered.' });
+      }
+    } catch (_) {
+      setActionMsg({ type: 'error', text: 'Failed to trigger milestone.' });
+    } finally {
+      setTriggeringId(null);
     }
   };
 
@@ -216,75 +447,41 @@ export default function CompletedJobDetailsPage() {
     setPdfViewerOpen(true);
   };
 
-  const calculateTotalTime = () => {
-    if (!job) return 0;
+  // ─── Computed values ────────────────────────────────────────────────────────
 
-    // For multi-day jobs, sum hours from all daily logs
-    if (dailyLogs.length > 0) {
-      const totalFromLogs = dailyLogs.reduce((sum, log) => sum + Number(log.hours_worked || 0), 0);
-      if (totalFromLogs > 0) return totalFromLogs;
-    }
+  const totalRegular = laborRows.reduce((s, r) => s + r.regular_hrs, 0);
+  const totalOT = laborRows.reduce((s, r) => s + r.ot_hrs, 0);
+  const totalNS = laborRows.reduce((s, r) => s + r.ns_hrs, 0);
+  const totalHrs = laborRows.reduce((s, r) => s + r.total, 0);
+  const laborCost = totalRegular * RATE_REGULAR + totalOT * RATE_OT + totalNS * RATE_NS;
 
-    // Fallback: single-day calculation from timestamps
-    const startTime = job.arrival_time || job.scheduled_date;
-    if (!startTime || !job.completion_signed_at) return 0;
-
-    const start = new Date(startTime);
-    const end = new Date(job.completion_signed_at);
-    const diffMs = end.getTime() - start.getTime();
-    if (diffMs < 0) return 0;
-
-    return diffMs / (1000 * 60 * 60);
-  };
-
-  const calculateStandbyHours = () => {
-    return standbyLogs.reduce((sum, log) => sum + (log.duration_hours || 0), 0);
-  };
-
-  const calculateLaborCost = () => {
-    const totalHours = calculateTotalTime();
-    return totalHours * 75;
-  };
-
-  const calculateStandbyCost = () => {
-    const standbyHours = calculateStandbyHours();
-    return standbyHours * 189;
-  };
-
-  const renderStars = (rating: number | null, maxRating: number = 5) => {
-    if (!rating) return null;
-    const stars = [];
-    const normalizedRating = maxRating === 10 ? rating / 2 : rating;
-
-    for (let i = 0; i < 5; i++) {
-      stars.push(
-        <Star
-          key={i}
-          className={`w-5 h-5 ${i < Math.floor(normalizedRating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
-        />
-      );
-    }
-    return <div className="flex gap-1">{stars}</div>;
-  };
+  // ─── Loading skeleton ────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading job details...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b border-gray-200 h-16 shadow-sm" />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+          <SkeletonCard />
+          <div className="grid grid-cols-3 gap-4">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
       </div>
     );
   }
 
-  if (!job) {
+  if (!summary) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Job Not Found</h2>
-          <Link href="/dashboard/admin/completed-job-tickets" className="text-blue-600 hover:underline">
+          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Job Not Found</h2>
+          <Link href="/dashboard/admin/completed-job-tickets" className="text-blue-600 hover:underline text-sm">
             Back to Completed Jobs
           </Link>
         </div>
@@ -292,682 +489,619 @@ export default function CompletedJobDetailsPage() {
     );
   }
 
-  const totalTime = calculateTotalTime();
-  const standbyHours = calculateStandbyHours();
-  const laborCost = calculateLaborCost();
-  const standbyCost = calculateStandbyCost();
+  const jobName = summary.project_name || summary.title || summary.job_number;
+  const customerName = summary.customer_name;
+  const location = summary.address || summary.location || summary.job_location || '--';
+  const scheduledDate = summary.scheduled_date ? new Date(summary.scheduled_date).toLocaleDateString() : '--';
+  const completedDate = (summary.completion_signed_at || summary.work_completed_at)
+    ? new Date((summary.completion_signed_at || summary.work_completed_at)!).toLocaleDateString()
+    : '--';
+  const signatureCaptured = !summary.contact_not_on_site && !!summary.completion_signer_name;
+  const isCycleBilling = (summary.billing_type || '').toLowerCase() === 'cycle';
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* ── Header Bar ───────────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/dashboard/admin/completed-job-tickets"
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{job.customer || job.customer_name}</h1>
-                <p className="text-sm text-gray-600">{job.job_number}</p>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/dashboard/admin/completed-job-tickets"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </Link>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{summary.job_number}</span>
+                <ChevronRight className="w-3 h-3 text-gray-300" />
+                <h1 className="text-lg font-bold text-gray-900 truncate">{jobName}</h1>
               </div>
+              <p className="text-sm text-gray-500">{customerName}</p>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-bold flex items-center gap-2">
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
                 <CheckCircle className="w-4 h-4" />
                 Completed
               </span>
+
               <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold flex items-center gap-2 transition-colors"
+                onClick={handleNotifySalesperson}
+                disabled={notifying}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
-                <Trash2 className="w-4 h-4" />
-                Delete Job
+                {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                Notify Salesperson
               </button>
+
+              <Link
+                href={`/dashboard/admin/billing/create?job=${jobId}`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors"
+              >
+                <Receipt className="w-4 h-4" />
+                Create Invoice
+              </Link>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">Delete Completed Job?</h3>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete job <strong>{job.job_number}</strong>? This action cannot be undone and will remove all associated data.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleting}
-                className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {deleting ? (
-                  <>
-                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </>
-                )}
-              </button>
-            </div>
+      {/* Action messages */}
+      {actionMsg && (
+        <div className={`max-w-6xl mx-auto px-4 sm:px-6 pt-4`}>
+          <div className={`flex items-center gap-3 p-3 rounded-lg border text-sm ${
+            actionMsg.type === 'success'
+              ? 'bg-green-50 border-green-200 text-green-700'
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}>
+            {actionMsg.type === 'success' ? <CheckCircle className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+            <span className="flex-1">{actionMsg.text}</span>
+            <button onClick={() => setActionMsg(null)}><X className="w-4 h-4" /></button>
           </div>
         </div>
       )}
 
-      {/* PDF Viewer Modal */}
-      {pdfViewerOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900">{currentPdfTitle}</h3>
-              <div className="flex items-center gap-2">
-                <a
-                  href={currentPdfUrl}
-                  download
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center gap-2 transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  Download
-                </a>
-                <button
-                  onClick={() => setPdfViewerOpen(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-6 h-6 text-gray-600" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <iframe
-                src={currentPdfUrl}
-                className="w-full h-full"
-                title={currentPdfTitle}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Time & Cost Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Clock className="w-6 h-6 text-blue-600" />
-              <span className="text-sm font-semibold text-gray-600">Total Time</span>
-            </div>
-            <p className="text-3xl font-bold text-blue-600">{totalTime.toFixed(1)}h</p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Clock className="w-6 h-6 text-yellow-600" />
-              <span className="text-sm font-semibold text-gray-600">Standby Time</span>
-            </div>
-            <p className="text-3xl font-bold text-yellow-600">{standbyHours.toFixed(1)}h</p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <DollarSign className="w-6 h-6 text-green-600" />
-              <span className="text-sm font-semibold text-gray-600">Labor Cost</span>
-            </div>
-            <p className="text-3xl font-bold text-green-600">${laborCost.toFixed(0)}</p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <DollarSign className="w-6 h-6 text-purple-600" />
-              <span className="text-sm font-semibold text-gray-600">Standby Cost</span>
-            </div>
-            <p className="text-3xl font-bold text-purple-600">${standbyCost.toFixed(0)}</p>
-          </div>
-        </div>
-
-        {/* Job Overview */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+        {/* ── Section 1: Job Overview ───────────────────────────────────────── */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-blue-600" />
-            Job Information
+            Job Overview
           </h2>
 
-          <div className="space-y-6">
-            {/* Row 1: Basic Job Info */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-2">Basic Information</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Job Number</label>
-                  <p className="text-gray-900 font-semibold">{job.job_number}</p>
-                </div>
-                {job.title && (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Job Title</label>
-                    <p className="text-gray-900 font-semibold">{job.title}</p>
-                  </div>
-                )}
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Operator</label>
-                  <p className="text-gray-900 font-semibold">{operatorName}</p>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Scheduled Date</label>
-                  <p className="text-gray-900 font-semibold">
-                    {job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString() : 'N/A'}
-                  </p>
-                </div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Customer</p>
+              <p className="text-gray-900 font-medium">{customerName}</p>
+              {summary.customer_contact && (
+                <p className="text-sm text-gray-500">{summary.customer_contact}</p>
+              )}
+              {summary.customer_email && (
+                <p className="text-sm text-gray-400">{summary.customer_email}</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Location</p>
+              <p className="text-gray-900 font-medium flex items-start gap-1">
+                <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                {location}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Dates</p>
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-600">{scheduledDate}</span>
+                <span className="text-gray-400">→</span>
+                <span className="text-gray-900 font-medium">{completedDate}</span>
               </div>
             </div>
 
-            {/* Row 2: Customer Information */}
             <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-2">Customer Information</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Company Name</label>
-                  <p className="text-gray-900 font-semibold">{job.customer_name || 'N/A'}</p>
-                </div>
-                {job.customer_contact && (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Customer Contact</label>
-                    <p className="text-gray-900 font-semibold">{job.customer_contact}</p>
-                  </div>
-                )}
-                {job.customer_email && (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Customer Email</label>
-                    <p className="text-gray-900 font-semibold">{job.customer_email}</p>
-                  </div>
-                )}
-              </div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Billing Type</p>
+              <div>{billingTypeBadge(summary.billing_type) ?? <span className="text-gray-400 text-sm">Not set</span>}</div>
             </div>
 
-            {/* Row 3: Job Site Contact */}
-            {(job.foreman_name || job.foreman_phone) && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Estimated Cost</p>
+              <p className="text-gray-900 font-medium">
+                {summary.estimated_cost ? `$${Number(summary.estimated_cost).toLocaleString()}` : '--'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Actual Cost</p>
+              <p className={`font-semibold ${summary.actual_cost && summary.estimated_cost && summary.actual_cost > summary.estimated_cost ? 'text-red-600' : 'text-emerald-600'}`}>
+                {summary.actual_cost ? `$${Number(summary.actual_cost).toLocaleString()}` : laborCost > 0 ? `$${laborCost.toFixed(0)} (labor est.)` : '--'}
+              </p>
+            </div>
+
+            {summary.po_number && (
               <div>
-                <h3 className="text-sm font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-2">Job Site Contact</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {job.foreman_name && (
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Contact On Site</label>
-                      <p className="text-gray-900 font-semibold">{job.foreman_name}</p>
-                    </div>
-                  )}
-                  {job.foreman_phone && (
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Contact Phone</label>
-                      <p className="text-gray-900 font-semibold">{job.foreman_phone}</p>
-                    </div>
-                  )}
-                </div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">PO Number</p>
+                <p className="text-gray-900 font-medium">{summary.po_number}</p>
               </div>
             )}
 
-            {/* Row 4: Job Details */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-2">Job Details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {job.po_number && (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">PO Number</label>
-                    <p className="text-gray-900 font-semibold">{job.po_number}</p>
-                  </div>
-                )}
-                {job.customer_job_number && (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Customer Job Number</label>
-                    <p className="text-gray-900 font-semibold">{job.customer_job_number}</p>
-                  </div>
-                )}
-                {job.job_site_number && (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Job Site Number</label>
-                    <p className="text-gray-900 font-semibold">{job.job_site_number}</p>
-                  </div>
-                )}
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Location</label>
-                  <p className="text-gray-900 font-semibold flex items-center gap-1">
-                    <MapPin className="w-4 h-4 text-gray-500" />
-                    {job.job_location || job.location}
-                  </p>
-                </div>
+            {summary.salesman_name && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Salesperson</p>
+                <p className="text-gray-900 font-medium flex items-center gap-1">
+                  <User className="w-4 h-4 text-gray-400" />
+                  {summary.salesman_name}
+                </p>
               </div>
-            </div>
+            )}
+
+            {(summary.foreman_name || summary.foreman_phone) && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Site Contact</p>
+                <p className="text-gray-900 font-medium">{summary.foreman_name}</p>
+                {summary.foreman_phone && <p className="text-sm text-gray-500">{summary.foreman_phone}</p>}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Work Performed & Original Scope */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            Work Details
-          </h2>
-
-          {/* Project Summary for Multi-Day Jobs */}
-          {dailyLogs.length > 1 && (
-            <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200 mb-4">
-              <h3 className="font-bold text-gray-900 mb-2">Project Summary</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div>
-                  <p className="text-gray-500 text-xs font-semibold">Total Days</p>
-                  <p className="text-indigo-700 font-bold text-lg">{dailyLogs.length}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs font-semibold">Total Hours</p>
-                  <p className="text-indigo-700 font-bold text-lg">
-                    {dailyLogs.reduce((sum: number, log: any) => sum + Number(log.hours_worked || 0), 0).toFixed(1)}h
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs font-semibold">Work Items</p>
-                  <p className="text-indigo-700 font-bold text-lg">{workPerformed.length}</p>
-                </div>
-                {job.estimated_cost && (
-                  <div>
-                    <p className="text-gray-500 text-xs font-semibold">Quoted</p>
-                    <p className="text-emerald-700 font-bold text-lg">${Number(job.estimated_cost).toLocaleString()}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <h3 className="font-bold text-gray-900 mb-3">Original Scope</h3>
-              <p className="text-gray-700 whitespace-pre-wrap text-sm">
-                {job.description || job.scope_of_work || 'No description provided'}
-              </p>
-              {/* Show structured scope details if available */}
-              {job.scope_details && Object.keys(job.scope_details).length > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">Scope Breakdown</p>
-                  {Object.entries(job.scope_details).map(([key, val]: [string, any]) => (
-                    <div key={key} className="mb-2">
-                      <p className="text-xs font-semibold text-gray-700">{key.replace(/_/g, ' ')}</p>
-                      {typeof val === 'object' && val !== null ? (
-                        <div className="ml-2 text-xs text-gray-600">
-                          {Object.entries(val).map(([k, v]) => (
-                            <span key={k} className="inline-block mr-3">
-                              {k}: <strong>{String(v)}</strong>
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-gray-600 ml-2">{String(val)}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-              <h3 className="font-bold text-gray-900 mb-3">Work Performed</h3>
-              {workPerformed.length > 0 ? (
-                <ul className="space-y-2">
-                  {workPerformed.map((item, idx) => {
-                    // Handle both DB format (work_type) and localStorage format (name)
-                    const itemName = item.work_type || item.name || 'Work Item';
-                    const qty = item.quantity || 1;
-                    const dayNum = item.day_number;
-                    return (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                        <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        <span className="flex-1">
-                          {itemName} {qty > 1 ? `(x${qty})` : ''}
-                          {item.core_quantity ? ` - ${item.core_quantity} cores` : ''}
-                          {item.linear_feet_cut ? ` - ${item.linear_feet_cut} LF` : ''}
-                          {item.notes ? ` - ${item.notes}` : ''}
-                        </span>
-                        {dayNum && dayNum > 0 && (
-                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold flex-shrink-0">
-                            Day {dayNum}
-                          </span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="text-gray-500 italic text-sm">No detailed work log available</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Daily Progress (Multi-day jobs) */}
-        {dailyLogs.length > 1 && (
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-purple-600" />
-              Daily Progress ({dailyLogs.length} days)
+        {/* ── Section 2: Scope Completed ────────────────────────────────────── */}
+        {scopeMetrics.length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-emerald-600" />
+              Scope Completed
             </h2>
-            <div className="space-y-3">
-              {dailyLogs.map((log, i) => (
-                <div key={i} className="flex items-center justify-between bg-purple-50 rounded-lg px-4 py-3 border border-purple-200">
-                  <div>
-                    <p className="font-bold text-gray-900 text-sm">
-                      Day {log.day_number || (i + 1)} — {new Date(log.log_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                    </p>
-                    {log.notes && (
-                      <p className="text-xs text-gray-500 mt-0.5">{log.notes}</p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-purple-700">{Number(log.hours_worked || 0).toFixed(1)}h</p>
-                  </div>
+
+            <div className={`grid grid-cols-1 gap-4 ${scopeMetrics.length === 1 ? 'sm:grid-cols-1' : scopeMetrics.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+              {scopeMetrics.map((m) => (
+                <div key={m.label} className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{m.label}</p>
+                  <p className="text-3xl font-bold text-gray-900 mb-1">{m.actual.toLocaleString()}</p>
+                  {m.expected > 0 && (
+                    <>
+                      <p className="text-xs text-gray-400 mb-3">of {m.expected.toLocaleString()} expected</p>
+                      <ProgressBar pct={m.pct} />
+                      <p className={`text-xs font-semibold mt-1 ${m.pct >= 100 ? 'text-green-600' : m.pct >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {m.pct.toFixed(0)}% complete
+                      </p>
+                    </>
+                  )}
                 </div>
               ))}
-              <div className="flex items-center justify-between bg-purple-100 rounded-lg px-4 py-3 border-2 border-purple-300 font-bold">
-                <span className="text-gray-900">Total Project Hours</span>
-                <span className="text-purple-800 text-lg">
-                  {dailyLogs.reduce((sum, log) => sum + Number(log.hours_worked || 0), 0).toFixed(1)}h
-                </span>
-              </div>
             </div>
           </div>
         )}
 
-        {/* Ratings Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Operator Job Survey */}
-          {(job.job_difficulty_rating || job.job_access_rating) && (
-            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Star className="w-5 h-5 text-orange-500" />
-                  Operator Job Survey
-                </h2>
-                {job.feedback_submitted_at && (
-                  <span className="text-xs text-gray-500">
-                    {new Date(job.feedback_submitted_at).toLocaleString()}
-                  </span>
-                )}
-              </div>
+        {/* ── Section 3: Labor Hours ────────────────────────────────────────── */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-blue-600" />
+            Labor Hours
+          </h2>
 
-              {job.feedback_submitted_by && (
-                <div className="mb-4 text-sm text-gray-600">
-                  <strong>Submitted by:</strong> {job.feedback_submitted_by}
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {job.job_difficulty_rating && (
-                  <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-gray-700 uppercase">Job Difficulty</span>
-                      <span className="text-lg font-bold text-orange-600">{job.job_difficulty_rating}/5</span>
-                    </div>
-                    {renderStars(job.job_difficulty_rating, 5)}
-                    {job.job_difficulty_notes && (
-                      <div className="mt-3 pt-3 border-t border-orange-300">
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">Notes:</p>
-                        <p className="text-sm text-gray-700">{job.job_difficulty_notes}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {job.job_access_rating && (
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-gray-700 uppercase">Site Access</span>
-                      <span className="text-lg font-bold text-blue-600">{job.job_access_rating}/5</span>
-                    </div>
-                    {renderStars(job.job_access_rating, 5)}
-                    {job.job_access_notes && (
-                      <div className="mt-3 pt-3 border-t border-blue-300">
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">Notes:</p>
-                        <p className="text-sm text-gray-700">{job.job_access_notes}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {job.operator_notes && (
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <p className="text-xs font-bold text-gray-500 uppercase mb-2">Additional Operator Notes:</p>
-                    <p className="text-sm text-gray-700">{job.operator_notes}</p>
-                  </div>
-                )}
-              </div>
+          {laborRows.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <Clock className="w-10 h-10 mx-auto mb-2 text-gray-200" />
+              <p className="text-sm">No timecard records found for this job.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {['Operator', 'Date', 'Regular Hrs', 'OT Hrs', 'NS Premium Hrs', 'Total'].map(h => (
+                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {laborRows.map((row, i) => (
+                    <tr key={i} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
+                      <td className="px-4 py-2.5 text-gray-900 font-medium">{row.operator_name}</td>
+                      <td className="px-4 py-2.5 text-gray-600">{row.date}</td>
+                      <td className="px-4 py-2.5 text-gray-700">{row.regular_hrs.toFixed(1)}</td>
+                      <td className="px-4 py-2.5 text-amber-700">{row.ot_hrs > 0 ? row.ot_hrs.toFixed(1) : '--'}</td>
+                      <td className="px-4 py-2.5 text-purple-700">{row.ns_hrs > 0 ? row.ns_hrs.toFixed(1) : '--'}</td>
+                      <td className="px-4 py-2.5 text-gray-900 font-semibold">{row.total.toFixed(1)}</td>
+                    </tr>
+                  ))}
+                  {/* Footer totals */}
+                  <tr className="bg-gray-100 border-t-2 border-gray-200 font-semibold">
+                    <td className="px-4 py-2.5 text-gray-900" colSpan={2}>Totals</td>
+                    <td className="px-4 py-2.5 text-gray-900">{totalRegular.toFixed(1)}</td>
+                    <td className="px-4 py-2.5 text-amber-700">{totalOT > 0 ? totalOT.toFixed(1) : '--'}</td>
+                    <td className="px-4 py-2.5 text-purple-700">{totalNS > 0 ? totalNS.toFixed(1) : '--'}</td>
+                    <td className="px-4 py-2.5 text-gray-900">{totalHrs.toFixed(1)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* Admin Ratings */}
-          {job.admin_operator_rating && (
-            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-600" />
-                Admin Operator Rating
-              </h2>
-
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-gray-600">Performance Rating</span>
-                    <span className="text-lg font-bold text-blue-600">{job.admin_operator_rating}/5</span>
-                  </div>
-                  {renderStars(job.admin_operator_rating, 5)}
-                </div>
-
-                {job.admin_feedback && (
-                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Admin Feedback:</p>
-                    <p className="text-sm text-gray-700">{job.admin_feedback}</p>
-                  </div>
-                )}
+          {/* Labor cost summary */}
+          {laborCost > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-4">
+              <div className="bg-blue-50 rounded-lg px-4 py-2 text-sm">
+                <span className="text-gray-600">Regular: </span>
+                <span className="font-semibold text-blue-700">${(totalRegular * RATE_REGULAR).toFixed(0)}</span>
+                <span className="text-gray-400 ml-1">@ ${RATE_REGULAR}/hr</span>
               </div>
-            </div>
-          )}
-
-          {/* Customer Performance Survey */}
-          {(job.customer_overall_rating || job.customer_cleanliness_rating || job.customer_communication_rating) && (
-            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 md:col-span-2">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                Customer Performance Survey
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Survey completed by: <strong>{job.completion_signer_name || 'Customer'}</strong>
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                {job.customer_overall_rating && (
-                  <div className="text-center bg-green-50 rounded-lg p-4 border border-green-200">
-                    <div className="text-4xl font-bold text-green-600 mb-2">
-                      {job.customer_overall_rating}/10
-                    </div>
-                    <div className="text-sm text-gray-600 font-semibold">Overall Rating</div>
-                  </div>
-                )}
-                {job.customer_cleanliness_rating && (
-                  <div className="text-center bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <div className="text-4xl font-bold text-blue-600 mb-2">
-                      {job.customer_cleanliness_rating}/10
-                    </div>
-                    <div className="text-sm text-gray-600 font-semibold">Cleanliness</div>
-                  </div>
-                )}
-                {job.customer_communication_rating && (
-                  <div className="text-center bg-purple-50 rounded-lg p-4 border border-purple-200">
-                    <div className="text-4xl font-bold text-purple-600 mb-2">
-                      {job.customer_communication_rating}/10
-                    </div>
-                    <div className="text-sm text-gray-600 font-semibold">Communication</div>
-                  </div>
-                )}
-              </div>
-
-              {job.customer_feedback_comments && (
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Customer Comments:</p>
-                  <p className="text-sm text-gray-700">{job.customer_feedback_comments}</p>
+              {totalOT > 0 && (
+                <div className="bg-amber-50 rounded-lg px-4 py-2 text-sm">
+                  <span className="text-gray-600">OT: </span>
+                  <span className="font-semibold text-amber-700">${(totalOT * RATE_OT).toFixed(0)}</span>
+                  <span className="text-gray-400 ml-1">@ ${RATE_OT}/hr</span>
                 </div>
               )}
+              {totalNS > 0 && (
+                <div className="bg-purple-50 rounded-lg px-4 py-2 text-sm">
+                  <span className="text-gray-600">Night Shift: </span>
+                  <span className="font-semibold text-purple-700">${(totalNS * RATE_NS).toFixed(0)}</span>
+                  <span className="text-gray-400 ml-1">@ ${RATE_NS}/hr</span>
+                </div>
+              )}
+              <div className="bg-emerald-50 rounded-lg px-4 py-2 text-sm font-bold">
+                <span className="text-gray-600">Total Labor Cost: </span>
+                <span className="text-emerald-700">${laborCost.toFixed(0)}</span>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Legal Documents & PDFs */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-red-600" />
-            Legal Documents & PDFs
+        {/* ── Section 4: Cycle Billing Milestones (only if cycle) ───────────── */}
+        {isCycleBilling && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Target className="w-5 h-5 text-purple-600" />
+                Cycle Billing Milestones
+              </h2>
+              <button
+                onClick={() => setShowMilestoneForm(prev => !prev)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Milestone
+              </button>
+            </div>
+
+            {/* Inline add form */}
+            {showMilestoneForm && (
+              <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200 flex flex-wrap gap-3 items-end">
+                <div className="flex-1 min-w-40">
+                  <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Label</label>
+                  <input
+                    type="text"
+                    value={milestoneLabel}
+                    onChange={e => setMilestoneLabel(e.target.value)}
+                    placeholder="e.g. Foundation Complete"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-200 bg-white"
+                  />
+                </div>
+                <div className="w-32">
+                  <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">% Target</label>
+                  <input
+                    type="number"
+                    value={milestonePercent}
+                    onChange={e => setMilestonePercent(e.target.value)}
+                    placeholder="25"
+                    min={1}
+                    max={100}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-200 bg-white"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddMilestone}
+                    disabled={savingMilestone || !milestoneLabel.trim() || !milestonePercent}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {savingMilestone ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setShowMilestoneForm(false)}
+                    className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {milestones.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <Target className="w-10 h-10 mx-auto mb-2 text-gray-200" />
+                <p className="text-sm">No milestones set. Add milestones to track billing cycles.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {milestones.map((ms) => (
+                  <div
+                    key={ms.id}
+                    className={`flex items-center justify-between p-4 rounded-lg border ${
+                      ms.status === 'triggered'
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        ms.status === 'triggered' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                      }`}>
+                        {ms.percent_target}%
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{ms.label}</p>
+                        {ms.triggered_at && (
+                          <p className="text-xs text-gray-500">
+                            Triggered: {new Date(ms.triggered_at).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {ms.status === 'triggered' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                          <CheckCircle className="w-3 h-3" />
+                          Triggered
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleTriggerMilestone(ms.id)}
+                          disabled={triggeringId === ms.id}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {triggeringId === ms.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                          Trigger Now
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Section 5: Customer Feedback ─────────────────────────────────── */}
+        {(summary.customer_overall_rating || summary.customer_cleanliness_rating || summary.customer_communication_rating || summary.customer_feedback_comments) && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+              Customer Feedback
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              {summary.customer_overall_rating && (
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Overall</p>
+                  <p className="text-3xl font-bold text-gray-900 mb-2">{summary.customer_overall_rating}/10</p>
+                  <StarDisplay rating={summary.customer_overall_rating} max={10} />
+                </div>
+              )}
+              {summary.customer_cleanliness_rating && (
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Cleanliness</p>
+                  <p className="text-3xl font-bold text-gray-900 mb-2">{summary.customer_cleanliness_rating}/10</p>
+                  <StarDisplay rating={summary.customer_cleanliness_rating} max={10} />
+                </div>
+              )}
+              {summary.customer_communication_rating && (
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Communication</p>
+                  <p className="text-3xl font-bold text-gray-900 mb-2">{summary.customer_communication_rating}/10</p>
+                  <StarDisplay rating={summary.customer_communication_rating} max={10} />
+                </div>
+              )}
+            </div>
+
+            {summary.customer_feedback_comments && (
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Customer Comments</p>
+                <p className="text-sm text-gray-700">{summary.customer_feedback_comments}</p>
+              </div>
+            )}
+
+            <div className="mt-3 text-xs text-gray-500 flex items-center gap-1">
+              {signatureCaptured ? (
+                <>
+                  <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                  Signed by: {summary.completion_signer_name}
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                  Contact not on site — no signature captured
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Section 6: Documents & Photos ─────────────────────────────────── */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-indigo-600" />
+            Documents & Photos
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Liability Release PDF */}
-            {job.liability_release_pdf_url && (
-              <div className="bg-red-50 rounded-lg p-4 border-2 border-red-200">
-                <div className="flex items-center gap-3 mb-3">
-                  <FileText className="w-5 h-5 text-red-600" />
-                  <h3 className="font-bold text-red-900">Liability Release</h3>
-                </div>
-                <p className="text-xs text-red-700 mb-3">
-                  Signed by: {job.liability_release_signed_by}<br />
-                  {job.liability_release_signed_at && new Date(job.liability_release_signed_at).toLocaleString()}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openPdfViewer(job.liability_release_pdf_url, 'Liability Release')}
-                    className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View
-                  </button>
-                  <a
-                    href={job.liability_release_pdf_url}
-                    download
-                    className="px-3 py-2 bg-white hover:bg-gray-50 text-red-600 border border-red-600 rounded-lg text-sm font-semibold transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
-            )}
+          {/* Signature status */}
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mb-4 ${
+            signatureCaptured ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+          }`}>
+            {signatureCaptured ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+            Customer Signature: {signatureCaptured ? 'Captured' : 'Not Captured'}
+          </div>
 
-            {/* Work Order Agreement PDF */}
-            {job.work_order_pdf_url && (
-              <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
-                <div className="flex items-center gap-3 mb-3">
-                  <FileText className="w-5 h-5 text-green-600" />
-                  <h3 className="font-bold text-green-900">Work Order Agreement</h3>
-                </div>
-                <p className="text-xs text-green-700 mb-3">
-                  Signed by: {job.completion_signer_name}<br />
-                  {job.completion_signed_at && new Date(job.completion_signed_at).toLocaleString()}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openPdfViewer(job.work_order_pdf_url, 'Work Order Agreement')}
-                    className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View
-                  </button>
-                  <a
-                    href={job.work_order_pdf_url}
-                    download
-                    className="px-3 py-2 bg-white hover:bg-gray-50 text-green-600 border border-green-600 rounded-lg text-sm font-semibold transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
+          {/* Core documents */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {summary.liability_release_pdf_url && (
+              <DocCard
+                title="Liability Release"
+                subtitle={summary.liability_release_signed_by ? `Signed by: ${summary.liability_release_signed_by}` : undefined}
+                date={summary.liability_release_signed_at}
+                color="red"
+                onView={() => openPdfViewer(summary.liability_release_pdf_url!, 'Liability Release')}
+                downloadUrl={summary.liability_release_pdf_url}
+              />
             )}
-
-            {/* Silica Exposure Plan PDF */}
-            {job.silica_plan_pdf_url && (
-              <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
-                <div className="flex items-center gap-3 mb-3">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-bold text-blue-900">Silica Exposure Plan</h3>
-                </div>
-                <p className="text-xs text-blue-700 mb-3">
-                  OSHA compliance document
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openPdfViewer(job.silica_plan_pdf_url, 'Silica Exposure Control Plan')}
-                    className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View
-                  </button>
-                  <a
-                    href={job.silica_plan_pdf_url}
-                    download
-                    className="px-3 py-2 bg-white hover:bg-gray-50 text-blue-600 border border-blue-600 rounded-lg text-sm font-semibold transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
+            {summary.work_order_pdf_url && (
+              <DocCard
+                title="Work Order Agreement"
+                subtitle={summary.completion_signer_name ? `Signed by: ${summary.completion_signer_name}` : undefined}
+                date={summary.completion_signed_at}
+                color="green"
+                onView={() => openPdfViewer(summary.work_order_pdf_url!, 'Work Order Agreement')}
+                downloadUrl={summary.work_order_pdf_url}
+              />
             )}
-
-            {/* Other Documents */}
+            {summary.silica_plan_pdf_url && (
+              <DocCard
+                title="Silica Exposure Plan"
+                subtitle="OSHA compliance document"
+                color="blue"
+                onView={() => openPdfViewer(summary.silica_plan_pdf_url!, 'Silica Exposure Control Plan')}
+                downloadUrl={summary.silica_plan_pdf_url}
+              />
+            )}
             {documents.map((doc) => (
-              <div key={doc.id} className="bg-purple-50 rounded-lg p-4 border-2 border-purple-200">
-                <div className="flex items-center gap-3 mb-3">
-                  <FileText className="w-5 h-5 text-purple-600" />
-                  <h3 className="font-bold text-purple-900">{doc.document_name}</h3>
-                </div>
-                <p className="text-xs text-purple-700 mb-3">
-                  Generated: {new Date(doc.generated_at).toLocaleString()}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openPdfViewer(doc.file_url, doc.document_name)}
-                    className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View
-                  </button>
-                  <a
-                    href={doc.file_url}
-                    download
-                    className="px-3 py-2 bg-white hover:bg-gray-50 text-purple-600 border border-purple-600 rounded-lg text-sm font-semibold transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
+              <DocCard
+                key={doc.id}
+                title={doc.document_name || 'Document'}
+                date={doc.generated_at}
+                color="purple"
+                onView={() => openPdfViewer(doc.file_url, doc.document_name)}
+                downloadUrl={doc.file_url}
+              />
             ))}
           </div>
 
-          {!job.liability_release_pdf_url && !job.work_order_pdf_url && !job.silica_plan_pdf_url && documents.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-              <p>No PDF documents available</p>
+          {/* Photos grid */}
+          {photos.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4" />
+                Job Photos ({photos.length})
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {photos.map((ph) => (
+                  <a
+                    key={ph.id}
+                    href={ph.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-100 hover:border-blue-400 transition-colors"
+                  >
+                    <img
+                      src={ph.url}
+                      alt={ph.caption || 'Job photo'}
+                      className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                    />
+                    {ph.caption && (
+                      <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-xs p-1 truncate">
+                        {ph.caption}
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!summary.liability_release_pdf_url && !summary.work_order_pdf_url && !summary.silica_plan_pdf_url && documents.length === 0 && photos.length === 0 && (
+            <div className="text-center py-8 text-gray-400">
+              <FileText className="w-10 h-10 mx-auto mb-2 text-gray-200" />
+              <p className="text-sm">No documents or photos available for this job.</p>
             </div>
           )}
         </div>
+
+      </div>
+
+      {/* ── PDF Viewer Modal ───────────────────────────────────────────────── */}
+      {pdfViewerOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900">{currentPdfTitle}</h3>
+              <div className="flex items-center gap-2">
+                <a
+                  href={currentPdfUrl}
+                  download
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </a>
+                <button onClick={() => setPdfViewerOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <iframe src={currentPdfUrl} className="w-full h-full" title={currentPdfTitle} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sub-component: DocCard ───────────────────────────────────────────────────
+
+function DocCard({
+  title,
+  subtitle,
+  date,
+  color,
+  onView,
+  downloadUrl,
+}: {
+  title: string;
+  subtitle?: string;
+  date?: string | null;
+  color: 'red' | 'green' | 'blue' | 'purple' | 'indigo';
+  onView: () => void;
+  downloadUrl: string;
+}) {
+  const colorMap = {
+    red: { bg: 'bg-red-50', border: 'border-red-200', icon: 'text-red-600', title: 'text-red-900', meta: 'text-red-700', btn: 'bg-red-600 hover:bg-red-700', outline: 'text-red-600 border-red-600' },
+    green: { bg: 'bg-green-50', border: 'border-green-200', icon: 'text-green-600', title: 'text-green-900', meta: 'text-green-700', btn: 'bg-green-600 hover:bg-green-700', outline: 'text-green-600 border-green-600' },
+    blue: { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'text-blue-600', title: 'text-blue-900', meta: 'text-blue-700', btn: 'bg-blue-600 hover:bg-blue-700', outline: 'text-blue-600 border-blue-600' },
+    purple: { bg: 'bg-purple-50', border: 'border-purple-200', icon: 'text-purple-600', title: 'text-purple-900', meta: 'text-purple-700', btn: 'bg-purple-600 hover:bg-purple-700', outline: 'text-purple-600 border-purple-600' },
+    indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', icon: 'text-indigo-600', title: 'text-indigo-900', meta: 'text-indigo-700', btn: 'bg-indigo-600 hover:bg-indigo-700', outline: 'text-indigo-600 border-indigo-600' },
+  };
+  const c = colorMap[color];
+  return (
+    <div className={`${c.bg} rounded-lg p-4 border ${c.border}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <FileText className={`w-4 h-4 ${c.icon}`} />
+        <h3 className={`font-semibold text-sm ${c.title}`}>{title}</h3>
+      </div>
+      {subtitle && <p className={`text-xs ${c.meta} mb-1`}>{subtitle}</p>}
+      {date && <p className={`text-xs ${c.meta} mb-3`}>{new Date(date).toLocaleDateString()}</p>}
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={onView}
+          className={`flex-1 px-2 py-1.5 ${c.btn} text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors`}
+        >
+          <Eye className="w-3.5 h-3.5" />
+          View
+        </button>
+        <a
+          href={downloadUrl}
+          download
+          className={`px-2 py-1.5 bg-white hover:bg-gray-50 ${c.outline} border rounded-lg text-xs font-semibold transition-colors flex items-center justify-center`}
+        >
+          <Download className="w-3.5 h-3.5" />
+        </a>
       </div>
     </div>
   );

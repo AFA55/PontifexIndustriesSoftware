@@ -11,7 +11,7 @@ import {
   MessageSquare, ThumbsUp, ThumbsDown, Send, ChevronDown, ChevronUp,
   DollarSign, Shield, AlertTriangle, Hash, Building2, Mail,
   HardHat, ClipboardCheck, BarChart3, Package, StickyNote,
-  Navigation, Layers, Activity,
+  Navigation, Layers, Activity, Plus,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -353,6 +353,14 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
   const [rejecting, setRejecting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
+  // Billing settings
+  const [billingType, setBillingType] = useState<string>('fixed');
+  const [billingMilestones, setBillingMilestones] = useState<Array<{ label: string; percent: number }>>([]);
+  const [newMsLabel, setNewMsLabel] = useState('');
+  const [newMsPct, setNewMsPct] = useState('');
+  const [savingBilling, setSavingBilling] = useState(false);
+  const [billingMsg, setBillingMsg] = useState<string | null>(null);
+
   // Auth guard
   useEffect(() => {
     const user = getCurrentUser();
@@ -435,6 +443,8 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
           completion_rejection_notes: d.completion_rejection_notes,
           created_at: d.created_at,
         });
+        // Seed billing type from DB
+        setBillingType(d.billing_type || 'fixed');
       } else {
         // Full job fetch failed — truly not found or no access
         setPageError('Job not found or you do not have access.');
@@ -509,6 +519,42 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
     } catch (e: unknown) {
       setFeedback({ type: 'error', msg: e instanceof Error ? e.message : 'Action failed' });
     } finally { setRejecting(false); }
+  };
+
+  const handleSaveBillingSettings = async () => {
+    setSavingBilling(true);
+    setBillingMsg(null);
+    try {
+      const payload: Record<string, unknown> = { billing_type: billingType };
+      if (billingType === 'cycle' && billingMilestones.length > 0) {
+        payload.expected_scope = billingMilestones.reduce((acc, m) => ({ ...acc, [m.label]: m.percent }), {});
+      }
+      const res = await apiFetch(`/api/admin/jobs/${jobId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setBillingMsg('Billing settings saved.');
+      } else {
+        // Fallback: direct Supabase update
+        const { error } = await supabase.from('job_orders').update(payload).eq('id', jobId);
+        if (!error) setBillingMsg('Billing settings saved.');
+        else setBillingMsg('Failed to save billing settings.');
+      }
+    } catch {
+      setBillingMsg('Failed to save billing settings.');
+    } finally { setSavingBilling(false); }
+  };
+
+  const addMilestone = () => {
+    if (!newMsLabel.trim() || !newMsPct) return;
+    setBillingMilestones(prev => [...prev, { label: newMsLabel.trim(), percent: Number(newMsPct) }].sort((a, b) => a.percent - b.percent));
+    setNewMsLabel('');
+    setNewMsPct('');
+  };
+
+  const removeMilestone = (idx: number) => {
+    setBillingMilestones(prev => prev.filter((_, i) => i !== idx));
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -1005,6 +1051,105 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
             )}
+
+            {/* Billing Settings */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-sm font-bold text-gray-800">Billing Settings</h3>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Billing Type</label>
+                  <select
+                    value={billingType}
+                    onChange={e => setBillingType(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                  >
+                    <option value="fixed">Fixed Price</option>
+                    <option value="cycle">Cycle Billing</option>
+                    <option value="tm">Time &amp; Material</option>
+                  </select>
+                </div>
+
+                {/* Cycle milestones */}
+                {billingType === 'cycle' && (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Milestones</label>
+                    {billingMilestones.map((m, i) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-2 bg-purple-50 rounded-lg border border-purple-100 mb-1.5 text-sm">
+                        <span className="font-medium text-gray-800">{m.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-purple-700 font-bold">{m.percent}%</span>
+                          <button onClick={() => removeMilestone(i)} className="text-gray-400 hover:text-red-500 transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        type="text"
+                        value={newMsLabel}
+                        onChange={e => setNewMsLabel(e.target.value)}
+                        placeholder="Label"
+                        className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-purple-400"
+                      />
+                      <input
+                        type="number"
+                        value={newMsPct}
+                        onChange={e => setNewMsPct(e.target.value)}
+                        placeholder="%"
+                        min={1} max={100}
+                        className="w-14 rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-purple-400"
+                      />
+                      <button
+                        onClick={addMilestone}
+                        disabled={!newMsLabel.trim() || !newMsPct}
+                        className="px-2 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* T&M rates display */}
+                {billingType === 'tm' && (
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-xs space-y-1">
+                    <p className="font-semibold text-amber-800">Standard Rates</p>
+                    <p className="text-amber-700">Regular: $125/hr</p>
+                    <p className="text-amber-700">OT: $187.50/hr</p>
+                    <p className="text-amber-700">Night Shift: $150/hr</p>
+                  </div>
+                )}
+
+                {billingMsg && (
+                  <p className={`text-xs ${billingMsg.includes('Failed') ? 'text-red-600' : 'text-emerald-600'} font-semibold`}>
+                    {billingMsg}
+                  </p>
+                )}
+
+                <button
+                  onClick={handleSaveBillingSettings}
+                  disabled={savingBilling}
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                >
+                  {savingBilling ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
+                  Save Billing Settings
+                </button>
+
+                {job.status === 'completed' && (
+                  <Link
+                    href={`/dashboard/admin/completed-job-tickets/${job.id}`}
+                    className="block w-full text-center py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    View Completion Summary
+                  </Link>
+                )}
+              </div>
+            </div>
 
             {/* Note for Operator */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">

@@ -65,6 +65,7 @@ interface CompletedJob {
   estimated_cost: number | null;
   work_completed_at: string;
   status: string;
+  billing_type: string | null;
   has_invoice: boolean;
 }
 
@@ -94,6 +95,7 @@ export default function BillingPage() {
   const [activeTab, setActiveTab] = useState<'invoices' | 'ready_to_bill'>('invoices');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [billingTypeFilter, setBillingTypeFilter] = useState<string>('all');
   const [creating, setCreating] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceDetail | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -135,7 +137,7 @@ export default function BillingPage() {
 
       const { data: completed } = await supabase
         .from('job_orders')
-        .select('id, job_number, title, customer_name, estimated_cost, work_completed_at, status')
+        .select('id, job_number, title, customer_name, estimated_cost, work_completed_at, status, billing_type')
         .eq('status', 'completed')
         .is('deleted_at', null)
         .order('work_completed_at', { ascending: false })
@@ -281,7 +283,31 @@ export default function BillingPage() {
     return true;
   });
 
-  const uninvoicedJobs = completedJobs.filter(j => !j.has_invoice);
+  const uninvoicedJobs = completedJobs.filter(j => {
+    if (j.has_invoice) return false;
+    if (billingTypeFilter !== 'all') {
+      const jt = (j.billing_type || 'fixed').toLowerCase().replace('time_material', 'tm');
+      const ft = billingTypeFilter.toLowerCase();
+      if (jt !== ft) return false;
+    }
+    return true;
+  });
+
+  const billingTypeBadge = (type: string | null) => {
+    const cfgs: Record<string, { bg: string; text: string; label: string }> = {
+      fixed: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Fixed' },
+      cycle: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Cycle' },
+      time_material: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
+      tm: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
+    };
+    const key = (type || 'fixed').toLowerCase();
+    const c = cfgs[key] || { bg: 'bg-gray-100', text: 'text-gray-600', label: type || 'Fixed' };
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${c.bg} ${c.text}`}>
+        {c.label}
+      </span>
+    );
+  };
 
   const statusBadge = (status: string) => {
     const configs: Record<string, { color: string; bg: string; icon: any }> = {
@@ -591,11 +617,38 @@ export default function BillingPage() {
         ) : (
           /* Ready to Bill Tab */
           <div className="space-y-3">
+            {/* Billing type filter */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500 font-medium">Filter by type:</span>
+              {(['all', 'fixed', 'cycle', 'tm'] as const).map(t => {
+                const labels: Record<string, string> = { all: 'All', fixed: 'Fixed', cycle: 'Cycle', tm: 'T&M' };
+                return (
+                  <button
+                    key={t}
+                    onClick={() => setBillingTypeFilter(t)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      billingTypeFilter === t
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-white border border-gray-300 text-gray-600 hover:border-emerald-400 hover:text-emerald-600'
+                    }`}
+                  >
+                    {labels[t]}
+                  </button>
+                );
+              })}
+            </div>
+
             {uninvoicedJobs.length === 0 ? (
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-12 text-center">
                 <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">All Caught Up</h3>
-                <p className="text-sm text-gray-500">All completed jobs have been invoiced.</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  {billingTypeFilter === 'all' ? 'All Caught Up' : 'No Jobs Found'}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {billingTypeFilter === 'all'
+                    ? 'All completed jobs have been invoiced.'
+                    : `No uninvoiced ${billingTypeFilter.toUpperCase()} billing jobs found.`}
+                </p>
               </div>
             ) : (
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
@@ -604,11 +657,14 @@ export default function BillingPage() {
                   <div className="col-span-2">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Job #</span>
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer</span>
                   </div>
                   <div className="col-span-2">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Title</span>
+                  </div>
+                  <div className="col-span-1 text-center">
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Billing</span>
                   </div>
                   <div className="col-span-2 text-right">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Estimated</span>
@@ -626,13 +682,21 @@ export default function BillingPage() {
                     className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors items-center"
                   >
                     <div className="md:col-span-2">
-                      <span className="text-sm font-semibold text-gray-900">{job.job_number}</span>
+                      <Link
+                        href={`/dashboard/admin/completed-job-tickets/${job.id}`}
+                        className="text-sm font-semibold text-blue-600 hover:underline"
+                      >
+                        {job.job_number}
+                      </Link>
                     </div>
-                    <div className="md:col-span-3">
+                    <div className="md:col-span-2">
                       <span className="text-sm text-gray-700">{job.customer_name}</span>
                     </div>
                     <div className="md:col-span-2">
                       <span className="text-sm text-gray-500 truncate block">{job.title}</span>
+                    </div>
+                    <div className="md:col-span-1 text-center">
+                      {billingTypeBadge(job.billing_type)}
                     </div>
                     <div className="md:col-span-2 text-right">
                       {job.estimated_cost ? (
