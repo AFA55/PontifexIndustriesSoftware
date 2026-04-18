@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     let profileMap: Record<string, string> = {};
     if (operatorIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
-        .from('user_profiles')
+        .from('profiles')
         .select('id, full_name')
         .in('id', operatorIds);
       for (const p of profiles ?? []) {

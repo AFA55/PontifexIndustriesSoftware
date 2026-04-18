@@ -49,11 +49,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         notes,
         internal_notes,
         assigned_to,
-        completion_submitted_at,
-        completion_approved_at,
-        completion_rejected_at,
-        completion_rejection_notes,
-        assigned_to
+        completion_submitted_at
       `)
       .eq('id', jobId);
     // Only filter by tenant if tenantId is set (super_admin may have none)
