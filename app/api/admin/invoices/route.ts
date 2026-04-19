@@ -207,14 +207,16 @@ export async function POST(request: NextRequest) {
     };
     const DEFAULT_LABOR_RATE = 125; // $/hr
 
-    // Build line items from work items
+    // Build line items — routed by billing_type to avoid double-billing
     const lineItems: any[] = [];
     let lineNumber = 1;
     let subtotal = 0;
 
-    // If there's an estimated cost, use that as a flat rate line item
-    if (job.estimated_cost && Number(job.estimated_cost) > 0) {
-      const amount = Number(job.estimated_cost);
+    const billingType = job.billing_type as string | null | undefined;
+
+    if (billingType === 'fixed') {
+      // Fixed price: use estimated_cost as a single flat-rate line item
+      const amount = Number(job.estimated_cost) || 0;
       lineItems.push({
         line_number: lineNumber++,
         description: `${job.title || job.job_number} — ${job.job_type || 'Concrete Cutting Services'}`,
@@ -226,8 +228,41 @@ export async function POST(request: NextRequest) {
         taxable: true,
       });
       subtotal += amount;
+
+    } else if (billingType === 'time_and_material') {
+      // T&M: labor hours only — per-unit rates are already embedded
+      if (laborHours > 0) {
+        const laborAmount = Number(laborHours.toFixed(2)) * DEFAULT_LABOR_RATE;
+        lineItems.push({
+          line_number: lineNumber++,
+          description: `Labor — ${laborHours.toFixed(1)} hours on-site`,
+          billing_type: 'labor',
+          quantity: Number(laborHours.toFixed(2)),
+          unit: 'hours',
+          unit_rate: DEFAULT_LABOR_RATE,
+          job_order_id: jobOrderId,
+          taxable: true,
+        });
+        subtotal += laborAmount;
+      }
+
+    } else if (billingType === 'cycle') {
+      // Cycle/milestone billing: use estimated_cost as milestone amount
+      const amount = Number(job.estimated_cost) || 0;
+      lineItems.push({
+        line_number: lineNumber++,
+        description: `${job.title || job.job_number} — Milestone Payment`,
+        billing_type: 'flat_rate',
+        quantity: 1,
+        unit: 'job',
+        unit_rate: amount,
+        job_order_id: jobOrderId,
+        taxable: true,
+      });
+      subtotal += amount;
+
     } else {
-      // Build from work items with default rates
+      // Default (null/unknown): per-unit work items only — no separate labor line
       if (workItems && workItems.length > 0) {
         for (const item of workItems) {
           let desc = item.work_type || 'Concrete Cutting';
@@ -264,23 +299,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Add labor hours line item
-      if (laborHours > 0) {
-        const laborAmount = Number(laborHours.toFixed(2)) * DEFAULT_LABOR_RATE;
-        lineItems.push({
-          line_number: lineNumber++,
-          description: `Labor — ${laborHours.toFixed(1)} hours on-site`,
-          billing_type: 'labor',
-          quantity: Number(laborHours.toFixed(2)),
-          unit: 'hours',
-          unit_rate: DEFAULT_LABOR_RATE,
-          job_order_id: jobOrderId,
-          taxable: true,
-        });
-        subtotal += laborAmount;
-      }
-
-      // If no work items and no labor, add a generic line item from job type
+      // Fallback: no work items — generic placeholder at $0 for admin to fill in
       if (lineItems.length === 0) {
         lineItems.push({
           line_number: lineNumber++,

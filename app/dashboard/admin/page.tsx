@@ -655,23 +655,27 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* Crew Utilization (team) / Your Active Jobs (personal) */}
+        {/* Crew Utilization (team) / Pending Timecards (personal) */}
         {scope === 'personal' ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <Link
+            href="/dashboard/admin/timecards"
+            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow group"
+          >
             <div className="flex items-start justify-between mb-4">
               <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-purple-600" />
+                <Clock className="w-5 h-5 text-purple-600" />
               </div>
+              <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-purple-500 transition-colors" />
             </div>
             {dashLoading ? (
               <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
             ) : (
               <p className="text-4xl font-bold text-gray-900">
-                {dashData?.jobs_today.count ?? 0}
+                {dashData?.open_items.pending_timecards ?? 0}
               </p>
             )}
-            <p className="text-sm text-gray-500 mt-1">Your Active Jobs</p>
-          </div>
+            <p className="text-sm text-gray-500 mt-1">Pending Timecards</p>
+          </Link>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-start justify-between mb-4">
@@ -940,11 +944,11 @@ export default function AdminDashboard() {
                 <span className="text-xs font-semibold">New Job</span>
               </Link>
               <Link
-                href="/dashboard/admin/schedule-form"
+                href="/dashboard/admin/completed-jobs"
                 className="flex flex-col items-center gap-2 p-4 bg-green-50 hover:bg-green-100 rounded-xl border border-green-200 text-green-700 transition-colors cursor-pointer"
               >
-                <Calendar className="w-5 h-5" />
-                <span className="text-xs font-semibold">Schedule Form</span>
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-xs font-semibold">Completed Jobs</span>
               </Link>
               <Link
                 href="/dashboard/admin/timecards"
