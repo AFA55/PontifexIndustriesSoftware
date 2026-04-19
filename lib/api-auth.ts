@@ -161,11 +161,15 @@ export function isTableNotFoundError(error: any): boolean {
 }
 
 /**
- * Require a valid Bearer token belonging to a shop user.
- * Stub -- accepts any authenticated user for now.
+ * Require a valid Bearer token belonging to a shop user (shop_manager, admin, super_admin, operations_manager).
  */
 export async function requireShopUser(request: NextRequest): Promise<AuthResult> {
-  return requireAuth(request);
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth;
+  if (!['shop_manager', 'admin', 'super_admin', 'operations_manager'].includes(auth.role || '')) {
+    return { authorized: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  }
+  return auth;
 }
 
 /**

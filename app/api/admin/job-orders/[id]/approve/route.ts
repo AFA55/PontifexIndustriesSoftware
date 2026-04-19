@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
@@ -23,7 +23,7 @@ export async function POST(
   try {
     const { id } = await params;
 
-    const auth = await requireSuperAdmin(request);
+    const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
@@ -129,7 +129,7 @@ export async function POST(
         job_number: jobOrder.job_number,
         changed_by: auth.userId,
         changed_by_name: approverName,
-        changed_by_role: 'super_admin',
+        changed_by_role: auth.role,
         change_type: 'approved',
         changes: {
           status: { old: jobOrder.status, new: 'scheduled' },

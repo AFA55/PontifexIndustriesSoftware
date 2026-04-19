@@ -50,13 +50,19 @@ export async function GET(request: NextRequest) {
     const isFinanceRole = ['super_admin', 'operations_manager', 'admin'].includes(userRole);
     const isOpsRole = ['super_admin', 'operations_manager'].includes(userRole);
     const isSalesman = userRole === 'salesman';
+    const isSuperAdmin = userRole === 'super_admin';
+    const tenantId = auth.tenantId;
+
+    // Helper: apply tenant filter unless super_admin (who sees all tenants intentionally)
+    const withTenant = (query: any) =>
+      isSuperAdmin ? query : query.eq('tenant_id', tenantId);
 
     // ─── REVENUE widget (dataKey: 'revenue') ─────────────────
     if (isFinanceRole) {
       queries.push((async () => {
         const [paidRes, outstandingRes] = await Promise.all([
-          supabaseAdmin.from('invoices').select('total_amount').eq('status', 'paid'),
-          supabaseAdmin.from('invoices').select('balance_due').in('status', ['sent', 'overdue']),
+          withTenant(supabaseAdmin.from('invoices').select('total_amount')).eq('status', 'paid'),
+          withTenant(supabaseAdmin.from('invoices').select('balance_due')).in('status', ['sent', 'overdue']),
         ]);
 
         const totalRevenue = (paidRes.data || []).reduce((s: number, i: any) => s + Number(i.total_amount || 0), 0);
@@ -65,9 +71,9 @@ export async function GET(request: NextRequest) {
         // Revenue trend (12 months)
         const twelveMonthsAgo = new Date();
         twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-        const { data: paidInvoices } = await supabaseAdmin
+        const { data: paidInvoices } = await withTenant(supabaseAdmin
           .from('invoices')
-          .select('total_amount, paid_date')
+          .select('total_amount, paid_date'))
           .eq('status', 'paid')
           .gte('paid_date', twelveMonthsAgo.toISOString().split('T')[0]);
 
@@ -97,9 +103,9 @@ export async function GET(request: NextRequest) {
       queries.push((async () => {
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-        const { data } = await supabaseAdmin
+        const { data } = await withTenant(supabaseAdmin
           .from('invoices')
-          .select('total_amount, paid_date')
+          .select('total_amount, paid_date'))
           .eq('status', 'paid')
           .gte('paid_date', sixMonthsAgo.toISOString().split('T')[0]);
 
@@ -121,9 +127,9 @@ export async function GET(request: NextRequest) {
     // ─── INVOICES widget (dataKey: 'invoices') ────────────────
     if (isFinanceRole) {
       queries.push((async () => {
-        const { data } = await supabaseAdmin
+        const { data } = await withTenant(supabaseAdmin
           .from('invoices')
-          .select('status, total_amount, balance_due');
+          .select('status, total_amount, balance_due'));
 
         const statusMap: Record<string, number> = {};
         let totalOutstanding = 0;
@@ -146,9 +152,9 @@ export async function GET(request: NextRequest) {
     // ─── JOB_STATUS widget (dataKey: 'job_status') ────────────
     if (!isSalesman) {
       queries.push((async () => {
-        const { data: allJobs } = await supabaseAdmin
+        const { data: allJobs } = await withTenant(supabaseAdmin
           .from('job_orders')
-          .select('status');
+          .select('status'));
 
         const byStatus: Record<string, number> = {};
         for (const j of allJobs || []) {
@@ -164,9 +170,9 @@ export async function GET(request: NextRequest) {
 
     // ─── SCHEDULE widget (dataKey: 'schedule') ────────────────
     queries.push((async () => {
-      const query = supabaseAdmin
+      const query = withTenant(supabaseAdmin
         .from('job_orders')
-        .select('id, job_number, customer_name, address, status, scheduled_time, assigned_to, profiles!job_orders_assigned_to_fkey(full_name)')
+        .select('id, job_number, customer_name, address, status, scheduled_time, assigned_to, profiles!job_orders_assigned_to_fkey(full_name)'))
         .eq('scheduled_date', today)
         .order('scheduled_time', { ascending: true })
         .limit(15);
@@ -189,17 +195,17 @@ export async function GET(request: NextRequest) {
     // ─── CREWS widget (dataKey: 'crews') ──────────────────────
     if (!isSalesman) {
       queries.push((async () => {
-        const { data: operators } = await supabaseAdmin
+        const { data: operators } = await withTenant(supabaseAdmin
           .from('profiles')
-          .select('id, active')
+          .select('id, active'))
           .in('role', ['operator', 'apprentice']);
 
         const totalActive = (operators || []).filter((o: any) => o.active).length;
 
         // Count operators by current job status
-        const { data: activeJobs } = await supabaseAdmin
+        const { data: activeJobs } = await withTenant(supabaseAdmin
           .from('job_orders')
-          .select('status, assigned_to')
+          .select('status, assigned_to'))
           .eq('scheduled_date', today)
           .not('assigned_to', 'is', null)
           .in('status', ['in_route', 'on_site', 'in_progress', 'dispatched']);
@@ -225,9 +231,9 @@ export async function GET(request: NextRequest) {
     // ─── COMPLETION widget (dataKey: 'completion') ────────────
     if (!isSalesman) {
       queries.push((async () => {
-        const { data } = await supabaseAdmin
+        const { data } = await withTenant(supabaseAdmin
           .from('job_orders')
-          .select('status')
+          .select('status'))
           .in('status', ['completed', 'cancelled']);
 
         const completed = (data || []).filter((j: any) => j.status === 'completed').length;
@@ -240,9 +246,9 @@ export async function GET(request: NextRequest) {
     // ─── OPERATORS widget (dataKey: 'operators') ──────────────
     if (isOpsRole) {
       queries.push((async () => {
-        const { data: completedJobs } = await supabaseAdmin
+        const { data: completedJobs } = await withTenant(supabaseAdmin
           .from('job_orders')
-          .select('assigned_to, estimated_cost')
+          .select('assigned_to, estimated_cost'))
           .eq('status', 'completed')
           .not('assigned_to', 'is', null);
 
@@ -257,9 +263,9 @@ export async function GET(request: NextRequest) {
         const sorted = Object.entries(opMap).sort(([, a], [, b]) => b.count - a.count).slice(0, 10);
         const operatorIds = sorted.map(([id]) => id);
         const { data: profiles } = operatorIds.length > 0
-          ? await supabaseAdmin.from('profiles').select('id, full_name, email').in('id', operatorIds)
+          ? await withTenant(supabaseAdmin.from('profiles').select('id, full_name, email')).in('id', operatorIds)
           : { data: [] };
-        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+        const profileMap = new Map<string, { id: string; full_name: string | null; email: string | null }>((profiles || []).map((p: any) => [p.id, p]));
 
         widgetData.operators = {
           operators: sorted.map(([id, stats]) => ({
@@ -274,9 +280,9 @@ export async function GET(request: NextRequest) {
     // ─── CUSTOMERS widget (dataKey: 'customers') ──────────────
     if (isOpsRole) {
       queries.push((async () => {
-        const { data } = await supabaseAdmin
+        const { data } = await withTenant(supabaseAdmin
           .from('job_orders')
-          .select('customer_name, estimated_cost');
+          .select('customer_name, estimated_cost'));
 
         const custMap: Record<string, number> = {};
         for (const j of data || []) {
@@ -296,9 +302,9 @@ export async function GET(request: NextRequest) {
     // ─── ACTIVITY widget (dataKey: 'activity') ────────────────
     if (isOpsRole) {
       queries.push((async () => {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await withTenant(supabaseAdmin
           .from('audit_logs')
-          .select('action, entity_type, details, created_at')
+          .select('action, entity_type, details, created_at'))
           .order('created_at', { ascending: false })
           .limit(15);
 
@@ -358,11 +364,11 @@ export async function GET(request: NextRequest) {
     // ─── KPI row data ─────────────────────────────────────────
     queries.push((async () => {
       const [jobsRes, invoicesRes, operatorsRes] = await Promise.all([
-        supabaseAdmin.from('job_orders').select('status, scheduled_date'),
+        withTenant(supabaseAdmin.from('job_orders').select('status, scheduled_date')),
         isFinanceRole
-          ? supabaseAdmin.from('invoices').select('total_amount, status')
+          ? withTenant(supabaseAdmin.from('invoices').select('total_amount, status'))
           : Promise.resolve({ data: [] }),
-        supabaseAdmin.from('profiles').select('id, active').in('role', ['operator', 'apprentice']),
+        withTenant(supabaseAdmin.from('profiles').select('id, active')).in('role', ['operator', 'apprentice']),
       ]);
 
       const jobs = jobsRes.data || [];
@@ -393,13 +399,14 @@ export async function GET(request: NextRequest) {
           .from('profiles')
           .select('commission_rate')
           .eq('id', userId)
+          .eq('tenant_id', tenantId)
           .single();
 
         const commissionRate = Number(profile?.commission_rate || 0);
 
-        const { data: completedJobs } = await supabaseAdmin
+        const { data: completedJobs } = await withTenant(supabaseAdmin
           .from('job_orders')
-          .select('estimated_cost, completed_at, created_at')
+          .select('estimated_cost, completed_at, created_at'))
           .eq('created_by', userId)
           .eq('status', 'completed');
 
@@ -440,9 +447,9 @@ export async function GET(request: NextRequest) {
     // ─── SALESMAN: my_jobs widget (dataKey: 'my_jobs') ────────
     if (isSalesman) {
       queries.push((async () => {
-        const { data } = await supabaseAdmin
+        const { data } = await withTenant(supabaseAdmin
           .from('job_orders')
-          .select('id, job_number, customer_name, status, estimated_cost, created_at')
+          .select('id, job_number, customer_name, status, estimated_cost, created_at'))
           .eq('created_by', userId)
           .order('created_at', { ascending: false });
 
@@ -474,9 +481,9 @@ export async function GET(request: NextRequest) {
     // ─── SALESMAN: pipeline widget (dataKey: 'pipeline') ──────
     if (isSalesman) {
       queries.push((async () => {
-        const { data } = await supabaseAdmin
+        const { data } = await withTenant(supabaseAdmin
           .from('job_orders')
-          .select('status')
+          .select('status'))
           .eq('created_by', userId);
 
         const pipeline: Record<string, number> = {};
@@ -512,9 +519,9 @@ export async function GET(request: NextRequest) {
     queries.push((async () => {
       const fourteenDays = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
       const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
-      const { data } = await supabaseAdmin
+      const { data } = await withTenant(supabaseAdmin
         .from('job_orders')
-        .select('id, job_number, customer_name, status, scheduled_date, scheduled_time')
+        .select('id, job_number, customer_name, status, scheduled_date, scheduled_time'))
         .gte('scheduled_date', thirtyDaysAgo)
         .lte('scheduled_date', fourteenDays)
         .order('scheduled_date');
@@ -540,18 +547,18 @@ export async function GET(request: NextRequest) {
     if (isOpsRole) {
       queries.push((async () => {
         // Count active operators
-        const { data: ops } = await supabaseAdmin
+        const { data: ops } = await withTenant(supabaseAdmin
           .from('profiles')
-          .select('id')
+          .select('id'))
           .eq('active', true)
           .in('role', ['operator', 'apprentice']);
         const totalOperators = ops?.length || 0;
         const availableHours = totalOperators * 8;
 
         // Count scheduled hours today
-        const { data: todayJobs } = await supabaseAdmin
+        const { data: todayJobs } = await withTenant(supabaseAdmin
           .from('job_orders')
-          .select('id, estimated_hours')
+          .select('id, estimated_hours'))
           .eq('scheduled_date', today)
           .not('status', 'in', '("completed","cancelled")');
         const scheduledHours = (todayJobs || []).reduce(

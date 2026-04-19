@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     let query = supabaseAdmin
       .from('team_messages')
       .select('*')
+      .eq('tenant_id', auth.tenantId)
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
         author_role: authorRole,
         content: content.trim(),
         channel: channel || 'general',
+        tenant_id: auth.tenantId,
       })
       .select()
       .single();
@@ -110,11 +112,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Message id is required' }, { status: 400 });
     }
 
-    // Super admin can delete any message; others can only delete their own
+    // Super admin can delete any message within tenant; others can only delete their own
     let query = supabaseAdmin
       .from('team_messages')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('tenant_id', auth.tenantId);
 
     if (auth.role !== 'super_admin') {
       query = query.eq('author_id', auth.userId);
