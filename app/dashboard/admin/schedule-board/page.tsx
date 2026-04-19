@@ -298,13 +298,14 @@ export default function ScheduleBoardPage() {
 
   // ═══ FEATURE FLAG GUARD ═══
   useEffect(() => {
+    if (!userRole) return; // wait for auth to initialize
     if (flagsLoading) return;
-    const isBypass = userRole === 'super_admin' || userRole === 'operations_manager';
+    const isBypass = ['super_admin', 'operations_manager', 'admin'].includes(userRole);
     if (!isBypass && !featureFlags.can_view_schedule_board) {
       router.push('/dashboard/admin');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flagsLoading, featureFlags.can_view_schedule_board]);
+  }, [flagsLoading, featureFlags.can_view_schedule_board, userRole]);
 
   // ═══ FETCH OPERATORS/HELPERS ═══
   useEffect(() => {

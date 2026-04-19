@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // Fetch active jobs
     const { data: jobsRaw, error: jobsError } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, customer_name, assigned_to, status, scheduled_date, scheduled_time')
+      .select('id, job_number, customer_name, assigned_to, status, scheduled_date')
       .eq('tenant_id', auth.tenantId)
       .in('status', ['assigned', 'in_route', 'on_site', 'in_progress'])
       .order('scheduled_date', { ascending: true })

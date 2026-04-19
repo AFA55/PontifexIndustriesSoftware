@@ -117,12 +117,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const actualCores = items.reduce((sum, i) => sum + Number(i.core_quantity || 0), 0);
     const actualLinearFeet = items.reduce((sum, i) => sum + Number(i.linear_feet_cut || 0), 0);
-    const actualSquareFeet = items.reduce((sum, i) => sum + Number(i.square_feet_cut || 0), 0);
 
-    const expectedScope = (job.expected_scope as any) || {};
+    const expectedScope = (job.expected_scope as Record<string, unknown>) || {};
     const expectedCores = Number(expectedScope.cores || 0);
     const expectedLinearFeet = Number(expectedScope.linear_feet || 0);
-    const expectedSquareFeet = Number(expectedScope.square_feet || 0);
 
     const pct = (actual: number, expected: number) =>
       expected > 0 ? Math.min(100, Math.round((actual / expected) * 1000) / 10) : 0;
@@ -137,11 +135,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
         expected: expectedLinearFeet,
         actual: actualLinearFeet,
         percent: pct(actualLinearFeet, expectedLinearFeet),
-      },
-      square_feet: {
-        expected: expectedSquareFeet,
-        actual: actualSquareFeet,
-        percent: pct(actualSquareFeet, expectedSquareFeet),
       },
     };
 

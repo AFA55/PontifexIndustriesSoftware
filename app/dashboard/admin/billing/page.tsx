@@ -286,7 +286,7 @@ export default function BillingPage() {
   const uninvoicedJobs = completedJobs.filter(j => {
     if (j.has_invoice) return false;
     if (billingTypeFilter !== 'all') {
-      const jt = (j.billing_type || 'fixed').toLowerCase().replace('time_material', 'tm');
+      const jt = (j.billing_type || 'fixed').toLowerCase().replace('time_and_material', 'tm').replace('time_material', 'tm');
       const ft = billingTypeFilter.toLowerCase();
       if (jt !== ft) return false;
     }
