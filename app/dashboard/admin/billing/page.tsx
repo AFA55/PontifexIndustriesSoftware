@@ -334,10 +334,11 @@ export default function BillingPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowCreateForm(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold transition-all shadow-sm"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold transition-all shadow-sm whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />
-                Create Invoice
+                <span className="hidden sm:inline">Create Invoice</span>
+                <span className="sm:hidden">New</span>
               </button>
               <button
                 onClick={fetchData}
@@ -450,14 +451,14 @@ export default function BillingPage() {
         ) : activeTab === 'invoices' ? (
           <>
             {/* Search + Filter */}
-            <div className="flex gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
               <div className="flex-1 relative">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search invoices by number, customer, or PO..."
+                  placeholder="Search invoices..."
                   className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white transition-all"
                 />
               </div>
@@ -672,9 +673,9 @@ export default function BillingPage() {
         {/* Invoice Detail Modal */}
         {selectedInvoice && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto py-8">
-            <div className="bg-white border border-gray-200 rounded-lg w-full max-w-2xl mx-4 shadow-xl">
+            <div className="bg-white border border-gray-200 rounded-lg w-full max-w-2xl mx-2 sm:mx-4 shadow-xl">
               {/* Modal Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200">
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">{selectedInvoice.invoice_number}</h2>
                   <p className="text-sm text-gray-500">{selectedInvoice.customer_name}</p>
@@ -713,7 +714,7 @@ export default function BillingPage() {
                 </div>
               </div>
 
-              <div className="p-6 space-y-6">
+              <div className="p-4 sm:p-6 space-y-6">
                 {/* Status + Actions */}
                 <div className="flex flex-wrap items-center gap-2">
                   {statusBadge(selectedInvoice.status)}

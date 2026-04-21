@@ -254,22 +254,23 @@ export default function UpcomingProjectsBoard() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
               <Link
                 href="/dashboard/admin"
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
               </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-3xl">📅</span>
-                  Upcoming Projects Board
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold text-gray-900 flex items-center gap-2 truncate">
+                  <span className="text-2xl sm:text-3xl">📅</span>
+                  <span className="hidden sm:inline">Upcoming Projects Board</span>
+                  <span className="sm:hidden">Upcoming</span>
                 </h1>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 hidden sm:block">
                   Schedule and manage upcoming projects
                 </p>
               </div>
@@ -352,8 +353,8 @@ export default function UpcomingProjectsBoard() {
             </div>
 
             {/* 7-Day Grid */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="grid grid-cols-7 gap-px bg-gray-200">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
+              <div className="grid grid-cols-7 gap-px bg-gray-200 min-w-[840px]">
                 {weekDays.map((day, index) => {
                   const isToday = day.toDateString() === new Date().toDateString();
                   const dayProjects = getProjectsForDate(day);
@@ -524,7 +525,7 @@ export default function UpcomingProjectsBoard() {
 
             <div className="p-6">
               {/* Project Overview */}
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                 <div>
                   <h3 className="font-semibold text-gray-800 mb-3">Project Information</h3>
                   <div className="space-y-2">
@@ -624,7 +625,7 @@ export default function UpcomingProjectsBoard() {
               {/* Equipment List */}
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-800 mb-3">Assigned Equipment</h3>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {selectedProject.equipment.map((equipment, index) => (
                     <div key={index} className="bg-blue-50 rounded-lg p-3 border border-blue-200">
                       <div className="text-sm font-medium text-blue-900">{equipment.name}</div>
@@ -645,7 +646,7 @@ export default function UpcomingProjectsBoard() {
               )}
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <button
                   onClick={() => handleEditProject(selectedProject)}
                   className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
