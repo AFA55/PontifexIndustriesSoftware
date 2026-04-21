@@ -45,7 +45,14 @@ Next.js 15 (App Router) + React 19 + TypeScript + Supabase (PostgreSQL) + Tailwi
 - 70+ migrations in `supabase/migrations/`
 - 90+ tables in production
 - All tables have RLS enabled
-- New tables should use JWT metadata for RLS: `auth.jwt() -> 'user_metadata' ->> 'role'`
+- **DO NOT use `auth.jwt() -> 'user_metadata'` in RLS.** `user_metadata` is client-writable via `supabase.auth.updateUser({ data: { role: 'super_admin' } })`, so any operator could self-promote. Supabase's linter flags this as `rls_references_user_metadata` (ERROR).
+- For role/tenant checks in RLS, use the SECURITY DEFINER helpers that read from `public.profiles`:
+  - `public.is_admin()` — true for `admin` or `super_admin`
+  - `public.current_user_role()` — returns the caller's `profiles.role`
+  - `public.current_user_tenant_id()` — returns the caller's `profiles.tenant_id`
+  - `public.current_user_has_role(VARIADIC text[])` — membership check against an allowed list
+- Example: `USING ( public.current_user_has_role('admin','super_admin','operations_manager') AND tenant_id = public.current_user_tenant_id() )`
+- If you need immutable identity claims, `auth.jwt() -> 'app_metadata'` is acceptable (server-only writable) — `user_metadata` is never safe for authorization.
 
 ## Roles (priority order)
 super_admin > operations_manager > admin > salesman > shop_manager > inventory_manager > operator > apprentice
@@ -112,22 +119,6 @@ npm run build      # Production build check (must pass with 0 errors)
 - [ ] Production deployment prep (env vars, custom domain, SSL)
 - [ ] Final build verification & merge to main
 
-### Session 10 — Schedule Board & Customer UX (April 14) ✅ COMPLETE
-- [x] Delete job cascade: operator notification + FK cleanup + hard delete
-- [x] Change orders system: scope additions on existing jobs (ChangeOrdersSection)
-- [x] New scope / continuation jobs: pre-filled child jobs (RelatedJobsSection)
-- [x] Schedule board delete modal: reschedule vs delete-permanently flow
-- [x] Customer project history: grouped by project name with collapsible folders
-- [x] Job detail panel: click job row → slide-in panel with tabs (Overview, Scope, Hours, Notes)
-- [x] API GET /api/admin/jobs/[id]/detail — full job aggregation endpoint
-- [x] Bug fix: customer detail showing 0 jobs / $0 (wrong column name contact_name → customer_contact)
-
 ### Ongoing / As-Needed
-- [ ] End-to-end workflow test (schedule → dispatch → operator → complete → invoice)
-- [ ] Mobile responsive audit on all operator pages
-- [ ] Loading states & error handling audit
-- [ ] Patriot logo + brand colors in tenant_branding
-- [ ] Reschedule notification to operator when job date changes
 - [ ] SMS integration for signature request delivery
-- [ ] Production deployment prep (Vercel, custom domain, SSL)
-- [ ] Merge feature/schedule-board-v2 → main
+- [ ] Schedule board performance optimization
