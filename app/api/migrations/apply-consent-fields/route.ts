@@ -8,12 +8,12 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSuperAdmin } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
     // Security: only admins can run migrations
-    const auth = await requireAdmin(request);
+    const auth = await requireSuperAdmin(request);
     if (!auth.authorized) return auth.response;
 
     console.log('🔄 Applying consent fields migration...');
@@ -80,7 +80,7 @@ COMMENT ON COLUMN public.access_requests.consent_ip_address IS 'IP address where
 export async function GET(request: NextRequest) {
   try {
     // Security: only admins can check migration status
-    const auth = await requireAdmin(request);
+    const auth = await requireSuperAdmin(request);
     if (!auth.authorized) return auth.response;
 
     // Check if migration has been applied

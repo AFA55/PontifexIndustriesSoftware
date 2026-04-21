@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSuperAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function escapeCSV(val: unknown): string {
@@ -14,7 +14,7 @@ function escapeCSV(val: unknown): string {
 
 // POST /api/admin/backups/contacts — generate and return contact CSV
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireSuperAdmin(request);
   if (!auth.authorized) return auth.response;
 
   const { userId, tenantId } = auth;
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
 // GET /api/admin/backups/contacts — list recent backups
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireSuperAdmin(request);
   if (!auth.authorized) return auth.response;
 
   const { tenantId } = auth;
