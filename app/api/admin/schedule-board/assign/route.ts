@@ -19,6 +19,8 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
     const { jobOrderId, operatorId, helperId } = body;
 
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
       .from('job_orders')
       .update(updateData)
       .eq('id', jobOrderId);
-    if (tenantId) { assignQuery = assignQuery.eq('tenant_id', tenantId); }
+    assignQuery = assignQuery.eq('tenant_id', tenantId);
     const { data: updated, error } = await assignQuery
       .select('id, job_number, customer_name, assigned_to, helper_assigned_to, status')
       .single();

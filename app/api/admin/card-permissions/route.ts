@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('user_id');
 
@@ -33,7 +34,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify the target user belongs to the same tenant
-    if (tenantId) {
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    {
       const { data: targetProfile } = await supabaseAdmin.from('profiles').select('id').eq('id', userId).eq('tenant_id', tenantId).single();
       if (!targetProfile) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -77,6 +79,8 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
 
     if (!body.user_id || !body.permissions || typeof body.permissions !== 'object') {
@@ -109,7 +113,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('id')
       .eq('id', user_id);
-    if (tenantId) { profileQuery = profileQuery.eq('tenant_id', tenantId); }
+    profileQuery = profileQuery.eq('tenant_id', tenantId);
     const { data: profile, error: profileError } = await profileQuery.single();
 
     if (profileError || !profile) {

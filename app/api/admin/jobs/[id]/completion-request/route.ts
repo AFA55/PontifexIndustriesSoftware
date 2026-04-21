@@ -33,7 +33,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { data: completionRequest, error } = await supabaseAdmin
       .from('job_completion_requests')
       .select(`
@@ -90,6 +90,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
 
     const { action, review_notes } = body;

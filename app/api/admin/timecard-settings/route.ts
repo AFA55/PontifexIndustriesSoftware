@@ -40,13 +40,12 @@ export async function GET(request: NextRequest) {
 
     const tenantId = auth.tenantId;
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Try to fetch existing settings
     let query = supabaseAdmin
       .from('timecard_settings')
       .select('*');
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
     const { data, error } = await query.limit(1).maybeSingle();
 
     if (error) {
@@ -83,6 +82,8 @@ export async function PUT(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = auth.tenantId;
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
 
     // Whitelist updatable fields
@@ -112,9 +113,7 @@ export async function PUT(request: NextRequest) {
     let existingQuery = supabaseAdmin
       .from('timecard_settings')
       .select('id');
-    if (tenantId) {
-      existingQuery = existingQuery.eq('tenant_id', tenantId);
-    }
+    existingQuery = existingQuery.eq('tenant_id', tenantId);
     const { data: existing, error: checkError } = await existingQuery.limit(1).maybeSingle();
 
     if (checkError && isTableNotFoundError(checkError)) {

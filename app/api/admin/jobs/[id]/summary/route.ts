@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // ── 1. Fetch the job ────────────────────────────────────────────────────
     const { data: job, error: jobError } = await supabaseAdmin
       .from('job_orders')

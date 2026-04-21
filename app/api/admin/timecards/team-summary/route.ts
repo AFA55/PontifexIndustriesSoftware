@@ -59,6 +59,8 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = auth.tenantId;
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const searchParams = request.nextUrl.searchParams;
     const weekStartParam = searchParams.get('weekStart');
 
@@ -81,9 +83,7 @@ export async function GET(request: NextRequest) {
       .in('role', ['operator', 'apprentice', 'shop_manager', 'admin', 'operations_manager'])
       .order('full_name', { ascending: true });
 
-    if (tenantId) {
-      profilesQuery = profilesQuery.eq('tenant_id', tenantId);
-    }
+    profilesQuery = profilesQuery.eq('tenant_id', tenantId);
 
     const { data: profiles, error: profilesError } = await profilesQuery;
 
@@ -100,9 +100,7 @@ export async function GET(request: NextRequest) {
       .lte('date', sundayStr)
       .order('date', { ascending: true });
 
-    if (tenantId) {
-      timecardsQuery = timecardsQuery.eq('tenant_id', tenantId);
-    }
+    timecardsQuery = timecardsQuery.eq('tenant_id', tenantId);
 
     const { data: timecards, error: timecardsError } = await timecardsQuery;
 

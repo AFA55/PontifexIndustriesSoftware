@@ -64,15 +64,13 @@ export async function GET(
 
     // Resolve tenant scope
     const tenantId = await getTenantId(user.id);
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Get operator profile (scoped to tenant)
     let operatorQuery = supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('id', id);
-    if (tenantId) {
-      operatorQuery = operatorQuery.eq('tenant_id', tenantId);
-    }
+    operatorQuery = operatorQuery.eq('tenant_id', tenantId);
     const { data: operator, error: operatorError } = await operatorQuery.single();
 
     if (operatorError || !operator) {
@@ -197,15 +195,13 @@ export async function PATCH(
 
     // Resolve tenant scope
     const tenantId = await getTenantId(user.id);
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Update operator profile (scoped to tenant)
     let updateQuery = supabaseAdmin
       .from('profiles')
       .update(sanitizedUpdates)
       .eq('id', id);
-    if (tenantId) {
-      updateQuery = updateQuery.eq('tenant_id', tenantId);
-    }
+    updateQuery = updateQuery.eq('tenant_id', tenantId);
     const { data: updatedOperator, error: updateError } = await updateQuery
       .select()
       .single();

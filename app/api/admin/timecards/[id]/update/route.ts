@@ -24,7 +24,7 @@ export async function PUT(
 
     const { id: timecardId } = await params;
     const tenantId = auth.tenantId;
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Parse request body
     const body = await request.json();
     const { clock_in_time, clock_out_time, notes, is_shop_hours, hour_type } = body;
@@ -34,9 +34,7 @@ export async function PUT(
       .from('timecards')
       .select('*')
       .eq('id', timecardId);
-    if (tenantId) {
-      checkQuery = checkQuery.eq('tenant_id', tenantId);
-    }
+    checkQuery = checkQuery.eq('tenant_id', tenantId);
     const { data: existingTimecard, error: checkError } = await checkQuery.single();
 
     if (checkError || !existingTimecard) {
@@ -102,9 +100,7 @@ export async function PUT(
       .from('timecards')
       .update(updateData)
       .eq('id', timecardId);
-    if (tenantId) {
-      updateQuery = updateQuery.eq('tenant_id', tenantId);
-    }
+    updateQuery = updateQuery.eq('tenant_id', tenantId);
     const { data: updatedTimecard, error: updateError } = await updateQuery
       .select()
       .single();
@@ -119,9 +115,7 @@ export async function PUT(
           .from('timecards')
           .update(updateData)
           .eq('id', timecardId);
-        if (tenantId) {
-          retryQuery = retryQuery.eq('tenant_id', tenantId);
-        }
+        retryQuery = retryQuery.eq('tenant_id', tenantId);
         const { data: retryData, error: retryError } = await retryQuery
           .select()
           .single();

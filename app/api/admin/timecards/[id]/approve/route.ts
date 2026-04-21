@@ -20,15 +20,13 @@ export async function POST(
 
     const { id: timecardId } = await params;
     const tenantId = auth.tenantId;
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Check if timecard exists (scoped to tenant)
     let checkQuery = supabaseAdmin
       .from('timecards')
       .select('id, is_approved, user_id')
       .eq('id', timecardId);
-    if (tenantId) {
-      checkQuery = checkQuery.eq('tenant_id', tenantId);
-    }
+    checkQuery = checkQuery.eq('tenant_id', tenantId);
     const { data: existingTimecard, error: checkError } = await checkQuery.single();
 
     if (checkError || !existingTimecard) {
@@ -54,9 +52,7 @@ export async function POST(
         approved_at: new Date().toISOString(),
       })
       .eq('id', timecardId);
-    if (tenantId) {
-      approveQuery = approveQuery.eq('tenant_id', tenantId);
-    }
+    approveQuery = approveQuery.eq('tenant_id', tenantId);
     const { data: updatedTimecard, error: updateError } = await approveQuery
       .select()
       .single();

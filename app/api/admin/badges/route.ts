@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { searchParams } = new URL(request.url);
     const facilityId = searchParams.get('facility_id');
     const operatorId = searchParams.get('operator_id');
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
       .order('facility_name')
       .order('operator_name');
 
-    if (tenantId) query = query.eq('tenant_id', tenantId);
+    query = query.eq('tenant_id', tenantId);
     if (facilityId) query = query.eq('facility_id', facilityId);
     if (operatorId) query = query.eq('operator_id', operatorId);
     if (status) query = query.eq('status', status);
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { data, error } = await supabaseAdmin
       .from('operator_facility_badges')
       .insert({

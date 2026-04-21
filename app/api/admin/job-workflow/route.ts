@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
 
     // Resolve tenant scope — verify the job belongs to this tenant
     const tenantId = await getTenantId(user.id);
-    if (tenantId) {
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    {
       const { data: jobCheck } = await supabaseAdmin
         .from('job_orders')
         .select('id')
