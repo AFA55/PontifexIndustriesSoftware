@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Auto-mark overdue: flip any sent invoices past due_date to 'overdue' (fire-and-forget)
     const today = new Date().toISOString().split('T')[0];
     Promise.resolve(
@@ -39,9 +40,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
@@ -111,6 +110,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'jobOrderId is required' }, { status: 400 });
     }
 
+    const callerTenantId = await getTenantId(auth.userId);
+    if (!callerTenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    }
+
     // Fetch the completed job with all details
     const { data: job, error: jobError } = await supabaseAdmin
       .from('job_orders')
@@ -119,6 +123,12 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (jobError || !job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    // P0-3: Cross-tenant FK check — the fetched job must belong to caller's tenant.
+    // Return 404 (not 403) to avoid leaking existence across tenants.
+    if (job.tenant_id !== callerTenantId) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
@@ -295,7 +305,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const tenantIdForInsert = await getTenantId(auth.userId);
+    const tenantIdForInsert = callerTenantId;
 
     // Create the invoice
     const { data: invoice, error: invoiceError } = await supabaseAdmin

@@ -13,16 +13,17 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: operatorId } = await params;
@@ -47,7 +48,12 @@ export async function GET(
         dateFilter = null;
     }
 
-    // Fetch profile first to verify operator exists
+    const callerTenantId = await getTenantId(auth.userId);
+    if (!callerTenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    }
+
+    // P0-3: Fetch profile and verify operator belongs to caller's tenant
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('*')
@@ -59,6 +65,9 @@ export async function GET(
         { error: 'Operator not found' },
         { status: 404 }
       );
+    }
+    if (profile.tenant_id !== callerTenantId) {
+      return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
     }
 
     // 12-months-ago date for timecard/monthly queries
