@@ -153,12 +153,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    }
 
-    let query = supabaseAdmin
+    const query = supabaseAdmin
       .from('work_items')
       .select('*')
-      .eq('job_order_id', jobId);
-    if (tenantId) query = query.eq('tenant_id', tenantId);
+      .eq('job_order_id', jobId)
+      .eq('tenant_id', tenantId);
 
     const { data: workItems, error } = await query.order('day_number', { ascending: true });
 
@@ -181,15 +184,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    }
 
     const body = await request.json();
 
     // Verify the job exists and belongs to this tenant
-    let jobQuery = supabaseAdmin
+    const jobQuery = supabaseAdmin
       .from('job_orders')
       .select('id')
-      .eq('id', jobId);
-    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+      .eq('id', jobId)
+      .eq('tenant_id', tenantId);
     const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
@@ -200,7 +206,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const workItemData = {
       ...body,
       job_order_id: jobId,
-      tenant_id: tenantId || null,
+      tenant_id: tenantId,
       operator_id: body.operator_id || auth.userId,
     };
 

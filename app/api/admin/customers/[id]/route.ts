@@ -21,6 +21,8 @@ export async function GET(
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     // Fetch customer
@@ -28,7 +30,7 @@ export async function GET(
       .from('customers')
       .select('*')
       .eq('id', id);
-    if (tenantId) { customerQuery = customerQuery.eq('tenant_id', tenantId); }
+    customerQuery = customerQuery.eq('tenant_id', tenantId);
     const { data: customer, error: customerError } = await customerQuery.single();
 
     if (customerError || !customer) {
@@ -126,11 +128,12 @@ export async function PATCH(
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     let updateQuery = supabaseAdmin
       .from('customers')
       .update(updateData)
       .eq('id', id);
-    if (tenantId) { updateQuery = updateQuery.eq('tenant_id', tenantId); }
+    updateQuery = updateQuery.eq('tenant_id', tenantId);
     const { data: customer, error } = await updateQuery.select().single();
 
     if (error) {
@@ -154,6 +157,8 @@ export async function DELETE(
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     // Unlink job_orders first
@@ -166,7 +171,7 @@ export async function DELETE(
       .from('customers')
       .delete()
       .eq('id', id);
-    if (tenantId) { deleteQuery = deleteQuery.eq('tenant_id', tenantId); }
+    deleteQuery = deleteQuery.eq('tenant_id', tenantId);
     const { error } = await deleteQuery;
 
     if (error) {

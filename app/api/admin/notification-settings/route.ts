@@ -19,12 +19,11 @@ export async function GET(request: NextRequest) {
 
     // Fetch settings scoped by tenant
     const tenantId = auth.tenantId;
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     let query = supabaseAdmin
       .from('notification_settings')
       .select('*');
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
     let { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(1)
@@ -69,10 +68,11 @@ export async function PUT(request: NextRequest) {
 
     // Check if a settings row already exists (scoped to tenant)
     const tenantId = auth.tenantId;
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     let existingQuery = supabaseAdmin
       .from('notification_settings')
       .select('id');
-    if (tenantId) existingQuery = existingQuery.eq('tenant_id', tenantId);
+    existingQuery = existingQuery.eq('tenant_id', tenantId);
     const { data: existing } = await existingQuery
       .order('created_at', { ascending: false })
       .limit(1)

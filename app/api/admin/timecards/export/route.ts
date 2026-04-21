@@ -36,9 +36,7 @@ async function generateCSV(weekStart: string, weekEnd: string, tenantId?: string
     .order('date')
     .order('clock_in_time');
 
-  if (tenantId) {
-    query = query.eq('tenant_id', tenantId);
-  }
+  query = query.eq('tenant_id', tenantId);
 
   const { data: timecards, error } = await query;
 
@@ -129,9 +127,7 @@ async function generateBatchPDF(weekStart: string, weekEnd: string, userId?: str
     tcQuery = tcQuery.eq('user_id', userId);
   }
 
-  if (tenantId) {
-    tcQuery = tcQuery.eq('tenant_id', tenantId);
-  }
+  tcQuery = tcQuery.eq('tenant_id', tenantId);
 
   const { data: allTimecards, error: tcError } = await tcQuery;
 

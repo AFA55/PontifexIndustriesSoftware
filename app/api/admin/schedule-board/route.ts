@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date'); // YYYY-MM-DD
     const startDate = searchParams.get('startDate');
@@ -31,9 +32,7 @@ export async function GET(request: NextRequest) {
       .neq('status', 'pending_approval')
       .order('arrival_time', { ascending: true, nullsFirst: false });
 
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     if (date) {
       // Show a job on a given date if it starts on or before that date
@@ -88,7 +87,7 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('status', 'pending_approval')
       .order('created_at', { ascending: false });
-    if (tenantId) { pendingQuery = pendingQuery.eq('tenant_id', tenantId); }
+    pendingQuery = pendingQuery.eq('tenant_id', tenantId);
     const { data: pendingJobs, error: pendingError } = await pendingQuery;
 
     if (pendingError) {
@@ -102,7 +101,7 @@ export async function GET(request: NextRequest) {
       .eq('is_will_call', true)
       .neq('status', 'pending_approval')
       .order('created_at', { ascending: false });
-    if (tenantId) { wcQuery = wcQuery.eq('tenant_id', tenantId); }
+    wcQuery = wcQuery.eq('tenant_id', tenantId);
     const { data: willCallJobs, error: wcError } = await wcQuery;
 
     if (wcError) {

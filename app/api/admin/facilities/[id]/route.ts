@@ -17,13 +17,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     let query = supabaseAdmin
       .from('facilities')
       .select('*')
       .eq('id', id);
-    if (tenantId) { query = query.eq('tenant_id', tenantId); }
+    query = query.eq('tenant_id', tenantId);
     const { data, error } = await query.single();
 
     if (error || !data) {
@@ -43,6 +45,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
     const body = await request.json();
 
@@ -62,7 +66,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .from('facilities')
       .update(updates)
       .eq('id', id);
-    if (tenantId) { updateQuery = updateQuery.eq('tenant_id', tenantId); }
+    updateQuery = updateQuery.eq('tenant_id', tenantId);
     const { data, error } = await updateQuery.select().single();
 
     if (error) {
@@ -83,6 +87,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     // Soft delete — set is_active to false
@@ -90,7 +96,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       .from('facilities')
       .update({ is_active: false })
       .eq('id', id);
-    if (tenantId) { deleteQuery = deleteQuery.eq('tenant_id', tenantId); }
+    deleteQuery = deleteQuery.eq('tenant_id', tenantId);
     const { data, error } = await deleteQuery.select().single();
 
     if (error) {

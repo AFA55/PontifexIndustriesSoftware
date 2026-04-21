@@ -20,6 +20,8 @@ export async function POST(
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     // Fetch customer
@@ -27,7 +29,7 @@ export async function POST(
       .from('customers')
       .select('*')
       .eq('id', id);
-    if (tenantId) { customerQuery = customerQuery.eq('tenant_id', tenantId); }
+    customerQuery = customerQuery.eq('tenant_id', tenantId);
     const { data: customer, error: customerError } = await customerQuery.single();
 
     if (customerError || !customer) {

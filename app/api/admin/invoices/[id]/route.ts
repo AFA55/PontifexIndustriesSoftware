@@ -20,13 +20,15 @@ export async function GET(
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     let invoiceQuery = supabaseAdmin
       .from('invoices')
       .select('*')
       .eq('id', id);
-    if (tenantId) { invoiceQuery = invoiceQuery.eq('tenant_id', tenantId); }
+    invoiceQuery = invoiceQuery.eq('tenant_id', tenantId);
     const { data: invoice, error } = await invoiceQuery.single();
 
     if (error || !invoice) {
@@ -70,6 +72,8 @@ export async function PATCH(
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
     const body = await request.json();
 
@@ -133,7 +137,7 @@ export async function PATCH(
       .from('invoices')
       .update(updates)
       .eq('id', id);
-    if (tenantId) { updateQuery = updateQuery.eq('tenant_id', tenantId); }
+    updateQuery = updateQuery.eq('tenant_id', tenantId);
     const { data: invoice, error } = await updateQuery.select().single();
 
     if (error) {

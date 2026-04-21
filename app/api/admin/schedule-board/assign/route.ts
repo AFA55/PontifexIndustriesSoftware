@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
     const { jobOrderId, operatorId, helperId, assignment_date } = body;
 
@@ -97,8 +99,7 @@ export async function POST(request: NextRequest) {
           updateData.assigned_at = null;
         }
 
-        let q = supabaseAdmin.from('job_orders').update(updateData).eq('id', jobOrderId);
-        if (tenantId) q = q.eq('tenant_id', tenantId);
+        const q = supabaseAdmin.from('job_orders').update(updateData).eq('id', jobOrderId).eq('tenant_id', tenantId);
         const { data: u } = await q
           .select('id, job_number, customer_name, assigned_to, helper_assigned_to, status')
           .single();
@@ -129,11 +130,11 @@ export async function POST(request: NextRequest) {
         updateData.assigned_at = null;
       }
 
-      let assignQuery = supabaseAdmin
+      const assignQuery = supabaseAdmin
         .from('job_orders')
         .update(updateData)
-        .eq('id', jobOrderId);
-      if (tenantId) { assignQuery = assignQuery.eq('tenant_id', tenantId); }
+        .eq('id', jobOrderId)
+        .eq('tenant_id', tenantId);
       const { data: u, error } = await assignQuery
         .select('id, job_number, customer_name, assigned_to, helper_assigned_to, status')
         .single();

@@ -49,6 +49,8 @@ export async function POST(
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
     const { scheduled_date, end_date, notes } = body;
 
@@ -64,7 +66,7 @@ export async function POST(
       .from('job_orders')
       .select('*')
       .eq('id', id);
-    if (tenantId) { origQuery = origQuery.eq('tenant_id', tenantId); }
+    origQuery = origQuery.eq('tenant_id', tenantId);
     const { data: original, error: fetchError } = await origQuery.single();
 
     if (fetchError || !original) {

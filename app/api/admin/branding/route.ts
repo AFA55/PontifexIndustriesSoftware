@@ -34,9 +34,7 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('is_active', true);
 
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     const { data, error } = await query.limit(1).single();
 

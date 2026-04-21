@@ -20,10 +20,13 @@ export async function GET(
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     // Verify customer belongs to tenant
-    if (tenantId) {
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    {
       const { data: customer } = await supabaseAdmin.from('customers').select('id').eq('id', id).eq('tenant_id', tenantId).single();
       if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
@@ -56,6 +59,8 @@ export async function POST(
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
     const body = await request.json();
 
@@ -64,7 +69,8 @@ export async function POST(
     }
 
     // Verify customer belongs to tenant
-    if (tenantId) {
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    {
       const { data: customer } = await supabaseAdmin.from('customers').select('id').eq('id', id).eq('tenant_id', tenantId).single();
       if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }

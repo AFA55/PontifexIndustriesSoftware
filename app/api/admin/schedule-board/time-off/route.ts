@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const date = request.nextUrl.searchParams.get('date');
     const startDate = request.nextUrl.searchParams.get('startDate');
     const endDate = request.nextUrl.searchParams.get('endDate');
@@ -27,9 +29,7 @@ export async function GET(request: NextRequest) {
       .select('id, operator_id, date, type, notes, approved_by, created_at, profiles:operator_id(full_name)')
       .order('date', { ascending: true });
 
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     if (date) {
       query = query.eq('date', date);
@@ -71,6 +71,8 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
     const { operator_id, date, type, notes } = body;
 
@@ -119,6 +121,8 @@ export async function DELETE(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const id = request.nextUrl.searchParams.get('id');
     if (!id) {
       return NextResponse.json({ error: 'Missing required query param: id' }, { status: 400 });
@@ -128,7 +132,7 @@ export async function DELETE(request: NextRequest) {
       .from('operator_time_off')
       .delete()
       .eq('id', id);
-    if (tenantId) { deleteQuery = deleteQuery.eq('tenant_id', tenantId); }
+    deleteQuery = deleteQuery.eq('tenant_id', tenantId);
     const { error } = await deleteQuery;
 
     if (error) {

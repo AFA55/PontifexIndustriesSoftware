@@ -70,13 +70,13 @@ export async function PATCH(
 
     // Resolve tenant scope — supabaseAdmin bypasses RLS, must scope manually
     const tenantId = await getTenantId(user.id);
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Get the current job order before updating (for audit trail)
     let oldJobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
       .eq('id', id);
-    if (tenantId) oldJobQuery = oldJobQuery.eq('tenant_id', tenantId);
+    oldJobQuery = oldJobQuery.eq('tenant_id', tenantId);
     const { data: oldJobOrder, error: fetchError } = await oldJobQuery.single();
 
     if (fetchError || !oldJobOrder) {
@@ -110,7 +110,7 @@ export async function PATCH(
       .from('job_orders')
       .update(updateFields)
       .eq('id', id);
-    if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+    updateQuery = updateQuery.eq('tenant_id', tenantId);
     const { data: jobOrder, error: updateError } = await updateQuery.select().single();
 
     console.log('Update result:', { jobOrder, updateError });
