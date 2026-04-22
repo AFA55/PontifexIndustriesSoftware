@@ -1,5 +1,24 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 18, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
+**Date:** April 22, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
+
+---
+
+## APRIL 22, 2026 SESSION — Permission plumbing end-to-end
+
+### Problem reported by user
+Sales user had permission toggles ON in Team Profiles but could not see Customers, Active Jobs, Invoicing, Completed Jobs in the sidebar. Schedule Board + Billing pages redirected on first visit.
+
+### 5-layer fix (3 parallel remediation agents + 3 verification agents)
+1. **Route guards (Agent J)** — 24 routes switched `requireAdmin` → `requireSalesStaff`; `grant-super-admin` → `requireSuperAdmin`; `commission` gated (self-only for non-admin); `profiles/[id]` GET/PATCH self-or-admin, non-admins can't edit role/active/hire_date. Commits `f1015c44`, `7aac68b1`.
+2. **Seed trigger (Agent K)** — `supabase/migrations/20260421120000_seed_user_feature_flags_by_role.sql`: AFTER INSERT on `profiles` auto-seeds role-appropriate `user_feature_flags`; AFTER UPDATE OF role re-seeds with 30-day stale-override heuristic; backfill for existing 5 profiles (was 2/5, now 5/5). Applied to `klatddoyncxidgqtcjnu`. Commit `427921eb`.
+3. **UI consumers + schema cleanup (Agent L)** — Added `flagKey` on Schedule Board / Schedule Form sidebar items; fixed page guards in team-profiles / settings / billing to honor flags; reconciled `ROLE_PERMISSION_PRESETS` with `ADMIN_CARDS` via new `preset()` helper; hid dead toggles (`can_grant_super_admin`, personal metrics). Commits `1dc2ea6e`, `18ef763e`, `f882c6bf`.
+4. **Feature-flag race (new)** — `useFeatureFlags` hook was setting `loading=false` when `userId` was still null, causing guards to briefly see `loading=false` + DEFAULT_FLAGS (all false) and redirect. Fix: keep loading=true until userId arrives; on stale-token 401 call `refreshSession()` and retry; subscribe to `onAuthStateChange` to catch late-arriving sessions. Also hardened billing page's inline flag fetch to poll getSession() up to 1.5s. Commit `b521a05e`.
+5. **Verification (3 agents)** — curl-verified 38 routes accept salesman (0 false-401s), SQL-verified triggers fire + backfill covers all profiles + stale-override heuristic works both branches, browser-verified sidebar + gated pages via Preview MCP. Reports: `AGENT_J_VERIFY.md`, `AGENT_K_VERIFY.md`, `AGENT_L_VERIFY.md`.
+
+### Login page
+Added Sales/PM demo account card (sales@pontifex.com / Sales1234!). Commit `5148c641`.
+
+---
 
 ---
 
