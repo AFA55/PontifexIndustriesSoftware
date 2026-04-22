@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAuth, ADMIN_ROLES } from '@/lib/api-auth';
 
 // GET: Single profile with project history
 export async function GET(
@@ -16,10 +16,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
     const { id } = await params;
+
+    if (id !== auth.userId && !ADMIN_ROLES.includes(auth.role as typeof ADMIN_ROLES[number])) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
@@ -59,17 +63,27 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
     const { id } = await params;
     const body = await request.json();
 
-    const allowedFields = [
+    const isAdmin = ADMIN_ROLES.includes(auth.role as typeof ADMIN_ROLES[number]);
+    if (id !== auth.userId && !isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Non-admins editing their own profile cannot change role or active status.
+    const selfOnlyFields = [
       'full_name', 'nickname', 'email', 'phone', 'phone_number',
-      'date_of_birth', 'hire_date', 'next_review_date', 'role', 'active', 'profile_picture_url',
+      'date_of_birth', 'profile_picture_url',
       'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
     ];
+    const adminOnlyFields = ['hire_date', 'next_review_date', 'role', 'active'];
+    const allowedFields = isAdmin
+      ? [...selfOnlyFields, ...adminOnlyFields]
+      : selfOnlyFields;
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const field of allowedFields) {
