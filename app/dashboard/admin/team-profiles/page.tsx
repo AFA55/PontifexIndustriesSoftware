@@ -676,10 +676,28 @@ export default function TeamProfilesPage() {
       const role = user.user_metadata?.role || 'operator';
       setUserRole(role);
 
+      const bypassRoles = ['super_admin', 'operations_manager'];
       const adminRoles = ['super_admin', 'operations_manager', 'admin'];
       if (!adminRoles.includes(role)) {
-        router.push('/dashboard/admin');
-        return;
+        // Fall back to feature flag: allow if can_manage_team is true
+        let canManageTeam = false;
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token;
+          if (token) {
+            const resp = await fetch(`/api/admin/user-flags/${user.id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const json = await resp.json();
+            canManageTeam = Boolean(json?.data?.can_manage_team);
+          }
+        } catch {
+          canManageTeam = false;
+        }
+        if (!bypassRoles.includes(role) && !canManageTeam) {
+          router.push('/dashboard/admin');
+          return;
+        }
       }
 
       await fetchMembers();

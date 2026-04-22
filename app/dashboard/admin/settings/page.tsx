@@ -39,15 +39,33 @@ export default function SettingsPage() {
   const [skillsSaved, setSkillsSaved] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Auth guard — super_admin only
+  // Auth guard — bypass roles OR can_manage_settings flag
   useEffect(() => {
-    const user = getCurrentUser();
-    if (!user) { router.push('/login'); return; }
-    if (user.role !== 'super_admin' && user.role !== 'operations_manager') {
+    const guard = async () => {
+      const user = getCurrentUser();
+      if (!user) { router.push('/login'); return; }
+      setIsSuperAdmin(user.role === 'super_admin');
+      const bypassRoles = ['super_admin', 'operations_manager'];
+      if (bypassRoles.includes(user.role)) return;
+
+      // Check feature flag
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) {
+          const resp = await fetch(`/api/admin/user-flags/${user.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const json = await resp.json();
+          if (json?.data?.can_manage_settings) return;
+        }
+      } catch {
+        // fall through to redirect
+      }
       router.push('/dashboard');
-      return;
-    }
-    setIsSuperAdmin(user.role === 'super_admin');
+    };
+    guard();
   }, [router]);
 
   // Fetch current settings

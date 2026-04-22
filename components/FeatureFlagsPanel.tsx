@@ -71,17 +71,11 @@ const FLAG_GROUPS = [
     flags: [
       { key: 'can_manage_team', label: 'Manage Team', desc: 'View and edit team profiles' },
       { key: 'can_manage_settings', label: 'Settings', desc: 'Access platform settings' },
-      { key: 'can_grant_super_admin', label: 'Grant Super Admin', desc: 'Elevate others to super admin (dangerous)' },
+      // 'can_grant_super_admin' — hidden until wired (no UI consumer reads it yet)
     ],
   },
-  {
-    label: 'Personal Metrics',
-    icon: '📊',
-    flags: [
-      { key: 'can_view_personal_hours', label: 'Personal Hours', desc: 'See their own hours on jobs' },
-      { key: 'can_view_personal_metrics', label: 'Personal Metrics', desc: 'View their own job performance metrics' },
-    ],
-  },
+  // 'Personal Metrics' group hidden until wired — 'can_view_personal_hours'
+  // and 'can_view_personal_metrics' currently have no UI consumers.
 ];
 
 const ADMIN_TYPE_PRESETS: Record<string, Partial<UserFeatureFlags>> = {
