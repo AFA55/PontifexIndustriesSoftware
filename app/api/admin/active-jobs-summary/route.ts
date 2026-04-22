@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // Fetch active jobs
     const { data: jobsRaw, error: jobsError } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, customer_name, assigned_to, status, scheduled_date')
+      .select('id, job_number, customer_name, assigned_to, status, scheduled_date, arrival_time')
       .eq('tenant_id', auth.tenantId)
       .in('status', ['assigned', 'in_route', 'on_site', 'in_progress'])
       .order('scheduled_date', { ascending: true })
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       operator_name: j.assigned_to ? (profileMap[j.assigned_to] ?? null) : null,
       status: j.status,
       scheduled_date: j.scheduled_date,
-      scheduled_time: j.scheduled_time ?? null,
+      scheduled_time: j.arrival_time ?? null,
       work_items_count: workCountMap[j.id] ?? 0,
     }));
 
