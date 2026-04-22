@@ -15,8 +15,9 @@ export async function POST(request: NextRequest) {
   const auth = await requireScheduleBoardAccess(request);
   if (!auth.authorized) return auth.response;
 
-  // Only users with full schedule_board access can dispatch
-  if (!['super_admin', 'operations_manager'].includes(auth.role)) {
+  // Only users with full schedule_board access can dispatch.
+  // admin is treated as a first-class dispatcher alongside super_admin/operations_manager.
+  if (!['super_admin', 'operations_manager', 'admin'].includes(auth.role)) {
     // Fetch explicit user card permissions (may be empty)
     const { data: permRows } = await supabaseAdmin
       .from('user_card_permissions')
