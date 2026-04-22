@@ -41,13 +41,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
         status,
         customer_id,
         estimated_cost,
-        actual_cost,
         expected_scope,
         billing_type,
-        customer_rating,
-        customer_feedback,
-        completed_at,
-        salesperson_id
+        actual_end_date,
+        completion_submitted_at
       `)
       .eq('id', jobId);
 
@@ -151,7 +148,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({
       success: true,
       data: {
-        job,
+        job: {
+          ...job,
+          actual_cost: null,
+          customer_rating: null,
+          customer_feedback: null,
+          completed_at: (job as any).actual_end_date ?? (job as any).completion_submitted_at ?? null,
+          salesperson_id: null,
+        },
         work_items: workItems || [],
         daily_logs: dailyLogs || [],
         timecards: timecards || [],
