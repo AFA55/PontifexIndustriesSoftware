@@ -58,7 +58,7 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || !['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(profile.role)) {
+  if (profileError || !profile || !['admin', 'super_admin', 'operations_manager'].includes(profile.role)) {
     return {
       authorized: false,
       response: NextResponse.json(
@@ -76,6 +76,33 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
     tenantId: profile.tenant_id || '',
   };
 }
+
+/**
+ * Require the request to have a valid Bearer token belonging to sales-capable staff.
+ * Admits admin, super_admin, operations_manager, supervisor, and salesman.
+ * Used for routes that salesman/supervisor must access (schedule form, active jobs, invoices, etc.).
+ */
+export async function requireSalesStaff(request: NextRequest): Promise<AuthResult> {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) return auth;
+
+  if (!['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(auth.role)) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Sales staff access required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return auth;
+}
+
+/**
+ * Admin role list shared across guards that perform self-or-admin access checks.
+ */
+export const ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager'] as const;
 
 /**
  * Require the request to have a valid Bearer token belonging to a super_admin user.

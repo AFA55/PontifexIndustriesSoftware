@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin, requireAuth } from '@/lib/api-auth';
+import { requireSalesStaff, requireAuth } from '@/lib/api-auth';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 // ─── POST ────────────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 // ─── PUT ─────────────────────────────────────────────────────────────────────
 export async function PUT(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
@@ -214,7 +214,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 // ─── DELETE ──────────────────────────────────────────────────────────────────
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
