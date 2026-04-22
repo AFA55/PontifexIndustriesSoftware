@@ -129,6 +129,46 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to save signature' }, { status: 500 });
     }
 
+    // If completion type, update job_orders with remote signature
+    if (sigRequest.request_type === 'completion') {
+      const signer_ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
+      Promise.resolve(
+        supabaseAdmin
+          .from('job_orders')
+          .update({
+            customer_signature: signature_data,
+            customer_signed_at: new Date().toISOString(),
+            customer_signature_method: 'remote',
+            ...(signer_name ? { completion_signer_name: signer_name } : {}),
+          })
+          .eq('id', sigRequest.job_order_id)
+      ).then(() => {}).catch(() => {});
+
+      // Also store signer_ip on the signature_request (fire-and-forget)
+      if (signer_ip) {
+        Promise.resolve(
+          supabaseAdmin
+            .from('signature_requests')
+            .update({ signer_ip } as any)
+            .eq('id', sigRequest.id)
+        ).then(() => {}).catch(() => {});
+      }
+
+      // Notify admins
+      Promise.resolve(
+        supabaseAdmin
+          .from('schedule_notifications')
+          .insert({
+            job_order_id: sigRequest.job_order_id,
+            notification_type: 'job_completed',
+            title: 'Customer Signed Work Ticket',
+            message: `${signer_name || 'Customer'} signed the work completion form remotely.`,
+            is_read: false,
+            created_at: new Date().toISOString(),
+          })
+      ).then(() => {}).catch(() => {});
+    }
+
     // If completion type and survey data included, save survey
     if (sigRequest.request_type === 'completion' && survey) {
       // Get operator ID from job

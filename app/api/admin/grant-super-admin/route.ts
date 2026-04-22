@@ -1,18 +1,11 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSuperAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireSuperAdmin(request);
   if (!auth.authorized) return auth.response;
-
-  if (auth.role !== 'super_admin') {
-    return NextResponse.json(
-      { error: 'Only super admins can grant super admin access' },
-      { status: 403 }
-    );
-  }
 
   const { userId } = (await request.json()) as { userId: string };
 

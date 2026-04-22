@@ -20,13 +20,14 @@ export async function GET(request: NextRequest) {
 
     const tenantId = auth.tenantId;
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     let query = supabaseAdmin
       .from('nfc_tags')
       .select('*')
       .order('created_at', { ascending: false });
 
     // Scope to tenant
-    if (tenantId) query = query.eq('tenant_id', tenantId);
+    query = query.eq('tenant_id', tenantId);
     if (activeOnly) query = query.eq('is_active', true);
     if (tagType) query = query.eq('tag_type', tagType);
 

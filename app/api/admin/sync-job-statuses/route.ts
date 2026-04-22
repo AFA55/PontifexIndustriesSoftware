@@ -32,15 +32,13 @@ export async function POST(request: NextRequest) {
 
     // Resolve tenant scope
     const tenantId = await getTenantId(user.id);
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Get all job orders (scoped to tenant)
     let jobsQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
       .order('scheduled_date', { ascending: false });
-    if (tenantId) {
-      jobsQuery = jobsQuery.eq('tenant_id', tenantId);
-    }
+    jobsQuery = jobsQuery.eq('tenant_id', tenantId);
     const { data: jobs, error: jobsError } = await jobsQuery;
 
     if (jobsError) {

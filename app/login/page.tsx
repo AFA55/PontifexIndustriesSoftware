@@ -277,6 +277,18 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Sales / PM Account */}
+            <div className="p-4 bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl border-2 border-purple-200 hover:border-purple-300 transition-all hover:shadow-md cursor-default">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                <h4 className="text-purple-800 font-bold text-xs tracking-wider">SALES / PM DASHBOARD</h4>
+              </div>
+              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+                <div><span className="text-purple-700 font-bold">Email:</span> sales@pontifex.com</div>
+                <div><span className="text-purple-700 font-bold">Password:</span> Sales1234!</div>
+              </div>
+            </div>
+
             {/* Admin Account */}
             <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200 hover:border-orange-300 transition-all hover:shadow-md cursor-default">
               <div className="flex items-center gap-2 mb-2">

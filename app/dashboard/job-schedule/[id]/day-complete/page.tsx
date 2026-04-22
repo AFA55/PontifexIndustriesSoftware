@@ -17,6 +17,7 @@ import {
   Trophy,
   PenTool,
   Camera,
+  Send,
 } from 'lucide-react';
 import PhotoUploader from '@/components/PhotoUploader';
 import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
@@ -541,6 +542,19 @@ export default function DayCompletePage() {
             >
               Add customer signature first
             </button>
+
+            {/* Remote signature option — customer not on site */}
+            <div className="border-t border-gray-200 pt-3">
+              <p className="text-center text-xs text-gray-400 mb-2">Customer not on site?</p>
+              <a
+                href={`/dashboard/admin/completed-job-tickets/${jobId}`}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-indigo-300 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-medium hover:bg-indigo-100 transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Send Signature Link to Customer
+              </a>
+              <p className="text-center text-xs text-gray-400 mt-1.5">Opens the job ticket page where you can email a signing link</p>
+            </div>
           </div>
         ) : (
           /* Customer Signature Section */

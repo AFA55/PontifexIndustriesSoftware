@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     // Resolve tenant scope — REQUIRED for supabaseAdmin (service role bypasses RLS)
     const tenantId = await getTenantId(user.id);
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Build query directly from job_orders table
     let query = supabaseAdmin
       .from('job_orders')
@@ -72,9 +72,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     // Scope to tenant (mandatory when using admin client)
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     // Apply filters
     if (status) {

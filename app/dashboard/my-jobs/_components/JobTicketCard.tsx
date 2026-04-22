@@ -47,9 +47,11 @@ export interface JobTicketData {
   scope_details?: Record<string, Record<string, string>> | null;
   scope_photo_urls?: string[] | null;
   site_compliance?: Record<string, any> | null;
+  jobsite_conditions?: Record<string, any> | null;
   special_equipment_notes?: string | null;
   site_contact_phone?: string | null;
   additional_info?: string | null;
+  directions?: string | null;
   // On-hold fields
   pause_reason?: string | null;
   return_date?: string | null;

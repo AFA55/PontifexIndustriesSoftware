@@ -1,16 +1,23 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAuth, requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+
+const ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager'];
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const auth = await requireAdmin(request);
+  const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
 
   const { userId } = await params;
+
+  // Users can read their own flags; only admins can read others'
+  if (userId !== auth.userId && !ADMIN_ROLES.includes(auth.role || '')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const { data, error } = await supabaseAdmin
     .from('user_feature_flags')

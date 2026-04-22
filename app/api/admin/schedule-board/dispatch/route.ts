@@ -4,12 +4,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getCardPermission, type PermissionLevel } from '@/lib/rbac';
-import { sendSMS, formatPhoneNumber } from '@/lib/sms';
+import { sendSMS } from '@/lib/sms';
 
 /**
  * POST /api/admin/schedule-board/dispatch
  * Push job tickets for a target date — dispatches all assigned jobs
  * and sends in-app notifications to operators and helpers.
+ *
+ * Body: { target_date: 'YYYY-MM-DD' }
+ *
+ * Behavior:
+ * - Always pushes ALL assigned jobs active on target_date (no blocking on prior dispatch state)
+ * - Each push inserts a schedule_notification with type='dispatched' and metadata.dispatch_date=targetDate
+ * - dispatched_at is set on first-ever dispatch only (not overwritten on re-push)
+ * - Multi-day jobs are included via date-range query (scheduled_date <= target AND end_date >= target)
  */
 export async function POST(request: NextRequest) {
   const auth = await requireScheduleBoardAccess(request);
@@ -51,14 +59,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Find all dispatchable jobs for the target date
+    // 1. Find all assigned jobs active on the target date (single-day AND multi-day)
+    //    A job is active on targetDate if: scheduled_date <= targetDate AND (end_date IS NULL OR end_date >= targetDate)
     const { data: jobs, error: fetchError } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, customer_name, location, job_type, assigned_to, helper_assigned_to, arrival_time, scheduled_date')
-      .eq('scheduled_date', targetDate)
+      .select('id, job_number, customer_name, location, job_type, assigned_to, helper_assigned_to, arrival_time, scheduled_date, end_date, dispatched_at')
       .not('assigned_to', 'is', null)
-      .in('status', ['scheduled', 'assigned'])
-      .is('dispatched_at', null)
+      .lte('scheduled_date', targetDate)
+      .or(`end_date.is.null,end_date.gte.${targetDate}`)
+      .in('status', ['scheduled', 'assigned', 'in_progress'])
       .is('deleted_at', null);
 
     if (fetchError) {
@@ -75,22 +84,30 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. Batch update: set dispatched_at and ensure status is 'assigned'
-    const jobIds = jobs.map(j => j.id);
-    const { error: updateError } = await supabaseAdmin
-      .from('job_orders')
-      .update({
-        dispatched_at: new Date().toISOString(),
-        status: 'assigned',
-      })
-      .in('id', jobIds);
+    // Always dispatch all assigned jobs on the target date — no blocking on prior dispatch state
+    const jobsToDispatch = jobs;
 
-    if (updateError) {
-      console.error('Error dispatching jobs:', updateError);
-      return NextResponse.json({ error: 'Failed to dispatch jobs.' }, { status: 500 });
+    // 2. Set dispatched_at on first-time dispatches (don't overwrite existing dispatched_at)
+    const firstTimeDispatchIds = jobsToDispatch
+      .filter(j => j.dispatched_at === null)
+      .map(j => j.id);
+
+    if (firstTimeDispatchIds.length > 0) {
+      const { error: updateError } = await supabaseAdmin
+        .from('job_orders')
+        .update({
+          dispatched_at: new Date().toISOString(),
+          status: 'assigned',
+        })
+        .in('id', firstTimeDispatchIds);
+
+      if (updateError) {
+        console.error('Error dispatching jobs:', updateError);
+        return NextResponse.json({ error: 'Failed to dispatch jobs.' }, { status: 500 });
+      }
     }
 
-    // 3. Create notifications for operators and helpers
+    // 4. Create notifications for operators and helpers
     const notifications: {
       recipient_id: string;
       job_order_id: string;
@@ -102,7 +119,7 @@ export async function POST(request: NextRequest) {
 
     // Get operator/helper names for notification messages
     const allUserIds = new Set<string>();
-    jobs.forEach(j => {
+    jobsToDispatch.forEach(j => {
       if (j.assigned_to) allUserIds.add(j.assigned_to);
       if (j.helper_assigned_to) allUserIds.add(j.helper_assigned_to);
     });
@@ -125,40 +142,49 @@ export async function POST(request: NextRequest) {
       day: 'numeric',
     });
 
-    for (const job of jobs) {
-      // Notification for operator
+    const notifTitle = 'Job Ticket Dispatched';
+
+    for (const job of jobsToDispatch) {
+      // Determine multi-day label
+      const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
+
+      // Notification for operator — always send on each push
       if (job.assigned_to) {
         notifications.push({
           recipient_id: job.assigned_to,
           job_order_id: job.id,
           type: 'dispatched',
-          title: 'Job Ticket Dispatched',
-          message: `You have been assigned to ${job.customer_name} at ${job.location} on ${formattedDate}.`,
+          title: notifTitle,
+          message: `You have been assigned to ${job.customer_name} at ${job.location} on ${formattedDate}.${isMultiDay ? ' (Multi-day job)' : ''}`,
           metadata: {
             job_number: job.job_number,
             customer_name: job.customer_name,
             location: job.location,
             job_type: job.job_type,
             arrival_time: job.arrival_time,
+            dispatch_date: targetDate,
+            is_multi_day: isMultiDay,
           },
         });
       }
 
-      // Notification for helper
+      // Notification for helper — always send on each push
       if (job.helper_assigned_to) {
         notifications.push({
           recipient_id: job.helper_assigned_to,
           job_order_id: job.id,
           type: 'dispatched',
-          title: 'Job Ticket Dispatched',
-          message: `You have been assigned as helper for ${job.customer_name} at ${job.location} on ${formattedDate}.`,
+          title: notifTitle,
+          message: `You have been assigned as helper for ${job.customer_name} at ${job.location} on ${formattedDate}.${isMultiDay ? ' (Multi-day job)' : ''}`,
           metadata: {
             job_number: job.job_number,
             customer_name: job.customer_name,
             location: job.location,
             job_type: job.job_type,
             arrival_time: job.arrival_time,
+            dispatch_date: targetDate,
             is_helper: true,
+            is_multi_day: isMultiDay,
           },
         });
       }
@@ -179,11 +205,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Fire-and-forget SMS to operators/helpers who have a phone number
+    // 5. Fire-and-forget SMS to operators/helpers who have a phone number
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
     const smsPromises: Promise<any>[] = [];
 
-    for (const job of jobs) {
+    for (const job of jobsToDispatch) {
       const formatTime = (t: string | null) => {
         if (!t) return '';
         const [h, m] = t.split(':');
@@ -224,10 +250,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      dispatched_count: jobIds.length,
+      dispatched_count: jobsToDispatch.length,
       notification_count: notificationCount,
       sms_attempted: smsPromises.length,
-      message: `Dispatched ${jobIds.length} job(s) for ${formattedDate}. ${notificationCount} notification(s) sent.`,
+      message: `Dispatched ${jobsToDispatch.length} job(s) for ${formattedDate}. ${notificationCount} notification(s) sent.`,
     });
   } catch (error) {
     console.error('Dispatch error:', error);
@@ -237,7 +263,9 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/admin/schedule-board/dispatch?date=YYYY-MM-DD
- * Check dispatch status for a given date (how many jobs are dispatched vs undispatched).
+ * Returns the count of assigned jobs active on the given date.
+ * Used to populate the "Push Tickets (N)" button on the schedule board.
+ * Always returns all assigned jobs — no "dispatched" blocking, since every push is valid.
  */
 export async function GET(request: NextRequest) {
   const auth = await requireScheduleBoardAccess(request);
@@ -251,28 +279,28 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Query jobs active on targetDate (single-day and multi-day)
     const { data: jobs, error } = await supabaseAdmin
       .from('job_orders')
-      .select('id, dispatched_at, assigned_to, status, customer_name')
-      .eq('scheduled_date', targetDate)
+      .select('id, customer_name, scheduled_date, end_date')
       .not('assigned_to', 'is', null)
       .is('deleted_at', null)
+      .lte('scheduled_date', targetDate)
+      .or(`end_date.is.null,end_date.gte.${targetDate}`)
       .in('status', ['scheduled', 'assigned', 'in_route', 'in_progress']);
 
     if (error) {
       return NextResponse.json({ error: 'Failed to check dispatch status.' }, { status: 500 });
     }
 
-    const total = jobs?.length || 0;
-    const dispatched = jobs?.filter(j => j.dispatched_at !== null).length || 0;
-    const undispatched = total - dispatched;
+    const jobList = jobs || [];
+    const total = jobList.length;
 
     // Check AR: find overdue balances for customers being dispatched
-    const customerNames = [...new Set((jobs || []).map(j => j.customer_name).filter(Boolean))];
+    const customerNames = [...new Set(jobList.map(j => j.customer_name).filter(Boolean))];
     let arWarnings: { customer_name: string; balance_due: number; days_overdue: number }[] = [];
 
     if (customerNames.length > 0) {
-      const today = new Date().toISOString().split('T')[0];
       const { data: overdueInvoices } = await supabaseAdmin
         .from('invoices')
         .select('customer_name, balance_due, due_date')
@@ -313,8 +341,9 @@ export async function GET(request: NextRequest) {
       success: true,
       date: targetDate,
       total,
-      dispatched,
-      undispatched,
+      // undispatched = total (all jobs are always pushable)
+      dispatched: 0,
+      undispatched: total,
       ar_warnings: arWarnings,
     });
   } catch (error) {

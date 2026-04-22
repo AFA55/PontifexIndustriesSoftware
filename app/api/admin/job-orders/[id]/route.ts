@@ -70,13 +70,13 @@ export async function PATCH(
 
     // Resolve tenant scope — supabaseAdmin bypasses RLS, must scope manually
     const tenantId = await getTenantId(user.id);
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Get the current job order before updating (for audit trail)
     let oldJobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
       .eq('id', id);
-    if (tenantId) oldJobQuery = oldJobQuery.eq('tenant_id', tenantId);
+    oldJobQuery = oldJobQuery.eq('tenant_id', tenantId);
     const { data: oldJobOrder, error: fetchError } = await oldJobQuery.single();
 
     if (fetchError || !oldJobOrder) {
@@ -110,7 +110,7 @@ export async function PATCH(
       .from('job_orders')
       .update(updateFields)
       .eq('id', id);
-    if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+    updateQuery = updateQuery.eq('tenant_id', tenantId);
     const { data: jobOrder, error: updateError } = await updateQuery.select().single();
 
     console.log('Update result:', { jobOrder, updateError });
@@ -299,10 +299,35 @@ export async function DELETE(
       );
     }
 
-    // Create audit trail entry before deletion — gracefully handle missing table
-    const { error: deleteHistoryError } = await supabaseAdmin
-      .from('job_orders_history')
-      .insert({
+    // ── Step 1: Notify assigned operator(s) BEFORE deletion ─────────────────
+    const assignedUserIds: string[] = [];
+    if (jobOrder.assigned_to) assignedUserIds.push(jobOrder.assigned_to);
+    if (jobOrder.helper_assigned_to) assignedUserIds.push(jobOrder.helper_assigned_to);
+
+    if (assignedUserIds.length > 0) {
+      const cancellationNotifications = assignedUserIds.map(userId => ({
+        user_id: userId,
+        tenant_id: tenantIdDel || jobOrder.tenant_id,
+        type: 'job_cancelled',
+        notification_type: 'job_cancelled',
+        title: 'Job Cancelled',
+        message: `${jobOrder.job_number} for ${jobOrder.customer_name || 'customer'} has been removed from the schedule.`,
+        job_id: id,
+        related_entity_type: 'job_order',
+        related_entity_id: id,
+        read: false,
+        is_read: false,
+        priority: 'high',
+        created_at: new Date().toISOString(),
+      }));
+      Promise.resolve(
+        supabaseAdmin.from('notifications').insert(cancellationNotifications)
+      ).catch(() => {});
+    }
+
+    // ── Step 2: Audit trail (before deletion so FK is still valid) ───────────
+    Promise.resolve(
+      supabaseAdmin.from('job_orders_history').insert({
         job_order_id: id,
         job_number: jobOrder.job_number,
         changed_by: user.id,
@@ -311,13 +336,55 @@ export async function DELETE(
         change_type: 'deleted',
         changes: { deleted: { old: jobOrder, new: null } },
         snapshot: jobOrder,
-      });
+      })
+    ).catch(() => {});
 
-    if (deleteHistoryError && !(isTableNotFoundError(deleteHistoryError))) {
-      console.error('Error logging deletion audit trail:', deleteHistoryError);
-    }
+    // ── Step 3: Clean up NO ACTION FK tables before hard delete ─────────────
+    // These tables have NO ACTION FK and would block or orphan if not cleaned
 
-    // Delete the job order (scoped to tenant)
+    // 3a. Invoice line items — remove association (preserve invoice record)
+    await supabaseAdmin
+      .from('invoice_line_items')
+      .delete()
+      .eq('job_order_id', id);
+
+    // 3b. Timecards — preserve payroll records, just unlink from this job
+    await supabaseAdmin
+      .from('timecards')
+      .update({ job_order_id: null })
+      .eq('job_order_id', id);
+
+    // 3c. Pay adjustments — preserve, just unlink
+    await supabaseAdmin
+      .from('pay_adjustments')
+      .update({ job_order_id: null })
+      .eq('job_order_id', id);
+
+    // 3d. Operator workflow log — delete (no longer relevant)
+    await supabaseAdmin
+      .from('operator_workflow_log')
+      .delete()
+      .eq('job_order_id', id);
+
+    // 3e. Operator workflow sessions — delete
+    await supabaseAdmin
+      .from('operator_workflow_sessions')
+      .delete()
+      .eq('job_order_id', id);
+
+    // 3f. Operator job history — delete
+    await supabaseAdmin
+      .from('operator_job_history')
+      .delete()
+      .eq('job_id', id);
+
+    // 3g. Unlink continuation jobs (set parent_job_id to null so they still exist)
+    await supabaseAdmin
+      .from('job_orders')
+      .update({ parent_job_id: null })
+      .eq('parent_job_id', id);
+
+    // ── Step 4: Hard delete the job order (CASCADE handles the rest) ─────────
     let deleteQuery = supabaseAdmin
       .from('job_orders')
       .delete()
@@ -333,12 +400,13 @@ export async function DELETE(
       );
     }
 
-    console.log(`Job order ${id} deleted by ${profile.full_name}`);
+    console.log(`Job order ${id} (${jobOrder.job_number}) deleted by ${profile.full_name}`);
 
     return NextResponse.json(
       {
         success: true,
         message: 'Job order deleted successfully',
+        notified_operators: assignedUserIds.length,
       },
       { status: 200 }
     );

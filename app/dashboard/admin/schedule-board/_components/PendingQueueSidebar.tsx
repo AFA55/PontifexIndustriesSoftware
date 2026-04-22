@@ -58,6 +58,19 @@ export interface PendingJob {
   missing_info_flagged?: boolean;
   missing_info_items?: string[];
   missing_info_note?: string | null;
+  po_number: string | null;
+  site_contact: string | null;
+  contact_phone: string | null;
+  project_name: string | null;
+  location_name: string | null;
+  scheduling_flexibility: {
+    special_arrival?: boolean;
+    special_arrival_time?: string | null;
+    can_work_weekends?: boolean;
+    can_work_fridays?: boolean;
+    outside_hours?: boolean;
+    outside_hours_details?: string | null;
+  } | null;
 }
 
 interface PendingQueueSidebarProps {

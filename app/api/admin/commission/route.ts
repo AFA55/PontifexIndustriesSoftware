@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { requireAuth, ADMIN_ROLES } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,12 +18,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId');
 
-    // Only super_admin can view another user's commission
+    // Non-admins can only read their own commission row
     let lookupUserId = auth.userId;
     if (targetUserId && targetUserId !== auth.userId) {
-      if (auth.role !== 'super_admin') {
+      if (!ADMIN_ROLES.includes(auth.role as typeof ADMIN_ROLES[number])) {
         return NextResponse.json(
-          { error: 'Forbidden. Only super admins can view other users\' commission.' },
+          { error: 'Forbidden. You can only view your own commission.' },
           { status: 403 }
         );
       }

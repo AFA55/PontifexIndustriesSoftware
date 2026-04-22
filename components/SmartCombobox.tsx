@@ -70,10 +70,27 @@ export default function SmartCombobox({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  // Close on outside click
+  // Close on outside click — commit the typed query as the value if it
+  // hasn't been explicitly added/selected yet. This prevents free-text
+  // entries (e.g. a new project name) from being silently discarded when
+  // the user clicks away or taps Next before clicking the "Add new" row.
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        const trimmed = query.trim();
+        if (trimmed.length > 0) {
+          const exactMatch = options.find(
+            (o) => o.label.toLowerCase() === trimmed.toLowerCase(),
+          );
+          if (exactMatch) {
+            onChange(exactMatch.value);
+          } else if (onAddNew) {
+            onAddNew(trimmed);
+            onChange(trimmed);
+          } else {
+            onChange(trimmed);
+          }
+        }
         setOpen(false);
         setQuery('');
         setActiveIndex(-1);
@@ -81,7 +98,7 @@ export default function SmartCombobox({
     }
     document.addEventListener('pointerdown', handlePointerDown);
     return () => document.removeEventListener('pointerdown', handlePointerDown);
-  }, []);
+  }, [query, options, onAddNew, onChange]);
 
   // Scroll active item into view
   useEffect(() => {

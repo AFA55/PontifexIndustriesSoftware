@@ -4,25 +4,25 @@ export const dynamic = 'force-dynamic';
  * API Route: GET /api/admin/jobs/[id]/summary
  * Full job summary for admin view: job info, scope, progress, completion request.
  *
- * GET — requireAdmin
+ * GET — requireSalesStaff
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // ── 1. Fetch the job ────────────────────────────────────────────────────
-    const { data: job, error: jobError } = await supabaseAdmin
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select(`
         id,
@@ -33,46 +33,56 @@ export async function GET(request: NextRequest, context: RouteContext) {
         end_date,
         actual_end_date,
         customer_name,
-        customer_phone,
+        customer_contact,
         customer_email,
-        contact_name,
+        site_contact_phone,
         job_type,
         location,
         address,
         description,
-        scope_of_work,
+        scope_details,
         arrival_time,
         is_will_call,
         po_number,
-        permit_number,
+        permits,
         permit_required,
-        notes,
-        internal_notes,
+        operator_notes,
+        dispatch_notes,
         assigned_to,
         completion_submitted_at,
-        completion_approved_at,
-        completion_rejected_at,
-        completion_rejection_notes,
-        profiles!job_orders_assigned_to_fkey(full_name)
+        rejected_at,
+        rejection_notes
       `)
-      .eq('id', jobId)
-      .eq('tenant_id', tenantId)
-      .single();
+      .eq('id', jobId);
+    // Only filter by tenant if tenantId is set (super_admin may have none)
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
+    // ── 1b. Fetch operator profile separately (assigned_to may ref auth.users) ──
+    let operatorProfile: { full_name: string } | null = null;
+    if (job.assigned_to) {
+      const { data: opProf } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', job.assigned_to)
+        .maybeSingle();
+      operatorProfile = opProf;
+    }
+
     // ── 2. Fetch scope items ────────────────────────────────────────────────
-    const { data: scopeItems } = await supabaseAdmin
+    let scopeQuery = supabaseAdmin
       .from('job_scope_items')
       .select('id, work_type, description, unit, target_quantity, sort_order')
-      .eq('job_order_id', jobId)
-      .eq('tenant_id', tenantId)
-      .order('sort_order', { ascending: true });
+      .eq('job_order_id', jobId);
+    if (tenantId) scopeQuery = scopeQuery.eq('tenant_id', tenantId);
+    const { data: scopeItems } = await scopeQuery.order('sort_order', { ascending: true });
 
     // ── 3. Fetch all progress entries ───────────────────────────────────────
-    const { data: progressEntries } = await supabaseAdmin
+    let progressQuery = supabaseAdmin
       .from('job_progress_entries')
       .select(`
         id,
@@ -85,9 +95,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
         profiles!job_progress_entries_operator_id_fkey(full_name),
         job_scope_items!job_progress_entries_scope_item_id_fkey(description, work_type, unit)
       `)
-      .eq('job_order_id', jobId)
-      .eq('tenant_id', tenantId)
-      .order('date', { ascending: false });
+      .eq('job_order_id', jobId);
+    if (tenantId) progressQuery = progressQuery.eq('tenant_id', tenantId);
+    const { data: progressEntries } = await progressQuery.order('date', { ascending: false });
 
     // ── 4. Fetch the latest completion request ──────────────────────────────
     let completionRequest: {
@@ -100,7 +110,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       profiles: { full_name: string } | { full_name: string }[] | null;
     } | null = null;
     try {
-      const { data: crData } = await supabaseAdmin
+      let crQuery = supabaseAdmin
         .from('job_completion_requests')
         .select(`
           id,
@@ -111,8 +121,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
           submitted_by,
           profiles!job_completion_requests_submitted_by_fkey(full_name)
         `)
-        .eq('job_order_id', jobId)
-        .eq('tenant_id', tenantId)
+        .eq('job_order_id', jobId);
+      if (tenantId) crQuery = crQuery.eq('tenant_id', tenantId);
+      const { data: crData } = await crQuery
         .order('submitted_at', { ascending: false })
         .limit(1)
         .single();
@@ -230,30 +241,36 @@ export async function GET(request: NextRequest, context: RouteContext) {
           end_date: (job as any).end_date ?? null,
           actual_end_date: job.actual_end_date,
           customer_name: job.customer_name,
-          customer_phone: (job as any).customer_phone ?? null,
+          customer_phone: (job as any).site_contact_phone ?? null,
           customer_email: (job as any).customer_email ?? null,
-          contact_name: (job as any).contact_name ?? null,
+          contact_name: (job as any).customer_contact ?? null,
           job_type: (job as any).job_type ?? null,
           location: (job as any).location ?? null,
           address: (job as any).address ?? null,
           description: (job as any).description ?? null,
-          scope_of_work: (job as any).scope_of_work ?? null,
+          scope_of_work: null,
           arrival_time: (job as any).arrival_time ?? null,
           is_will_call: (job as any).is_will_call ?? false,
           po_number: (job as any).po_number ?? null,
-          permit_number: (job as any).permit_number ?? null,
+          permit_number: (() => {
+            const p = (job as any).permits;
+            if (Array.isArray(p) && p.length > 0 && typeof p[0] === 'object' && p[0]?.permit_number) {
+              return p[0].permit_number;
+            }
+            return null;
+          })(),
           permit_required: (job as any).permit_required ?? false,
-          notes: (job as any).notes ?? null,
-          internal_notes: (job as any).internal_notes ?? null,
+          notes: (job as any).operator_notes ?? null,
+          internal_notes: (job as any).dispatch_notes ?? null,
           assigned_to: job.assigned_to ?? null,
-          operator_name: (job.profiles as any)?.full_name ?? null,
+          operator_name: operatorProfile?.full_name ?? null,
           helper_name: null,
           completion_submitted_at: job.completion_submitted_at,
           completion_requested_at: completionRequest?.submitted_at ?? job.completion_submitted_at ?? null,
           completion_request_notes: completionRequest?.operator_notes ?? null,
-          completion_approved_at: (job as any).completion_approved_at ?? null,
-          completion_rejected_at: (job as any).completion_rejected_at ?? null,
-          completion_rejection_notes: (job as any).completion_rejection_notes ?? null,
+          completion_approved_at: null,
+          completion_rejected_at: (job as any).rejected_at ?? null,
+          completion_rejection_notes: (job as any).rejection_notes ?? null,
         },
         scope: {
           items: enrichedScopeItems,

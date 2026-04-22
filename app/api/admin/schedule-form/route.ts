@@ -17,14 +17,14 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
-    // Fetch full_name for logging (role already verified by requireAdmin)
+    // Fetch full_name for logging (role already verified by requireSalesStaff)
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('full_name')

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getCurrentUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import {
   Briefcase,
@@ -202,10 +203,10 @@ export default function ActiveJobsPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map(job => (
-              <button
+              <Link
                 key={job.id}
-                onClick={() => router.push(`/dashboard/admin/jobs/${job.id}`)}
-                className="w-full bg-white border border-gray-200 hover:border-gray-300 rounded-xl p-4 text-left transition-all shadow-sm hover:shadow-md"
+                href={`/dashboard/admin/jobs/${job.id}`}
+                className="block w-full bg-white border border-gray-200 hover:border-gray-300 rounded-xl p-4 text-left transition-all shadow-sm hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -256,7 +257,7 @@ export default function ActiveJobsPage() {
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" />
                 </div>
-              </button>
+              </Link>
             ))}
           </div>
         )}

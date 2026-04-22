@@ -200,15 +200,65 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
     );
   };
 
-  // Scope details as table rows
-  const scopeRows: { type: string; details: Record<string, string> }[] = [];
+  // Scope details as table rows — parse nested JSON strings for cuts/holes
+  const scopeRows: { type: string; qty: string; footage: string; depth: string; wallFloor: string; notes: string }[] = [];
+
   if (job.scope_details) {
-    for (const [key, val] of Object.entries(job.scope_details)) {
-      if (typeof val === 'object' && val !== null) {
-        scopeRows.push({ type: key.replace(/_/g, ' '), details: val as Record<string, string> });
-      } else {
-        scopeRows.push({ type: key.replace(/_/g, ' '), details: { value: String(val) } });
+    for (const [serviceCode, val] of Object.entries(job.scope_details)) {
+      if (!val || typeof val !== 'object') continue;
+      const entry = val as Record<string, string>;
+      const label = serviceCode.replace(/_/g, ' ');
+
+      // Floor/wall sawing — parse cuts array
+      if (entry.cuts) {
+        try {
+          const cuts = JSON.parse(entry.cuts) as { linear_feet?: string; depth?: string; num_cuts?: string }[];
+          cuts.forEach((cut, idx) => {
+            scopeRows.push({
+              type: cuts.length > 1 ? `${label} (cut ${idx + 1})` : label,
+              qty: cut.num_cuts || '—',
+              footage: cut.linear_feet ? `${cut.linear_feet} LF` : '—',
+              depth: cut.depth ? `${cut.depth}"` : '—',
+              wallFloor: entry.wall_floor_type || entry.material || '—',
+              notes: entry.notes || '—',
+            });
+          });
+        } catch { /* skip malformed */ }
+        continue;
       }
+
+      // Core drilling — parse holes array
+      if (entry.holes) {
+        try {
+          const holes = JSON.parse(entry.holes) as { qty?: string; bit_size?: string; depth?: string }[];
+          holes.forEach((hole, idx) => {
+            scopeRows.push({
+              type: holes.length > 1 ? `${label} (set ${idx + 1})` : label,
+              qty: hole.qty || '—',
+              footage: hole.bit_size ? `${hole.bit_size}" dia` : '—',
+              depth: hole.depth ? `${hole.depth}"` : '—',
+              wallFloor: entry.material || entry.wall_floor_type || '—',
+              notes: entry.notes || '—',
+            });
+          });
+        } catch { /* skip malformed */ }
+        continue;
+      }
+
+      // Demo, Removal, GPR, or other text-based entries
+      const noteParts: string[] = [];
+      if (entry.description) noteParts.push(entry.description);
+      if (entry.method) noteParts.push(`Method: ${entry.method.replace(/_/g, ' ')}`);
+      if (entry.equipment) noteParts.push(`Equip: ${entry.equipment}`);
+
+      scopeRows.push({
+        type: label,
+        qty: entry.quantity || entry.area || '—',
+        footage: entry.size || entry.footage || '—',
+        depth: entry.depth || '—',
+        wallFloor: entry.material || entry.wall_floor_type || '—',
+        notes: noteParts.join(' | ') || entry.notes || '—',
+      });
     }
   }
 
@@ -274,12 +324,6 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                   <Text style={s.fieldLabel}>Time</Text>
                   <Text style={s.fieldValueBold}>{job.arrival_time || '—'}</Text>
                 </View>
-                {job.end_date && (
-                  <View style={s.fieldRow}>
-                    <Text style={s.fieldLabel}>End Date</Text>
-                    <Text style={s.fieldValue}>{formatDate(job.end_date)}</Text>
-                  </View>
-                )}
                 <View style={s.fieldRow}>
                   <Text style={s.fieldLabel}>Cust Name</Text>
                   <Text style={s.fieldValueBold}>{job.customer_name}</Text>
@@ -312,12 +356,6 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                   <Text style={s.fieldLabel}>Quoted By</Text>
                   <Text style={s.fieldValue}>{job.salesman_name || '—'}</Text>
                 </View>
-                {job.estimated_cost && (
-                  <View style={s.fieldRow}>
-                    <Text style={s.fieldLabel}>Est. Cost</Text>
-                    <Text style={s.fieldValueBold}>${Number(job.estimated_cost).toLocaleString()}</Text>
-                  </View>
-                )}
                 {job.estimated_hours && (
                   <View style={s.fieldRow}>
                     <Text style={s.fieldLabel}>Est. Hours</Text>
@@ -362,20 +400,6 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
               </View>
             )}
 
-            {/* Difficulty */}
-            {difficulty > 0 && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2, marginBottom: 4 }}>
-                <Text style={{ fontSize: 7, fontWeight: 'bold', color: '#64748B' }}>DIFFICULTY: {difficulty}/10</Text>
-                <View style={{ flexDirection: 'row', gap: 1.5 }}>
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <View key={i} style={{
-                      width: 12, height: 6, borderRadius: 1,
-                      backgroundColor: i >= difficulty ? '#E2E8F0' : difficulty <= 3 ? '#10B981' : difficulty <= 6 ? '#F59E0B' : '#EF4444',
-                    }} />
-                  ))}
-                </View>
-              </View>
-            )}
           </View>
 
           {/* ── COLUMN 2: Work Conditions ── */}
@@ -472,11 +496,11 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
             {scopeRows.map((row, i) => (
               <View key={i} style={i % 2 === 0 ? s.scopeDataRow : s.scopeDataRowAlt}>
                 <Text style={{ ...s.scopeCell, width: 100, fontWeight: 'bold' }}>{row.type}</Text>
-                <Text style={{ ...s.scopeCell, width: 60 }}>{row.details.quantity || row.details.count || '—'}</Text>
-                <Text style={{ ...s.scopeCell, width: 100 }}>{row.details.footage || row.details.diameter || row.details.size || '—'}</Text>
-                <Text style={{ ...s.scopeCell, width: 80 }}>{row.details.depth || '—'}</Text>
-                <Text style={{ ...s.scopeCell, width: 120 }}>{row.details.material || row.details.wall_floor || '—'}</Text>
-                <Text style={{ ...s.scopeCell, flex: 1 }}>{row.details.notes || row.details.value || '—'}</Text>
+                <Text style={{ ...s.scopeCell, width: 60 }}>{row.qty}</Text>
+                <Text style={{ ...s.scopeCell, width: 100 }}>{row.footage}</Text>
+                <Text style={{ ...s.scopeCell, width: 80 }}>{row.depth}</Text>
+                <Text style={{ ...s.scopeCell, width: 120 }}>{row.wallFloor}</Text>
+                <Text style={{ ...s.scopeCell, flex: 1 }}>{row.notes}</Text>
               </View>
             ))}
           </View>
@@ -514,19 +538,6 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
           ))}
         </View>
 
-        {/* ═══ SIGNATURE ═══ */}
-        <View style={s.footer}>
-          <View style={s.sigBox}>
-            <Text style={s.sigLabel}>Operator Signature</Text>
-          </View>
-          <View style={s.sigBox}>
-            <Text style={s.sigLabel}>Customer / Site Contact Signature</Text>
-          </View>
-          <View style={{ width: 100 }}>
-            <Text style={s.sigLabel}>Date</Text>
-            <View style={{ borderBottom: '1 solid #94A3B8', paddingBottom: 16, marginTop: 3 }} />
-          </View>
-        </View>
 
       </Page>
     </Document>

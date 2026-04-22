@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin, requireSuperAdmin } from '@/lib/api-auth';
+import { requireSalesStaff, requireSuperAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 
@@ -17,10 +17,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     // Fetch customer
@@ -28,7 +30,7 @@ export async function GET(
       .from('customers')
       .select('*')
       .eq('id', id);
-    if (tenantId) { customerQuery = customerQuery.eq('tenant_id', tenantId); }
+    customerQuery = customerQuery.eq('tenant_id', tenantId);
     const { data: customer, error: customerError } = await customerQuery.single();
 
     if (customerError || !customer) {
@@ -46,7 +48,7 @@ export async function GET(
     // Fetch job history
     const { data: jobs } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, title, job_type, status, scheduled_date, end_date, estimated_cost, created_at')
+      .select('id, job_number, title, job_type, status, scheduled_date, end_date, estimated_cost, created_at, project_name, address, location, customer_contact, site_contact_phone, equipment_needed, description')
       .eq('customer_id', id)
       .order('scheduled_date', { ascending: false });
 
@@ -78,7 +80,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id } = await params;
@@ -126,11 +128,12 @@ export async function PATCH(
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     let updateQuery = supabaseAdmin
       .from('customers')
       .update(updateData)
       .eq('id', id);
-    if (tenantId) { updateQuery = updateQuery.eq('tenant_id', tenantId); }
+    updateQuery = updateQuery.eq('tenant_id', tenantId);
     const { data: customer, error } = await updateQuery.select().single();
 
     if (error) {
@@ -154,6 +157,8 @@ export async function DELETE(
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     // Unlink job_orders first
@@ -166,7 +171,7 @@ export async function DELETE(
       .from('customers')
       .delete()
       .eq('id', id);
-    if (tenantId) { deleteQuery = deleteQuery.eq('tenant_id', tenantId); }
+    deleteQuery = deleteQuery.eq('tenant_id', tenantId);
     const { error } = await deleteQuery;
 
     if (error) {

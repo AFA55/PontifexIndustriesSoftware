@@ -26,6 +26,7 @@ interface OperatorRowProps {
   onEditJob?: (job: JobCardData) => void;
   onRequestChange?: (job: JobCardData) => void;
   onViewNotes?: (job: JobCardData) => void;
+  onRemoveJob?: (job: JobCardData) => void;
   onPreviewJob?: (job: JobCardData) => void;
   onAssignJob?: () => void;
   onChangeOperator?: (name: string | null) => void;
@@ -136,6 +137,7 @@ export default function OperatorRow({
   onEditJob,
   onRequestChange,
   onViewNotes,
+  onRemoveJob,
   onPreviewJob,
   onAssignJob,
   onChangeOperator,
@@ -275,6 +277,7 @@ export default function OperatorRow({
                   onEdit={onEditJob}
                   onRequestChange={onRequestChange}
                   onViewNotes={onViewNotes}
+                  onRemove={onRemoveJob}
                 />
               </div>
             ))}

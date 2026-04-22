@@ -345,15 +345,16 @@ export default function AdminNotificationsPage() {
             <button
               onClick={handleSendClockInReminder}
               disabled={sendingReminder}
-              className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 rounded-xl text-sm font-semibold transition-all"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 rounded-xl text-sm font-semibold transition-all whitespace-nowrap"
             >
               {sendingReminder ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
-              Send Clock-In Reminder
+              <span className="hidden sm:inline">Send Clock-In Reminder</span>
+              <span className="sm:hidden">Remind</span>
             </button>
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 mt-4">
+          <div className="flex gap-1 mt-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             {[
               { id: 'send' as TabType, label: 'Send Notification', icon: Send },
               { id: 'settings' as TabType, label: 'Auto Settings', icon: Settings },
@@ -362,7 +363,7 @@ export default function AdminNotificationsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-all ${
+                className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab.id
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
                     : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'

@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     // Resolve tenant scope
     const tenantId = await getTenantId(user.id);
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Get all operators with their profile data
     let operatorsQuery = supabaseAdmin
       .from('profiles')
@@ -67,9 +67,7 @@ export async function GET(request: NextRequest) {
       .in('role', ['operator', 'apprentice'])
       .eq('active', true)
       .order('full_name');
-    if (tenantId) {
-      operatorsQuery = operatorsQuery.eq('tenant_id', tenantId);
-    }
+    operatorsQuery = operatorsQuery.eq('tenant_id', tenantId);
     const { data: operators, error: operatorsError } = await operatorsQuery;
 
     if (operatorsError) {

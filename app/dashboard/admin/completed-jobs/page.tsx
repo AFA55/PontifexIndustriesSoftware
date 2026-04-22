@@ -97,8 +97,7 @@ export default function CompletedJobsArchivePage() {
         .from('job_orders')
         .select('*')
         .eq('status', 'completed')
-        .not('completion_signed_at', 'is', null)
-        .order('completion_signed_at', { ascending: false });
+        .order('scheduled_date', { ascending: false });
 
       if (error && error.message) {
         console.error('Error loading completed jobs:', error);

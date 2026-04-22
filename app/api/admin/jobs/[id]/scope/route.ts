@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin, requireAuth } from '@/lib/api-auth';
+import { requireSalesStaff, requireAuth } from '@/lib/api-auth';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Fetch scope items
     const { data: scopeItems, error: scopeError } = await supabaseAdmin
       .from('job_scope_items')
@@ -113,11 +113,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
 // ─── POST ────────────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
 
     const { work_type, description, unit, target_quantity } = body;
@@ -127,6 +128,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     if (target_quantity == null || isNaN(Number(target_quantity))) {
       return NextResponse.json({ error: 'target_quantity must be a number' }, { status: 400 });
+    }
+
+    // P0-3: verify parent job belongs to caller's tenant
+    {
+      const { data: jobCheck } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
     }
 
     // Get current max sort_order for this job
@@ -171,11 +185,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
 // ─── PUT ─────────────────────────────────────────────────────────────────────
 export async function PUT(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
 
     const { id: itemId, work_type, description, unit, target_quantity } = body;
@@ -214,11 +229,12 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 // ─── DELETE ──────────────────────────────────────────────────────────────────
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const itemId = request.nextUrl.searchParams.get('itemId');
 
     if (!itemId) {

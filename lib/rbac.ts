@@ -204,10 +204,30 @@ function allCards(level: PermissionLevel): Record<string, PermissionLevel> {
   return result;
 }
 
+/**
+ * Build a preset that contains an entry for every key in ALL_CARD_KEYS.
+ * Keys not provided in `overrides` default to 'none'.
+ * Warns in dev if an override references a non-card key (prevents the
+ * `active_jobs` / `customers` / `invoicing` / `notifications` class of bugs).
+ */
+function preset(overrides: Record<string, PermissionLevel>): Record<string, PermissionLevel> {
+  const result: Record<string, PermissionLevel> = {};
+  ALL_CARD_KEYS.forEach(key => { result[key] = 'none'; });
+  Object.entries(overrides).forEach(([k, v]) => {
+    if (!(k in result)) {
+      // eslint-disable-next-line no-console
+      if (typeof window === 'undefined') console.warn(`[rbac] preset key "${k}" is not a known ADMIN_CARDS key — ignored`);
+      return;
+    }
+    result[k] = v;
+  });
+  return result;
+}
+
 export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLevel>> = {
   super_admin: allCards('full'),
   operations_manager: allCards('full'),
-  admin: {
+  admin: preset({
     timecards: 'view',
     schedule_form: 'submit',
     schedule_board: 'view',
@@ -217,78 +237,31 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     completed_jobs: 'view',
     billing: 'view',
     customer_profiles: 'full',
-    operations_hub: 'none',
-    settings: 'none',
-  },
-  supervisor: {
+  }),
+  supervisor: preset({
     schedule_form: 'submit',
     schedule_board: 'view',
-    active_jobs: 'view',
-    customers: 'view',
-    completed_jobs: 'view',
-    timecards: 'view',
-    invoicing: 'view',
-    team_management: 'none',
-    analytics: 'none',
-    notifications: 'view',
-    operator_profiles: 'none',
-    billing: 'none',
-    customer_profiles: 'none',
-    operations_hub: 'none',
-    settings: 'none',
-  },
-  salesman: {
-    schedule_form: 'submit',
-    schedule_board: 'view',
-    active_jobs: 'view',
-    customers: 'view',
-    completed_jobs: 'view',
-    timecards: 'none',
-    team_management: 'none',
-    invoicing: 'none',
-    analytics: 'none',
-    notifications: 'view',
-    operator_profiles: 'none',
-    billing: 'none',
-    customer_profiles: 'none',
-    operations_hub: 'none',
-    settings: 'none',
-  },
-  inventory_manager: {
-    schedule_form: 'none',
-    schedule_board: 'view',
-    active_jobs: 'view',
-    customers: 'view',
-    completed_jobs: 'view',
-    timecards: 'view',
-    invoicing: 'view',
-    team_management: 'none',
-    analytics: 'none',
-    notifications: 'view',
-    operator_profiles: 'none',
-    billing: 'view',
     customer_profiles: 'view',
-    operations_hub: 'none',
-    settings: 'none',
-  },
-  operator: allCards('none'),
-  apprentice: {
-    schedule_board: 'none',
-    schedule_form: 'none',
-    active_jobs: 'view',
-    timecards: 'none',
-    customers: 'none',
     completed_jobs: 'view',
-    team_management: 'none',
-    invoicing: 'none',
-    analytics: 'none',
-    operator_profiles: 'none',
-    billing: 'none',
-    customer_profiles: 'none',
-    operations_hub: 'none',
-    settings: 'none',
-    notifications: 'none',
-  },
+    timecards: 'view',
+  }),
+  salesman: preset({
+    schedule_form: 'submit',
+    schedule_board: 'view',
+    customer_profiles: 'view',
+    completed_jobs: 'view',
+  }),
+  inventory_manager: preset({
+    schedule_board: 'view',
+    customer_profiles: 'view',
+    completed_jobs: 'view',
+    timecards: 'view',
+    billing: 'view',
+  }),
+  operator: allCards('none'),
+  apprentice: preset({
+    completed_jobs: 'view',
+  }),
 };
 
 // ============================================================

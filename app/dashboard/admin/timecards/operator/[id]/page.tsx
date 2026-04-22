@@ -8,7 +8,8 @@ import {
   ChevronLeft, ChevronRight, Edit, XCircle, Moon, Factory,
   Briefcase, AlertTriangle, TrendingUp, Loader2, MapPin,
   ExternalLink, Users, Shield, MessageSquare, Send, Coffee,
-  Navigation, Hammer, Flag, X, Save, ChevronDown, ChevronUp
+  Navigation, Hammer, Flag, X, Save, ChevronDown, ChevronUp,
+  RefreshCw, DollarSign, Zap
 } from 'lucide-react';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -75,6 +76,13 @@ interface TimecardEntry {
   job_title: string | null;
   gps_logs: GpsLog[];
   found_coworkers: Coworker[];
+  // Night shift premium fields
+  night_shift_premium_hours?: number | null;
+  pay_type_override?: string | null;
+  regular_hours?: number | null;
+  overtime_hours?: number | null;
+  double_time_hours?: number | null;
+  labor_cost?: number | null;
 }
 
 interface WeekStats {
@@ -83,12 +91,14 @@ interface WeekStats {
   weeklyOTHours: number;
   mandatoryOTHours: number;
   nightShiftHours: number;
+  nightShiftPremiumHours: number;
   shopHours: number;
   daysWorked: number;
   breakMinutes: number;
   approvedCount: number;
   pendingCount: number;
   totalEntries: number;
+  effectiveTotalPay?: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -149,6 +159,91 @@ const ENTRY_TYPE_STYLES: Record<string, { bg: string; text: string }> = {
   late: { bg: 'bg-amber-50', text: 'text-amber-700' },
 };
 
+// Pay type override options
+const PAY_TYPE_OPTIONS = [
+  { value: '', label: 'Auto (system calculates)' },
+  { value: 'regular', label: 'Regular' },
+  { value: 'night_shift_premium', label: 'Night Shift Premium' },
+  { value: 'overtime', label: 'Overtime' },
+  { value: 'double_time', label: 'Double Time' },
+  { value: 'mandatory_overtime', label: 'Mandatory OT' },
+];
+
+// ── Pay type badge helper ──────────────────────────────────────
+function getPayTypeBadge(entry: TimecardEntry, weekRunningHours: number) {
+  const override = entry.pay_type_override;
+  const isNightShift = entry.is_night_shift;
+  const nsHours = Number(entry.night_shift_premium_hours) || 0;
+  const otHours = Number(entry.overtime_hours) || 0;
+  const dtHours = Number(entry.double_time_hours) || 0;
+
+  // Manual override
+  if (override) {
+    const overrideMap: Record<string, { label: string; className: string }> = {
+      regular: { label: 'Regular', className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+      night_shift_premium: { label: 'Night Shift Premium', className: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+      overtime: { label: 'Overtime (Override)', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+      double_time: { label: 'Double Time (Override)', className: 'bg-red-500/10 text-red-400 border-red-500/20' },
+      mandatory_overtime: { label: 'Mandatory OT (Override)', className: 'bg-red-500/10 text-red-400 border-red-500/20' },
+    };
+    const o = overrideMap[override] || { label: override, className: 'bg-gray-500/10 text-gray-400 border-gray-500/20' };
+    return (
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${o.className}`}>
+        <Zap size={8} />
+        {o.label}
+      </span>
+    );
+  }
+
+  // Night shift that crossed into OT
+  if (isNightShift && nsHours > 0 && otHours > 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20">
+        <Moon size={8} />
+        Night Shift + OT
+      </span>
+    );
+  }
+
+  // Pure night shift premium
+  if (isNightShift && nsHours > 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+        <Moon size={8} />
+        Night Shift Premium
+      </span>
+    );
+  }
+
+  // Double time
+  if (dtHours > 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">
+        <TrendingUp size={8} />
+        Double Time
+      </span>
+    );
+  }
+
+  // Overtime
+  if (otHours > 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        <TrendingUp size={8} />
+        Overtime
+      </span>
+    );
+  }
+
+  // Regular
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+      <CheckCircle size={8} />
+      Regular
+    </span>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────
 function OperatorTimecardDetailPageInner() {
   const params = useParams();
@@ -172,7 +267,13 @@ function OperatorTimecardDetailPageInner() {
   // Edit modal
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<TimecardEntry | null>(null);
-  const [editFormData, setEditFormData] = useState({ clock_in_time: '', clock_out_time: '', notes: '' });
+  const [editFormData, setEditFormData] = useState({
+    clock_in_time: '',
+    clock_out_time: '',
+    notes: '',
+    pay_type_override: '' as string, // '' = Auto/null
+    is_night_shift: false,
+  });
 
   // Notes
   const [weekNotes, setWeekNotes] = useState('');
@@ -182,6 +283,9 @@ function OperatorTimecardDetailPageInner() {
   // Reject modal
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+
+  // Night shift multiplier (fetched from settings for display)
+  const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
 
   const isRedirecting = useRef(false);
 
@@ -259,6 +363,21 @@ function OperatorTimecardDetailPageInner() {
   useEffect(() => {
     if (user) fetchData();
   }, [user, fetchData]);
+
+  // ── Fetch night shift multiplier from settings ──────────────
+  useEffect(() => {
+    const loadSettings = async () => {
+      const { data } = await supabase
+        .from('timecard_settings_v2')
+        .select('night_shift_multiplier')
+        .limit(1)
+        .single();
+      if (data?.night_shift_multiplier) {
+        setNightShiftMultiplier(Number(data.night_shift_multiplier));
+      }
+    };
+    loadSettings().catch(() => {});
+  }, []);
 
   // ── Week navigation ─────────────────────────────────────────
   const navigateWeek = (direction: -1 | 1) => {
@@ -354,7 +473,9 @@ function OperatorTimecardDetailPageInner() {
     setEditFormData({
       clock_in_time: entry.clock_in_time,
       clock_out_time: entry.clock_out_time || '',
-      notes: entry.admin_notes || entry.notes || ''
+      notes: entry.admin_notes || entry.notes || '',
+      pay_type_override: entry.pay_type_override || '',
+      is_night_shift: entry.is_night_shift,
     });
     setShowEditModal(true);
   };
@@ -364,10 +485,17 @@ function OperatorTimecardDetailPageInner() {
     try {
       const token = await getSessionToken();
       if (!token) return;
+      const payload: Record<string, unknown> = {
+        clock_in_time: editFormData.clock_in_time,
+        clock_out_time: editFormData.clock_out_time,
+        notes: editFormData.notes,
+        is_night_shift: editFormData.is_night_shift,
+        pay_type_override: editFormData.pay_type_override || null, // '' → null (auto)
+      };
       const response = await fetch(`/api/admin/timecards/${selectedEntry.id}/update`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(editFormData)
+        body: JSON.stringify(payload)
       });
       if (response.ok) {
         setShowEditModal(false);
@@ -378,6 +506,30 @@ function OperatorTimecardDetailPageInner() {
       }
     } catch (error) {
       console.error('Error updating entry:', error);
+    }
+  };
+
+  // ── Recalculate week ────────────────────────────────────────
+  const handleRecalculateWeek = async () => {
+    setActionLoading('recalculate');
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+      const response = await fetch('/api/admin/timecards/recalculate-week', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ userId: operatorId, weekStart })
+      });
+      if (response.ok) {
+        await fetchData();
+      } else {
+        const err = await response.json();
+        alert(`Recalculation failed: ${err.error}`);
+      }
+    } catch (error) {
+      console.error('Error recalculating week:', error);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -397,6 +549,21 @@ function OperatorTimecardDetailPageInner() {
     });
     return grouped;
   }, [entries, weekStart]);
+
+  // Running weekly total per entry (for 40hr crossover display)
+  const runningTotals = useMemo(() => {
+    const sortedEntries = [...entries].sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.clock_in_time.localeCompare(b.clock_in_time);
+    });
+    let running = 0;
+    const map: Record<string, number> = {};
+    for (const e of sortedEntries) {
+      map[e.id] = running;
+      running += Number(e.total_hours) || 0;
+    }
+    return map;
+  }, [entries]);
 
   const toggleDay = (date: string) => {
     setExpandedDays(prev => {
@@ -503,6 +670,94 @@ function OperatorTimecardDetailPageInner() {
         {label}
         <ExternalLink size={8} />
       </a>
+    );
+  };
+
+  // ── Effective pay rate display ──────────────────────────────
+  const getEffectiveRateLabel = (payType: string): string => {
+    switch (payType) {
+      case 'night_shift_premium': return `${nightShiftMultiplier}×`;
+      case 'overtime': return '1.5×';
+      case 'double_time': return '2.0×';
+      case 'mandatory_overtime': return '1.5×';
+      default: return '1.0×';
+    }
+  };
+
+  // ── Hours breakdown preview for edit modal ─────────────────
+  const getHoursBreakdownPreview = (entry: TimecardEntry | null, formPayType: string, formIsNightShift: boolean) => {
+    if (!entry || !entry.total_hours) return null;
+    const totalHours = Number(entry.total_hours);
+    const weekBefore = runningTotals[entry.id] ?? 0;
+    const hoursUntil40 = Math.max(0, 40 - weekBefore);
+    const laborCost = Number(entry.labor_cost) || 0;
+    const baseRate = totalHours > 0 && laborCost > 0 ? laborCost / totalHours : null;
+
+    if (formPayType) {
+      // Override mode — simple
+      const mult = formPayType === 'night_shift_premium' ? nightShiftMultiplier
+        : formPayType === 'overtime' || formPayType === 'mandatory_overtime' ? 1.5
+        : formPayType === 'double_time' ? 2.0 : 1.0;
+      return (
+        <div className="space-y-1 text-[11px]">
+          <div className="flex justify-between text-gray-600">
+            <span>{PAY_TYPE_OPTIONS.find(o => o.value === formPayType)?.label || formPayType}</span>
+            <span className="font-bold">{totalHours.toFixed(2)} hrs × {mult}×{baseRate ? ` = $${(totalHours * baseRate * mult).toFixed(2)}` : ''}</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (formIsNightShift) {
+      const nsHours = Math.min(totalHours, hoursUntil40);
+      const otHours = Math.max(0, totalHours - hoursUntil40);
+      return (
+        <div className="space-y-1 text-[11px]">
+          {nsHours > 0 && (
+            <div className="flex justify-between text-purple-600">
+              <span>Night Shift Premium ({nightShiftMultiplier}×)</span>
+              <span className="font-bold">{nsHours.toFixed(2)} hrs{baseRate ? ` = $${(nsHours * baseRate * nightShiftMultiplier).toFixed(2)}` : ''}</span>
+            </div>
+          )}
+          {otHours > 0 && (
+            <div className="flex justify-between text-amber-600">
+              <span>Overtime (1.5×) — 40hr crossover</span>
+              <span className="font-bold">{otHours.toFixed(2)} hrs{baseRate ? ` = $${(otHours * baseRate * 1.5).toFixed(2)}` : ''}</span>
+            </div>
+          )}
+          {baseRate && (
+            <div className="flex justify-between text-gray-900 font-bold border-t border-gray-200 pt-1 mt-1">
+              <span>Total</span>
+              <span>${((nsHours * baseRate * nightShiftMultiplier) + (otHours * baseRate * 1.5)).toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const regHours = Math.min(totalHours, hoursUntil40);
+    const otHours = Math.max(0, totalHours - hoursUntil40);
+    return (
+      <div className="space-y-1 text-[11px]">
+        {regHours > 0 && (
+          <div className="flex justify-between text-emerald-600">
+            <span>Regular (1.0×)</span>
+            <span className="font-bold">{regHours.toFixed(2)} hrs{baseRate ? ` = $${(regHours * baseRate).toFixed(2)}` : ''}</span>
+          </div>
+        )}
+        {otHours > 0 && (
+          <div className="flex justify-between text-amber-600">
+            <span>Overtime (1.5×) — weekly OT</span>
+            <span className="font-bold">{otHours.toFixed(2)} hrs{baseRate ? ` = $${(otHours * baseRate * 1.5).toFixed(2)}` : ''}</span>
+          </div>
+        )}
+        {baseRate && totalHours > 0 && (
+          <div className="flex justify-between text-gray-900 font-bold border-t border-gray-200 pt-1 mt-1">
+            <span>Total</span>
+            <span>${((regHours * baseRate) + (otHours * baseRate * 1.5)).toFixed(2)}</span>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -698,7 +953,7 @@ function OperatorTimecardDetailPageInner() {
 
         {/* ── Metrics Row ──────────────────────────────────── */}
         {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
             {/* Total Hours — hero card */}
             <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 rounded-xl p-4 text-white shadow-lg shadow-purple-500/10 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
@@ -738,6 +993,18 @@ function OperatorTimecardDetailPageInner() {
               <p className="text-[10px] text-gray-400 mt-0.5">Over 40h weekly</p>
             </div>
 
+            {/* Night Shift Premium */}
+            <div className="bg-white rounded-xl p-3.5 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Night Shift</span>
+                <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <Moon size={13} className="text-purple-400" />
+                </div>
+              </div>
+              <p className="text-xl font-bold text-gray-900">{(stats.nightShiftPremiumHours ?? stats.nightShiftHours ?? 0).toFixed(1)}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{nightShiftMultiplier}× premium hrs</p>
+            </div>
+
             {/* Days Worked */}
             <div className="bg-white rounded-xl p-3.5 border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-1.5">
@@ -750,16 +1017,20 @@ function OperatorTimecardDetailPageInner() {
               <p className="text-[10px] text-gray-400 mt-0.5">{stats.totalEntries} entries</p>
             </div>
 
-            {/* Break Time */}
+            {/* Effective Total Pay */}
             <div className="bg-white rounded-xl p-3.5 border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Breaks</span>
-                <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                  <Coffee size={13} className="text-amber-400" />
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Est. Pay</span>
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <DollarSign size={13} className="text-emerald-400" />
                 </div>
               </div>
-              <p className="text-xl font-bold text-gray-900">{stats.breakMinutes}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">minutes deducted</p>
+              <p className="text-xl font-bold text-gray-900">
+                {stats.effectiveTotalPay != null
+                  ? `$${stats.effectiveTotalPay.toFixed(0)}`
+                  : '--'}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">with multipliers</p>
             </div>
           </div>
         )}
@@ -771,7 +1042,7 @@ function OperatorTimecardDetailPageInner() {
               { label: 'Regular', value: stats.regularHours, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle },
               { label: 'Weekly OT', value: stats.weeklyOTHours, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20', icon: TrendingUp },
               { label: 'Mandatory OT', value: stats.mandatoryOTHours, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: Briefcase },
-              { label: 'Night Shift', value: stats.nightShiftHours, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', icon: Moon },
+              { label: `Night Shift Premium (${nightShiftMultiplier}×)`, value: stats.nightShiftPremiumHours ?? stats.nightShiftHours ?? 0, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', icon: Moon },
               { label: 'Shop Hours', value: stats.shopHours, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: Factory },
             ].filter(x => x.value > 0).map(({ label, value, color, bg, border, icon: Icon }) => (
               <div key={label} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${border} ${bg}`}>
@@ -780,6 +1051,19 @@ function OperatorTimecardDetailPageInner() {
                 <span className="text-[10px] text-gray-500">{label}</span>
               </div>
             ))}
+
+            {/* Recalculate button */}
+            <button
+              onClick={handleRecalculateWeek}
+              disabled={actionLoading === 'recalculate'}
+              title="Re-apply weekly 40hr OT rule to all entries this week"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
+            >
+              {actionLoading === 'recalculate'
+                ? <Loader2 size={12} className="animate-spin" />
+                : <RefreshCw size={12} />}
+              <span className="text-[10px] font-bold">Apply 40hr Rule</span>
+            </button>
 
             {/* Approval summary */}
             <div className="ml-auto flex items-center gap-2">
@@ -796,15 +1080,32 @@ function OperatorTimecardDetailPageInner() {
           </div>
         )}
 
-        {/* ── OT Alerts ────────────────────────────────────── */}
-        {stats && stats.weeklyOTHours > 0 && (
-          <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg">
-            <AlertTriangle size={16} className="text-orange-400 flex-shrink-0" />
-            <p className="text-sm text-orange-700">
-              <strong>{stats.weeklyOTHours.toFixed(1)} weekly overtime hours</strong> — Mon-Fri hours exceeded 40.
-            </p>
-          </div>
-        )}
+        {/* ── 40hr Crossover Info Banner ───────────────────── */}
+        {stats && (() => {
+          const totalHrs = stats.totalHours;
+          const hoursToOT = Math.max(0, 40 - totalHrs);
+          if (totalHrs >= 40) {
+            return (
+              <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <AlertTriangle size={16} className="text-orange-400 flex-shrink-0" />
+                <p className="text-sm text-orange-700">
+                  <strong>{stats.weeklyOTHours.toFixed(1)} weekly overtime hours</strong> — 40hr threshold reached. Night shift premium stops; standard OT (1.5×) applies.
+                </p>
+              </div>
+            );
+          }
+          if (hoursToOT < 8 && hoursToOT > 0) {
+            return (
+              <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <Clock size={16} className="text-amber-400 flex-shrink-0" />
+                <p className="text-sm text-amber-700">
+                  Week total: {totalHrs.toFixed(1)} hrs — next shift triggers OT at 40 hrs ({hoursToOT.toFixed(1)} hrs remaining)
+                </p>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* ── Daily Breakdown ──────────────────────────────── */}
         <div className="space-y-2 mb-5">
@@ -894,6 +1195,9 @@ function OperatorTimecardDetailPageInner() {
                           {dayEntries.some(e => e.hour_type === 'mandatory_overtime') && (
                             <span className="text-[9px] text-red-400 font-bold">MANDATORY OT</span>
                           )}
+                          {dayEntries.some(e => e.is_night_shift) && (
+                            <span className="text-[9px] text-purple-400 font-bold ml-1">NIGHT</span>
+                          )}
                         </>
                       ) : (
                         <p className="text-sm text-gray-300">--</p>
@@ -911,11 +1215,16 @@ function OperatorTimecardDetailPageInner() {
                   {/* Expanded day detail */}
                   {isExpanded && hasEntries && (
                     <div className="border-t border-gray-100">
-                      {dayEntries.map((entry, entryIdx) => (
+                      {dayEntries.map((entry, entryIdx) => {
+                        const weekBefore = runningTotals[entry.id] ?? 0;
+                        const hoursToOT = Math.max(0, 40 - weekBefore);
+
+                        return (
                         <div
                           key={entry.id}
                           className={`px-4 py-3 ${entryIdx > 0 ? 'border-t border-gray-100' : ''} ${
-                            entry.hour_type === 'mandatory_overtime' ? 'border-l-2 border-l-red-500' : ''
+                            entry.hour_type === 'mandatory_overtime' ? 'border-l-2 border-l-red-500' :
+                            entry.is_night_shift ? 'border-l-2 border-l-purple-400' : ''
                           }`}
                         >
                           {/* Entry header */}
@@ -949,6 +1258,19 @@ function OperatorTimecardDetailPageInner() {
                                     <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-cyan-500/10 text-cyan-400">NFC</span>
                                   )}
                                 </div>
+                              </div>
+
+                              {/* Running weekly total indicator */}
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <span className="text-[10px] text-gray-400">
+                                  Week before this entry: <span className="font-bold text-gray-600">{weekBefore.toFixed(1)} hrs</span>
+                                  {weekBefore < 40 && hoursToOT > 0 && (
+                                    <span className="text-gray-400"> — {hoursToOT.toFixed(1)} hrs until OT</span>
+                                  )}
+                                  {weekBefore >= 40 && (
+                                    <span className="text-amber-500 font-bold"> — OT applies</span>
+                                  )}
+                                </span>
                               </div>
 
                               {/* Job info */}
@@ -987,6 +1309,9 @@ function OperatorTimecardDetailPageInner() {
 
                               {/* Badges */}
                               <div className="flex items-center gap-1 flex-wrap justify-end">
+                                {/* Pay type badge */}
+                                {getPayTypeBadge(entry, weekBefore)}
+
                                 {/* Entry type */}
                                 {entry.entry_type && entry.entry_type !== 'regular' && (
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${ENTRY_TYPE_STYLES[entry.entry_type]?.bg || ''} ${ENTRY_TYPE_STYLES[entry.entry_type]?.text || 'text-gray-500'}`}>
@@ -995,9 +1320,6 @@ function OperatorTimecardDetailPageInner() {
                                 )}
                                 {entry.is_shop_hours && (
                                   <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400">Shop</span>
-                                )}
-                                {entry.is_night_shift && (
-                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-400">Night</span>
                                 )}
                                 {entry.hour_type === 'mandatory_overtime' && (
                                   <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/10 text-red-400">Wknd OT</span>
@@ -1029,6 +1351,24 @@ function OperatorTimecardDetailPageInner() {
                                   </span>
                                 )}
                               </div>
+
+                              {/* Hours breakdown (when not all regular) */}
+                              {(Number(entry.night_shift_premium_hours) > 0 || Number(entry.overtime_hours) > 0 || Number(entry.double_time_hours) > 0) && (
+                                <div className="text-[9px] text-right space-y-0.5">
+                                  {Number(entry.regular_hours) > 0 && (
+                                    <div className="text-emerald-500">{Number(entry.regular_hours).toFixed(2)}h reg</div>
+                                  )}
+                                  {Number(entry.night_shift_premium_hours) > 0 && (
+                                    <div className="text-purple-500">{Number(entry.night_shift_premium_hours).toFixed(2)}h NS ({nightShiftMultiplier}×)</div>
+                                  )}
+                                  {Number(entry.overtime_hours) > 0 && (
+                                    <div className="text-amber-500">{Number(entry.overtime_hours).toFixed(2)}h OT (1.5×)</div>
+                                  )}
+                                  {Number(entry.double_time_hours) > 0 && (
+                                    <div className="text-red-500">{Number(entry.double_time_hours).toFixed(2)}h DT (2×)</div>
+                                  )}
+                                </div>
+                              )}
 
                               {/* Status + actions */}
                               <div className="flex items-center gap-1.5">
@@ -1140,7 +1480,8 @@ function OperatorTimecardDetailPageInner() {
                             </div>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1220,7 +1561,7 @@ function OperatorTimecardDetailPageInner() {
             { color: 'bg-emerald-500', label: 'Regular (Mon-Fri, up to 40 hrs)' },
             { color: 'bg-orange-500', label: 'Weekly OT (Mon-Fri over 40 hrs)' },
             { color: 'bg-red-500', label: 'Mandatory OT (Sat/Sun)' },
-            { color: 'bg-indigo-500', label: 'Night Shift' },
+            { color: 'bg-purple-500', label: `Night Shift Premium (${nightShiftMultiplier}×)` },
             { color: 'bg-amber-500', label: 'Shop Hours' },
           ].map(({ color, label }) => (
             <div key={label} className="flex items-center gap-1.5">
@@ -1236,8 +1577,8 @@ function OperatorTimecardDetailPageInner() {
       {/* ── Edit Modal ─────────────────────────────────────── */}
       {showEditModal && selectedEntry && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200">
-            <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
               <div>
                 <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
@@ -1258,6 +1599,7 @@ function OperatorTimecardDetailPageInner() {
             </div>
 
             <div className="p-5 space-y-4">
+              {/* Clock times */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Clock In Time</label>
                 <input
@@ -1278,6 +1620,80 @@ function OperatorTimecardDetailPageInner() {
                 />
               </div>
 
+              {/* Pay Type Override */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Pay Type Override</label>
+                <select
+                  value={editFormData.pay_type_override}
+                  onChange={(e) => setEditFormData({ ...editFormData, pay_type_override: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 text-sm text-gray-900 transition-all"
+                >
+                  {PAY_TYPE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                {editFormData.pay_type_override && (
+                  <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
+                    <Zap size={10} />
+                    Override locks this entry to {editFormData.pay_type_override.replace(/_/g, ' ')} ({getEffectiveRateLabel(editFormData.pay_type_override)}) regardless of weekly hours.
+                  </p>
+                )}
+                {!editFormData.pay_type_override && (
+                  <p className="text-[10px] text-gray-400 mt-1">Auto: system calculates based on night shift flag and weekly hours.</p>
+                )}
+              </div>
+
+              {/* Night Shift toggle — only when not overriding pay type */}
+              {!editFormData.pay_type_override && (
+                <div className="flex items-center justify-between px-3 py-2.5 bg-purple-50 rounded-lg border border-purple-100">
+                  <div className="flex items-center gap-2">
+                    <Moon size={14} className="text-purple-500" />
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Mark as Night Shift</p>
+                      <p className="text-[10px] text-gray-500">Applies {nightShiftMultiplier}× premium (up to 40hr weekly threshold)</p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.is_night_shift}
+                      onChange={(e) => setEditFormData({ ...editFormData, is_night_shift: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+              )}
+
+              {/* Effective rate display */}
+              {selectedEntry.labor_cost && selectedEntry.total_hours && (
+                <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-[10px] font-semibold text-gray-500 mb-1 uppercase tracking-wide">Effective Pay Rate</p>
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={12} className="text-gray-400" />
+                    <span className="text-sm font-bold text-gray-900">
+                      ${(selectedEntry.labor_cost / selectedEntry.total_hours).toFixed(2)}/hr base
+                    </span>
+                    {editFormData.pay_type_override ? (
+                      <span className="text-xs text-purple-600 font-semibold">
+                        × {getEffectiveRateLabel(editFormData.pay_type_override)} = ${((selectedEntry.labor_cost / selectedEntry.total_hours) * parseFloat(getEffectiveRateLabel(editFormData.pay_type_override))).toFixed(2)}/hr
+                      </span>
+                    ) : editFormData.is_night_shift ? (
+                      <span className="text-xs text-purple-600 font-semibold">× {nightShiftMultiplier} night shift</span>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+
+              {/* Hours breakdown preview */}
+              {selectedEntry.total_hours && (
+                <div className="px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-[10px] font-semibold text-gray-500 mb-2 uppercase tracking-wide">Hours Breakdown Preview</p>
+                  {getHoursBreakdownPreview(selectedEntry, editFormData.pay_type_override, editFormData.is_night_shift)}
+                </div>
+              )}
+
+              {/* Notes */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Admin Notes</label>
                 <textarea

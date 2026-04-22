@@ -45,7 +45,14 @@ Next.js 15 (App Router) + React 19 + TypeScript + Supabase (PostgreSQL) + Tailwi
 - 70+ migrations in `supabase/migrations/`
 - 90+ tables in production
 - All tables have RLS enabled
-- New tables should use JWT metadata for RLS: `auth.jwt() -> 'user_metadata' ->> 'role'`
+- **DO NOT use `auth.jwt() -> 'user_metadata'` in RLS.** `user_metadata` is client-writable via `supabase.auth.updateUser({ data: { role: 'super_admin' } })`, so any operator could self-promote. Supabase's linter flags this as `rls_references_user_metadata` (ERROR).
+- For role/tenant checks in RLS, use the SECURITY DEFINER helpers that read from `public.profiles`:
+  - `public.is_admin()` — true for `admin` or `super_admin`
+  - `public.current_user_role()` — returns the caller's `profiles.role`
+  - `public.current_user_tenant_id()` — returns the caller's `profiles.tenant_id`
+  - `public.current_user_has_role(VARIADIC text[])` — membership check against an allowed list
+- Example: `USING ( public.current_user_has_role('admin','super_admin','operations_manager') AND tenant_id = public.current_user_tenant_id() )`
+- If you need immutable identity claims, `auth.jwt() -> 'app_metadata'` is acceptable (server-only writable) — `user_metadata` is never safe for authorization.
 
 ## Roles (priority order)
 super_admin > operations_manager > admin > salesman > shop_manager > inventory_manager > operator > apprentice

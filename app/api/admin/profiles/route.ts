@@ -21,15 +21,14 @@ export async function GET(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     let query = supabaseAdmin
       .from('profiles')
       .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, hire_date, next_review_date, role, active, profile_picture_url, created_at')
       .in('role', ['operator', 'apprentice'])
       .order('full_name');
 
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     const { data: profiles, error } = await query;
 
@@ -86,6 +85,7 @@ export async function POST(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Create profile
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')

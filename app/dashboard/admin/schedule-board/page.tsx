@@ -7,7 +7,7 @@ import {
   Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
   UserCheck, UserX, Eye, FolderOpen, Timer, Loader2, Settings, Search, X,
-  Megaphone, CheckCircle2, Sparkles, Zap, Brain
+  Megaphone, CheckCircle2, Sparkles, Zap, Brain, RefreshCw
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
@@ -31,12 +31,12 @@ import type { JobCardData } from './_components/JobCard';
 import type { PendingJob } from './_components/PendingQueueSidebar';
 import type { ToastData } from './_components/Toast';
 import type { NoteData } from './_components/NotesDrawer';
-import JobPreviewPanel from './_components/JobPreviewPanel';
 import JobDetailView from './_components/JobDetailView';
 import DndBoardWrapper from './_components/DndBoardWrapper';
 import OperatorRowView from './_components/OperatorRowView';
 import ViewToggle from './_components/ViewToggle';
 import CrewScheduleGrid from './_components/CrewScheduleGrid';
+import CancelJobModal from './_components/CancelJobModal';
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
@@ -91,7 +91,7 @@ async function apiFetch(url: string, opts?: RequestInit) {
 }
 
 // ─── Convert API job to JobCardData ──────────────────────────────────────
-function toJobCard(job: any): JobCardData {
+function toJobCard(job: any, viewDate?: string): JobCardData {
   return {
     id: job.id,
     job_number: job.job_number,
@@ -110,18 +110,20 @@ function toJobCard(job: any): JobCardData {
     change_requests_count: job.pending_change_requests_count || 0,
     helper_names: job.helper_name ? [job.helper_name] : [],
     po_number: job.po_number || null,
-    day_label: computeDayLabel(job),
+    day_label: computeDayLabel(job, viewDate),
     status: job.status || null,
   };
 }
 
-function computeDayLabel(job: any): string | undefined {
+function computeDayLabel(job: any, viewDate?: string): string | undefined {
   if (!job.scheduled_date || !job.end_date) return undefined;
+  if (job.scheduled_date === job.end_date) return undefined; // single-day job
   const start = parseLocalDate(job.scheduled_date);
   const end = parseLocalDate(job.end_date);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const currentDay = Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  // Use the date currently being viewed on the board, not today's real date
+  const current = viewDate ? parseLocalDate(viewDate) : (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+  const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const currentDay = Math.round((current.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   if (currentDay >= 1 && currentDay <= totalDays) return `Day ${currentDay} of ${totalDays}`;
   return undefined;
 }
@@ -165,8 +167,8 @@ export default function ScheduleBoardPage() {
   // Feature flags — determines read-only vs edit access for non-super-admins
   const { flags: featureFlags, loading: flagsLoading } = useFeatureFlags(userId, userRole);
 
-  // canEdit: super_admin always can; operations_manager always can; others need the flag
-  const canEdit = userRole === 'super_admin' || userRole === 'operations_manager' || featureFlags.can_edit_schedule_board;
+  // canEdit: super_admin, operations_manager, and admin always can; others need the flag
+  const canEdit = userRole === 'super_admin' || userRole === 'operations_manager' || userRole === 'admin' || featureFlags.can_edit_schedule_board;
 
   // ═══ DATA STATE (from API) ═══
   const [operatorJobs, setOperatorJobs] = useState<Record<number, JobCardData[]>>({});
@@ -212,16 +214,19 @@ export default function ScheduleBoardPage() {
   const [dispatchLoading, setDispatchLoading] = useState(false);
   const [dispatchInfo, setDispatchInfo] = useState<{ total: number; dispatched: number; undispatched: number } | null>(null);
 
+  // Update schedule state
+  const [updatingSchedule, setUpdatingSchedule] = useState(false);
+
   // Modal states
   const [approvalTarget, setApprovalTarget] = useState<PendingJob | null>(null);
   const [missingInfoTarget, setMissingInfoTarget] = useState<PendingJob | null>(null);
   const [assignTarget, setAssignTarget] = useState<{ job: JobCardData; source: 'unassigned' | 'willcall' } | null>(null);
   const [editTarget, setEditTarget] = useState<{ job: JobCardData; rowIndex: number | null } | null>(null);
   const [changeRequestTarget, setChangeRequestTarget] = useState<JobCardData | null>(null);
+  const [cancelJobTarget, setCancelJobTarget] = useState<JobCardData | null>(null);
   const [notesTarget, setNotesTarget] = useState<JobCardData | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
-  const [previewJob, setPreviewJob] = useState<{ job: JobCardData; operatorName?: string | null; helperName?: string | null } | null>(null);
   const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null } | null>(null);
 
   // ═══ AI AUTO-SCHEDULE STATE ═══
@@ -265,7 +270,7 @@ export default function ScheduleBoardPage() {
       });
       const json = await res.json();
       if (res.ok && json.success) {
-        addToast('success', 'Jobs Dispatched', json.message);
+        addToast('success', 'Tickets Dispatched', json.message);
         setShowDispatchModal(false);
         fetchDispatchStatus(targetDate);
       } else {
@@ -293,13 +298,14 @@ export default function ScheduleBoardPage() {
 
   // ═══ FEATURE FLAG GUARD ═══
   useEffect(() => {
+    if (!userRole) return; // wait for auth to initialize
     if (flagsLoading) return;
-    const isBypass = userRole === 'super_admin' || userRole === 'operations_manager';
+    const isBypass = ['super_admin', 'operations_manager', 'admin'].includes(userRole);
     if (!isBypass && !featureFlags.can_view_schedule_board) {
       router.push('/dashboard/admin');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flagsLoading, featureFlags.can_view_schedule_board]);
+  }, [flagsLoading, featureFlags.can_view_schedule_board, userRole]);
 
   // ═══ FETCH OPERATORS/HELPERS ═══
   useEffect(() => {
@@ -501,7 +507,7 @@ export default function ScheduleBoardPage() {
       }
       const json = await res.json();
 
-      const unassigned = (json.data?.unassigned || []).map(toJobCard);
+      const unassigned = (json.data?.unassigned || []).map((j: any) => toJobCard(j, date));
       const pending = (json.data?.pending || []).map((j: any) => ({
         id: j.id,
         job_number: j.job_number,
@@ -527,8 +533,14 @@ export default function ScheduleBoardPage() {
         missing_info_flagged: j.missing_info_flagged || false,
         missing_info_items: j.missing_info_items || [],
         missing_info_note: j.missing_info_note || null,
+        po_number: j.po_number || null,
+        site_contact: null,
+        contact_phone: j.site_contact_phone || null,
+        project_name: j.project_name || null,
+        location_name: null,
+        scheduling_flexibility: j.scheduling_flexibility || null,
       }));
-      const willCall = (json.data?.willCall || []).map(toJobCard);
+      const willCall = (json.data?.willCall || []).map((j: any) => toJobCard(j, date));
 
       // Group assigned jobs by operator name into rows
       const newRows: { operator: string | null; helper: string | null }[] = [];
@@ -540,7 +552,7 @@ export default function ScheduleBoardPage() {
         if (!operatorGrouped.has(opName)) {
           operatorGrouped.set(opName, { jobs: [], helperName: rawJob.helper_name || null });
         }
-        operatorGrouped.get(opName)!.jobs.push(toJobCard(rawJob));
+        operatorGrouped.get(opName)!.jobs.push(toJobCard(rawJob, date));
       }
 
       let rowIdx = 0;
@@ -568,27 +580,46 @@ export default function ScheduleBoardPage() {
     }
   }, [addToast, capacityMaxSlots]);
 
+  // ═══ UPDATE SCHEDULE (re-push to operators) ═══
+  const handleUpdateSchedule = useCallback(async () => {
+    setUpdatingSchedule(true);
+    try {
+      const res = await apiFetch('/api/admin/schedule-board/update-schedule', {
+        method: 'POST',
+        body: JSON.stringify({ date: selectedDate }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to update schedule');
+      addToast('success', 'Schedule Updated', `${json.data?.operatorsNotified || 0} operators notified of changes`);
+      fetchScheduleData(selectedDate);
+    } catch (err: any) {
+      addToast('error', 'Update Failed', err.message);
+    } finally {
+      setUpdatingSchedule(false);
+    }
+  }, [selectedDate, addToast, fetchScheduleData]);
+
   // ═══ FETCH WEEK DATA (for weekly view) ═══
   const fetchWeekData = useCallback(async (startDate: string) => {
     try {
-      // Calculate Mon-Fri of the week containing startDate
+      // Calculate Mon-Sun of the week containing startDate
       const d = parseLocalDate(startDate);
       const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ...
       const monday = new Date(d);
       monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-      const friday = new Date(monday);
-      friday.setDate(monday.getDate() + 4);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
 
       const monStr = toDateString(monday);
-      const friStr = toDateString(friday);
+      const sunStr = toDateString(sunday);
 
-      const res = await apiFetch(`/api/admin/schedule-board?startDate=${monStr}&endDate=${friStr}`);
+      const res = await apiFetch(`/api/admin/schedule-board?startDate=${monStr}&endDate=${sunStr}`);
       if (!res.ok) return;
       const json = await res.json();
 
       // Group all jobs by date
       const byDate: Record<string, JobCardData[]> = {};
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 7; i++) {
         const dt = new Date(monday);
         dt.setDate(monday.getDate() + i);
         byDate[toDateString(dt)] = [];
@@ -803,6 +834,7 @@ export default function ScheduleBoardPage() {
           jobOrderId: jobId,
           operatorId: targetOperatorId || null,
           helperId: targetHelperId || null,
+          assignment_date: selectedDate,
         }),
       });
 
@@ -1030,15 +1062,21 @@ export default function ScheduleBoardPage() {
     return -1;
   };
 
-  const proceedWithAssignment = async (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null) => {
-    const operatorName = rowAssignments[rowIndex]?.operator;
+  const proceedWithAssignment = async (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null, explicitOperatorName?: string) => {
+    const operatorName = explicitOperatorName ?? rowAssignments[rowIndex]?.operator;
     const operatorId = operatorName ? operatorIdMap[operatorName] : null;
     const helperId = helperName ? helperIdMap[helperName] : null;
+
+    if (!operatorId && operatorName) {
+      console.warn('operatorIdMap missing entry for:', operatorName, 'map:', operatorIdMap);
+      addToast('error', 'Assignment Failed', `Operator "${operatorName}" not found in crew roster. Please refresh the page.`);
+      return;
+    }
 
     try {
       const res = await apiFetch('/api/admin/schedule-board/assign', {
         method: 'POST',
-        body: JSON.stringify({ jobOrderId: job.id, operatorId, helperId }),
+        body: JSON.stringify({ jobOrderId: job.id, operatorId, helperId, assignment_date: selectedDate }),
       });
       if (!res.ok) throw new Error('Failed to assign');
     } catch {
@@ -1064,7 +1102,7 @@ export default function ScheduleBoardPage() {
       [rowIndex]: [...(prev[rowIndex] || []), assignedJob],
     }));
 
-    const opName = rowAssignments[rowIndex]?.operator || 'Operator';
+    const opName = operatorName || 'Operator';
     addToast('success', `${job.customer_name} → ${opName}`, 'Operator assigned successfully');
   };
 
@@ -1104,14 +1142,14 @@ export default function ScheduleBoardPage() {
       return;
     }
 
-    proceedWithAssignment(targetRow, job, source, helperName);
+    proceedWithAssignment(targetRow, job, source, helperName, operatorName);
     setAssignTarget(null);
   };
 
   const handleConflictAddSecondJob = () => {
     if (!conflictData) return;
     const { targetRowIndex, newJob, newJobSource, helperName } = conflictData;
-    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName);
+    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName, conflictData.personName);
     setConflictData(null);
   };
 
@@ -1125,7 +1163,7 @@ export default function ScheduleBoardPage() {
         try {
           await apiFetch('/api/admin/schedule-board/assign', {
             method: 'POST',
-            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null }),
+            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate }),
           });
         } catch { /* continue */ }
       }
@@ -1133,12 +1171,12 @@ export default function ScheduleBoardPage() {
       setOperatorJobs(prev => ({ ...prev, [targetRowIndex]: [] }));
     }
 
-    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName);
+    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName, conflictData.personName);
     setConflictData(null);
   };
 
   // --- Edit Job: Save ---
-  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null }) => {
+  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; estimated_cost?: number; jobsite_conditions?: string }) => {
     if (!editTarget) return;
     const { job, rowIndex: currentRowIdx } = editTarget;
     const newOpName = updates.newOperatorName;
@@ -1151,7 +1189,17 @@ export default function ScheduleBoardPage() {
     const apiPayload: Record<string, unknown> = {};
     if (jobUpdates.arrival_time !== undefined) apiPayload.arrival_time = jobUpdates.arrival_time;
     if (jobUpdates.scheduled_date !== undefined) apiPayload.scheduled_date = jobUpdates.scheduled_date;
+    if (jobUpdates.end_date !== undefined) apiPayload.end_date = jobUpdates.end_date;
     if (jobUpdates.description !== undefined) apiPayload.description = jobUpdates.description;
+    if (jobUpdates.po_number !== undefined) apiPayload.po_number = jobUpdates.po_number;
+    if (jobUpdates.equipment_needed !== undefined) apiPayload.equipment_needed = jobUpdates.equipment_needed;
+    if (jobUpdates.customer_name !== undefined) apiPayload.customer_name = jobUpdates.customer_name;
+    if (jobUpdates.location !== undefined) apiPayload.location_name = jobUpdates.location;
+    if (jobUpdates.address !== undefined) apiPayload.site_address = jobUpdates.address;
+    if (updates.customer_contact !== undefined) apiPayload.customer_contact = updates.customer_contact;
+    if (updates.site_contact_phone !== undefined) apiPayload.site_contact_phone = updates.site_contact_phone;
+    if (updates.estimated_cost !== undefined) apiPayload.estimated_cost = updates.estimated_cost;
+    if (updates.jobsite_conditions !== undefined) apiPayload.jobsite_conditions = updates.jobsite_conditions;
 
     const currentOp = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.operator : null;
     const operatorChanged = newOpName !== undefined && newOpName !== currentOp;
@@ -1234,9 +1282,11 @@ export default function ScheduleBoardPage() {
 
   // --- Change Request (success callback — modal handles the API call) ---
   const handleChangeRequestSuccess = () => {
-    if (!changeRequestTarget) return;
+    // May be called from ChangeRequestModal (changeRequestTarget set) or EditJobPanel (editTarget set)
+    const targetJob = changeRequestTarget || editTarget?.job;
+    if (!targetJob) return;
 
-    const jobId = changeRequestTarget.id;
+    const jobId = targetJob.id;
     const updateJobInPlace = (jobs: JobCardData[]) =>
       jobs.map(j => j.id === jobId ? { ...j, change_requests_count: j.change_requests_count + 1 } : j);
 
@@ -1247,8 +1297,11 @@ export default function ScheduleBoardPage() {
       }
     }
 
-    addToast('success', 'Change Request Submitted', `${changeRequestTarget.customer_name} — Supervisor will review`);
-    setChangeRequestTarget(null);
+    if (changeRequestTarget) {
+      addToast('success', 'Change Request Submitted', `${targetJob.customer_name} — Supervisor will review`);
+      setChangeRequestTarget(null);
+    }
+    // If called from EditJobPanel, the panel handles its own toast/close
   };
 
   // --- Notes (from API) ---
@@ -1331,6 +1384,35 @@ export default function ScheduleBoardPage() {
     }
   };
 
+  // ── Cancel job: reschedule or delete permanently ─────────────────────────
+  const handleRescheduleJob = async (jobId: string, newDate: string, reason?: string) => {
+    const notes = reason ? `Rescheduled: ${reason}` : undefined;
+    const res = await apiFetch(`/api/admin/job-orders/${jobId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        scheduled_date: newDate,
+        status: 'scheduled',
+        ...(notes ? { notes } : {}),
+      }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d?.error || 'Failed to reschedule');
+    }
+    addToast('success', 'Job Rescheduled', `Job moved to ${newDate}`);
+    fetchScheduleData(selectedDate);
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    const res = await apiFetch(`/api/admin/job-orders/${jobId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d?.error || 'Failed to delete job');
+    }
+    addToast('success', 'Job Deleted', 'Job has been permanently removed');
+    fetchScheduleData(selectedDate);
+  };
+
   const handleDeleteDailyNote = async (id: string) => {
     try {
       const res = await apiFetch(`/api/admin/daily-notes?id=${id}`, { method: 'DELETE' });
@@ -1390,10 +1472,24 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Row dropdown: change operator (with conflict detection) ---
-  const handleChangeRowOperator = (rowIndex: number, newOperator: string | null) => {
+  const handleChangeRowOperator = async (rowIndex: number, newOperator: string | null) => {
     if (!newOperator) {
-      // Clearing operator — no conflict possible
-      setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, operator: newOperator } : r));
+      // Clearing operator — unassign all jobs in this row from the DB first
+      const rowJobs = operatorJobs[rowIndex] || [];
+      for (const j of rowJobs) {
+        try {
+          await apiFetch('/api/admin/schedule-board/assign', {
+            method: 'POST',
+            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate }),
+          });
+        } catch { /* continue */ }
+      }
+      // Move jobs back to unassigned pool
+      if (rowJobs.length > 0) {
+        setUnassignedJobs(prev => [...prev, ...rowJobs.map(j => ({ ...j, helper_names: [] }))]);
+        setOperatorJobs(prev => ({ ...prev, [rowIndex]: [] }));
+      }
+      setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { operator: null, helper: null } : r));
       return;
     }
 
@@ -1428,7 +1524,7 @@ export default function ScheduleBoardPage() {
       try {
         await apiFetch('/api/admin/schedule-board/assign', {
           method: 'POST',
-          body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null }),
+          body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate }),
         });
       } catch { /* continue */ }
     }
@@ -1459,7 +1555,22 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Row dropdown: change helper ---
-  const handleChangeRowHelper = (rowIndex: number, newHelper: string | null) => {
+  const handleChangeRowHelper = async (rowIndex: number, newHelper: string | null) => {
+    const operatorName = rowAssignments[rowIndex]?.operator;
+    const operatorId = operatorName ? operatorIdMap[operatorName] : null;
+    const newHelperId = newHelper ? helperIdMap[newHelper] : null;
+
+    // Persist helper change to DB for all jobs in this row
+    const rowJobs = operatorJobs[rowIndex] || [];
+    for (const j of rowJobs) {
+      try {
+        await apiFetch('/api/admin/schedule-board/assign', {
+          method: 'POST',
+          body: JSON.stringify({ jobOrderId: j.id, operatorId: operatorId || null, helperId: newHelperId, assignment_date: selectedDate }),
+        });
+      } catch { /* continue */ }
+    }
+
     setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, helper: newHelper } : r));
   };
 
@@ -1584,6 +1695,18 @@ export default function ScheduleBoardPage() {
                     <Plus className="w-4 h-4" /> Quick Add
                   </button>
                   <button
+                    onClick={handleUpdateSchedule}
+                    disabled={updatingSchedule}
+                    className="px-3 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Re-push schedule changes to operators"
+                  >
+                    {updatingSchedule ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</>
+                    ) : (
+                      <><RefreshCw className="w-4 h-4" /> Update Schedule</>
+                    )}
+                  </button>
+                  <button
                     onClick={() => {
                       fetchDispatchStatus(selectedDate);
                       setShowDispatchModal(true);
@@ -1591,8 +1714,8 @@ export default function ScheduleBoardPage() {
                     className="relative px-3 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
                   >
                     <Megaphone className="w-4 h-4" /> Push Tickets
-                    {dispatchInfo && dispatchInfo.undispatched > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex items-center justify-center">{dispatchInfo.undispatched}</span>
+                    {dispatchInfo && dispatchInfo.total > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex items-center justify-center">{dispatchInfo.total}</span>
                     )}
                   </button>
                 </>
@@ -1773,7 +1896,7 @@ export default function ScheduleBoardPage() {
       {viewMode === 'week' && boardViewMode !== 'crew-grid' && (
         <div className="container mx-auto px-4 md:px-6 pb-6">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-x-auto">
-            <div className="grid grid-cols-1 md:grid-cols-5 divide-x divide-gray-200 min-w-0 md:min-w-[800px]">
+            <div className="grid grid-cols-1 md:grid-cols-7 divide-x divide-gray-200 min-w-0 md:min-w-[1000px]">
               {Object.entries(weekData).sort(([a], [b]) => a.localeCompare(b)).map(([date, jobs]) => {
                 const d = parseLocalDate(date);
                 const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
@@ -1843,12 +1966,12 @@ export default function ScheduleBoardPage() {
         </div>
       )}
 
-      {/* ═══ READ-ONLY BANNER (view-only admins) ════════════════════════ */}
-      {!canEdit && (
+      {/* ═══ CHANGE REQUEST BANNER (admin/salesman) ════════════════════════ */}
+      {!canEdit && (userRole === 'admin' || userRole === 'salesman') && (
         <div className="container mx-auto px-4 md:px-6 pb-2">
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-sm text-amber-300 flex items-center gap-2">
-            <span>👁️</span>
-            <span>You have view-only access. Click any job to request a change.</span>
+            <span>✏️</span>
+            <span>Click any job to edit fields — changes will be submitted for supervisor approval.</span>
           </div>
         </div>
       )}
@@ -1872,10 +1995,11 @@ export default function ScheduleBoardPage() {
                 allHelpers={allHelpersList}
                 busyOperators={busyOperators}
                 busyHelpers={busyHelpers}
-                onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setChangeRequestTarget(job)}
+                onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setEditTarget({ job, rowIndex: idx })}
                 onRequestChange={(job) => setChangeRequestTarget(job)}
                 onViewNotes={(job) => handleViewNotes(job)}
-                onPreviewJob={(job) => setPreviewJob({ job, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
+                onRemoveJob={(job) => setCancelJobTarget(job)}
+                onPreviewJob={(job) => setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper })}
                 onAssignJob={() => handleAssignToAvailableOperator(idx)}
                 onChangeOperator={(name) => handleChangeRowOperator(idx, name)}
                 onChangeHelper={(name) => handleChangeRowHelper(idx, name)}
@@ -1894,10 +2018,10 @@ export default function ScheduleBoardPage() {
             timeOffMap={timeOffMap}
             canDrag={canEdit}
             canEdit={canEdit}
-            onEditJob={(job, rowIndex) => canEdit ? setEditTarget({ job, rowIndex }) : setChangeRequestTarget(job)}
+            onEditJob={(job, rowIndex) => setEditTarget({ job, rowIndex: rowIndex ?? null })}
             onRequestChange={(job) => setChangeRequestTarget(job)}
             onViewNotes={(job) => handleViewNotes(job)}
-            onPreviewJob={(job) => setPreviewJob({ job })}
+            onPreviewJob={(job) => setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null })}
           />
         )}
 
@@ -2012,7 +2136,8 @@ export default function ScheduleBoardPage() {
       {editTarget && (
         <EditJobPanel
           job={editTarget.job}
-          canEdit={canEdit}
+          canEdit={canEdit || userRole === 'admin' || userRole === 'salesman'}
+          userRole={userRole}
           allOperators={allOperatorsList}
           allHelpers={allHelpersList}
           currentOperatorName={editTarget.rowIndex !== null ? rowAssignments[editTarget.rowIndex]?.operator ?? null : null}
@@ -2021,13 +2146,22 @@ export default function ScheduleBoardPage() {
           busyHelpers={busyHelpers}
           operatorSkillMap={operatorSkillMap}
           onSave={handleEditSave}
+          onChangeRequestSuccess={handleChangeRequestSuccess}
           onClose={() => setEditTarget(null)}
           onViewNotes={() => { setEditTarget(null); handleViewNotes(editTarget.job); }}
-          onMakeWillCall={handleMakeWillCall}
-          onRemoveFromSchedule={handleRemoveFromSchedule}
+          onMakeWillCall={canEdit ? handleMakeWillCall : undefined}
+          onRemoveFromSchedule={canEdit ? handleRemoveFromSchedule : undefined}
         />
       )}
       {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSuccess={handleChangeRequestSuccess} onClose={() => setChangeRequestTarget(null)} />}
+      {cancelJobTarget && (
+        <CancelJobModal
+          job={cancelJobTarget}
+          onClose={() => setCancelJobTarget(null)}
+          onReschedule={handleRescheduleJob}
+          onDelete={handleDeleteJob}
+        />
+      )}
       {notesTarget && <NotesDrawer job={notesTarget} notes={jobNotes[notesTarget.id] || []} onAddNote={handleAddNote} onClose={() => setNotesTarget(null)} />}
       {showQuickAdd && <QuickAddModal salesmen={SALESMEN} onSubmit={handleQuickAdd} onClose={() => setShowQuickAdd(false)} />}
 
@@ -2156,16 +2290,6 @@ export default function ScheduleBoardPage() {
         />
       )}
 
-      {/* ═══ JOB PREVIEW PANEL ════════════════════════════════════════ */}
-      {previewJob && (
-        <JobPreviewPanel
-          job={previewJob.job}
-          operatorName={previewJob.operatorName}
-          helperName={previewJob.helperName}
-          onClose={() => setPreviewJob(null)}
-        />
-      )}
-
       {/* ═══ JOB DETAIL VIEW (full-page overlay) ═══════════════════════ */}
       {jobDetailTarget && (
         <JobDetailView
@@ -2179,6 +2303,11 @@ export default function ScheduleBoardPage() {
             setJobDetailTarget(null);
             setEditTarget({ job: target.job, rowIndex: target.rowIndex });
           }}
+          onRemove={canEdit ? () => {
+            const target = jobDetailTarget;
+            setJobDetailTarget(null);
+            setCancelJobTarget(target.job);
+          } : undefined}
         />
       )}
 
@@ -2238,35 +2367,27 @@ export default function ScheduleBoardPage() {
               <div className="p-5 space-y-4">
                 {dispatchInfo ? (
                   <>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="text-center p-3 bg-gray-50 rounded-xl">
-                        <div className="text-2xl font-bold text-gray-900">{dispatchInfo.total}</div>
-                        <div className="text-xs text-gray-500 font-medium">Total Jobs</div>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-xl border border-green-200">
-                        <div className="text-2xl font-bold text-green-700">{dispatchInfo.dispatched}</div>
-                        <div className="text-xs text-green-600 font-medium">Dispatched</div>
-                      </div>
-                      <div className="text-center p-3 bg-orange-50 rounded-xl border border-orange-200">
-                        <div className="text-2xl font-bold text-orange-700">{dispatchInfo.undispatched}</div>
-                        <div className="text-xs text-orange-600 font-medium">Ready to Push</div>
+                    <div className="flex justify-center">
+                      <div className="text-center p-4 bg-gray-50 rounded-xl min-w-[120px]">
+                        <div className="text-3xl font-bold text-gray-900">{dispatchInfo.total}</div>
+                        <div className="text-xs text-gray-500 font-medium mt-1">Assigned Jobs</div>
                       </div>
                     </div>
 
-                    {dispatchInfo.undispatched === 0 ? (
-                      <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
-                        <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0" />
+                    {dispatchInfo.total === 0 ? (
+                      <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                        <AlertCircle className="w-6 h-6 text-gray-400 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-bold text-green-800">All jobs dispatched!</p>
-                          <p className="text-xs text-green-600">All assigned jobs for this date have been pushed to operators.</p>
+                          <p className="text-sm font-bold text-gray-700">No assigned jobs for this date</p>
+                          <p className="text-xs text-gray-500">Assign operators to jobs on the board first.</p>
                         </div>
                       </div>
                     ) : (
                       <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-xl">
-                        <AlertCircle className="w-6 h-6 text-orange-600 flex-shrink-0" />
+                        <Megaphone className="w-6 h-6 text-orange-600 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-bold text-orange-800">{dispatchInfo.undispatched} job(s) ready to dispatch</p>
-                          <p className="text-xs text-orange-600">This will notify all assigned operators and helpers.</p>
+                          <p className="text-sm font-bold text-orange-800">{dispatchInfo.total} job(s) will be dispatched</p>
+                          <p className="text-xs text-orange-600">All assigned operators and helpers will be notified.</p>
                         </div>
                       </div>
                     )}
@@ -2287,13 +2408,13 @@ export default function ScheduleBoardPage() {
                   </button>
                   <button
                     onClick={() => handleDispatchJobs(selectedDate)}
-                    disabled={dispatchLoading || !dispatchInfo || dispatchInfo.undispatched === 0}
+                    disabled={dispatchLoading || !dispatchInfo || dispatchInfo.total === 0}
                     className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {dispatchLoading ? (
                       <><Loader2 className="w-4 h-4 animate-spin" /> Dispatching...</>
                     ) : (
-                      <><Megaphone className="w-4 h-4" /> Push {dispatchInfo?.undispatched || 0} Tickets</>
+                      <><Megaphone className="w-4 h-4" /> Push {dispatchInfo?.total || 0} Tickets</>
                     )}
                   </button>
                 </div>
@@ -2320,7 +2441,17 @@ export default function ScheduleBoardPage() {
       <div className="fixed bottom-4 left-4 z-50">
         <div className={`px-4 py-2 rounded-xl text-sm font-bold shadow-lg ${canEdit ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
           <Eye className="w-4 h-4 inline mr-1.5" />
-          {canEdit ? 'Super Admin — Full Edit' : userRole === 'salesman' ? 'Salesman — View & Request' : 'Admin — View & Request'}
+          {canEdit
+            ? userRole === 'super_admin'
+              ? 'Super Admin — Full Edit'
+              : userRole === 'operations_manager'
+              ? 'Operations Manager — Full Edit'
+              : userRole === 'admin'
+              ? 'Admin — Full Edit'
+              : 'Full Edit'
+            : userRole === 'salesman'
+            ? 'Salesman — View & Request'
+            : 'View & Request'}
         </div>
       </div>
     </div>

@@ -13,8 +13,19 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
+
+/** P0-3: verify the target operator profile belongs to the caller's tenant. */
+async function verifyOperatorTenant(operatorId: string, callerTenantId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from('profiles')
+    .select('tenant_id')
+    .eq('id', operatorId)
+    .maybeSingle();
+  return !!data && data.tenant_id === callerTenantId;
+}
 
 const VALID_NOTE_TYPES = [
   'general',
@@ -30,10 +41,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: operatorId } = await params;
+
+    const callerTenantId = await getTenantId(auth.userId);
+    if (!callerTenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    }
+    if (!(await verifyOperatorTenant(operatorId, callerTenantId))) {
+      return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
+    }
 
     // Fetch notes with author info
     const { data: notes, error } = await supabaseAdmin
@@ -82,7 +101,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: operatorId } = await params;
@@ -106,14 +125,22 @@ export async function POST(
       );
     }
 
-    // Verify operator exists
+    const callerTenantId = await getTenantId(auth.userId);
+    if (!callerTenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    }
+
+    // P0-3: Verify operator exists and belongs to caller's tenant
     const { data: operator, error: opError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name')
+      .select('id, full_name, tenant_id')
       .eq('id', operatorId)
       .single();
 
     if (opError || !operator) {
+      return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
+    }
+    if (operator.tenant_id !== callerTenantId) {
       return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
     }
 
@@ -185,7 +212,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     // Only super_admin can delete notes
@@ -202,6 +229,14 @@ export async function DELETE(
 
     if (!noteId) {
       return NextResponse.json({ error: 'noteId query parameter is required' }, { status: 400 });
+    }
+
+    const callerTenantId = await getTenantId(auth.userId);
+    if (!callerTenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    }
+    if (!(await verifyOperatorTenant(operatorId, callerTenantId))) {
+      return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
     }
 
     // Verify the note belongs to this operator before deleting
