@@ -37,7 +37,7 @@ export interface AuthFailure {
 export type AuthResult = AuthSuccess | AuthFailure;
 
 /** Roles allowed through `requireAdmin` (narrowed — excludes salesman/supervisor). */
-const ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager'];
+export const ADMIN_ROLES: string[] = ['admin', 'super_admin', 'operations_manager'];
 /** Broader set for read-only / schedule-board / sales pipeline routes. */
 const SALES_STAFF_ROLES = ['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'];
 

@@ -4,18 +4,18 @@ export const dynamic = 'force-dynamic';
  * API Route: GET /api/admin/jobs/[id]/summary
  * Full job summary for admin view: job info, scope, progress, completion request.
  *
- * GET — requireAdmin
+ * GET — requireSalesStaff
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;

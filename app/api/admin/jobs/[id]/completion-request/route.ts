@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
  * API Route: /api/admin/jobs/[id]/completion-request
  * Admin reviews and approves or rejects a job completion request.
  *
- * GET — requireAdmin; returns the latest completion request for the job
- * PUT — requireAdmin; approve or reject
+ * GET — requireSalesStaff; returns the latest completion request for the job
+ * PUT — requireSalesStaff; approve or reject
  *   Body: { action: 'approve' | 'reject', review_notes?: string }
  *
  * On approve:
@@ -21,14 +21,14 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 // ─── PUT ─────────────────────────────────────────────────────────────────────
 export async function PUT(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
