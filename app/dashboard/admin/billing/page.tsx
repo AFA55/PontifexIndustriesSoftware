@@ -104,12 +104,36 @@ export default function BillingPage() {
   const [confirmVoid, setConfirmVoid] = useState<string | null>(null);
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-    if (!currentUser) { router.push('/login'); return; }
-    if (!['admin', 'super_admin', 'operations_manager'].includes(currentUser.role)) {
-      router.push('/dashboard'); return;
-    }
-    fetchData();
+    const guard = async () => {
+      const currentUser = getCurrentUser();
+      if (!currentUser) { router.push('/login'); return; }
+      const allowedRoles = ['admin', 'super_admin', 'operations_manager'];
+      const bypassRoles = ['super_admin', 'operations_manager'];
+      if (!allowedRoles.includes(currentUser.role)) {
+        // Fall back to feature flag: allow if can_view_invoicing is true
+        let canView = false;
+        try {
+          const { supabase } = await import('@/lib/supabase');
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token;
+          if (token) {
+            const resp = await fetch(`/api/admin/user-flags/${currentUser.id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const json = await resp.json();
+            canView = Boolean(json?.data?.can_view_invoicing);
+          }
+        } catch {
+          canView = false;
+        }
+        if (!bypassRoles.includes(currentUser.role) && !canView) {
+          router.push('/dashboard');
+          return;
+        }
+      }
+      fetchData();
+    };
+    guard();
   }, []);
 
   // Auto-clear success message
