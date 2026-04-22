@@ -63,9 +63,9 @@ const NAV_SECTIONS: NavSection[] = [
     accent: 'text-blue-400',
     items: [
       { label: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-      { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar },
+      { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar, flagKey: 'can_view_schedule_board' },
       { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase, flagKey: 'can_view_active_jobs' },
-      { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit },
+      { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms' },
     ],
   },
   {
