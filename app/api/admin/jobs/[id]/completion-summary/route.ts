@@ -19,7 +19,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
-    const tenantId = auth.tenantId;
+
+    // Tenant scoping: super_admin may pass ?tenantId= to override; everyone
+    // else is locked to their own tenant. Mirrors the pattern in /summary.
+    const overrideTenantId = request.nextUrl.searchParams.get('tenantId');
+    const tenantId = auth.tenantId ?? (auth.role === 'super_admin' ? overrideTenantId : null);
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: 'Tenant scope required. super_admin must pass ?tenantId=' },
+        { status: 400 }
+      );
+    }
 
     // ── 1. Fetch the job ────────────────────────────────────────────────────
     let jobQuery = supabaseAdmin
