@@ -112,18 +112,29 @@ export default function BillingPage() {
       const allowedRoles = ['admin', 'super_admin', 'operations_manager'];
       const bypassRoles = ['super_admin', 'operations_manager'];
       if (!allowedRoles.includes(currentUser.role)) {
-        // Fall back to feature flag: allow if can_view_invoicing is true
+        // Fall back to feature flag: allow if can_view_invoicing is true.
+        // Wait for a real session token before giving up — right after login the
+        // session may not yet be cached client-side, producing a false 401.
+        const getToken = async (): Promise<string | null> => {
+          const { supabase } = await import('@/lib/supabase');
+          for (let i = 0; i < 10; i++) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) return session.access_token;
+            await new Promise((r) => setTimeout(r, 150));
+          }
+          return null;
+        };
         let canView = false;
         try {
-          const { supabase } = await import('@/lib/supabase');
-          const { data: { session } } = await supabase.auth.getSession();
-          const token = session?.access_token;
+          const token = await getToken();
           if (token) {
             const resp = await fetch(`/api/admin/user-flags/${currentUser.id}`, {
               headers: { Authorization: `Bearer ${token}` },
             });
-            const json = await resp.json();
-            canView = Boolean(json?.data?.can_view_invoicing);
+            if (resp.ok) {
+              const json = await resp.json();
+              canView = Boolean(json?.data?.can_view_invoicing);
+            }
           }
         } catch {
           canView = false;

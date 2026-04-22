@@ -66,10 +66,10 @@ export function useFeatureFlags(
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
+    // While userId is still being resolved by the caller, keep `loading: true`
+    // so page guards don't briefly see loading=false + DEFAULT_FLAGS (all-false)
+    // and wrongly redirect before flags arrive.
+    if (!userId) return;
 
     setLoading(true); // reset before every fetch so guards wait for fresh data
 
@@ -80,19 +80,58 @@ export function useFeatureFlags(
       return;
     }
 
-    // Fetch the current session token via Supabase client (reliable across all storage modes)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const token = session?.access_token;
-      return fetch(`/api/admin/user-flags/${userId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-    })
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.data) setFlags({ ...DEFAULT_FLAGS, ...json.data });
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    let loaded = false;
+
+    const fetchFlags = async (token: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/admin/user-flags/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (!res.ok) return false;
+        const json = await res.json();
+        if (!cancelled && json?.data) {
+          setFlags({ ...DEFAULT_FLAGS, ...json.data });
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // Subscribe first so we catch SIGNED_IN / TOKEN_REFRESHED that fire between
+    // getSession() returning null and the token becoming available.
+    const { data: authSub } = supabase.auth.onAuthStateChange(async (_evt, newSession) => {
+      if (loaded || cancelled) return;
+      if (newSession?.access_token) {
+        const ok = await fetchFlags(newSession.access_token);
+        if (ok && !cancelled) { loaded = true; setLoading(false); }
+      }
+    });
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled) return;
+      if (session?.access_token) {
+        let ok = await fetchFlags(session.access_token);
+        if (!ok && !cancelled) {
+          // Stale token — refresh and retry once before giving up.
+          const { data: refreshed } = await supabase.auth.refreshSession();
+          if (refreshed?.session?.access_token && !cancelled) {
+            ok = await fetchFlags(refreshed.session.access_token);
+          }
+        }
+        if (ok && !cancelled) { loaded = true; setLoading(false); return; }
+      }
+      // Safety: stop the loader eventually even if no token arrives.
+      // onAuthStateChange may still fire later and populate flags.
+      setTimeout(() => { if (!cancelled && !loaded) setLoading(false); }, 3000);
+    });
+
+    return () => {
+      cancelled = true;
+      authSub.subscription.unsubscribe();
+    };
   }, [userId, role]);
 
   return { flags, loading };
