@@ -1707,12 +1707,28 @@ export default function ScheduleFormPage() {
                       </button>
                     </div>
                   )}
-                  {filteredCrmCustomers.map(c => (
+                  {filteredCrmCustomers.map(c => {
+                    // Snapshot the customer object at render time so the click
+                    // handler always selects the customer displayed on THIS
+                    // tile, regardless of any concurrent list mutation (search
+                    // filtering, re-fetch, optimistic new-customer prepend,
+                    // etc.). Previously the closure captured `c` by reference
+                    // which — combined with list reordering — could cause a
+                    // tap on "tile 2" to select a different customer than the
+                    // label showed.
+                    const customerSnapshot = {
+                      id: c.id,
+                      company_name: c.company_name,
+                      primary_contact_name: c.primary_contact_name,
+                      primary_contact_phone: c.primary_contact_phone,
+                      address: c.address,
+                    };
+                    return (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => {
-                        selectCrmCustomer(c);
+                        selectCrmCustomer(customerSnapshot);
                         setCustomerSearch('');
                       }}
                       className="w-full flex items-center gap-4 px-5 py-4 bg-white border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm transition-all text-left group"
@@ -1729,7 +1745,8 @@ export default function ScheduleFormPage() {
                       </div>
                       <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Or type freely */}
