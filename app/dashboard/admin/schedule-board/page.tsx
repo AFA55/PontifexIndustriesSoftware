@@ -165,8 +165,8 @@ export default function ScheduleBoardPage() {
   // Feature flags — determines read-only vs edit access for non-super-admins
   const { flags: featureFlags, loading: flagsLoading } = useFeatureFlags(userId, userRole);
 
-  // canEdit: super_admin always can; operations_manager always can; others need the flag
-  const canEdit = userRole === 'super_admin' || userRole === 'operations_manager' || featureFlags.can_edit_schedule_board;
+  // canEdit: super_admin, operations_manager, and admin always can; others need the flag
+  const canEdit = userRole === 'super_admin' || userRole === 'operations_manager' || userRole === 'admin' || featureFlags.can_edit_schedule_board;
 
   // ═══ DATA STATE (from API) ═══
   const [operatorJobs, setOperatorJobs] = useState<Record<number, JobCardData[]>>({});
@@ -2320,7 +2320,17 @@ export default function ScheduleBoardPage() {
       <div className="fixed bottom-4 left-4 z-50">
         <div className={`px-4 py-2 rounded-xl text-sm font-bold shadow-lg ${canEdit ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
           <Eye className="w-4 h-4 inline mr-1.5" />
-          {canEdit ? 'Super Admin — Full Edit' : userRole === 'salesman' ? 'Salesman — View & Request' : 'Admin — View & Request'}
+          {canEdit
+            ? userRole === 'super_admin'
+              ? 'Super Admin — Full Edit'
+              : userRole === 'operations_manager'
+              ? 'Operations Manager — Full Edit'
+              : userRole === 'admin'
+              ? 'Admin — Full Edit'
+              : 'Full Edit'
+            : userRole === 'salesman'
+            ? 'Salesman — View & Request'
+            : 'View & Request'}
         </div>
       </div>
     </div>
