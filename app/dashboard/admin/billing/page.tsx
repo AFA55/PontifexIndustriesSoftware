@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import CreateInvoiceForm from './_components/CreateInvoiceForm';
+import BillingSkeleton from './_skeleton';
+import { RevealSection } from '@/components/ui/Skeleton';
 import {
   ArrowLeft,
   RefreshCw,
@@ -371,6 +373,10 @@ export default function BillingPage() {
     } catch { return d; }
   };
 
+  if (loading && invoices.length === 0 && completedJobs.length === 0) {
+    return <BillingSkeleton />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -436,6 +442,7 @@ export default function BillingPage() {
         )}
 
         {/* Stats Cards */}
+        <RevealSection index={0}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
@@ -474,8 +481,10 @@ export default function BillingPage() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Outstanding</p>
           </div>
         </div>
+        </RevealSection>
 
         {/* Tabs */}
+        <RevealSection index={1}>
         <div className="flex gap-1 mb-5 border-b border-gray-200">
           <button
             onClick={() => setActiveTab('invoices')}
@@ -503,7 +512,9 @@ export default function BillingPage() {
             )}
           </button>
         </div>
+        </RevealSection>
 
+        <RevealSection index={2}>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-3" />
@@ -768,6 +779,7 @@ export default function BillingPage() {
             )}
           </div>
         )}
+        </RevealSection>
 
         {/* Invoice Detail Modal */}
         {selectedInvoice && (
