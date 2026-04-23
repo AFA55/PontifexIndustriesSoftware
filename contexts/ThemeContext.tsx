@@ -19,8 +19,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light');
 
   useEffect(() => {
+    // One-time factory reset: older builds auto-followed OS `prefers-color-scheme`
+    // and may have persisted `theme=dark` for users who never opted in. Bump a
+    // reset sentinel so every client lands on light the next time they load,
+    // then only honor subsequent explicit toggles.
     let saved: Theme | null = null;
     try {
+      const resetDone = localStorage.getItem('theme.factory-reset') === 'v1';
+      if (!resetDone) {
+        localStorage.removeItem('theme');
+        localStorage.setItem('theme.factory-reset', 'v1');
+      }
       saved = localStorage.getItem('theme') as Theme | null;
     } catch {
       // localStorage unavailable (private browsing) — stay on light
@@ -29,7 +38,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setTheme('dark');
       document.documentElement.classList.add('dark');
     } else {
-      // Either no preference, or explicitly 'light'. Ensure dark class is off.
       setTheme('light');
       document.documentElement.classList.remove('dark');
     }
