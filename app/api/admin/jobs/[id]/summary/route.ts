@@ -262,7 +262,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           internal_notes: null,
           project_name: (job as any).project_name ?? null,
           assigned_to: job.assigned_to ?? null,
-          operator_name: (job.profiles as any)?.full_name ?? null,
+          operator_name: ((job as any).profiles as any)?.full_name ?? null,
           helper_name: null,
           completion_submitted_at: job.completion_submitted_at,
           completion_requested_at: completionRequest?.submitted_at ?? job.completion_submitted_at ?? null,
