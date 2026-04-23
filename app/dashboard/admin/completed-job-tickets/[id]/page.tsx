@@ -7,6 +7,8 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { CompletedJobTicketSkeleton } from './_skeleton';
+import { RevealSection } from '@/components/ui/Skeleton';
 import {
   ArrowLeft, FileText, Star, Clock, DollarSign, User, MapPin,
   CheckCircle, Calendar, AlertCircle, Download, Eye, X, Plus,
@@ -261,14 +263,7 @@ export default function CompletedJobSummaryPage() {
   const pendingReq = sigRequests.find(r => (r.status === 'sent' || r.status === 'opened') && !r.is_expired);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200 h-16 shadow-sm" />
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-4">
-          <SkeletonCard /><div className="grid grid-cols-3 gap-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /></div><SkeletonCard /><SkeletonCard />
-        </div>
-      </div>
-    );
+    return <CompletedJobTicketSkeleton />;
   }
 
   if (!summary) {
@@ -340,6 +335,7 @@ export default function CompletedJobSummaryPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         {/* Job Overview */}
+        <RevealSection index={0}>
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><FileText className="w-5 h-5 text-blue-600" />Job Overview</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -379,9 +375,11 @@ export default function CompletedJobSummaryPage() {
             {(summary.foreman_name || summary.foreman_phone) && <div><p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Site Contact</p><p className="text-gray-900 font-medium">{summary.foreman_name}</p>{summary.foreman_phone && <p className="text-sm text-gray-500">{summary.foreman_phone}</p>}</div>}
           </div>
         </div>
+        </RevealSection>
 
         {/* Scope Completed */}
         {scopeMetrics.length > 0 && (
+          <RevealSection index={1}>
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-emerald-600" />Scope Completed</h2>
             <div className={`grid grid-cols-1 gap-4 ${scopeMetrics.length === 1 ? 'sm:grid-cols-1' : scopeMetrics.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
@@ -394,9 +392,11 @@ export default function CompletedJobSummaryPage() {
               ))}
             </div>
           </div>
+          </RevealSection>
         )}
 
         {/* Labor Hours */}
+        <RevealSection index={2}>
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Clock className="w-5 h-5 text-blue-600" />Labor Hours</h2>
           {laborRows.length === 0 ? (
@@ -440,8 +440,10 @@ export default function CompletedJobSummaryPage() {
             </div>
           )}
         </div>
+        </RevealSection>
 
         {/* Cycle Billing */}
+        <RevealSection index={3}>
         {!isCycleBilling && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
             <strong>Cycle billing not enabled.</strong> To use milestone-based billing for this job,{' '}
@@ -490,9 +492,11 @@ export default function CompletedJobSummaryPage() {
             )}
           </div>
         )}
+        </RevealSection>
 
         {/* Customer Feedback */}
         {(summary.customer_overall_rating != null || summary.customer_cleanliness_rating != null || summary.customer_communication_rating != null || summary.customer_feedback_comments) && (
+          <RevealSection index={4}>
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />Customer Feedback</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -505,9 +509,11 @@ export default function CompletedJobSummaryPage() {
               {signatureCaptured ? (<><CheckCircle className="w-3.5 h-3.5 text-green-500" />Signed by: {summary.completion_signer_name}</>) : (<><AlertCircle className="w-3.5 h-3.5 text-amber-500" />Contact not on site &mdash; no signature captured</>)}
             </div>
           </div>
+          </RevealSection>
         )}
 
         {/* Documents & Photos */}
+        <RevealSection index={5}>
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><FileText className="w-5 h-5 text-indigo-600" />Documents &amp; Photos</h2>
 
@@ -572,6 +578,7 @@ export default function CompletedJobSummaryPage() {
             <div className="text-center py-8 text-gray-400"><FileText className="w-10 h-10 mx-auto mb-2 text-gray-200" /><p className="text-sm">No documents or photos available for this job.</p></div>
           )}
         </div>
+        </RevealSection>
       </div>
 
       {/* PDF Viewer Modal */}
