@@ -4,7 +4,21 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { FileText, Clock, DollarSign, TrendingUp, Star, MapPin, User } from 'lucide-react';
+import {
+  FileText,
+  Clock,
+  DollarSign,
+  TrendingUp,
+  Star,
+  MapPin,
+  User,
+  ArrowLeft,
+  Search,
+  Download,
+  Calendar,
+  CheckCircle,
+  AlertCircle,
+} from 'lucide-react';
 
 interface CompletedJob {
   id: string;
@@ -20,26 +34,16 @@ interface CompletedJob {
   scheduled_date: string;
   arrival_time: string;
   shop_arrival_time: string;
-
-  // Completion data
   completion_signed_at: string;
   completion_signer_name: string;
   contact_not_on_site: boolean;
-
-  // Liability release
   liability_release_signed_by: string;
   liability_release_signed_at: string;
   liability_release_pdf: string | null;
-
-  // Silica form
   silica_form_completed_at: string | null;
   silica_form_pdf: string | null;
-
-  // Work order agreement
   agreement_pdf: string | null;
   agreement_pdf_generated_at: string | null;
-
-  // Customer ratings
   customer_overall_rating: number | null;
   customer_cleanliness_rating: number | null;
   customer_communication_rating: number | null;
@@ -78,13 +82,11 @@ export default function CompletedJobsArchivePage() {
       router.push('/login');
       return;
     }
-
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', session.user.id)
       .single();
-
     if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(profile?.role || '')) {
       router.push('/dashboard');
     }
@@ -92,7 +94,6 @@ export default function CompletedJobsArchivePage() {
 
   const loadCompletedJobs = async () => {
     try {
-      console.log('Loading completed jobs...');
       const { data, error } = await supabase
         .from('job_orders')
         .select('*')
@@ -100,18 +101,12 @@ export default function CompletedJobsArchivePage() {
         .order('scheduled_date', { ascending: false });
 
       if (error && error.message) {
-        console.error('Error loading completed jobs:', error);
         throw error;
       }
-
-      console.log('Completed jobs loaded:', data?.length || 0, 'jobs');
-      console.log('First job:', data?.[0]);
       setJobs(data || []);
     } catch (error: any) {
-      // Only log/alert if there's an actual error message
       if (error?.message) {
         console.error('Error loading completed jobs:', error.message);
-        alert('Error loading completed jobs. Check console for details.');
       }
     } finally {
       setLoading(false);
@@ -119,58 +114,40 @@ export default function CompletedJobsArchivePage() {
   };
 
   const loadJobDetails = async (job: CompletedJob) => {
-    console.log('Loading details for job:', job.id);
     setLoadingDetails(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.log('No session found');
         setLoadingDetails(false);
         return;
       }
 
-      // Get operator name
-      console.log('Fetching operator profile for:', job.assigned_to);
       let operatorName = 'Unknown';
       try {
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('full_name')
           .eq('id', job.assigned_to)
           .single();
+        operatorName = profile?.full_name || 'Unknown';
+      } catch (_) {}
 
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-        } else {
-          operatorName = profile?.full_name || 'Unknown';
-        }
-      } catch (err) {
-        console.error('Profile fetch failed:', err);
-      }
-
-      // Get standby logs
       let standbyLogs: any[] = [];
       try {
-        const { data, error: standbyError } = await supabase
+        const { data } = await supabase
           .from('standby_logs')
           .select('*')
           .eq('job_order_id', job.id)
           .eq('status', 'completed');
+        standbyLogs = data || [];
+      } catch (_) {}
 
-        if (standbyError) {
-          console.error('Error fetching standby logs:', standbyError);
-        } else {
-          standbyLogs = data || [];
-        }
-      } catch (err) {
-        console.error('Standby logs fetch failed:', err);
-      }
+      const totalStandbyHours = standbyLogs.reduce(
+        (sum, log) => sum + (log.duration_hours || 0),
+        0
+      );
+      const totalStandbyCost = totalStandbyHours * 189;
 
-      // Calculate standby totals
-      const totalStandbyHours = standbyLogs.reduce((sum, log) => sum + (log.duration_hours || 0), 0);
-      const totalStandbyCost = totalStandbyHours * 189; // $189/hr standby rate
-
-      // Fetch work items from database (not localStorage — admin doesn't have operator's local data)
       let workPerformed: any[] = [];
       try {
         const { data: workItems } = await supabase
@@ -179,38 +156,25 @@ export default function CompletedJobsArchivePage() {
           .eq('job_order_id', job.id)
           .order('day_number', { ascending: true });
         workPerformed = workItems || [];
-      } catch (e) {
-        // Fallback: no work items available
-      }
+      } catch (_) {}
 
-      // Calculate total job hours
       const startTime = new Date(job.arrival_time || job.scheduled_date);
       const endTime = new Date(job.completion_signed_at);
-      const totalJobHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
-
-      // Calculate labor cost (assuming $75/hr base rate - adjust as needed)
+      const totalJobHours =
+        (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
       const laborCost = totalJobHours * 75;
 
-      // Get documents
       let documents: any[] = [];
       try {
-        const { data, error: docsError } = await supabase
+        const { data } = await supabase
           .from('pdf_documents')
           .select('*')
           .eq('job_id', job.id)
           .eq('is_latest', true)
           .order('generated_at', { ascending: false });
+        documents = data || [];
+      } catch (_) {}
 
-        if (docsError) {
-          console.error('Error fetching documents:', docsError);
-        } else {
-          documents = data || [];
-        }
-      } catch (err) {
-        console.error('Documents fetch failed:', err);
-      }
-
-      console.log('Job details loaded successfully');
       setSelectedJobDetails({
         job,
         operatorName,
@@ -220,141 +184,180 @@ export default function CompletedJobsArchivePage() {
         totalStandbyCost,
         totalJobHours,
         laborCost,
-        documents
+        documents,
       });
-    } catch (error) {
-      console.error('Error loading job details:', error);
+    } catch (err) {
+      console.error('Error loading job details:', err);
     } finally {
       setLoadingDetails(false);
     }
   };
 
-  const filteredJobs = jobs.filter(job => {
+  const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
       job.customer?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.job_location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.job_number?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesRating = filterRating === null ||
+    const matchesRating =
+      filterRating === null ||
       (job.customer_overall_rating && job.customer_overall_rating >= filterRating);
-
     return matchesSearch && matchesRating;
   });
 
-  const getAverageRating = () => {
-    const jobsWithRatings = jobs.filter(j => j.customer_overall_rating);
-    if (jobsWithRatings.length === 0) return 0;
-    const sum = jobsWithRatings.reduce((acc, j) => acc + (j.customer_overall_rating || 0), 0);
-    return (sum / jobsWithRatings.length).toFixed(1);
+  const averageRating = (() => {
+    const rated = jobs.filter((j) => j.customer_overall_rating);
+    if (rated.length === 0) return '0.0';
+    return (
+      rated.reduce((acc, j) => acc + (j.customer_overall_rating || 0), 0) / rated.length
+    ).toFixed(1);
+  })();
+
+  const downloadPdf = (base64: string, filename: string) => {
+    const blob = new Blob(
+      [Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))],
+      { type: 'application/pdf' }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   };
-
-  const getTotalJobsCompleted = () => jobs.length;
-
-  const getJobsWithoutSignature = () => jobs.filter(j => j.contact_not_on_site).length;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading completed jobs...</p>
+          <div className="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-600 dark:text-white/60 font-medium">
+            Loading completed jobs...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold text-gray-800">Completed Jobs Archive</h1>
-                <p className="text-sm text-gray-600">Analytics, documents, and performance data</p>
-              </div>
+    <div className="min-h-screen p-6 bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/admin"
+              className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors dark:bg-white/5 dark:border-white/10 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                Completed Jobs Archive
+              </h1>
+              <p className="text-slate-600 dark:text-white/60 mt-1">
+                Analytics, documents, and performance data
+              </p>
             </div>
-            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-              {jobs.length} Completed
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent tabular-nums">
+              {jobs.length}
             </span>
+            <span className="text-sm text-slate-500 dark:text-white/60">completed</span>
           </div>
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-6">
-        {/* Show message if no completed jobs */}
-        {jobs.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-12 text-center mb-6">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No Completed Jobs Yet</h3>
-            <p className="text-gray-600">
-              Completed jobs with customer signatures will appear here once they're finished.
+        {jobs.length === 0 ? (
+          <div className="rounded-2xl p-12 text-center shadow-sm bg-white border border-slate-200 dark:bg-white/5 dark:border-white/10">
+            <FileText className="w-12 h-12 text-slate-300 dark:text-white/20 mx-auto mb-3" />
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+              No Completed Jobs Yet
+            </h3>
+            <p className="text-slate-500 dark:text-white/60 text-sm">
+              Completed jobs with customer signatures will appear here.
             </p>
           </div>
-        )}
-
-        {/* Stats Overview */}
-        {jobs.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-2">
-                <FileText className="w-8 h-8 text-blue-600" />
-                <span className="text-3xl font-bold text-gray-900">{getTotalJobsCompleted()}</span>
-              </div>
-              <p className="text-sm text-gray-600 font-medium">Total Jobs Completed</p>
+        ) : (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {[
+                {
+                  label: 'Total Jobs Completed',
+                  value: jobs.length,
+                  icon: FileText,
+                  tile: 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
+                },
+                {
+                  label: 'Average Rating',
+                  value: averageRating,
+                  icon: Star,
+                  tile: 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
+                },
+                {
+                  label: 'Contact Not On Site',
+                  value: jobs.filter((j) => j.contact_not_on_site).length,
+                  icon: User,
+                  tile: 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300',
+                },
+                {
+                  label: 'Highly Rated (8+)',
+                  value: jobs.filter(
+                    (j) => j.customer_overall_rating && j.customer_overall_rating >= 8
+                  ).length,
+                  icon: TrendingUp,
+                  tile: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl p-4 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-slate-500 dark:text-white/60 text-sm font-medium">
+                      {stat.label}
+                    </span>
+                    <span
+                      className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${stat.tile}`}
+                    >
+                      <stat.icon className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums">
+                    {stat.value}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-2">
-                <Star className="w-8 h-8 text-yellow-500" />
-                <span className="text-3xl font-bold text-gray-900">{getAverageRating()}</span>
+            {/* Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+              <div className="md:col-span-2 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/40" />
+                <input
+                  type="text"
+                  placeholder="Search by customer, location, job number..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl text-sm transition-colors
+                    bg-white border border-slate-200 text-slate-900 placeholder-slate-400
+                    focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
+                    dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                />
               </div>
-              <p className="text-sm text-gray-600 font-medium">Average Rating</p>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-2">
-                <User className="w-8 h-8 text-purple-600" />
-                <span className="text-3xl font-bold text-gray-900">{getJobsWithoutSignature()}</span>
-              </div>
-              <p className="text-sm text-gray-600 font-medium">Contact Not On Site</p>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-2">
-                <TrendingUp className="w-8 h-8 text-green-600" />
-                <span className="text-3xl font-bold text-gray-900">
-                  {jobs.filter(j => j.customer_overall_rating && j.customer_overall_rating >= 8).length}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 font-medium">Highly Rated (8+)</p>
-            </div>
-          </div>
-        )}
-
-        {/* Filters */}
-        {jobs.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Search by customer, location, job number..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none"
-              />
               <select
                 value={filterRating || ''}
-                onChange={(e) => setFilterRating(e.target.value ? Number(e.target.value) : null)}
-                className="px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none"
+                onChange={(e) =>
+                  setFilterRating(e.target.value ? Number(e.target.value) : null)
+                }
+                className="px-4 py-3 rounded-xl text-sm transition-colors
+                  bg-white border border-slate-200 text-slate-900
+                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  dark:bg-white/5 dark:border-white/10 dark:text-white
+                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
               >
                 <option value="">All Ratings</option>
                 <option value="9">9+ Stars</option>
@@ -363,419 +366,481 @@ export default function CompletedJobsArchivePage() {
                 <option value="5">5+ Stars</option>
               </select>
             </div>
-          </div>
-        )}
 
-        {jobs.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Jobs List */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Jobs ({filteredJobs.length})</h2>
-
-                <div className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto">
-                {filteredJobs.map((job) => (
-                  <button
-                    key={job.id}
-                    onClick={() => loadJobDetails(job)}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                      selectedJobDetails?.job.id === job.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="font-bold text-gray-900">{job.customer || job.customer_name}</div>
-                      {job.contact_not_on_site && (
-                        <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
-                          No Contact
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-600 mb-2">{job.job_location || job.location}</div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500">
-                        {new Date(job.completion_signed_at).toLocaleDateString()}
-                      </span>
-                      {job.customer_overall_rating && (
-                        <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-semibold flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-current" />
-                          {job.customer_overall_rating}/10
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-
-                {filteredJobs.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    No completed jobs found
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Jobs List */}
+              <div className="lg:col-span-1">
+                <div className="rounded-2xl p-4 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3 px-1">
+                    Jobs ({filteredJobs.length})
+                  </h2>
+                  <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto pr-1">
+                    {filteredJobs.map((job) => {
+                      const active = selectedJobDetails?.job.id === job.id;
+                      return (
+                        <button
+                          key={job.id}
+                          onClick={() => loadJobDetails(job)}
+                          className={`relative w-full text-left p-3 rounded-xl overflow-hidden transition-all
+                            ${active
+                              ? 'bg-violet-50 ring-2 ring-violet-400 dark:bg-violet-500/15 dark:ring-violet-400/60'
+                              : 'bg-white ring-1 ring-slate-200 hover:ring-slate-300 dark:bg-white/[0.03] dark:ring-white/10 dark:hover:ring-white/20'
+                            }`}
+                        >
+                          <span
+                            className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-400 to-teal-500"
+                            aria-hidden
+                          />
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <span className="font-semibold text-slate-900 dark:text-white text-sm truncate">
+                              {job.customer || job.customer_name}
+                            </span>
+                            {job.contact_not_on_site && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-400/30 flex-shrink-0">
+                                No contact
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-white/50 truncate mb-1.5">
+                            {job.job_location || job.location || '—'}
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-500 dark:text-white/50">
+                              {new Date(job.completion_signed_at).toLocaleDateString()}
+                            </span>
+                            {job.customer_overall_rating && (
+                              <span className="px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-1 bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30">
+                                <Star className="w-3 h-3 fill-current" />
+                                {job.customer_overall_rating}/10
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {filteredJobs.length === 0 && (
+                      <div className="text-center py-8 text-slate-500 dark:text-white/50 text-sm">
+                        No completed jobs found
+                      </div>
+                    )}
                   </div>
-                )}
                 </div>
               </div>
-            </div>
 
-            {/* Job Details Panel */}
-            <div className="lg:col-span-2">
-              {selectedJobDetails ? (
-              <div className="space-y-6">
-                {/* Job Overview Card */}
-                <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Job Details</h2>
-
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600">Job Number</label>
-                      <p className="text-gray-900">{selectedJobDetails.job.job_number}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600">Customer</label>
-                      <p className="text-gray-900">{selectedJobDetails.job.customer || selectedJobDetails.job.customer_name}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600">Location</label>
-                      <p className="text-gray-900">{selectedJobDetails.job.job_location || selectedJobDetails.job.location}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600">Operator</label>
-                      <p className="text-gray-900">{selectedJobDetails.operatorName}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600">Scheduled Date</label>
-                      <p className="text-gray-900">
-                        {new Date(selectedJobDetails.job.scheduled_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600">Completion Date</label>
-                      <p className="text-gray-900">
-                        {new Date(selectedJobDetails.job.completion_signed_at).toLocaleString()}
-                      </p>
-                    </div>
+              {/* Details */}
+              <div className="lg:col-span-2">
+                {loadingDetails ? (
+                  <div className="rounded-2xl p-12 text-center shadow-sm bg-white border border-slate-200 dark:bg-white/5 dark:border-white/10">
+                    <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto" />
                   </div>
-
-                  {/* Time & Cost Metrics */}
-                  <div className="grid grid-cols-3 gap-4 mb-6">
-                    <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="w-5 h-5 text-blue-600" />
-                        <span className="text-sm font-semibold text-blue-900">Total Time</span>
-                      </div>
-                      <p className="text-2xl font-bold text-blue-900">
-                        {selectedJobDetails.totalJobHours.toFixed(1)}h
-                      </p>
-                    </div>
-
-                    <div className="bg-yellow-50 rounded-xl p-4 border-2 border-yellow-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="w-5 h-5 text-yellow-600" />
-                        <span className="text-sm font-semibold text-yellow-900">Standby Time</span>
-                      </div>
-                      <p className="text-2xl font-bold text-yellow-900">
-                        {selectedJobDetails.totalStandbyHours.toFixed(1)}h
-                      </p>
-                    </div>
-
-                    <div className="bg-green-50 rounded-xl p-4 border-2 border-green-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <DollarSign className="w-5 h-5 text-green-600" />
-                        <span className="text-sm font-semibold text-green-900">Labor Cost</span>
-                      </div>
-                      <p className="text-2xl font-bold text-green-900">
-                        ${selectedJobDetails.laborCost.toFixed(0)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Scope Comparison */}
-                  <div className="bg-gray-50 rounded-xl p-4 border-2 border-gray-200 mb-6">
-                    <h3 className="font-bold text-gray-900 mb-3">Original Scope vs Work Performed</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-600 mb-2">Original Description:</p>
-                        <p className="text-sm text-gray-900">
-                          {selectedJobDetails.job.description || selectedJobDetails.job.scope_of_work || 'No description'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-600 mb-2">Work Performed:</p>
-                        {selectedJobDetails.workPerformed.length > 0 ? (
-                          <ul className="text-sm text-gray-900 space-y-1">
-                            {selectedJobDetails.workPerformed.map((item, idx) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <span className="text-green-600 mt-0.5">✓</span>
-                                <span>{item.name} {item.quantity > 1 ? `(x${item.quantity})` : ''}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-gray-500 italic">No detailed work log available</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Customer Ratings */}
-                  {(selectedJobDetails.job.customer_overall_rating ||
-                    selectedJobDetails.job.customer_cleanliness_rating ||
-                    selectedJobDetails.job.customer_communication_rating) && (
-                    <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-xl p-6 border-2 border-green-200">
-                      <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <Star className="w-5 h-5 text-yellow-500 fill-current" />
-                        Customer Feedback
-                      </h3>
-                      <div className="grid grid-cols-3 gap-4 mb-4">
-                        {selectedJobDetails.job.customer_overall_rating && (
-                          <div className="text-center">
-                            <div className="text-3xl font-bold text-green-600">
-                              {selectedJobDetails.job.customer_overall_rating}/10
-                            </div>
-                            <div className="text-xs text-gray-600">Overall</div>
+                ) : selectedJobDetails ? (
+                  <div className="space-y-6">
+                    {/* Overview */}
+                    <div className="relative overflow-hidden rounded-2xl p-6 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
+                      <span
+                        className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500"
+                        aria-hidden
+                      />
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+                        Job Details
+                      </h2>
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        {[
+                          ['Job Number', selectedJobDetails.job.job_number],
+                          [
+                            'Customer',
+                            selectedJobDetails.job.customer ||
+                              selectedJobDetails.job.customer_name,
+                          ],
+                          [
+                            'Location',
+                            selectedJobDetails.job.job_location ||
+                              selectedJobDetails.job.location,
+                          ],
+                          ['Operator', selectedJobDetails.operatorName],
+                          [
+                            'Scheduled Date',
+                            new Date(
+                              selectedJobDetails.job.scheduled_date
+                            ).toLocaleDateString(),
+                          ],
+                          [
+                            'Completion Date',
+                            new Date(
+                              selectedJobDetails.job.completion_signed_at
+                            ).toLocaleString(),
+                          ],
+                        ].map(([label, value]) => (
+                          <div key={label as string}>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-1">
+                              {label}
+                            </p>
+                            <p className="text-sm text-slate-900 dark:text-white">
+                              {value || '—'}
+                            </p>
                           </div>
-                        )}
-                        {selectedJobDetails.job.customer_cleanliness_rating && (
-                          <div className="text-center">
-                            <div className="text-3xl font-bold text-blue-600">
-                              {selectedJobDetails.job.customer_cleanliness_rating}/10
-                            </div>
-                            <div className="text-xs text-gray-600">Cleanliness</div>
-                          </div>
-                        )}
-                        {selectedJobDetails.job.customer_communication_rating && (
-                          <div className="text-center">
-                            <div className="text-3xl font-bold text-purple-600">
-                              {selectedJobDetails.job.customer_communication_rating}/10
-                            </div>
-                            <div className="text-xs text-gray-600">Communication</div>
-                          </div>
-                        )}
+                        ))}
                       </div>
-                      {selectedJobDetails.job.customer_feedback_comments && (
-                        <div className="text-sm text-gray-700 bg-white p-3 rounded-lg">
-                          <strong>Comments:</strong> {selectedJobDetails.job.customer_feedback_comments}
+
+                      {/* Metrics */}
+                      <div className="grid grid-cols-3 gap-3 mb-6">
+                        {[
+                          {
+                            icon: Clock,
+                            label: 'Total Time',
+                            value: `${selectedJobDetails.totalJobHours.toFixed(1)}h`,
+                            tile: 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-400/30',
+                          },
+                          {
+                            icon: Clock,
+                            label: 'Standby Time',
+                            value: `${selectedJobDetails.totalStandbyHours.toFixed(1)}h`,
+                            tile: 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30',
+                          },
+                          {
+                            icon: DollarSign,
+                            label: 'Labor Cost',
+                            value: `$${selectedJobDetails.laborCost.toFixed(0)}`,
+                            tile: 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/30',
+                          },
+                        ].map((m) => (
+                          <div
+                            key={m.label}
+                            className={`rounded-xl p-4 ring-1 ${m.tile}`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <m.icon className="w-4 h-4" />
+                              <span className="text-xs font-semibold">{m.label}</span>
+                            </div>
+                            <p className="text-2xl font-bold tabular-nums">{m.value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Scope */}
+                      <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10 mb-6">
+                        <h3 className="font-bold text-slate-900 dark:text-white mb-3 text-sm">
+                          Original Scope vs Work Performed
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs font-semibold uppercase text-slate-500 dark:text-white/50 mb-1">
+                              Original Description
+                            </p>
+                            <p className="text-sm text-slate-700 dark:text-white/80">
+                              {selectedJobDetails.job.description ||
+                                selectedJobDetails.job.scope_of_work ||
+                                'No description'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase text-slate-500 dark:text-white/50 mb-1">
+                              Work Performed
+                            </p>
+                            {selectedJobDetails.workPerformed.length > 0 ? (
+                              <ul className="text-sm text-slate-700 dark:text-white/80 space-y-1">
+                                {selectedJobDetails.workPerformed.map((item, idx) => (
+                                  <li key={idx} className="flex items-start gap-2">
+                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                                    <span>
+                                      {item.name}{' '}
+                                      {item.quantity > 1 ? `(x${item.quantity})` : ''}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm italic text-slate-500 dark:text-white/50">
+                                No detailed work log available
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Ratings */}
+                      {(selectedJobDetails.job.customer_overall_rating ||
+                        selectedJobDetails.job.customer_cleanliness_rating ||
+                        selectedJobDetails.job.customer_communication_rating) && (
+                        <div className="rounded-xl p-5 ring-1 bg-gradient-to-br from-emerald-50 to-sky-50 ring-emerald-200 dark:from-emerald-500/10 dark:to-sky-500/10 dark:ring-emerald-400/30">
+                          <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2 text-sm">
+                            <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                            Customer Feedback
+                          </h3>
+                          <div className="grid grid-cols-3 gap-4 mb-3">
+                            {selectedJobDetails.job.customer_overall_rating && (
+                              <div className="text-center">
+                                <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-300 tabular-nums">
+                                  {selectedJobDetails.job.customer_overall_rating}/10
+                                </div>
+                                <div className="text-xs text-slate-600 dark:text-white/60">
+                                  Overall
+                                </div>
+                              </div>
+                            )}
+                            {selectedJobDetails.job.customer_cleanliness_rating && (
+                              <div className="text-center">
+                                <div className="text-3xl font-bold text-sky-600 dark:text-sky-300 tabular-nums">
+                                  {selectedJobDetails.job.customer_cleanliness_rating}/10
+                                </div>
+                                <div className="text-xs text-slate-600 dark:text-white/60">
+                                  Cleanliness
+                                </div>
+                              </div>
+                            )}
+                            {selectedJobDetails.job.customer_communication_rating && (
+                              <div className="text-center">
+                                <div className="text-3xl font-bold text-violet-600 dark:text-violet-300 tabular-nums">
+                                  {
+                                    selectedJobDetails.job
+                                      .customer_communication_rating
+                                  }
+                                  /10
+                                </div>
+                                <div className="text-xs text-slate-600 dark:text-white/60">
+                                  Communication
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {selectedJobDetails.job.customer_feedback_comments && (
+                            <div className="text-sm p-3 rounded-lg bg-white/80 text-slate-700 dark:bg-white/5 dark:text-white/80">
+                              <strong>Comments: </strong>
+                              {selectedJobDetails.job.customer_feedback_comments}
+                            </div>
+                          )}
+                          <div className="mt-3 text-xs text-slate-600 dark:text-white/60 flex items-center gap-1">
+                            {selectedJobDetails.job.contact_not_on_site ? (
+                              <>
+                                <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                                No customer signature — contact not available on site
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                                Signed by:{' '}
+                                {selectedJobDetails.job.completion_signer_name ||
+                                  'Unknown'}
+                              </>
+                            )}
+                          </div>
                         </div>
                       )}
-                      <div className="mt-3 text-xs text-gray-600">
-                        {selectedJobDetails.job.contact_not_on_site
-                          ? '⚠️ No customer signature - contact not available on site'
-                          : `Signed by: ${selectedJobDetails.job.completion_signer_name || 'Unknown'}`
-                        }
-                      </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Legal Documents Card */}
-                <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <FileText className="w-6 h-6 text-orange-600" />
-                    Job Documents & Attachments
-                  </h2>
-
-                  <div className="space-y-3">
-                    {/* Work Order Agreement PDF */}
-                    {selectedJobDetails.job.agreement_pdf && (
-                      <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3">
-                            <FileText className="w-5 h-5 text-orange-600 mt-0.5" />
-                            <div>
-                              <p className="font-bold text-orange-900">Work Order Agreement</p>
-                              <p className="text-sm text-orange-700">
-                                Signed at start of job - Terms & conditions accepted
-                              </p>
-                              <p className="text-xs text-orange-600">
-                                {selectedJobDetails.job.agreement_pdf_generated_at
-                                  ? new Date(selectedJobDetails.job.agreement_pdf_generated_at).toLocaleString()
-                                  : 'Generated with job'}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const blob = new Blob(
-                                [Uint8Array.from(atob(selectedJobDetails.job.agreement_pdf!), c => c.charCodeAt(0))],
-                                { type: 'application/pdf' }
-                              );
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `WorkOrderAgreement_${selectedJobDetails.job.job_number}.pdf`;
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            }}
-                            className="px-3 py-1 bg-orange-600 text-white rounded-lg text-xs font-semibold hover:bg-orange-700 transition-colors flex items-center gap-1"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Download
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Liability Release PDF */}
-                    {selectedJobDetails.job.liability_release_signed_at && selectedJobDetails.job.liability_release_pdf && (
-                      <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3">
-                            <FileText className="w-5 h-5 text-red-600 mt-0.5" />
-                            <div>
-                              <p className="font-bold text-red-900">Liability Release & Indemnification</p>
-                              <p className="text-sm text-red-700">
-                                Signed by: {selectedJobDetails.job.liability_release_signed_by}
-                              </p>
-                              <p className="text-xs text-red-600">
-                                {new Date(selectedJobDetails.job.liability_release_signed_at).toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const blob = new Blob(
-                                [Uint8Array.from(atob(selectedJobDetails.job.liability_release_pdf!), c => c.charCodeAt(0))],
-                                { type: 'application/pdf' }
-                              );
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `LiabilityRelease_${selectedJobDetails.job.job_number}.pdf`;
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            }}
-                            className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors flex items-center gap-1"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Download
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Silica Exposure Control Plan PDF */}
-                    {selectedJobDetails.job.silica_form_completed_at && selectedJobDetails.job.silica_form_pdf && (
-                      <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3">
-                            <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
-                            <div>
-                              <p className="font-bold text-blue-900">Silica Dust/Exposure Control Plan</p>
-                              <p className="text-sm text-blue-700">
-                                OSHA compliant silica exposure documentation
-                              </p>
-                              <p className="text-xs text-blue-600">
-                                {new Date(selectedJobDetails.job.silica_form_completed_at).toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const blob = new Blob(
-                                [Uint8Array.from(atob(selectedJobDetails.job.silica_form_pdf!), c => c.charCodeAt(0))],
-                                { type: 'application/pdf' }
-                              );
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `SilicaForm_${selectedJobDetails.job.job_number}.pdf`;
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            }}
-                            className="px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Download
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Service Completion Agreement */}
-                    {selectedJobDetails.job.completion_signed_at && !selectedJobDetails.job.contact_not_on_site && (
-                      <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3">
-                            <FileText className="w-5 h-5 text-green-600 mt-0.5" />
-                            <div>
-                              <p className="font-bold text-green-900">Service Completion Signature</p>
-                              <p className="text-sm text-green-700">
-                                Signed by: {selectedJobDetails.job.completion_signer_name}
-                              </p>
-                              <p className="text-xs text-green-600">
-                                {new Date(selectedJobDetails.job.completion_signed_at).toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                            ✓ Signed
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Show message if no documents available */}
-                    {!selectedJobDetails.job.agreement_pdf &&
-                     !selectedJobDetails.job.liability_release_pdf &&
-                     !selectedJobDetails.job.silica_form_pdf &&
-                     !selectedJobDetails.job.completion_signed_at && (
-                      <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-6 text-center">
-                        <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-600 font-medium">No documents available for this job</p>
-                        <p className="text-sm text-gray-500 mt-1">Documents are generated during job workflow completion</p>
-                      </div>
-                    )}
-
-                    {/* Other Storage Documents */}
-                    {selectedJobDetails.documents.length > 0 && (
-                      <>
-                        <div className="border-t-2 border-gray-200 my-4 pt-4">
-                          <h3 className="text-sm font-bold text-gray-700 mb-2">Additional Storage Documents</h3>
-                        </div>
-                        {selectedJobDetails.documents.map((doc) => (
-                          <div key={doc.id} className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                            <div className="flex items-start justify-between">
+                    {/* Documents */}
+                    <div className="rounded-2xl p-6 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
+                      <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+                        Job Documents &amp; Attachments
+                      </h2>
+                      <div className="space-y-3">
+                        {selectedJobDetails.job.agreement_pdf && (
+                          <DocRow
+                            title="Work Order Agreement"
+                            subtitle="Signed at start of job — Terms & conditions accepted"
+                            date={
+                              selectedJobDetails.job.agreement_pdf_generated_at ||
+                              'Generated with job'
+                            }
+                            hue="orange"
+                            onDownload={() =>
+                              downloadPdf(
+                                selectedJobDetails.job.agreement_pdf!,
+                                `WorkOrderAgreement_${selectedJobDetails.job.job_number}.pdf`
+                              )
+                            }
+                          />
+                        )}
+                        {selectedJobDetails.job.liability_release_signed_at &&
+                          selectedJobDetails.job.liability_release_pdf && (
+                            <DocRow
+                              title="Liability Release & Indemnification"
+                              subtitle={`Signed by: ${selectedJobDetails.job.liability_release_signed_by}`}
+                              date={selectedJobDetails.job.liability_release_signed_at}
+                              hue="rose"
+                              onDownload={() =>
+                                downloadPdf(
+                                  selectedJobDetails.job.liability_release_pdf!,
+                                  `LiabilityRelease_${selectedJobDetails.job.job_number}.pdf`
+                                )
+                              }
+                            />
+                          )}
+                        {selectedJobDetails.job.silica_form_completed_at &&
+                          selectedJobDetails.job.silica_form_pdf && (
+                            <DocRow
+                              title="Silica Dust/Exposure Control Plan"
+                              subtitle="OSHA compliant silica exposure documentation"
+                              date={selectedJobDetails.job.silica_form_completed_at}
+                              hue="sky"
+                              onDownload={() =>
+                                downloadPdf(
+                                  selectedJobDetails.job.silica_form_pdf!,
+                                  `SilicaForm_${selectedJobDetails.job.job_number}.pdf`
+                                )
+                              }
+                            />
+                          )}
+                        {selectedJobDetails.job.completion_signed_at &&
+                          !selectedJobDetails.job.contact_not_on_site && (
+                            <div className="rounded-xl p-4 bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30 flex items-start justify-between gap-3">
                               <div className="flex items-start gap-3">
-                                <FileText className="w-5 h-5 text-purple-600 mt-0.5" />
+                                <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5" />
                                 <div>
-                                  <p className="font-bold text-purple-900">{doc.document_name}</p>
-                                  <p className="text-xs text-purple-600">
-                                    Generated: {new Date(doc.generated_at).toLocaleString()}
+                                  <p className="font-semibold text-emerald-900 dark:text-emerald-200">
+                                    Service Completion Signature
+                                  </p>
+                                  <p className="text-sm text-emerald-700 dark:text-emerald-300/80">
+                                    Signed by:{' '}
+                                    {selectedJobDetails.job.completion_signer_name}
+                                  </p>
+                                  <p className="text-xs text-emerald-600 dark:text-emerald-300/60">
+                                    {new Date(
+                                      selectedJobDetails.job.completion_signed_at
+                                    ).toLocaleString()}
                                   </p>
                                 </div>
                               </div>
-                              <a
-                                href={doc.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors"
-                              >
-                                View
-                              </a>
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/30 flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" />
+                                Signed
+                              </span>
                             </div>
-                          </div>
-                        ))}
-                      </>
-                    )}
+                          )}
+
+                        {!selectedJobDetails.job.agreement_pdf &&
+                          !selectedJobDetails.job.liability_release_pdf &&
+                          !selectedJobDetails.job.silica_form_pdf &&
+                          !selectedJobDetails.job.completion_signed_at && (
+                            <div className="rounded-xl p-6 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                              <FileText className="w-10 h-10 text-slate-300 dark:text-white/20 mx-auto mb-2" />
+                              <p className="text-slate-600 dark:text-white/70 font-medium text-sm">
+                                No documents available for this job
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-white/50 mt-1">
+                                Documents are generated during job workflow completion
+                              </p>
+                            </div>
+                          )}
+
+                        {selectedJobDetails.documents.length > 0 && (
+                          <>
+                            <div className="border-t border-slate-200 dark:border-white/10 my-4 pt-4">
+                              <h3 className="text-sm font-bold text-slate-700 dark:text-white/80 mb-2">
+                                Additional Storage Documents
+                              </h3>
+                            </div>
+                            {selectedJobDetails.documents.map((doc) => (
+                              <div
+                                key={doc.id}
+                                className="rounded-xl p-4 bg-violet-50 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/30 flex items-start justify-between gap-3"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <FileText className="w-5 h-5 text-violet-600 dark:text-violet-300 mt-0.5" />
+                                  <div>
+                                    <p className="font-semibold text-violet-900 dark:text-violet-200">
+                                      {doc.document_name}
+                                    </p>
+                                    <p className="text-xs text-violet-600 dark:text-violet-300/70">
+                                      Generated:{' '}
+                                      {new Date(doc.generated_at).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                                <a
+                                  href={doc.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors flex-shrink-0"
+                                >
+                                  View
+                                </a>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-2xl p-12 text-center shadow-sm bg-white border border-slate-200 dark:bg-white/5 dark:border-white/10">
+                    <FileText className="w-12 h-12 text-slate-300 dark:text-white/20 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+                      Select a Job
+                    </h3>
+                    <p className="text-slate-500 dark:text-white/60 text-sm">
+                      Click on a job from the list to view detailed analytics and
+                      documents
+                    </p>
+                  </div>
+                )}
               </div>
-              ) : (
-                <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-12 text-center">
-                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Select a Job</h3>
-                  <p className="text-gray-600">Click on a job from the list to view detailed analytics and documents</p>
-                </div>
-              )}
             </div>
-          </div>
+          </>
         )}
       </div>
+    </div>
+  );
+}
+
+function DocRow({
+  title,
+  subtitle,
+  date,
+  hue,
+  onDownload,
+}: {
+  title: string;
+  subtitle: string;
+  date: string;
+  hue: 'orange' | 'rose' | 'sky';
+  onDownload: () => void;
+}) {
+  const hueMap = {
+    orange:
+      'bg-orange-50 ring-orange-200 dark:bg-orange-500/10 dark:ring-orange-400/30',
+    rose: 'bg-rose-50 ring-rose-200 dark:bg-rose-500/10 dark:ring-rose-400/30',
+    sky: 'bg-sky-50 ring-sky-200 dark:bg-sky-500/10 dark:ring-sky-400/30',
+  };
+  const textMap = {
+    orange: 'text-orange-600 dark:text-orange-300',
+    rose: 'text-rose-600 dark:text-rose-300',
+    sky: 'text-sky-600 dark:text-sky-300',
+  };
+  const titleMap = {
+    orange: 'text-orange-900 dark:text-orange-200',
+    rose: 'text-rose-900 dark:text-rose-200',
+    sky: 'text-sky-900 dark:text-sky-200',
+  };
+  const btnMap = {
+    orange: 'bg-orange-600 hover:bg-orange-700',
+    rose: 'bg-rose-600 hover:bg-rose-700',
+    sky: 'bg-sky-600 hover:bg-sky-700',
+  };
+  return (
+    <div
+      className={`rounded-xl p-4 ring-1 flex items-start justify-between gap-3 ${hueMap[hue]}`}
+    >
+      <div className="flex items-start gap-3">
+        <FileText className={`w-5 h-5 mt-0.5 ${textMap[hue]}`} />
+        <div>
+          <p className={`font-semibold ${titleMap[hue]}`}>{title}</p>
+          <p className={`text-sm ${textMap[hue]}`}>{subtitle}</p>
+          <p className={`text-xs ${textMap[hue]} opacity-80`}>
+            {typeof date === 'string' && !isNaN(Date.parse(date))
+              ? new Date(date).toLocaleString()
+              : date}
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={onDownload}
+        className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors flex items-center gap-1 flex-shrink-0 ${btnMap[hue]}`}
+      >
+        <Download className="w-3.5 h-3.5" />
+        Download
+      </button>
     </div>
   );
 }

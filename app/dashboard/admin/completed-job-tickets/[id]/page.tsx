@@ -53,38 +53,80 @@ async function apiFetch(url: string, opts?: RequestInit) {
 }
 function billingTypeBadge(type: string | null) {
   if (!type) return null;
-  const cfg: Record<string, { bg: string; text: string; label: string }> = {
-    fixed: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Fixed Price' },
-    cycle: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Cycle Billing' },
-    time_material: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
-    time_and_material: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
-    tm: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'T&M' },
+  const cfg: Record<string, { cls: string; label: string }> = {
+    fixed: {
+      cls: 'bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30',
+      label: 'Fixed Price',
+    },
+    cycle: {
+      cls: 'bg-violet-100 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30',
+      label: 'Cycle Billing',
+    },
+    time_material: {
+      cls: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30',
+      label: 'T&M',
+    },
+    time_and_material: {
+      cls: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30',
+      label: 'T&M',
+    },
+    tm: {
+      cls: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30',
+      label: 'T&M',
+    },
   };
-  const c = cfg[type.toLowerCase()] || { bg: 'bg-gray-100', text: 'text-gray-700', label: type };
-  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${c.bg} ${c.text}`}>{c.label}</span>;
+  const c = cfg[type.toLowerCase()] || {
+    cls: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white/80 dark:ring-white/10',
+    label: type,
+  };
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${c.cls}`}
+    >
+      {c.label}
+    </span>
+  );
 }
 function StarDisplay({ rating, max = 5 }: { rating: number | null; max?: number }) {
-  if (rating === null || rating === undefined) return <span className="text-gray-400 text-sm">No rating</span>;
+  if (rating === null || rating === undefined)
+    return <span className="text-slate-400 dark:text-white/40 text-sm">No rating</span>;
   const normalized = max === 10 ? rating / 2 : rating;
   return (
     <div className="flex items-center gap-1">
-      {[0, 1, 2, 3, 4].map(i => <Star key={i} className={`w-4 h-4 ${i < Math.floor(normalized) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />)}
-      <span className="ml-1 text-sm font-medium text-gray-600">{rating}/{max}</span>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Star
+          key={i}
+          className={`w-4 h-4 ${
+            i < Math.floor(normalized)
+              ? 'fill-amber-400 text-amber-400'
+              : 'text-slate-300 dark:text-white/20'
+          }`}
+        />
+      ))}
+      <span className="ml-1 text-sm font-medium text-slate-600 dark:text-white/70">
+        {rating}/{max}
+      </span>
     </div>
   );
 }
 function ProgressBar({ pct }: { pct: number }) {
-  const color = pct >= 100 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-400' : 'bg-red-500';
-  return <div className="h-2 rounded-full bg-gray-200 overflow-hidden"><div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} /></div>;
-}
-function SkeletonCard() {
+  const color =
+    pct >= 100
+      ? 'bg-emerald-500'
+      : pct >= 50
+      ? 'bg-amber-400'
+      : 'bg-rose-500';
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm animate-pulse">
-      <div className="h-5 bg-gray-200 rounded w-1/3 mb-4" />
-      <div className="space-y-3"><div className="h-4 bg-gray-100 rounded" /><div className="h-4 bg-gray-100 rounded w-3/4" /><div className="h-4 bg-gray-100 rounded w-1/2" /></div>
+    <div className="h-2 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+      <div
+        className={`h-2 rounded-full ${color} transition-all`}
+        style={{ width: `${Math.min(pct, 100)}%` }}
+      />
     </div>
   );
 }
+const SECTION_CARD =
+  'rounded-2xl p-6 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10';
 
 export default function CompletedJobSummaryPage() {
   const router = useRouter();
@@ -268,11 +310,16 @@ export default function CompletedJobSummaryPage() {
 
   if (!summary) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
         <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Job Not Found</h2>
-          <Link href="/dashboard/admin/completed-job-tickets" className="text-blue-600 hover:underline text-sm">Back to Completed Jobs</Link>
+          <AlertCircle className="w-12 h-12 text-rose-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Job Not Found</h2>
+          <Link
+            href="/dashboard/admin/completed-job-tickets"
+            className="text-violet-600 dark:text-violet-300 hover:underline text-sm"
+          >
+            Back to Completed Jobs
+          </Link>
         </div>
       </div>
     );
@@ -287,34 +334,60 @@ export default function CompletedJobSummaryPage() {
   const isCycleBilling = (summary.billing_type || '').toLowerCase() === 'cycle';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+      <div className="sticky top-0 z-40 backdrop-blur bg-white/80 border-b border-slate-200 dark:bg-[#0b0618]/80 dark:border-white/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Link href="/dashboard/admin/completed-job-tickets" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            <Link
+              href="/dashboard/admin/completed-job-tickets"
+              className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors dark:bg-white/5 dark:border-white/10 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10"
+            >
+              <ArrowLeft className="w-5 h-5" />
             </Link>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{summary.job_number}</span>
-                <ChevronRight className="w-3 h-3 text-gray-300" />
-                <h1 className="text-lg font-bold text-gray-900 truncate">{jobName}</h1>
+                <span className="text-xs font-mono font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider">
+                  {summary.job_number}
+                </span>
+                <ChevronRight className="w-3 h-3 text-slate-300 dark:text-white/30" />
+                <h1 className="text-lg font-bold text-slate-900 dark:text-white truncate">
+                  {jobName}
+                </h1>
               </div>
-              <p className="text-sm text-gray-500">{customerName}</p>
+              <p className="text-sm text-slate-500 dark:text-white/60">{customerName}</p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-                <CheckCircle className="w-4 h-4" />Completed
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30">
+                <CheckCircle className="w-4 h-4" />
+                Completed
               </span>
-              <button onClick={handleNotifySalesperson} disabled={notifying} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}Notify Salesperson
+              <button
+                onClick={handleNotifySalesperson}
+                disabled={notifying}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50
+                  bg-white border border-slate-200 text-slate-700 hover:bg-slate-50
+                  dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10"
+              >
+                {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                Notify Salesperson
               </button>
-              <button onClick={() => openSigModal()} className="inline-flex items-center gap-1.5 px-3 py-2 border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium transition-colors">
-                <Send className="w-4 h-4" />Send for Signature
+              <button
+                onClick={() => openSigModal()}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                  bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100
+                  dark:bg-violet-500/15 dark:border-violet-400/30 dark:text-violet-200 dark:hover:bg-violet-500/25"
+              >
+                <Send className="w-4 h-4" />
+                Send for Signature
               </button>
-              <Link href={`/dashboard/admin/billing/create?job=${jobId}`} className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors">
-                <Receipt className="w-4 h-4" />Create Invoice
+              <Link
+                href={`/dashboard/admin/billing/create?job=${jobId}`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+                  bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 text-white shadow-md shadow-violet-500/20 hover:shadow-lg"
+              >
+                <Receipt className="w-4 h-4" />
+                Create Invoice
               </Link>
             </div>
           </div>
@@ -324,10 +397,22 @@ export default function CompletedJobSummaryPage() {
       {/* Action messages */}
       {actionMsg && (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
-          <div className={`flex items-center gap-3 p-3 rounded-lg border text-sm ${actionMsg.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-            {actionMsg.type === 'success' ? <CheckCircle className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+          <div
+            className={`flex items-center gap-3 p-3 rounded-xl ring-1 text-sm ${
+              actionMsg.type === 'success'
+                ? 'bg-emerald-50 ring-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:ring-emerald-400/30 dark:text-emerald-300'
+                : 'bg-rose-50 ring-rose-200 text-rose-700 dark:bg-rose-500/10 dark:ring-rose-400/30 dark:text-rose-300'
+            }`}
+          >
+            {actionMsg.type === 'success' ? (
+              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            )}
             <span className="flex-1">{actionMsg.text}</span>
-            <button onClick={() => setActionMsg(null)}><X className="w-4 h-4" /></button>
+            <button onClick={() => setActionMsg(null)}>
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
@@ -336,43 +421,83 @@ export default function CompletedJobSummaryPage() {
 
         {/* Job Overview */}
         <RevealSection index={0}>
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><FileText className="w-5 h-5 text-blue-600" />Job Overview</h2>
+        <div className={`relative overflow-hidden ${SECTION_CARD}`}>
+          <span className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" aria-hidden />
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+            Job Overview
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Customer</p>
-              <p className="text-gray-900 font-medium">{customerName}</p>
-              {summary.customer_contact && <p className="text-sm text-gray-500">{summary.customer_contact}</p>}
-              {summary.customer_email && <p className="text-sm text-gray-400">{summary.customer_email}</p>}
+              <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Customer</p>
+              <p className="text-slate-900 dark:text-white font-medium">{customerName}</p>
+              {summary.customer_contact && <p className="text-sm text-slate-500 dark:text-white/60">{summary.customer_contact}</p>}
+              {summary.customer_email && <p className="text-sm text-slate-400 dark:text-white/40">{summary.customer_email}</p>}
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Location</p>
-              <p className="text-gray-900 font-medium flex items-start gap-1"><MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />{location}</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Location</p>
+              <p className="text-slate-900 dark:text-white font-medium flex items-start gap-1">
+                <MapPin className="w-4 h-4 text-slate-400 dark:text-white/40 mt-0.5 flex-shrink-0" />
+                {location}
+              </p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Dates</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Dates</p>
               <div className="flex items-center gap-2 text-sm">
-                <Calendar className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-600">{scheduledDate}</span><span className="text-gray-400">→</span><span className="text-gray-900 font-medium">{completedDate}</span>
+                <Calendar className="w-4 h-4 text-slate-400 dark:text-white/40" />
+                <span className="text-slate-600 dark:text-white/70">{scheduledDate}</span>
+                <span className="text-slate-400 dark:text-white/40">→</span>
+                <span className="text-slate-900 dark:text-white font-medium">{completedDate}</span>
               </div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Billing Type</p>
-              <div>{billingTypeBadge(summary.billing_type) ?? <span className="text-gray-400 text-sm">Not set</span>}</div>
+              <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Billing Type</p>
+              <div>{billingTypeBadge(summary.billing_type) ?? <span className="text-slate-400 dark:text-white/40 text-sm">Not set</span>}</div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Estimated Cost</p>
-              <p className="text-gray-900 font-medium">{summary.estimated_cost ? `$${Number(summary.estimated_cost).toLocaleString()}` : '--'}</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Estimated Cost</p>
+              <p className="text-slate-900 dark:text-white font-medium">{summary.estimated_cost ? `$${Number(summary.estimated_cost).toLocaleString()}` : '--'}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Actual Cost</p>
-              <p className={`font-semibold ${summary.actual_cost && summary.estimated_cost && summary.actual_cost > summary.estimated_cost ? 'text-red-600' : 'text-emerald-600'}`}>
-                {summary.actual_cost ? `$${Number(summary.actual_cost).toLocaleString()}` : laborCost > 0 ? `$${laborCost.toFixed(0)} (labor est.)` : '--'}
+              <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Actual Cost</p>
+              <p
+                className={`font-semibold ${
+                  summary.actual_cost &&
+                  summary.estimated_cost &&
+                  summary.actual_cost > summary.estimated_cost
+                    ? 'text-rose-600 dark:text-rose-300'
+                    : 'text-emerald-600 dark:text-emerald-300'
+                }`}
+              >
+                {summary.actual_cost
+                  ? `$${Number(summary.actual_cost).toLocaleString()}`
+                  : laborCost > 0
+                  ? `$${laborCost.toFixed(0)} (labor est.)`
+                  : '--'}
               </p>
             </div>
-            {summary.po_number && <div><p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">PO Number</p><p className="text-gray-900 font-medium">{summary.po_number}</p></div>}
-            {summary.salesman_name && <div><p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Salesperson</p><p className="text-gray-900 font-medium flex items-center gap-1"><User className="w-4 h-4 text-gray-400" />{summary.salesman_name}</p></div>}
-            {(summary.foreman_name || summary.foreman_phone) && <div><p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Site Contact</p><p className="text-gray-900 font-medium">{summary.foreman_name}</p>{summary.foreman_phone && <p className="text-sm text-gray-500">{summary.foreman_phone}</p>}</div>}
+            {summary.po_number && (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">PO Number</p>
+                <p className="text-slate-900 dark:text-white font-medium">{summary.po_number}</p>
+              </div>
+            )}
+            {summary.salesman_name && (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Salesperson</p>
+                <p className="text-slate-900 dark:text-white font-medium flex items-center gap-1">
+                  <User className="w-4 h-4 text-slate-400 dark:text-white/40" />
+                  {summary.salesman_name}
+                </p>
+              </div>
+            )}
+            {(summary.foreman_name || summary.foreman_phone) && (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Site Contact</p>
+                <p className="text-slate-900 dark:text-white font-medium">{summary.foreman_name}</p>
+                {summary.foreman_phone && <p className="text-sm text-slate-500 dark:text-white/60">{summary.foreman_phone}</p>}
+              </div>
+            )}
           </div>
         </div>
         </RevealSection>
@@ -380,14 +505,25 @@ export default function CompletedJobSummaryPage() {
         {/* Scope Completed */}
         {scopeMetrics.length > 0 && (
           <RevealSection index={1}>
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-emerald-600" />Scope Completed</h2>
+          <div className={SECTION_CARD}>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-emerald-600 dark:text-emerald-300" />
+              Scope Completed
+            </h2>
             <div className={`grid grid-cols-1 gap-4 ${scopeMetrics.length === 1 ? 'sm:grid-cols-1' : scopeMetrics.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
               {scopeMetrics.map((m) => (
-                <div key={m.label} className="bg-gray-50 rounded-lg p-4 text-center">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{m.label}</p>
-                  <p className="text-3xl font-bold text-gray-900 mb-1">{m.actual.toLocaleString()}</p>
-                  {m.expected > 0 && (<><p className="text-xs text-gray-400 mb-3">of {m.expected.toLocaleString()} expected</p><ProgressBar pct={m.pct} /><p className={`text-xs font-semibold mt-1 ${m.pct >= 100 ? 'text-green-600' : m.pct >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>{m.pct.toFixed(0)}% complete</p></>)}
+                <div key={m.label} className="rounded-xl p-4 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-2">{m.label}</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-1 tabular-nums">{m.actual.toLocaleString()}</p>
+                  {m.expected > 0 && (
+                    <>
+                      <p className="text-xs text-slate-400 dark:text-white/40 mb-3">of {m.expected.toLocaleString()} expected</p>
+                      <ProgressBar pct={m.pct} />
+                      <p className={`text-xs font-semibold mt-1 ${m.pct >= 100 ? 'text-emerald-600 dark:text-emerald-300' : m.pct >= 50 ? 'text-amber-600 dark:text-amber-300' : 'text-rose-600 dark:text-rose-300'}`}>
+                        {m.pct.toFixed(0)}% complete
+                      </p>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -397,46 +533,75 @@ export default function CompletedJobSummaryPage() {
 
         {/* Labor Hours */}
         <RevealSection index={2}>
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Clock className="w-5 h-5 text-blue-600" />Labor Hours</h2>
+        <div className={SECTION_CARD}>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-sky-600 dark:text-sky-300" />
+            Labor Hours
+          </h2>
           {laborRows.length === 0 ? (
-            <div className="text-center py-8 text-gray-400"><Clock className="w-10 h-10 mx-auto mb-2 text-gray-200" /><p className="text-sm">No timecard records found for this job.</p></div>
+            <div className="text-center py-8 text-slate-400 dark:text-white/40">
+              <Clock className="w-10 h-10 mx-auto mb-2 text-slate-200 dark:text-white/20" />
+              <p className="text-sm">No timecard records found for this job.</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    {['Operator', 'Date', 'Regular Hrs', 'OT Hrs', 'NS Premium Hrs', 'Total'].map(h => <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>)}
+                  <tr className="bg-slate-50 dark:bg-white/[0.03] border-b border-slate-200 dark:border-white/10">
+                    {['Operator', 'Date', 'Regular Hrs', 'OT Hrs', 'NS Premium Hrs', 'Total'].map((h) => (
+                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider">
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {laborRows.map((row, i) => (
-                    <tr key={i} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
-                      <td className="px-4 py-2.5 text-gray-900 font-medium">{row.operator_name}</td>
-                      <td className="px-4 py-2.5 text-gray-600">{row.date}</td>
-                      <td className="px-4 py-2.5 text-gray-700">{row.regular_hrs.toFixed(1)}</td>
-                      <td className="px-4 py-2.5 text-amber-700">{row.ot_hrs > 0 ? row.ot_hrs.toFixed(1) : '--'}</td>
-                      <td className="px-4 py-2.5 text-purple-700">{row.ns_hrs > 0 ? row.ns_hrs.toFixed(1) : '--'}</td>
-                      <td className="px-4 py-2.5 text-gray-900 font-semibold">{row.total.toFixed(1)}</td>
+                    <tr key={i} className={i % 2 === 1 ? 'bg-slate-50/70 dark:bg-white/[0.02]' : ''}>
+                      <td className="px-4 py-2.5 text-slate-900 dark:text-white font-medium">{row.operator_name}</td>
+                      <td className="px-4 py-2.5 text-slate-600 dark:text-white/70">{row.date}</td>
+                      <td className="px-4 py-2.5 text-slate-700 dark:text-white/80 tabular-nums">{row.regular_hrs.toFixed(1)}</td>
+                      <td className="px-4 py-2.5 text-amber-700 dark:text-amber-300 tabular-nums">{row.ot_hrs > 0 ? row.ot_hrs.toFixed(1) : '--'}</td>
+                      <td className="px-4 py-2.5 text-violet-700 dark:text-violet-300 tabular-nums">{row.ns_hrs > 0 ? row.ns_hrs.toFixed(1) : '--'}</td>
+                      <td className="px-4 py-2.5 text-slate-900 dark:text-white font-semibold tabular-nums">{row.total.toFixed(1)}</td>
                     </tr>
                   ))}
-                  <tr className="bg-gray-100 border-t-2 border-gray-200 font-semibold">
-                    <td className="px-4 py-2.5 text-gray-900" colSpan={2}>Totals</td>
-                    <td className="px-4 py-2.5 text-gray-900">{totalRegular.toFixed(1)}</td>
-                    <td className="px-4 py-2.5 text-amber-700">{totalOT > 0 ? totalOT.toFixed(1) : '--'}</td>
-                    <td className="px-4 py-2.5 text-purple-700">{totalNS > 0 ? totalNS.toFixed(1) : '--'}</td>
-                    <td className="px-4 py-2.5 text-gray-900">{totalHrs.toFixed(1)}</td>
+                  <tr className="bg-slate-100 dark:bg-white/[0.05] border-t-2 border-slate-200 dark:border-white/10 font-semibold">
+                    <td className="px-4 py-2.5 text-slate-900 dark:text-white" colSpan={2}>Totals</td>
+                    <td className="px-4 py-2.5 text-slate-900 dark:text-white tabular-nums">{totalRegular.toFixed(1)}</td>
+                    <td className="px-4 py-2.5 text-amber-700 dark:text-amber-300 tabular-nums">{totalOT > 0 ? totalOT.toFixed(1) : '--'}</td>
+                    <td className="px-4 py-2.5 text-violet-700 dark:text-violet-300 tabular-nums">{totalNS > 0 ? totalNS.toFixed(1) : '--'}</td>
+                    <td className="px-4 py-2.5 text-slate-900 dark:text-white tabular-nums">{totalHrs.toFixed(1)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           )}
           {laborCost > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-4">
-              <div className="bg-blue-50 rounded-lg px-4 py-2 text-sm"><span className="text-gray-600">Regular: </span><span className="font-semibold text-blue-700">${(totalRegular * RATE_REGULAR).toFixed(0)}</span><span className="text-gray-400 ml-1">@ ${RATE_REGULAR}/hr</span></div>
-              {totalOT > 0 && <div className="bg-amber-50 rounded-lg px-4 py-2 text-sm"><span className="text-gray-600">OT: </span><span className="font-semibold text-amber-700">${(totalOT * RATE_OT).toFixed(0)}</span><span className="text-gray-400 ml-1">@ ${RATE_OT}/hr</span></div>}
-              {totalNS > 0 && <div className="bg-purple-50 rounded-lg px-4 py-2 text-sm"><span className="text-gray-600">Night Shift: </span><span className="font-semibold text-purple-700">${(totalNS * RATE_NS).toFixed(0)}</span><span className="text-gray-400 ml-1">@ ${RATE_NS}/hr</span></div>}
-              <div className="bg-emerald-50 rounded-lg px-4 py-2 text-sm font-bold"><span className="text-gray-600">Total Labor Cost: </span><span className="text-emerald-700">${laborCost.toFixed(0)}</span></div>
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 flex flex-wrap gap-3">
+              <div className="rounded-lg px-3 py-2 text-sm bg-sky-50 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:ring-sky-400/30">
+                <span className="text-slate-600 dark:text-white/60">Regular: </span>
+                <span className="font-semibold text-sky-700 dark:text-sky-300">${(totalRegular * RATE_REGULAR).toFixed(0)}</span>
+                <span className="text-slate-400 dark:text-white/40 ml-1">@ ${RATE_REGULAR}/hr</span>
+              </div>
+              {totalOT > 0 && (
+                <div className="rounded-lg px-3 py-2 text-sm bg-amber-50 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/30">
+                  <span className="text-slate-600 dark:text-white/60">OT: </span>
+                  <span className="font-semibold text-amber-700 dark:text-amber-300">${(totalOT * RATE_OT).toFixed(0)}</span>
+                  <span className="text-slate-400 dark:text-white/40 ml-1">@ ${RATE_OT}/hr</span>
+                </div>
+              )}
+              {totalNS > 0 && (
+                <div className="rounded-lg px-3 py-2 text-sm bg-violet-50 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/30">
+                  <span className="text-slate-600 dark:text-white/60">Night Shift: </span>
+                  <span className="font-semibold text-violet-700 dark:text-violet-300">${(totalNS * RATE_NS).toFixed(0)}</span>
+                  <span className="text-slate-400 dark:text-white/40 ml-1">@ ${RATE_NS}/hr</span>
+                </div>
+              )}
+              <div className="rounded-lg px-3 py-2 text-sm font-bold bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30">
+                <span className="text-slate-600 dark:text-white/60">Total Labor Cost: </span>
+                <span className="text-emerald-700 dark:text-emerald-300">${laborCost.toFixed(0)}</span>
+              </div>
             </div>
           )}
         </div>
@@ -445,44 +610,126 @@ export default function CompletedJobSummaryPage() {
         {/* Cycle Billing */}
         <RevealSection index={3}>
         {!isCycleBilling && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
-            <strong>Cycle billing not enabled.</strong> To use milestone-based billing for this job,{' '}
-            go to the <a href={`/dashboard/admin/jobs/${summary.id}`} className="underline">Job Detail page</a> and set Billing Type to &ldquo;Cycle Billing&rdquo;.
+          <div className="rounded-xl p-4 text-sm bg-sky-50 ring-1 ring-sky-200 text-sky-700 dark:bg-sky-500/10 dark:ring-sky-400/30 dark:text-sky-300">
+            <strong>Cycle billing not enabled.</strong> To use milestone-based billing for this job, go to the{' '}
+            <a href={`/dashboard/admin/jobs/${summary.id}`} className="underline font-semibold">Job Detail page</a> and set Billing Type to &ldquo;Cycle Billing&rdquo;.
           </div>
         )}
         {isCycleBilling && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <div className={SECTION_CARD}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Target className="w-5 h-5 text-purple-600" />Cycle Billing Milestones</h2>
-              <button onClick={() => setShowMilestoneForm(prev => !prev)} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"><Plus className="w-4 h-4" />Add Milestone</button>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <Target className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+                Cycle Billing Milestones
+              </h2>
+              <button
+                onClick={() => setShowMilestoneForm((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-all
+                  bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 hover:shadow-md shadow-violet-500/20"
+              >
+                <Plus className="w-4 h-4" />
+                Add Milestone
+              </button>
             </div>
             {showMilestoneForm && (
-              <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200 flex flex-wrap gap-3 items-end">
-                <div className="flex-1 min-w-40"><label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Label</label><input type="text" value={milestoneLabel} onChange={e => setMilestoneLabel(e.target.value)} placeholder="e.g. Foundation Complete" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-200 bg-white" /></div>
-                <div className="w-32"><label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">% Target</label><input type="number" value={milestonePercent} onChange={e => setMilestonePercent(e.target.value)} placeholder="25" min={1} max={100} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-200 bg-white" /></div>
+              <div className="mb-4 p-4 rounded-xl bg-violet-50 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/30 flex flex-wrap gap-3 items-end">
+                <div className="flex-1 min-w-40">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-white/70 uppercase mb-1 block">Label</label>
+                  <input
+                    type="text"
+                    value={milestoneLabel}
+                    onChange={(e) => setMilestoneLabel(e.target.value)}
+                    placeholder="e.g. Foundation Complete"
+                    className="w-full px-3 py-2 rounded-lg text-sm bg-white border border-slate-300 text-slate-900 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                      dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                  />
+                </div>
+                <div className="w-32">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-white/70 uppercase mb-1 block">% Target</label>
+                  <input
+                    type="number"
+                    value={milestonePercent}
+                    onChange={(e) => setMilestonePercent(e.target.value)}
+                    placeholder="25"
+                    min={1}
+                    max={100}
+                    className="w-full px-3 py-2 rounded-lg text-sm bg-white border border-slate-300 text-slate-900 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                      dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                  />
+                </div>
                 <div className="flex gap-2">
-                  <button onClick={handleAddMilestone} disabled={savingMilestone || !milestoneLabel.trim() || !milestonePercent} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5">{savingMilestone ? <Loader2 className="w-4 h-4 animate-spin" /> : null}Save</button>
-                  <button onClick={() => setShowMilestoneForm(false)} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">Cancel</button>
+                  <button
+                    onClick={handleAddMilestone}
+                    disabled={savingMilestone || !milestoneLabel.trim() || !milestonePercent}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50 flex items-center gap-1.5
+                      bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:shadow-md"
+                  >
+                    {savingMilestone ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setShowMilestoneForm(false)}
+                    className="px-4 py-2 rounded-lg text-sm transition-colors bg-white border border-slate-300 text-slate-600 hover:bg-slate-50
+                      dark:bg-white/5 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             )}
             {milestones.length === 0 ? (
-              <div className="text-center py-8 text-gray-400"><Target className="w-10 h-10 mx-auto mb-2 text-gray-200" /><p className="text-sm">No milestones set.</p></div>
+              <div className="text-center py-8 text-slate-400 dark:text-white/40">
+                <Target className="w-10 h-10 mx-auto mb-2 text-slate-200 dark:text-white/20" />
+                <p className="text-sm">No milestones set.</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {milestones.map((ms) => {
                   const isTriggered = !!ms.triggered_at;
                   return (
-                    <div key={ms.id} className={`flex items-center justify-between p-4 rounded-lg border ${isTriggered ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div
+                      key={ms.id}
+                      className={`flex items-center justify-between p-4 rounded-xl ring-1 ${
+                        isTriggered
+                          ? 'bg-emerald-50 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30'
+                          : 'bg-slate-50 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10'
+                      }`}
+                    >
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isTriggered ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>{ms.milestone_percent}%</div>
-                        <div><p className="font-medium text-gray-900">{ms.label}</p>{ms.triggered_at && <p className="text-xs text-gray-500">Triggered: {new Date(ms.triggered_at).toLocaleDateString()}</p>}</div>
+                        <div
+                          className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${
+                            isTriggered
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-white/70'
+                          }`}
+                        >
+                          {ms.milestone_percent}%
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-900 dark:text-white">{ms.label}</p>
+                          {ms.triggered_at && (
+                            <p className="text-xs text-slate-500 dark:text-white/50">
+                              Triggered: {new Date(ms.triggered_at).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         {isTriggered ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"><CheckCircle className="w-3 h-3" />Triggered</span>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30">
+                            <CheckCircle className="w-3 h-3" />
+                            Triggered
+                          </span>
                         ) : (
-                          <button onClick={() => handleTriggerMilestone(ms.id)} disabled={triggeringId === ms.id} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1">{triggeringId === ms.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}Trigger Now</button>
+                          <button
+                            onClick={() => handleTriggerMilestone(ms.id)}
+                            disabled={triggeringId === ms.id}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all disabled:opacity-50 flex items-center gap-1
+                              bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:shadow-md"
+                          >
+                            {triggeringId === ms.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                            Trigger Now
+                          </button>
                         )}
                       </div>
                     </div>
@@ -497,16 +744,52 @@ export default function CompletedJobSummaryPage() {
         {/* Customer Feedback */}
         {(summary.customer_overall_rating != null || summary.customer_cleanliness_rating != null || summary.customer_communication_rating != null || summary.customer_feedback_comments) && (
           <RevealSection index={4}>
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />Customer Feedback</h2>
+          <div className={SECTION_CARD}>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+              Customer Feedback
+            </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-              {summary.customer_overall_rating != null && <div className="bg-gray-50 rounded-lg p-4 text-center"><p className="text-xs font-semibold text-gray-500 uppercase mb-2">Overall</p><p className="text-3xl font-bold text-gray-900 mb-2">{summary.customer_overall_rating}/10</p><StarDisplay rating={summary.customer_overall_rating} max={10} /></div>}
-              {summary.customer_cleanliness_rating != null && <div className="bg-gray-50 rounded-lg p-4 text-center"><p className="text-xs font-semibold text-gray-500 uppercase mb-2">Cleanliness</p><p className="text-3xl font-bold text-gray-900 mb-2">{summary.customer_cleanliness_rating}/10</p><StarDisplay rating={summary.customer_cleanliness_rating} max={10} /></div>}
-              {summary.customer_communication_rating != null && <div className="bg-gray-50 rounded-lg p-4 text-center"><p className="text-xs font-semibold text-gray-500 uppercase mb-2">Communication</p><p className="text-3xl font-bold text-gray-900 mb-2">{summary.customer_communication_rating}/10</p><StarDisplay rating={summary.customer_communication_rating} max={10} /></div>}
+              {summary.customer_overall_rating != null && (
+                <div className="rounded-xl p-4 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase mb-2">Overall</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tabular-nums">{summary.customer_overall_rating}/10</p>
+                  <StarDisplay rating={summary.customer_overall_rating} max={10} />
+                </div>
+              )}
+              {summary.customer_cleanliness_rating != null && (
+                <div className="rounded-xl p-4 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase mb-2">Cleanliness</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tabular-nums">{summary.customer_cleanliness_rating}/10</p>
+                  <StarDisplay rating={summary.customer_cleanliness_rating} max={10} />
+                </div>
+              )}
+              {summary.customer_communication_rating != null && (
+                <div className="rounded-xl p-4 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase mb-2">Communication</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tabular-nums">{summary.customer_communication_rating}/10</p>
+                  <StarDisplay rating={summary.customer_communication_rating} max={10} />
+                </div>
+              )}
             </div>
-            {summary.customer_feedback_comments && <div className="bg-gray-50 rounded-lg p-4 border border-gray-200"><p className="text-xs font-semibold text-gray-500 uppercase mb-1">Customer Comments</p><p className="text-sm text-gray-700">{summary.customer_feedback_comments}</p></div>}
-            <div className="mt-3 text-xs text-gray-500 flex items-center gap-1">
-              {signatureCaptured ? (<><CheckCircle className="w-3.5 h-3.5 text-green-500" />Signed by: {summary.completion_signer_name}</>) : (<><AlertCircle className="w-3.5 h-3.5 text-amber-500" />Contact not on site &mdash; no signature captured</>)}
+            {summary.customer_feedback_comments && (
+              <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase mb-1">Customer Comments</p>
+                <p className="text-sm text-slate-700 dark:text-white/80">{summary.customer_feedback_comments}</p>
+              </div>
+            )}
+            <div className="mt-3 text-xs text-slate-500 dark:text-white/60 flex items-center gap-1">
+              {signatureCaptured ? (
+                <>
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  Signed by: {summary.completion_signer_name}
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                  Contact not on site &mdash; no signature captured
+                </>
+              )}
             </div>
           </div>
           </RevealSection>
@@ -514,38 +797,69 @@ export default function CompletedJobSummaryPage() {
 
         {/* Documents & Photos */}
         <RevealSection index={5}>
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><FileText className="w-5 h-5 text-indigo-600" />Documents &amp; Photos</h2>
+        <div className={SECTION_CARD}>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+            Documents &amp; Photos
+          </h2>
 
           {/* Signature status */}
           <div className="mb-4">
             {signatureCaptured ? (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                <CheckCircle className="w-3.5 h-3.5" />Signed on-site by {summary.completion_signer_name}
-                {summary.completion_signed_at && <span className="ml-1 opacity-70">&mdash; {new Date(summary.completion_signed_at).toLocaleDateString()}</span>}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Signed on-site by {summary.completion_signer_name}
+                {summary.completion_signed_at && (
+                  <span className="ml-1 opacity-70">
+                    &mdash; {new Date(summary.completion_signed_at).toLocaleDateString()}
+                  </span>
+                )}
               </div>
             ) : remoteSignedReq ? (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                <CheckCircle className="w-3.5 h-3.5" />Signed remotely by {remoteSignedReq.contact_name || 'customer'}
-                {remoteSignedReq.signed_at && <span className="ml-1 opacity-70">&mdash; {new Date(remoteSignedReq.signed_at).toLocaleDateString()}</span>}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Signed remotely by {remoteSignedReq.contact_name || 'customer'}
+                {remoteSignedReq.signed_at && (
+                  <span className="ml-1 opacity-70">
+                    &mdash; {new Date(remoteSignedReq.signed_at).toLocaleDateString()}
+                  </span>
+                )}
               </div>
             ) : pendingReq ? (
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                  <AlertCircle className="w-3.5 h-3.5" />Signature requested &mdash; awaiting {pendingReq.contact_email}
-                  {pendingReq.sent_at && <span className="ml-1 opacity-70">(sent {new Date(pendingReq.sent_at).toLocaleDateString()})</span>}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  Signature requested &mdash; awaiting {pendingReq.contact_email}
+                  {pendingReq.sent_at && (
+                    <span className="ml-1 opacity-70">
+                      (sent {new Date(pendingReq.sent_at).toLocaleDateString()})
+                    </span>
+                  )}
                 </div>
-                <button onClick={() => openSigModal(pendingReq.contact_email || '', pendingReq.contact_name || '')} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors">
-                  <RefreshCw className="w-3 h-3" />Resend
+                <button
+                  onClick={() => openSigModal(pendingReq.contact_email || '', pendingReq.contact_name || '')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors
+                    bg-white border border-amber-300 text-amber-700 hover:bg-amber-50
+                    dark:bg-white/5 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-500/15"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Resend
                 </button>
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-                  <AlertCircle className="w-3.5 h-3.5" />Customer Signature: Not Yet Signed
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white/70 dark:ring-white/10">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  Customer Signature: Not Yet Signed
                 </div>
-                <button onClick={() => openSigModal()} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-700 border border-indigo-300 rounded-lg hover:bg-indigo-50 transition-colors">
-                  <Send className="w-3 h-3" />Send for Signature
+                <button
+                  onClick={() => openSigModal()}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors
+                    bg-white border border-violet-300 text-violet-700 hover:bg-violet-50
+                    dark:bg-white/5 dark:border-violet-400/30 dark:text-violet-300 dark:hover:bg-violet-500/15"
+                >
+                  <Send className="w-3 h-3" />
+                  Send for Signature
                 </button>
               </div>
             )}
@@ -553,30 +867,90 @@ export default function CompletedJobSummaryPage() {
 
           {/* Core documents */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {summary.liability_release_pdf_url && <DocCard title="Liability Release" subtitle={summary.liability_release_signed_by ? `Signed by: ${summary.liability_release_signed_by}` : undefined} date={summary.liability_release_signed_at} color="red" onView={() => openPdfViewer(summary.liability_release_pdf_url!, 'Liability Release')} downloadUrl={summary.liability_release_pdf_url} />}
-            {summary.work_order_pdf_url && <DocCard title="Work Order Agreement" subtitle={summary.completion_signer_name ? `Signed by: ${summary.completion_signer_name}` : undefined} date={summary.completion_signed_at} color="green" onView={() => openPdfViewer(summary.work_order_pdf_url!, 'Work Order Agreement')} downloadUrl={summary.work_order_pdf_url} />}
-            {summary.silica_plan_pdf_url && <DocCard title="Silica Exposure Plan" subtitle="OSHA compliance document" color="blue" onView={() => openPdfViewer(summary.silica_plan_pdf_url!, 'Silica Exposure Control Plan')} downloadUrl={summary.silica_plan_pdf_url} />}
-            {documents.map((doc) => <DocCard key={doc.id} title={doc.document_name || 'Document'} date={doc.generated_at} color="purple" onView={() => openPdfViewer(doc.file_url, doc.document_name)} downloadUrl={doc.file_url} />)}
+            {summary.liability_release_pdf_url && (
+              <DocCard
+                title="Liability Release"
+                subtitle={summary.liability_release_signed_by ? `Signed by: ${summary.liability_release_signed_by}` : undefined}
+                date={summary.liability_release_signed_at}
+                color="rose"
+                onView={() => openPdfViewer(summary.liability_release_pdf_url!, 'Liability Release')}
+                downloadUrl={summary.liability_release_pdf_url}
+              />
+            )}
+            {summary.work_order_pdf_url && (
+              <DocCard
+                title="Work Order Agreement"
+                subtitle={summary.completion_signer_name ? `Signed by: ${summary.completion_signer_name}` : undefined}
+                date={summary.completion_signed_at}
+                color="emerald"
+                onView={() => openPdfViewer(summary.work_order_pdf_url!, 'Work Order Agreement')}
+                downloadUrl={summary.work_order_pdf_url}
+              />
+            )}
+            {summary.silica_plan_pdf_url && (
+              <DocCard
+                title="Silica Exposure Plan"
+                subtitle="OSHA compliance document"
+                color="sky"
+                onView={() => openPdfViewer(summary.silica_plan_pdf_url!, 'Silica Exposure Control Plan')}
+                downloadUrl={summary.silica_plan_pdf_url}
+              />
+            )}
+            {documents.map((doc) => (
+              <DocCard
+                key={doc.id}
+                title={doc.document_name || 'Document'}
+                date={doc.generated_at}
+                color="violet"
+                onView={() => openPdfViewer(doc.file_url, doc.document_name)}
+                downloadUrl={doc.file_url}
+              />
+            ))}
           </div>
 
           {/* Photos */}
           {photos.length > 0 && (
             <div>
-              <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><ImageIcon className="w-4 h-4" />Job Photos ({photos.length})</p>
+              <p className="text-sm font-semibold text-slate-700 dark:text-white/80 mb-3 flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4" />
+                Job Photos ({photos.length})
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {photos.map((ph) => (
-                  <a key={ph.id} href={ph.url} target="_blank" rel="noopener noreferrer" className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-100 hover:border-blue-400 transition-colors">
-                    <img src={ph.url} alt={ph.caption || 'Job photo'} className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
-                    {ph.caption && <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-xs p-1 truncate">{ph.caption}</div>}
+                  <a
+                    key={ph.id}
+                    href={ph.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative aspect-square rounded-xl overflow-hidden ring-1 ring-slate-200 bg-slate-100 hover:ring-violet-400 transition-colors
+                      dark:ring-white/10 dark:bg-white/5 dark:hover:ring-violet-400/60"
+                  >
+                    <img
+                      src={ph.url}
+                      alt={ph.caption || 'Job photo'}
+                      className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                    />
+                    {ph.caption && (
+                      <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-xs p-1 truncate">
+                        {ph.caption}
+                      </div>
+                    )}
                   </a>
                 ))}
               </div>
             </div>
           )}
 
-          {!summary.liability_release_pdf_url && !summary.work_order_pdf_url && !summary.silica_plan_pdf_url && documents.length === 0 && photos.length === 0 && (
-            <div className="text-center py-8 text-gray-400"><FileText className="w-10 h-10 mx-auto mb-2 text-gray-200" /><p className="text-sm">No documents or photos available for this job.</p></div>
-          )}
+          {!summary.liability_release_pdf_url &&
+            !summary.work_order_pdf_url &&
+            !summary.silica_plan_pdf_url &&
+            documents.length === 0 &&
+            photos.length === 0 && (
+              <div className="text-center py-8 text-slate-400 dark:text-white/40">
+                <FileText className="w-10 h-10 mx-auto mb-2 text-slate-200 dark:text-white/20" />
+                <p className="text-sm">No documents or photos available for this job.</p>
+              </div>
+            )}
         </div>
         </RevealSection>
       </div>
@@ -584,15 +958,30 @@ export default function CompletedJobSummaryPage() {
       {/* PDF Viewer Modal */}
       {pdfViewerOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-900">{currentPdfTitle}</h3>
+          <div className="bg-white dark:bg-[#120a24] rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col ring-1 ring-slate-200 dark:ring-white/10">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-white/10">
+              <h3 className="font-semibold text-slate-900 dark:text-white">{currentPdfTitle}</h3>
               <div className="flex items-center gap-2">
-                <a href={currentPdfUrl} download className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"><Download className="w-4 h-4" />Download</a>
-                <button onClick={() => setPdfViewerOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
+                <a
+                  href={currentPdfUrl}
+                  download
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-all flex items-center gap-1.5
+                    bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:shadow-md"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </a>
+                <button
+                  onClick={() => setPdfViewerOpen(false)}
+                  className="p-2 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-white/10"
+                >
+                  <X className="w-5 h-5 text-slate-500 dark:text-white/60" />
+                </button>
               </div>
             </div>
-            <div className="flex-1 overflow-hidden"><iframe src={currentPdfUrl} className="w-full h-full" title={currentPdfTitle} /></div>
+            <div className="flex-1 overflow-hidden">
+              <iframe src={currentPdfUrl} className="w-full h-full" title={currentPdfTitle} />
+            </div>
           </div>
         </div>
       )}
@@ -600,31 +989,85 @@ export default function CompletedJobSummaryPage() {
       {/* Send for Signature Modal */}
       {showSigModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center gap-2"><PenTool className="w-5 h-5 text-indigo-600" /><h3 className="text-lg font-bold text-gray-900">Send Signature Request</h3></div>
-              <button onClick={() => setShowSigModal(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
+          <div className="bg-white dark:bg-[#120a24] rounded-2xl shadow-2xl w-full max-w-md ring-1 ring-slate-200 dark:ring-white/10">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <PenTool className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Send Signature Request</h3>
+              </div>
+              <button
+                onClick={() => setShowSigModal(false)}
+                className="p-2 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-white/10"
+              >
+                <X className="w-5 h-5 text-slate-500 dark:text-white/60" />
+              </button>
             </div>
             <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-500">The customer receives an email with a secure link to sign from any phone or device. Link expires in 7 days.</p>
+              <p className="text-sm text-slate-500 dark:text-white/60">
+                The customer receives an email with a secure link to sign from any phone or
+                device. Link expires in 7 days.
+              </p>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Customer Email <span className="text-red-500">*</span></label>
-                <input type="email" value={sigEmail} onChange={e => setSigEmail(e.target.value)} placeholder="customer@example.com" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900" />
+                <label className="block text-sm font-semibold text-slate-700 dark:text-white/80 mb-1">
+                  Customer Email <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={sigEmail}
+                  onChange={(e) => setSigEmail(e.target.value)}
+                  placeholder="customer@example.com"
+                  className="w-full px-4 py-3 rounded-xl text-slate-900 transition-colors
+                    bg-white border border-slate-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Customer Name</label>
-                <input type="text" value={sigName} onChange={e => setSigName(e.target.value)} placeholder={summary?.customer_name || 'Customer name'} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900" />
+                <label className="block text-sm font-semibold text-slate-700 dark:text-white/80 mb-1">
+                  Customer Name
+                </label>
+                <input
+                  type="text"
+                  value={sigName}
+                  onChange={(e) => setSigName(e.target.value)}
+                  placeholder={summary?.customer_name || 'Customer name'}
+                  className="w-full px-4 py-3 rounded-xl text-slate-900 transition-colors
+                    bg-white border border-slate-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Phone (optional)</label>
-                <input type="tel" value={sigPhone} onChange={e => setSigPhone(e.target.value)} placeholder="(555) 000-0000" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900" />
+                <label className="block text-sm font-semibold text-slate-700 dark:text-white/80 mb-1">
+                  Phone (optional)
+                </label>
+                <input
+                  type="tel"
+                  value={sigPhone}
+                  onChange={(e) => setSigPhone(e.target.value)}
+                  placeholder="(555) 000-0000"
+                  className="w-full px-4 py-3 rounded-xl text-slate-900 transition-colors
+                    bg-white border border-slate-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                />
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={handleSendSignatureRequest} disabled={!sigEmail.trim() || sendingSig} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-3 font-semibold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                <button
+                  onClick={handleSendSignatureRequest}
+                  disabled={!sigEmail.trim() || sendingSig}
+                  className="flex-1 rounded-xl py-3 font-semibold text-sm text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2
+                    bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 hover:shadow-md shadow-violet-500/20"
+                >
                   {sendingSig ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   {sendingSig ? 'Sending...' : 'Send Signature Request'}
                 </button>
-                <button onClick={() => setShowSigModal(false)} disabled={sendingSig} className="px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+                <button
+                  onClick={() => setShowSigModal(false)}
+                  disabled={sendingSig}
+                  className="px-4 py-3 rounded-xl font-medium transition-colors disabled:opacity-50
+                    bg-white border border-slate-300 text-slate-700 hover:bg-slate-50
+                    dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
@@ -634,23 +1077,80 @@ export default function CompletedJobSummaryPage() {
   );
 }
 
-function DocCard({ title, subtitle, date, color, onView, downloadUrl }: { title: string; subtitle?: string; date?: string | null; color: 'red' | 'green' | 'blue' | 'purple' | 'indigo'; onView: () => void; downloadUrl: string; }) {
+function DocCard({
+  title,
+  subtitle,
+  date,
+  color,
+  onView,
+  downloadUrl,
+}: {
+  title: string;
+  subtitle?: string;
+  date?: string | null;
+  color: 'rose' | 'emerald' | 'sky' | 'violet';
+  onView: () => void;
+  downloadUrl: string;
+}) {
   const colorMap = {
-    red: { bg: 'bg-red-50', border: 'border-red-200', icon: 'text-red-600', title: 'text-red-900', meta: 'text-red-700', btn: 'bg-red-600 hover:bg-red-700', outline: 'text-red-600 border-red-600' },
-    green: { bg: 'bg-green-50', border: 'border-green-200', icon: 'text-green-600', title: 'text-green-900', meta: 'text-green-700', btn: 'bg-green-600 hover:bg-green-700', outline: 'text-green-600 border-green-600' },
-    blue: { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'text-blue-600', title: 'text-blue-900', meta: 'text-blue-700', btn: 'bg-blue-600 hover:bg-blue-700', outline: 'text-blue-600 border-blue-600' },
-    purple: { bg: 'bg-purple-50', border: 'border-purple-200', icon: 'text-purple-600', title: 'text-purple-900', meta: 'text-purple-700', btn: 'bg-purple-600 hover:bg-purple-700', outline: 'text-purple-600 border-purple-600' },
-    indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', icon: 'text-indigo-600', title: 'text-indigo-900', meta: 'text-indigo-700', btn: 'bg-indigo-600 hover:bg-indigo-700', outline: 'text-indigo-600 border-indigo-600' },
+    rose: {
+      card: 'bg-rose-50 ring-rose-200 dark:bg-rose-500/10 dark:ring-rose-400/30',
+      icon: 'text-rose-600 dark:text-rose-300',
+      title: 'text-rose-900 dark:text-rose-200',
+      meta: 'text-rose-700 dark:text-rose-300/80',
+      btn: 'bg-rose-600 hover:bg-rose-700',
+      outline: 'text-rose-600 border-rose-300 dark:text-rose-300 dark:border-rose-400/30',
+    },
+    emerald: {
+      card: 'bg-emerald-50 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30',
+      icon: 'text-emerald-600 dark:text-emerald-300',
+      title: 'text-emerald-900 dark:text-emerald-200',
+      meta: 'text-emerald-700 dark:text-emerald-300/80',
+      btn: 'bg-emerald-600 hover:bg-emerald-700',
+      outline: 'text-emerald-600 border-emerald-300 dark:text-emerald-300 dark:border-emerald-400/30',
+    },
+    sky: {
+      card: 'bg-sky-50 ring-sky-200 dark:bg-sky-500/10 dark:ring-sky-400/30',
+      icon: 'text-sky-600 dark:text-sky-300',
+      title: 'text-sky-900 dark:text-sky-200',
+      meta: 'text-sky-700 dark:text-sky-300/80',
+      btn: 'bg-sky-600 hover:bg-sky-700',
+      outline: 'text-sky-600 border-sky-300 dark:text-sky-300 dark:border-sky-400/30',
+    },
+    violet: {
+      card: 'bg-violet-50 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/30',
+      icon: 'text-violet-600 dark:text-violet-300',
+      title: 'text-violet-900 dark:text-violet-200',
+      meta: 'text-violet-700 dark:text-violet-300/80',
+      btn: 'bg-violet-600 hover:bg-violet-700',
+      outline: 'text-violet-600 border-violet-300 dark:text-violet-300 dark:border-violet-400/30',
+    },
   };
   const c = colorMap[color];
   return (
-    <div className={`${c.bg} rounded-lg p-4 border ${c.border}`}>
-      <div className="flex items-center gap-2 mb-2"><FileText className={`w-4 h-4 ${c.icon}`} /><h3 className={`font-semibold text-sm ${c.title}`}>{title}</h3></div>
+    <div className={`rounded-xl p-4 ring-1 ${c.card}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <FileText className={`w-4 h-4 ${c.icon}`} />
+        <h3 className={`font-semibold text-sm ${c.title}`}>{title}</h3>
+      </div>
       {subtitle && <p className={`text-xs ${c.meta} mb-1`}>{subtitle}</p>}
       {date && <p className={`text-xs ${c.meta} mb-3`}>{new Date(date).toLocaleDateString()}</p>}
       <div className="flex gap-2 mt-3">
-        <button onClick={onView} className={`flex-1 px-2 py-1.5 ${c.btn} text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors`}><Eye className="w-3.5 h-3.5" />View</button>
-        <a href={downloadUrl} download className={`px-2 py-1.5 bg-white hover:bg-gray-50 ${c.outline} border rounded-lg text-xs font-semibold transition-colors flex items-center justify-center`}><Download className="w-3.5 h-3.5" /></a>
+        <button
+          onClick={onView}
+          className={`flex-1 px-2 py-1.5 ${c.btn} text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors`}
+        >
+          <Eye className="w-3.5 h-3.5" />
+          View
+        </button>
+        <a
+          href={downloadUrl}
+          download
+          className={`px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center
+            bg-white hover:bg-slate-50 dark:bg-white/5 dark:hover:bg-white/10 ${c.outline}`}
+        >
+          <Download className="w-3.5 h-3.5" />
+        </a>
       </div>
     </div>
   );
