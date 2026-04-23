@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Zap } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import NotificationBell from '@/components/NotificationBell';
-import QuickAddModal from '@/components/ui/QuickAddModal';
+import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
@@ -54,7 +54,7 @@ function HeaderAvatar({ user }: { user: User | null }) {
           {initial}
         </div>
       )}
-      <span className="hidden sm:block text-sm font-medium text-gray-700 truncate max-w-[120px]">
+      <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-white/80 truncate max-w-[120px]">
         {user.name}
       </span>
     </div>
@@ -68,14 +68,13 @@ function HeaderAvatar({ user }: { user: User | null }) {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   useEffect(() => {
     setUser(getCurrentUser());
   }, []);
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-[#0b0618]">
       {/*
         DashboardSidebar handles its own desktop/mobile rendering:
         - Desktop: fixed-width aside (240px expanded / 64px collapsed), hidden below lg
@@ -90,7 +89,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* ---------------------------------------------------------------- */}
         {/* Sticky top header                                                */}
         {/* ---------------------------------------------------------------- */}
-        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm flex-shrink-0">
+        <header className="
+          sticky top-0 z-30 flex-shrink-0 flex items-center justify-between
+          px-4 sm:px-6 py-3 shadow-sm border-b
+          bg-white border-gray-200
+          dark:bg-[#0e0720]/90 dark:border-white/10 dark:backdrop-blur
+        ">
 
           {/* Left: spacer on mobile (sidebar has its own hamburger), Search on sm+ */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -101,28 +105,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="w-8 lg:hidden flex-shrink-0" aria-hidden="true" />
 
             {/* Search input — hidden on mobile to keep header clean */}
-            <div className="hidden sm:flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2 w-64 xl:w-80">
-              <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <div className="
+              hidden sm:flex items-center gap-2 rounded-lg px-3 py-2 w-64 xl:w-80
+              bg-gray-100
+              dark:bg-white/5 dark:border dark:border-white/10
+            ">
+              <Search className="w-4 h-4 text-gray-400 dark:text-white/45 flex-shrink-0" />
               <input
                 type="text"
                 placeholder="Search jobs, customers..."
-                className="bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none flex-1 min-w-0"
+                className="
+                  bg-transparent text-sm outline-none flex-1 min-w-0
+                  text-gray-700 placeholder-gray-400
+                  dark:text-white dark:placeholder-white/40
+                "
               />
             </div>
           </div>
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* Quick Add — secondary outlined button */}
-            <button
-              onClick={() => setQuickAddOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 hover:border-purple-300 transition-all"
-              title="Quick Add: placeholder a job on the schedule"
-            >
-              <Zap className="w-4 h-4" />
-              <span className="hidden sm:inline">Quick Add</span>
-            </button>
-
             {/* + New Job */}
             <button
               onClick={() => router.push('/dashboard/admin/schedule-form')}
@@ -135,12 +137,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Notification bell — light variant for white header */}
             <NotificationBell variant="light" />
 
+            {/* Dark mode toggle — primary surface for switching themes */}
+            <DarkModeIconToggle />
+
             {/* User avatar */}
             <HeaderAvatar user={user} />
           </div>
-
-          {/* Quick Add modal — rendered at layout level so it's available on all admin pages */}
-          <QuickAddModal isOpen={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
         </header>
 
         {/* ---------------------------------------------------------------- */}

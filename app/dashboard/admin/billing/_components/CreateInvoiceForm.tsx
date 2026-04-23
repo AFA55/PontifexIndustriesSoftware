@@ -39,8 +39,13 @@ interface CreateInvoiceFormProps {
   onCreated: () => void;
 }
 
-const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white transition-all';
-const labelClass = 'block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1';
+const inputClass =
+  'w-full px-3 py-2 rounded-lg text-sm transition-all ' +
+  'bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 ' +
+  'focus:border-violet-500 focus:ring-1 focus:ring-violet-200 ' +
+  'dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/40 ' +
+  'dark:focus:border-violet-400 dark:focus:ring-violet-500/30';
+const labelClass = 'block text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider mb-1';
 
 export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceFormProps) {
   // Customer & Job
@@ -300,31 +305,43 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto py-8">
-      <div className="bg-white border border-gray-200 rounded-lg w-full max-w-3xl shadow-xl mx-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto py-8">
+      <div className="
+        w-full max-w-3xl mx-4 rounded-2xl shadow-2xl ring-1
+        bg-white ring-slate-200
+        dark:bg-[#120826] dark:ring-white/10
+      ">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-              <FileText size={16} className="text-blue-600" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+              <FileText size={16} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Create Invoice</h2>
-              <p className="text-xs text-gray-500">Generate a new invoice for billing</p>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Create Invoice</h2>
+              <p className="text-xs text-slate-500 dark:text-white/60">Generate a new invoice for billing</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="
+              p-2 rounded-lg transition-colors
+              hover:bg-slate-100 text-slate-500
+              dark:hover:bg-white/10 dark:text-white/70
+            "
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
           {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex items-center gap-2">
+            <div className="
+              text-sm px-4 py-3 rounded-xl flex items-center gap-2 ring-1
+              bg-rose-50 ring-rose-200 text-rose-700
+              dark:bg-rose-500/10 dark:ring-rose-400/30 dark:text-rose-200
+            ">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}
             </div>
@@ -332,7 +349,7 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
 
           {/* Section 1: Customer & Job Selection */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider mb-3">
               Customer & Job
             </h3>
             <div className="space-y-3">
@@ -403,7 +420,7 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
 
           {/* Section 2: Invoice Details */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider mb-3">
               Invoice Details
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -495,34 +512,38 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
           {/* Section 3: Line Items */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                <Calculator size={14} className="text-blue-600" />
+              <h3 className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider flex items-center gap-2">
+                <Calculator size={14} className="text-violet-600 dark:text-violet-300" />
                 Line Items
               </h3>
               <button
                 type="button"
                 onClick={addLineItem}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors border border-blue-200"
+                className="
+                  flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ring-1
+                  bg-violet-50 text-violet-700 ring-violet-200 hover:bg-violet-100
+                  dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/30 dark:hover:bg-violet-500/25
+                "
               >
                 <Plus size={14} />
                 Add Line Item
               </button>
             </div>
 
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="rounded-xl ring-1 ring-slate-200 dark:ring-white/10 overflow-hidden">
               {/* Table Header */}
-              <div className="grid grid-cols-12 gap-0 bg-gray-50 border-b border-gray-200">
+              <div className="grid grid-cols-12 gap-0 bg-slate-50 dark:bg-white/[0.03] border-b border-slate-200 dark:border-white/10">
                 <div className="col-span-5 px-3 py-2">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider">Description</span>
                 </div>
                 <div className="col-span-2 px-2 py-2 text-right">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider">Qty</span>
                 </div>
                 <div className="col-span-2 px-2 py-2 text-right">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Rate</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider">Rate</span>
                 </div>
                 <div className="col-span-2 px-2 py-2 text-right">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider">Amount</span>
                 </div>
                 <div className="col-span-1 px-2 py-2"></div>
               </div>
@@ -530,8 +551,8 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
               {lineItems.map((item, idx) => (
                 <div
                   key={idx}
-                  className={`grid grid-cols-12 gap-0 items-center border-b border-gray-100 ${
-                    idx % 2 === 1 ? 'bg-gray-50/50' : ''
+                  className={`grid grid-cols-12 gap-0 items-center border-b border-slate-100 dark:border-white/5 ${
+                    idx % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
                   }`}
                 >
                   <div className="col-span-5 px-2 py-1.5">
@@ -539,7 +560,13 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                       type="text"
                       value={item.description}
                       onChange={(e) => updateLineItem(idx, 'description', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition-all"
+                      className="
+                        w-full px-2 py-1.5 rounded-lg text-sm transition-all
+                        bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400
+                        focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                        dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/40
+                        dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                      "
                       placeholder="Description of work"
                     />
                   </div>
@@ -548,7 +575,13 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                       type="number"
                       value={item.quantity || ''}
                       onChange={(e) => updateLineItem(idx, 'quantity', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white text-right focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition-all"
+                      className="
+                        w-full px-2 py-1.5 rounded-lg text-sm text-right transition-all tabular-nums
+                        bg-white border border-slate-200 text-slate-900
+                        focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                        dark:bg-white/5 dark:border-white/10 dark:text-white
+                        dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                      "
                       min="0"
                       step="any"
                     />
@@ -558,13 +591,19 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                       type="number"
                       value={item.rate || ''}
                       onChange={(e) => updateLineItem(idx, 'rate', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white text-right focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition-all"
+                      className="
+                        w-full px-2 py-1.5 rounded-lg text-sm text-right transition-all tabular-nums
+                        bg-white border border-slate-200 text-slate-900
+                        focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                        dark:bg-white/5 dark:border-white/10 dark:text-white
+                        dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                      "
                       min="0"
                       step="0.01"
                     />
                   </div>
                   <div className="col-span-2 px-2 py-1.5">
-                    <div className="px-2 py-1.5 text-sm font-semibold text-gray-900 text-right">
+                    <div className="px-2 py-1.5 text-sm font-semibold text-slate-900 dark:text-white text-right tabular-nums">
                       ${item.amount.toFixed(2)}
                     </div>
                   </div>
@@ -573,7 +612,11 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                       type="button"
                       onClick={() => removeLineItem(idx)}
                       disabled={lineItems.length <= 1}
-                      className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="
+                        p-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed
+                        text-slate-400 hover:text-rose-500 hover:bg-rose-50
+                        dark:text-white/40 dark:hover:text-rose-300 dark:hover:bg-rose-500/15
+                      "
                     >
                       <Trash2 size={14} />
                     </button>
@@ -586,28 +629,34 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
             <div className="flex justify-end mt-4">
               <div className="w-72 space-y-2">
                 <div className="flex justify-between text-sm px-3">
-                  <span className="text-gray-500">Subtotal</span>
-                  <span className="font-semibold text-gray-900">${subtotal.toFixed(2)}</span>
+                  <span className="text-slate-500 dark:text-white/60">Subtotal</span>
+                  <span className="font-semibold text-slate-900 dark:text-white tabular-nums">${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm px-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-500">Tax</span>
+                    <span className="text-slate-500 dark:text-white/60">Tax</span>
                     <input
                       type="number"
                       value={taxRate || ''}
                       onChange={(e) => setTaxRate(Number(e.target.value) || 0)}
-                      className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-right text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition-all"
+                      className="
+                        w-16 px-2 py-1 rounded text-xs text-right transition-all tabular-nums
+                        bg-white border border-slate-200 text-slate-900
+                        focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                        dark:bg-white/5 dark:border-white/10 dark:text-white
+                        dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                      "
                       placeholder="0"
                       min="0"
                       step="0.01"
                     />
-                    <span className="text-gray-400 text-xs">%</span>
+                    <span className="text-slate-400 dark:text-white/40 text-xs">%</span>
                   </div>
-                  <span className="font-semibold text-gray-900">${taxAmount.toFixed(2)}</span>
+                  <span className="font-semibold text-slate-900 dark:text-white tabular-nums">${taxAmount.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-base font-bold px-3 pt-2 border-t-2 border-blue-600">
-                  <span className="text-gray-900">Total</span>
-                  <span className="text-gray-900">${total.toFixed(2)}</span>
+                <div className="flex justify-between text-base font-bold px-3 pt-2 border-t-2 border-violet-600 dark:border-violet-400">
+                  <span className="text-slate-900 dark:text-white">Total</span>
+                  <span className="tabular-nums bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent">${total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -615,32 +664,46 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
 
           {/* Section 4: Notes */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider mb-3">
               Notes & Terms
             </h3>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white transition-all resize-none"
+              className="
+                w-full px-3 py-2 rounded-lg text-sm transition-all resize-none
+                bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400
+                focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/40
+                dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+              "
               placeholder="Payment terms, notes, or special instructions..."
             />
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] rounded-b-2xl">
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg text-sm font-semibold transition-colors"
+            className="
+              px-4 py-2 rounded-lg text-sm font-semibold transition-colors
+              text-slate-600 hover:text-slate-900 hover:bg-slate-100
+              dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10
+            "
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50 shadow-sm"
+            className="
+              flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50
+              bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 text-white
+              shadow-md shadow-violet-500/20 hover:shadow-lg hover:shadow-violet-500/30
+            "
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
