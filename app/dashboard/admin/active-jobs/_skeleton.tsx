@@ -1,72 +1,49 @@
 'use client';
 
 /**
- * Shape-matched skeleton for /dashboard/admin/active-jobs.
- *
- * Real page:
- *   header row (title + toggle + refresh)
- *   4 stat tiles
- *   filter chip row
- *   vertical list of job cards (job-number, status pill, title, meta row)
+ * Shared skeleton for the Active Jobs list page.
+ * Shape matches the live layout: header, stat grid, filter row, job cards.
  */
-
-import { Skeleton, SkeletonStat, RevealSection } from '@/components/ui/Skeleton';
-
 export default function ActiveJobsSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-[#0b0714] via-[#110a24] to-[#0b0714] p-6">
+      <div className="max-w-7xl mx-auto animate-pulse">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="space-y-2">
-            <Skeleton width="w-40" height="h-6" />
-            <Skeleton width="w-56" height="h-3.5" />
+            <div className="h-7 w-48 rounded-lg bg-white/10" />
+            <div className="h-4 w-32 rounded bg-white/5" />
           </div>
-          <div className="flex items-center gap-3">
-            <Skeleton width="w-32" height="h-9" rounded="rounded-lg" />
-            <Skeleton width="w-9" height="h-9" rounded="rounded-lg" />
+          <div className="flex gap-3">
+            <div className="h-9 w-32 rounded-lg bg-white/10" />
+            <div className="h-9 w-9 rounded-lg bg-white/10" />
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stat tiles */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonStat key={i} />
+            <div
+              key={i}
+              className="h-24 rounded-2xl border border-white/10 bg-white/5"
+            />
           ))}
         </div>
 
-        {/* Filter chips */}
-        <div className="flex gap-2 mb-4 flex-wrap">
-          {['w-16', 'w-20', 'w-28', 'w-36'].map((w, i) => (
-            <Skeleton key={i} width={w} height="h-9" rounded="rounded-lg" />
+        {/* Filter pills */}
+        <div className="flex gap-2 mb-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-9 w-24 rounded-lg bg-white/10" />
           ))}
         </div>
 
-        {/* Job cards */}
+        {/* Cards */}
         <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <RevealSection key={i} index={i}>
-              <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0 space-y-2.5">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Skeleton width="w-24" height="h-3" />
-                      <Skeleton width="w-20" height="h-5" rounded="rounded-full" />
-                      {i % 3 === 0 && (
-                        <Skeleton width="w-28" height="h-5" rounded="rounded-full" />
-                      )}
-                    </div>
-                    <Skeleton width="w-2/3" height="h-5" />
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <Skeleton width="w-28" height="h-3" />
-                      <Skeleton width="w-36" height="h-3" />
-                      <Skeleton width="w-24" height="h-3" />
-                    </div>
-                  </div>
-                  <Skeleton width="w-5" height="h-5" rounded="rounded" />
-                </div>
-              </div>
-            </RevealSection>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-28 rounded-2xl border border-white/10 bg-white/5"
+            />
           ))}
         </div>
       </div>
