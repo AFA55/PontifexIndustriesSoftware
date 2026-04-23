@@ -53,7 +53,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      console.error('[completion-summary] job fetch failed', { jobId, tenantId, jobError });
+      return NextResponse.json({ error: 'Job not found', debug: jobError?.message }, { status: 404 });
     }
 
     // ── 2. Fetch work_items ─────────────────────────────────────────────────

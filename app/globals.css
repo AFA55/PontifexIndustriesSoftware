@@ -233,6 +233,74 @@ select {
     animation: pulse-slow 2s ease-in-out infinite;
   }
 
+  /* ---------- Skeleton shimmer system ---------- */
+  @keyframes skeleton-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+
+  .skeleton-base {
+    position: relative;
+    overflow: hidden;
+    background-color: #e5e7eb; /* gray-200 */
+    background-image: linear-gradient(
+      90deg,
+      rgba(229, 231, 235, 0) 0%,
+      rgba(255, 255, 255, 0.65) 50%,
+      rgba(229, 231, 235, 0) 100%
+    );
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+
+  .dark .skeleton-base {
+    background-color: #1e293b; /* slate-800 */
+    background-image: linear-gradient(
+      90deg,
+      rgba(30, 41, 59, 0) 0%,
+      rgba(71, 85, 105, 0.55) 50%,
+      rgba(30, 41, 59, 0) 100%
+    );
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-base {
+      background-image: none;
+      animation: skeleton-pulse 2.4s ease-in-out infinite;
+    }
+  }
+
+  /* Section cascade fade-in */
+  @keyframes section-fade-in {
+    0% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  .section-reveal {
+    animation: section-fade-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .section-reveal {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* View Transitions default crossfade tuning */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 320ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
   /* Landing page dark theme utilities */
   .grid-pattern {
     background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
