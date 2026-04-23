@@ -12,6 +12,8 @@ import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import CustomerCard from './_components/CustomerCard';
 import CustomerForm from './_components/CustomerForm';
+import CustomersSkeleton from './_skeleton';
+import { RevealSection } from '@/components/ui/Skeleton';
 
 interface Customer {
   id: string;
@@ -98,6 +100,10 @@ export default function CustomersPage() {
   const totalRevenue = customers.reduce((sum, c) => sum + c.total_revenue, 0);
   const totalJobs = customers.reduce((sum, c) => sum + c.job_count, 0);
 
+  if (loading && customers.length === 0 && !search) {
+    return <CustomersSkeleton />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 md:px-6 py-6 max-w-6xl">
@@ -125,6 +131,7 @@ export default function CustomersPage() {
         </div>
 
         {/* Stats */}
+        <RevealSection index={0}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
             <p className="text-2xl font-bold text-gray-900">{totalCount}</p>
@@ -139,8 +146,10 @@ export default function CustomersPage() {
             <p className="text-xs text-gray-500">Total Revenue</p>
           </div>
         </div>
+        </RevealSection>
 
         {/* Search */}
+        <RevealSection index={1}>
         <div className="mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -153,6 +162,7 @@ export default function CustomersPage() {
             />
           </div>
         </div>
+        </RevealSection>
 
         {/* Error Banner */}
         {error && (
@@ -178,12 +188,13 @@ export default function CustomersPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {customers.map((customer) => (
-              <CustomerCard
-                key={customer.id}
-                customer={customer}
-                onClick={() => router.push(`/dashboard/admin/customers/${customer.id}`)}
-              />
+            {customers.map((customer, i) => (
+              <RevealSection key={customer.id} index={Math.min(2 + Math.floor(i / 3), 6)}>
+                <CustomerCard
+                  customer={customer}
+                  onClick={() => router.push(`/dashboard/admin/customers/${customer.id}`)}
+                />
+              </RevealSection>
             ))}
           </div>
         )}
