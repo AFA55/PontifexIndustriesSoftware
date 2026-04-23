@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrentUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import {
   Briefcase,
@@ -296,10 +297,10 @@ export default function ActiveJobsPage() {
                 const pct = Math.max(0, Math.min(100, Number(job.overall_pct ?? 0)));
                 const hasProgress = typeof job.overall_pct === 'number';
                 return (
-                  <button
+                  <Link
                     key={job.id}
-                    onClick={() => router.push(`/dashboard/admin/jobs/${job.id}`)}
-                    className="group relative text-left rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.02] p-[1px] hover:border-purple-400/40 transition-all"
+                    href={`/dashboard/admin/jobs/${job.id}`}
+                    className="group relative block text-left rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.02] p-[1px] hover:border-purple-400/40 transition-all"
                   >
                     {/* Inner card */}
                     <div className="relative rounded-2xl bg-gradient-to-br from-[#180c2c]/80 to-[#0e0720]/80 backdrop-blur-sm p-4 h-full">
@@ -402,7 +403,7 @@ export default function ActiveJobsPage() {
                         </div>
                       )}
                     </div>
-                  </button>
+                  </Link>
                 );
               })}
             </div>

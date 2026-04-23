@@ -53,16 +53,28 @@ export async function GET(request: NextRequest, context: RouteContext) {
         helper_assigned_to,
         foreman_name,
         foreman_phone,
-        project_name,
-        profiles!job_orders_assigned_to_fkey(full_name)
+        project_name
       `)
       .eq('id', jobId)
       .eq('tenant_id', tenantId)
       .single();
 
     if (jobError || !job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      console.error('[summary] job fetch failed', { jobId, tenantId, jobError });
+      return NextResponse.json({ error: 'Job not found', debug: jobError?.message }, { status: 404 });
     }
+
+    // Fetch operator profile separately (assigned_to → auth.users, not profiles)
+    let operatorProfile: { full_name: string } | null = null;
+    if ((job as any).assigned_to) {
+      const { data: opProf } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', (job as any).assigned_to)
+        .maybeSingle();
+      operatorProfile = opProf;
+    }
+    (job as any).profiles = operatorProfile;
 
     // ── 2. Fetch scope items ────────────────────────────────────────────────
     const { data: scopeItems } = await supabaseAdmin
