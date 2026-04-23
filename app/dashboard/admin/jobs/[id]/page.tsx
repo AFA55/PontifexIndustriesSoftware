@@ -17,6 +17,8 @@ import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import ChangeOrdersSection from '@/components/jobs/ChangeOrdersSection';
 import RelatedJobsSection from '@/components/jobs/RelatedJobsSection';
+import JobDetailSkeleton from './_skeleton';
+import { RevealSection } from '@/components/ui/Skeleton';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -250,23 +252,6 @@ function InfoGrid({ items }: { items: Array<{ label: string; value: React.ReactN
           <p className="text-sm font-semibold text-gray-900">{value}</p>
         </div>
       ))}
-    </div>
-  );
-}
-
-function PageSkeleton() {
-  return (
-    <div className="animate-pulse space-y-5">
-      <div className="h-7 w-40 bg-gray-200 rounded" />
-      <div className="h-28 bg-gray-100 rounded-2xl" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 space-y-5">
-          {[1, 2, 3].map(i => <div key={i} className="h-40 bg-gray-100 rounded-2xl" />)}
-        </div>
-        <div className="space-y-5">
-          {[1, 2, 3].map(i => <div key={i} className="h-32 bg-gray-100 rounded-2xl" />)}
-        </div>
-      </div>
     </div>
   );
 }
@@ -560,11 +545,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
   // ── Render ──────────────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 px-4 sm:px-6 py-6">
-        <div className="max-w-7xl mx-auto"><PageSkeleton /></div>
-      </div>
-    );
+    return <JobDetailSkeleton />;
   }
 
   if (pageError || !job) {
@@ -613,6 +594,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
         </Link>
 
         {/* ── Header ────────────────────────────────────────────────────────── */}
+        <RevealSection index={0}>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <div className="flex flex-col sm:flex-row sm:items-start gap-4">
             <div className="flex-1 min-w-0">
@@ -669,6 +651,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
         </div>
+        </RevealSection>
 
         {/* ── Feedback Banner ────────────────────────────────────────────────── */}
         {feedback && (
@@ -686,6 +669,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
           <div className="lg:col-span-2 space-y-5">
 
             {/* Project Details */}
+            <RevealSection index={1}>
             <Section title="Project Details" icon={Building2} accent="blue">
               <InfoGrid items={[
                 { label: 'Customer', value: job.customer_name },
@@ -772,6 +756,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               )}
             </Section>
+            </RevealSection>
 
             {/* Equipment */}
             {((job.equipment_needed && job.equipment_needed.length > 0) || (job.equipment_rentals && job.equipment_rentals.length > 0)) && (
@@ -801,6 +786,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
 
             {/* Scope Progress */}
             {scopeProgress.length > 0 && (
+              <RevealSection index={2}>
               <Section title="Scope Progress" icon={BarChart3} accent="indigo">
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-1.5">
@@ -836,10 +822,12 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
                   ))}
                 </div>
               </Section>
+              </RevealSection>
             )}
 
             {/* Work Performed — Progress entries from operators */}
             {(progressByDate.length > 0 || workDays.length > 0) && (
+              <RevealSection index={3}>
               <Section title="Work Performed" icon={Activity} accent="green">
                 <div className="space-y-4">
                   {progressByDate.map(({ date, entries }) => (
@@ -902,6 +890,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
                   ))}
                 </div>
               </Section>
+              </RevealSection>
             )}
 
             {/* Jobsite Conditions */}
@@ -984,6 +973,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
           <div className="space-y-5">
 
             {/* Status Tracker */}
+            <RevealSection index={1}>
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Activity className="w-5 h-5 text-blue-600" />
@@ -1019,9 +1009,11 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
                 })}
               </div>
             </div>
+            </RevealSection>
 
             {/* Crew */}
             {job.operator_name && (
+              <RevealSection index={2}>
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <HardHat className="w-5 h-5 text-blue-600" />
@@ -1050,9 +1042,11 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
                   )}
                 </div>
               </div>
+              </RevealSection>
             )}
 
             {/* Billing Settings */}
+            <RevealSection index={3}>
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-3">
                 <DollarSign className="w-5 h-5 text-emerald-600" />
@@ -1150,6 +1144,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
                 )}
               </div>
             </div>
+            </RevealSection>
 
             {/* Note for Operator */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -1212,6 +1207,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
             )}
 
             {/* Notes Feed */}
+            <RevealSection index={4}>
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-3">
                 <StickyNote className="w-5 h-5 text-purple-600" />
@@ -1246,6 +1242,7 @@ export default function AdminJobDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               )}
             </div>
+            </RevealSection>
           </div>
         </div>
       </div>
