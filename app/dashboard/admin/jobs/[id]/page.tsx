@@ -91,6 +91,22 @@ interface ChangeRequest {
   reviewer: { full_name: string } | null;
 }
 
+interface ChangeOrder {
+  id: string;
+  co_number: string | null;
+  description: string;
+  work_type: string | null;
+  unit: string | null;
+  target_quantity: number | null;
+  cost_amount: number | null;
+  price_amount: number | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  creator?: { full_name: string } | null;
+  approver?: { full_name: string } | null;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function getToken() {
@@ -288,6 +304,23 @@ export default function AdminJobDetailPage({
   const [crReviewing, setCrReviewing] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string>('admin');
 
+  // Change orders (extra work)
+  const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([]);
+  const [coLoading, setCoLoading] = useState(false);
+  const [coError, setCoError] = useState<string | null>(null);
+  const [showAddCo, setShowAddCo] = useState(false);
+  const [coForm, setCoForm] = useState({
+    description: '',
+    work_type: '',
+    unit: '',
+    target_quantity: '',
+    cost_amount: '',
+    price_amount: '',
+    notes: '',
+  });
+  const [coSaving, setCoSaving] = useState(false);
+  const [coActing, setCoActing] = useState<string | null>(null);
+
   // Auth guard
   useEffect(() => {
     const user = getCurrentUser();
@@ -319,7 +352,10 @@ export default function AdminJobDetailPage({
       const res = await apiFetch(`/api/admin/jobs/${jobId}/scope`);
       if (res.ok) {
         const json = await res.json();
-        setScopeItems(json.data?.scope_items || []);
+        const list = Array.isArray(json.data)
+          ? json.data
+          : (json.data?.scope_items ?? json.meta?.scope_items ?? []);
+        setScopeItems(list);
       }
     } catch { /* ignore */ }
   }, [jobId]);
@@ -337,6 +373,68 @@ export default function AdminJobDetailPage({
       }
     } catch { /* ignore */ }
   }, [jobId]);
+
+  const fetchChangeOrders = useCallback(async () => {
+    setCoLoading(true);
+    setCoError(null);
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/change-orders`);
+      if (!res.ok) {
+        setCoError('Failed to load change orders');
+        return;
+      }
+      const json = await res.json();
+      setChangeOrders(json.data?.change_orders || []);
+    } catch {
+      setCoError('Failed to load change orders');
+    } finally {
+      setCoLoading(false);
+    }
+  }, [jobId]);
+
+  const handleAddChangeOrder = async () => {
+    if (!coForm.description.trim()) return;
+    setCoSaving(true);
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/change-orders`, {
+        method: 'POST',
+        body: JSON.stringify({
+          description: coForm.description.trim(),
+          work_type: coForm.work_type || null,
+          unit: coForm.unit || null,
+          target_quantity: coForm.target_quantity ? Number(coForm.target_quantity) : null,
+          cost_amount: coForm.cost_amount ? Number(coForm.cost_amount) : 0,
+          price_amount: coForm.price_amount ? Number(coForm.price_amount) : 0,
+          notes: coForm.notes || null,
+        }),
+      });
+      if (res.ok) {
+        setShowAddCo(false);
+        setCoForm({
+          description: '', work_type: '', unit: '', target_quantity: '',
+          cost_amount: '', price_amount: '', notes: '',
+        });
+        await fetchChangeOrders();
+      }
+    } finally {
+      setCoSaving(false);
+    }
+  };
+
+  const handleReviewChangeOrder = async (coId: string, action: 'approve' | 'reject') => {
+    setCoActing(coId);
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/change-orders/${coId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        await fetchChangeOrders();
+      }
+    } finally {
+      setCoActing(null);
+    }
+  };
 
   const fetchChangeRequests = useCallback(async () => {
     setCrLoading(true);
@@ -370,11 +468,11 @@ export default function AdminJobDetailPage({
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests()]);
+      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchChangeOrders()]);
       setLoading(false);
     };
     load();
-  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests]);
+  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests, fetchChangeOrders]);
 
   const handleApprove = async () => {
     if (!job) return;
@@ -562,6 +660,203 @@ export default function AdminJobDetailPage({
             />
 
             <JobProgressChart jobId={jobId} scopeItems={scopeItems} />
+
+            {/* Change Orders (extra work) */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-purple-600" />
+                  <h2 className="text-base font-semibold text-gray-900">Change Orders</h2>
+                  <span className="text-xs text-gray-400">Extra work outside original scope</span>
+                </div>
+                <button
+                  onClick={() => setShowAddCo(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  + Add Change Order
+                </button>
+              </div>
+
+              {coLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+                </div>
+              ) : coError ? (
+                <p className="text-sm text-red-600 text-center py-4">{coError}</p>
+              ) : changeOrders.length === 0 ? (
+                <div className="text-center py-6">
+                  <FileText className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400">No change orders yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {changeOrders.map((co) => (
+                    <div key={co.id} className={`rounded-lg border p-3 text-sm ${
+                      co.status === 'pending' ? 'border-amber-200 bg-amber-50' :
+                      co.status === 'approved' ? 'border-green-200 bg-green-50' :
+                      co.status === 'rejected' ? 'border-red-200 bg-red-50' :
+                      'border-gray-200 bg-gray-50'
+                    }`}>
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs text-gray-600">{co.co_number || 'CO-?'}</span>
+                          <span className="font-semibold text-gray-800">{co.description}</span>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize whitespace-nowrap ${
+                          co.status === 'pending' ? 'bg-amber-200 text-amber-800' :
+                          co.status === 'approved' ? 'bg-green-200 text-green-800' :
+                          co.status === 'rejected' ? 'bg-red-200 text-red-800' :
+                          'bg-gray-200 text-gray-700'
+                        }`}>
+                          {co.status}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                        {co.work_type && <span>{co.work_type}</span>}
+                        {co.target_quantity != null && co.unit && (
+                          <span>{co.target_quantity} {co.unit}</span>
+                        )}
+                        {co.cost_amount != null && Number(co.cost_amount) > 0 && (
+                          <span>Cost: ${Number(co.cost_amount).toFixed(2)}</span>
+                        )}
+                        {co.price_amount != null && Number(co.price_amount) > 0 && (
+                          <span className="font-semibold">Price: ${Number(co.price_amount).toFixed(2)}</span>
+                        )}
+                      </div>
+                      {co.notes && <p className="text-xs text-gray-500 italic mt-1">{co.notes}</p>}
+                      {co.status === 'pending' && (
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => handleReviewChangeOrder(co.id, 'approve')}
+                            disabled={coActing === co.id}
+                            className="inline-flex items-center gap-1 px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {coActing === co.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ThumbsUp className="w-3 h-3" />}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReviewChangeOrder(co.id, 'reject')}
+                            disabled={coActing === co.id}
+                            className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded hover:bg-red-200 disabled:opacity-50"
+                          >
+                            {coActing === co.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ThumbsDown className="w-3 h-3" />}
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add Change Order Modal */}
+            {showAddCo && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-base font-semibold text-gray-900">Add Change Order</h3>
+                    <button
+                      onClick={() => setShowAddCo(false)}
+                      className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <X className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                      <textarea
+                        value={coForm.description}
+                        onChange={(e) => setCoForm((f) => ({ ...f, description: e.target.value }))}
+                        rows={2}
+                        placeholder="e.g. Additional 50 LF of wall sawing on east wall"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Work Type</label>
+                        <input
+                          type="text"
+                          value={coForm.work_type}
+                          onChange={(e) => setCoForm((f) => ({ ...f, work_type: e.target.value }))}
+                          placeholder="wall_sawing"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                        <input
+                          type="text"
+                          value={coForm.unit}
+                          onChange={(e) => setCoForm((f) => ({ ...f, unit: e.target.value }))}
+                          placeholder="linear_ft"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Qty</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={coForm.target_quantity}
+                          onChange={(e) => setCoForm((f) => ({ ...f, target_quantity: e.target.value }))}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Cost $</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={coForm.cost_amount}
+                          onChange={(e) => setCoForm((f) => ({ ...f, cost_amount: e.target.value }))}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Price $</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={coForm.price_amount}
+                          onChange={(e) => setCoForm((f) => ({ ...f, price_amount: e.target.value }))}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                      <textarea
+                        value={coForm.notes}
+                        onChange={(e) => setCoForm((f) => ({ ...f, notes: e.target.value }))}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-5">
+                    <button
+                      onClick={handleAddChangeOrder}
+                      disabled={coSaving || !coForm.description.trim()}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                    >
+                      {coSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      Save Change Order
+                    </button>
+                    <button
+                      onClick={() => setShowAddCo(false)}
+                      className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Completion Request Panel */}
             {isPendingCompletion && (
