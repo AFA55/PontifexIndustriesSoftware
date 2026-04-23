@@ -5,6 +5,8 @@ import { getCurrentUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import ActiveJobsSkeleton from './_skeleton';
+import { RevealSection } from '@/components/ui/Skeleton';
 import {
   Briefcase,
   Calendar,
@@ -110,6 +112,10 @@ export default function ActiveJobsPage() {
     ).length,
   };
 
+  if (loading && jobs.length === 0) {
+    return <ActiveJobsSkeleton />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
@@ -192,8 +198,14 @@ export default function ActiveJobsPage() {
 
         {/* Job list */}
         {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <RevealSection key={i} index={i}>
+                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm animate-pulse">
+                  <div className="h-14" />
+                </div>
+              </RevealSection>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
@@ -202,9 +214,9 @@ export default function ActiveJobsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map(job => (
+            {filtered.map((job, idx) => (
+              <RevealSection key={job.id} index={Math.min(idx, 6)}>
               <Link
-                key={job.id}
                 href={`/dashboard/admin/jobs/${job.id}`}
                 className="block w-full bg-white border border-gray-200 hover:border-gray-300 rounded-xl p-4 text-left transition-all shadow-sm hover:shadow-md"
               >
@@ -258,6 +270,7 @@ export default function ActiveJobsPage() {
                   <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" />
                 </div>
               </Link>
+              </RevealSection>
             ))}
           </div>
         )}
