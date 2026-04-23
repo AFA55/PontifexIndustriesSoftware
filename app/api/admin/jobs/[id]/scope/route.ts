@@ -41,7 +41,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (!scopeItems || scopeItems.length === 0) {
       return NextResponse.json({
         success: true,
-        data: {
+        data: [],
+        meta: {
           scope_items: [],
           overall_pct: 0,
           total_target: 0,
@@ -95,9 +96,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const overallPct =
       totalTarget > 0 ? parseFloat(Math.min(100, (totalCompleted / totalTarget) * 100).toFixed(1)) : 0;
 
+    // Return scope items as `data` array for components that expect a list,
+    // and also include `meta.scope_items` / totals for pages that use the
+    // richer shape. This keeps both callers happy.
     return NextResponse.json({
       success: true,
-      data: {
+      data: enrichedItems,
+      meta: {
         scope_items: enrichedItems,
         overall_pct: overallPct,
         total_target: totalTarget,
@@ -193,10 +198,11 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
 
-    const { id: itemId, work_type, description, unit, target_quantity } = body;
+    const itemId = body.itemId || body.id;
+    const { work_type, description, unit, target_quantity } = body;
 
     if (!itemId) {
-      return NextResponse.json({ error: 'id (scope item id) is required' }, { status: 400 });
+      return NextResponse.json({ error: 'itemId (scope item id) is required' }, { status: 400 });
     }
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };

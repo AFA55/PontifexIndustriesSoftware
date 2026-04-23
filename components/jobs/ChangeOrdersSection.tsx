@@ -373,7 +373,8 @@ export default function ChangeOrdersSection({
       const res = await apiFetch(`/api/admin/jobs/${jobId}/change-orders`);
       if (!res.ok) throw new Error('Failed to load change orders');
       const json = await res.json();
-      setChangeOrders(json.data || []);
+      const list = Array.isArray(json.data) ? json.data : (json.data?.change_orders ?? []);
+      setChangeOrders(list);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error loading change orders');
     } finally {
