@@ -143,6 +143,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
       id: string;
       full_name: string;
       skill_level_numeric: number | null;
+      scope_skill?: number;
       match_quality: 'good' | 'stretch' | 'over';
       is_qualified: boolean;
       is_available: boolean;
@@ -855,9 +856,11 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="text-sm font-semibold truncate">{op.full_name}</span>
-                                {op.skill_level_numeric != null && (
+                                {(op.scope_skill != null || op.skill_level_numeric != null) && (
                                   <span className="text-[10px] opacity-70 font-medium">
-                                    skill {op.skill_level_numeric}
+                                    {op.scope_skill != null && op.scope_skill !== op.skill_level_numeric
+                                      ? `scope ${op.scope_skill}`
+                                      : `skill ${op.skill_level_numeric}`}
                                   </span>
                                 )}
                               </div>
