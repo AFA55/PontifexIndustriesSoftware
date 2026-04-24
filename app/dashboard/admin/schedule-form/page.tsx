@@ -339,6 +339,7 @@ interface FormData {
   scope_photo_urls: string[];
   // Step 4
   equipment_needed: string[];
+  equipment_rental_flags: Record<string, boolean>;
   equipment_details: Record<string, EquipmentDetail>;
   equipment_selections: Record<string, Record<string, string>>; // per service type: { _sub: 'pentruder', item_id: 'qty_or_yes', ... }
   special_equipment: string;
@@ -422,6 +423,7 @@ const initialFormData: FormData = {
   removal_equipment: [],
   scope_photo_urls: [],
   equipment_needed: [],
+  equipment_rental_flags: {},
   equipment_details: {},
   equipment_selections: {},
   special_equipment: '',
@@ -1454,6 +1456,7 @@ export default function ScheduleFormPage() {
         scope_photo_urls: form.scope_photo_urls.length > 0 ? form.scope_photo_urls : [],
         // Step 4
         equipment_needed: form.equipment_needed,
+        equipment_rental_flags: Object.keys(form.equipment_rental_flags).length > 0 ? form.equipment_rental_flags : undefined,
         equipment_details: Object.keys(form.equipment_details).length > 0 ? form.equipment_details : undefined,
         equipment_selections: Object.keys(form.equipment_selections).length > 0 ? form.equipment_selections : undefined,
         special_equipment: form.special_equipment || null,
@@ -2828,10 +2831,31 @@ export default function ScheduleFormPage() {
                 {form.equipment_needed.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {form.equipment_needed.map(eq => (
-                      <span key={eq} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-full text-xs font-semibold">
-                        {eq}
-                        <button type="button" onClick={() => updateForm({ equipment_needed: form.equipment_needed.filter(e => e !== eq) })} className="ml-0.5 text-slate-400 hover:text-slate-700">×</button>
-                      </span>
+                      <div key={eq} className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-1.5 rounded-xl text-sm shadow-sm">
+                        <span className="text-slate-700 font-semibold text-xs">{eq}</span>
+                        <button
+                          type="button"
+                          onClick={() => updateForm({
+                            equipment_rental_flags: { ...form.equipment_rental_flags, [eq]: !form.equipment_rental_flags[eq] }
+                          })}
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${
+                            form.equipment_rental_flags[eq]
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-slate-200 text-slate-500 hover:bg-purple-100 hover:text-purple-700'
+                          }`}
+                          title="Toggle rental"
+                        >
+                          {form.equipment_rental_flags[eq] ? '+ Rental' : 'Rental?'}
+                        </button>
+                        <button type="button" onClick={() => {
+                          const flags = { ...form.equipment_rental_flags };
+                          delete flags[eq];
+                          updateForm({
+                            equipment_needed: form.equipment_needed.filter(e => e !== eq),
+                            equipment_rental_flags: flags
+                          });
+                        }} className="ml-0.5 text-slate-400 hover:text-slate-700">×</button>
+                      </div>
                     ))}
                   </div>
                 )}
