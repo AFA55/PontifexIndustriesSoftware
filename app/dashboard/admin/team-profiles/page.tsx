@@ -766,6 +766,84 @@ function SkillsTab({
   );
 }
 
+// ─── Skill Snapshot Card (compact summary for info tab) ──────────────────────
+
+function SkillSnapshotCard({
+  memberId,
+  getAuthHeaders,
+}: {
+  memberId: string;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+}) {
+  const [skillLevels, setSkillLevels] = useState<Record<string, number>>({});
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAuthHeaders().then(headers =>
+      fetch(`/api/admin/team-profiles/${memberId}/skills`, { headers })
+        .then(r => r.json())
+        .then(json => {
+          if (!cancelled) {
+            setSkillLevels(json.data?.skill_levels || {});
+            setLoaded(true);
+          }
+        })
+        .catch(() => { if (!cancelled) setLoaded(true); })
+    );
+    return () => { cancelled = true; };
+  }, [memberId, getAuthHeaders]);
+
+  if (!loaded) return null;
+
+  // Only show scopes with non-zero values
+  const cuttingItems = CUTTING_SCOPES.filter(s => (skillLevels[s.key] ?? 0) > 0);
+  const equipItems = HEAVY_EQUIPMENT.filter(s => (skillLevels[s.key] ?? 0) > 0);
+
+  if (cuttingItems.length === 0 && equipItems.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Skill Snapshot</h3>
+        <span className="text-[10px] text-gray-400">out of 10 / 5</span>
+      </div>
+      <div className="space-y-2">
+        {cuttingItems.map(s => {
+          const val = skillLevels[s.key] ?? 0;
+          return (
+            <div key={s.key} className="flex items-center gap-2">
+              <span className="text-xs text-gray-600 w-24 truncate">{s.label}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                <div
+                  className="bg-violet-500 h-1.5 rounded-full"
+                  style={{ width: `${(val / 10) * 100}%` }}
+                />
+              </div>
+              <span className="text-[11px] font-bold text-gray-700 w-4 text-right">{val}</span>
+            </div>
+          );
+        })}
+        {equipItems.map(s => {
+          const val = skillLevels[s.key] ?? 0;
+          return (
+            <div key={s.key} className="flex items-center gap-2">
+              <span className="text-xs text-gray-600 w-24 truncate">{s.label}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                <div
+                  className="bg-amber-500 h-1.5 rounded-full"
+                  style={{ width: `${(val / 5) * 100}%` }}
+                />
+              </div>
+              <span className="text-[11px] font-bold text-gray-700 w-4 text-right">{val}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 
 type DetailTab = 'info' | 'skills' | 'permissions';
@@ -900,6 +978,11 @@ function MemberDetailPanel({
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Profile Info</h3>
               <ProfileInfoSection member={member} onSaveHireDate={handleSaveHireDate} />
             </div>
+
+            {/* Skill Snapshot — operators & apprentices only */}
+            {showSkillsTab && (
+              <SkillSnapshotCard memberId={member.id} getAuthHeaders={getAuthHeaders} />
+            )}
 
             {/* Quick Actions */}
             <QuickActionsSection
