@@ -18,6 +18,8 @@ import {
   Calendar,
   CheckCircle,
   AlertCircle,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 
 interface CompletedJob {
@@ -70,6 +72,41 @@ export default function CompletedJobsArchivePage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRating, setFilterRating] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDeleteJob = async (jobId: string, jobNumber: string) => {
+    const confirmed = window.confirm(
+      `Permanently delete ${jobNumber}? This removes the job, its scope, progress, completion request, invoice line items, and related history. This cannot be undone.`
+    );
+    if (!confirmed) return;
+    setDeletingId(jobId);
+    setDeleteError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setDeleteError('Not signed in.');
+        setDeletingId(null);
+        return;
+      }
+      const res = await fetch(`/api/admin/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(json.error || 'Failed to delete job');
+        setDeletingId(null);
+        return;
+      }
+      setJobs((prev) => prev.filter((j) => j.id !== jobId));
+      if (selectedJobDetails?.job.id === jobId) setSelectedJobDetails(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete job');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     checkAuth();
@@ -441,9 +478,34 @@ export default function CompletedJobsArchivePage() {
                         className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500"
                         aria-hidden
                       />
-                      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                        Job Details
-                      </h2>
+                      <div className="flex items-center justify-between mb-4 gap-3">
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                          Job Details
+                        </h2>
+                        <button
+                          onClick={() =>
+                            handleDeleteJob(
+                              selectedJobDetails.job.id,
+                              selectedJobDetails.job.job_number
+                            )
+                          }
+                          disabled={deletingId === selectedJobDetails.job.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="Permanently delete this job"
+                        >
+                          {deletingId === selectedJobDetails.job.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          {deletingId === selectedJobDetails.job.id ? 'Deleting…' : 'Delete Job'}
+                        </button>
+                      </div>
+                      {deleteError && (
+                        <div className="mb-3 px-3 py-2 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30">
+                          {deleteError}
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-4 mb-6">
                         {[
                           ['Job Number', selectedJobDetails.job.job_number],

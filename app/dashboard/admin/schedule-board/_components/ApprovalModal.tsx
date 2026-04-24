@@ -131,6 +131,49 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
     }
   }, [scheduledDate, endDate, checkCapacity]);
 
+  // ── Fetch operator skill/availability match for selected date ──
+  const [skillMatchLoading, setSkillMatchLoading] = useState(false);
+  const [skillMatch, setSkillMatch] = useState<{
+    job_difficulty: number;
+    job_types: string[];
+    qualified_count: number;
+    available_qualified_count: number;
+    total_operators: number;
+    operators: Array<{
+      id: string;
+      full_name: string;
+      skill_level_numeric: number | null;
+      match_quality: 'good' | 'stretch' | 'over';
+      is_qualified: boolean;
+      is_available: boolean;
+      tasks_qualified_for: string[];
+    }>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!scheduledDate || !job.id) return;
+    let cancelled = false;
+    (async () => {
+      setSkillMatchLoading(true);
+      try {
+        const token = await getToken();
+        const res = await fetch(
+          `/api/admin/schedule-board/skill-match?jobId=${job.id}&date=${scheduledDate}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok && !cancelled) {
+          const json = await res.json();
+          setSkillMatch(json.data);
+        }
+      } catch (err) {
+        console.error('Skill match fetch failed:', err);
+      } finally {
+        if (!cancelled) setSkillMatchLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [scheduledDate, job.id]);
+
   // ── Find Next Available ──
   const handleFindNextAvailable = async () => {
     setFindingNext(true);
@@ -754,6 +797,83 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ── Operator Availability ── */}
+            {scheduledDate && (
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-slate-500" />
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Operator Availability
+                    </span>
+                  </div>
+                  {skillMatch && (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      skillMatch.available_qualified_count > 0
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-rose-100 text-rose-700'
+                    }`}>
+                      {skillMatch.available_qualified_count} of {skillMatch.total_operators} ready
+                    </span>
+                  )}
+                </div>
+                <div className="p-3">
+                  {skillMatchLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking crew availability...
+                    </div>
+                  ) : !skillMatch ? (
+                    <p className="text-xs text-slate-400">Select a date to see qualified operators.</p>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-slate-500 mb-2">
+                        Matched against {skillMatch.job_types.length > 0
+                          ? <span className="font-bold text-slate-700">{skillMatch.job_types.join(', ').toUpperCase()}</span>
+                          : 'this job'} · difficulty <span className="font-bold text-slate-700">{skillMatch.job_difficulty}/10</span>
+                      </p>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {skillMatch.operators.map((op) => {
+                          const matchColor =
+                            !op.is_available ? 'bg-slate-100 text-slate-400 ring-slate-200 line-through' :
+                            !op.is_qualified ? 'bg-rose-50 text-rose-600 ring-rose-200' :
+                            op.match_quality === 'good' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' :
+                            op.match_quality === 'stretch' ? 'bg-amber-50 text-amber-700 ring-amber-200' :
+                            'bg-rose-50 text-rose-600 ring-rose-200';
+                          const statusLabel =
+                            !op.is_available ? 'Busy' :
+                            !op.is_qualified ? 'Not qualified' :
+                            op.match_quality === 'good' ? 'Good match' :
+                            op.match_quality === 'stretch' ? 'Stretch' :
+                            'Under-skilled';
+                          return (
+                            <div
+                              key={op.id}
+                              className={`flex items-center justify-between rounded-lg px-3 py-2 ring-1 ${matchColor}`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-sm font-semibold truncate">{op.full_name}</span>
+                                {op.skill_level_numeric != null && (
+                                  <span className="text-[10px] opacity-70 font-medium">
+                                    skill {op.skill_level_numeric}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider">
+                                {statusLabel}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {skillMatch.operators.length === 0 && (
+                          <p className="text-xs text-slate-400">No operators found.</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
