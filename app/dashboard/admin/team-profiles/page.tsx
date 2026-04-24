@@ -10,6 +10,7 @@ import {
   Star, Briefcase, User, Settings, X,
   AlertTriangle, CheckCircle2, Mail, Phone, Calendar,
   Loader2, ChevronRight, Activity, Clock, UserCheck, Pencil,
+  Wrench, Save, CheckCircle, Award, Truck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
@@ -455,9 +456,319 @@ function QuickActionsSection({
   );
 }
 
+// ─── Skills & Proficiency Tab ─────────────────────────────────────────────────
+
+const CUTTING_SCOPES: Array<{ key: string; label: string }> = [
+  { key: 'core_drill', label: 'Core Drilling' },
+  { key: 'slab_saw', label: 'Slab Saw' },
+  { key: 'wall_saw', label: 'Wall Saw / Track Saw' },
+  { key: 'push_saw', label: 'Push Saw' },
+  { key: 'chain_saw', label: 'Chain Saw' },
+  { key: 'hand_saw', label: 'Hand Saw' },
+  { key: 'removal', label: 'Removal' },
+  { key: 'demo', label: 'Demo' },
+];
+
+const HEAVY_EQUIPMENT: Array<{ key: string; label: string }> = [
+  { key: 'mini_ex', label: 'Mini Excavator' },
+  { key: 'skid_steer', label: 'Skid Steer' },
+  { key: 'lull', label: 'Lull' },
+  { key: 'forklift', label: 'Forklift' },
+];
+
+type SkillLevels = Record<string, number>;
+
+function cuttingBandClasses(n: number, active: boolean): string {
+  if (!active) {
+    return 'bg-white border-2 border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:bg-white/[0.04] dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/[0.08]';
+  }
+  if (n === 0) {
+    return 'bg-slate-400 text-white shadow-lg shadow-slate-200 scale-110 dark:bg-slate-600 dark:shadow-black/30';
+  }
+  if (n <= 3) {
+    return 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 scale-110 dark:shadow-emerald-900/40';
+  }
+  if (n <= 6) {
+    return 'bg-amber-500 text-white shadow-lg shadow-amber-200 scale-110 dark:shadow-amber-900/40';
+  }
+  return 'bg-rose-600 text-white shadow-lg shadow-rose-200 scale-110 dark:shadow-rose-900/40';
+}
+
+function equipmentBandClasses(n: number, active: boolean): string {
+  if (!active) {
+    return 'bg-white border-2 border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:bg-white/[0.04] dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/[0.08]';
+  }
+  if (n === 0) {
+    return 'bg-slate-400 text-white shadow-lg shadow-slate-200 scale-110 dark:bg-slate-600';
+  }
+  if (n <= 2) {
+    return 'bg-amber-500 text-white shadow-lg shadow-amber-200 scale-110';
+  }
+  return 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 scale-110';
+}
+
+function ScaleRow({
+  label,
+  value,
+  max,
+  onChange,
+  bandFn,
+  zeroLabel,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  onChange: (n: number) => void;
+  bandFn: (n: number, active: boolean) => string;
+  zeroLabel: string;
+}) {
+  const nums = Array.from({ length: max + 1 }, (_, i) => i);
+  return (
+    <div className="py-2.5 border-b border-slate-100 dark:border-white/5 last:border-b-0">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</span>
+        {value === 0 && (
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            {zeroLabel}
+          </span>
+        )}
+      </div>
+      <div className="flex gap-1.5 sm:gap-2 flex-wrap">
+        {nums.map(n => {
+          const isActive = value === n;
+          return (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(n)}
+              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-xs sm:text-sm font-bold transition-all duration-200 ${bandFn(n, isActive)}`}
+              aria-label={`${label} level ${n}`}
+            >
+              {n}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SkillsTab({
+  memberId,
+  getAuthHeaders,
+}: {
+  memberId: string;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [skillLevels, setSkillLevels] = useState<SkillLevels>({});
+  const [initialLevels, setInitialLevels] = useState<SkillLevels>({});
+  const [notes, setNotes] = useState('');
+  const [initialNotes, setInitialNotes] = useState('');
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/admin/team-profiles/${memberId}/skills`, { headers });
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok || json.success === false) {
+          setError(json.error || 'Failed to load skills');
+          setSkillLevels({});
+          setInitialLevels({});
+          setNotes('');
+          setInitialNotes('');
+        } else {
+          const data = json.data || {};
+          const levels: SkillLevels = data.skill_levels || {};
+          const n: string = data.notes || '';
+          setSkillLevels(levels);
+          setInitialLevels(levels);
+          setNotes(n);
+          setInitialNotes(n);
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load skills');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [memberId, getAuthHeaders]);
+
+  const dirty =
+    notes !== initialNotes ||
+    [...CUTTING_SCOPES, ...HEAVY_EQUIPMENT].some(s =>
+      (skillLevels[s.key] ?? 0) !== (initialLevels[s.key] ?? 0)
+    );
+
+  const setLevel = (key: string, n: number) => {
+    setSkillLevels(prev => ({ ...prev, [key]: n }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      // Ensure all known keys present (fill missing with 0)
+      const payloadLevels: SkillLevels = {};
+      for (const s of [...CUTTING_SCOPES, ...HEAVY_EQUIPMENT]) {
+        payloadLevels[s.key] = skillLevels[s.key] ?? 0;
+      }
+      const res = await fetch(`/api/admin/team-profiles/${memberId}/skills`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ skill_levels: payloadLevels, notes }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.success === false) {
+        setError(json.error || 'Failed to save');
+      } else {
+        setInitialLevels(payloadLevels);
+        setInitialNotes(notes);
+        setSavedAt(Date.now());
+        setTimeout(() => setSavedAt(null), 2500);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {error && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:border-red-900/50 dark:text-red-300">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Cutting Scopes */}
+      <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-5 dark:bg-white/[0.04] dark:ring-white/10">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-lg flex items-center justify-center">
+            <Wrench className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Cutting Scopes</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">0 = Not trained &middot; 1–3 Beginner &middot; 4–6 Proficient &middot; 7–10 Expert</p>
+          </div>
+        </div>
+        <div>
+          {CUTTING_SCOPES.map(s => (
+            <ScaleRow
+              key={s.key}
+              label={s.label}
+              value={skillLevels[s.key] ?? 0}
+              max={10}
+              onChange={n => setLevel(s.key, n)}
+              bandFn={cuttingBandClasses}
+              zeroLabel="Not trained"
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Heavy Equipment */}
+      <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-5 dark:bg-white/[0.04] dark:ring-white/10">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
+            <Truck className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Heavy Equipment Proficiency</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">0 = Not qualified &middot; 1–2 Learning &middot; 3–5 Qualified</p>
+          </div>
+        </div>
+        <div>
+          {HEAVY_EQUIPMENT.map(s => (
+            <ScaleRow
+              key={s.key}
+              label={s.label}
+              value={skillLevels[s.key] ?? 0}
+              max={5}
+              onChange={n => setLevel(s.key, n)}
+              bandFn={equipmentBandClasses}
+              zeroLabel="Not qualified"
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-5 dark:bg-white/[0.04] dark:ring-white/10">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+            <Award className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Notes</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">Certifications, specialties, development goals</p>
+          </div>
+        </div>
+        <textarea
+          rows={5}
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="e.g. OSHA 30 certified, working on wall saw certification..."
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors resize-none dark:bg-white/[0.04] dark:border-white/10 dark:text-slate-100 dark:placeholder-slate-500"
+        />
+      </div>
+
+      {/* Save bar */}
+      <div className="sticky bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent dark:from-slate-900 dark:via-slate-900 pt-4 pb-1 -mx-1 px-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-h-[28px]">
+            {dirty && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Unsaved changes
+              </span>
+            )}
+            {!dirty && savedAt && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Saved
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!dirty || saving}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 text-white text-sm font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? 'Saving...' : 'Save Skills'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 
-type DetailTab = 'info' | 'permissions';
+type DetailTab = 'info' | 'skills' | 'permissions';
 
 function MemberDetailPanel({
   member,
@@ -516,6 +827,20 @@ function MemberDetailPanel({
   const isOwnProfile = member.id === currentUserId;
   const canGrant = isSuperAdmin && !isOwnProfile && member.role !== 'super_admin';
   const showPermissionsTab = member.role !== 'super_admin';
+  const showSkillsTab = member.role === 'operator' || member.role === 'apprentice';
+  const showTabBar = showPermissionsTab || showSkillsTab;
+
+  const visibleTabs: DetailTab[] = [
+    'info',
+    ...(showSkillsTab ? (['skills'] as DetailTab[]) : []),
+    ...(showPermissionsTab ? (['permissions'] as DetailTab[]) : []),
+  ];
+
+  const tabLabel: Record<DetailTab, string> = {
+    info: 'Profile Info',
+    skills: 'Skills',
+    permissions: 'Feature Permissions',
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -547,20 +872,20 @@ function MemberDetailPanel({
         </div>
       </div>
 
-      {/* Tab bar — only show permissions tab for non-super-admin */}
-      {showPermissionsTab && (
-        <div className="flex gap-1 px-4 pt-4 flex-shrink-0 border-b border-gray-200 pb-0">
-          {(['info', 'permissions'] as DetailTab[]).map(t => (
+      {/* Tab bar */}
+      {showTabBar && (
+        <div className="flex gap-1 px-4 pt-4 flex-shrink-0 border-b border-gray-200 pb-0 overflow-x-auto">
+          {visibleTabs.map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-all capitalize ${
+              className={`px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-all whitespace-nowrap ${
                 tab === t
                   ? 'bg-violet-600 text-white'
                   : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
-              {t === 'permissions' ? 'Feature Permissions' : 'Profile Info'}
+              {tabLabel[t]}
             </button>
           ))}
         </div>
@@ -568,7 +893,7 @@ function MemberDetailPanel({
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-gray-50">
-        {(tab === 'info' || !showPermissionsTab) && (
+        {(tab === 'info' || !showTabBar) && (
           <>
             {/* Profile Info */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
@@ -608,6 +933,10 @@ function MemberDetailPanel({
               </div>
             )}
           </>
+        )}
+
+        {tab === 'skills' && showSkillsTab && (
+          <SkillsTab memberId={member.id} getAuthHeaders={getAuthHeaders} />
         )}
 
         {tab === 'permissions' && showPermissionsTab && (

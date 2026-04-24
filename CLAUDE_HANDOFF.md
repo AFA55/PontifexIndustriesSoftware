@@ -1,5 +1,33 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 22, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
+**Date:** April 24, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
+
+---
+
+## APRIL 24, 2026 SESSION — Jobs UI refresh, Change Orders, Operator Skills
+
+### What shipped
+- **Active Jobs + Job Detail redesign** — light-default aesthetic with `dark:` variants; gradient accent bars per status; 5 metric tiles in hero card; tabs: Scope & Progress / Change Orders / Daily Activity.
+- **Change Orders data model** — new `change_orders` table (migration `supabase/migrations/20260423_change_orders.sql` applied to `klatddoyncxidgqtcjnu`), separate from `job_scope_items`. Auto-numbered `CO-NNN` via trigger. API routes: `GET/POST /api/admin/jobs/[id]/change-orders`, `PATCH /api/admin/jobs/[id]/change-orders/[coId]` (approve/reject).
+- **Multi-day progress analytics** — `GET /api/admin/jobs/[id]/progress-by-day` returns per-entry `cumulative_quantity` + `cumulative_pct`. `in_route` derived from `daily_job_logs` → `timecards` fallback → `job_status_history`.
+- **Summary route fix** — `/api/admin/jobs/[id]/summary` was 404ing because it embedded `profiles!job_orders_assigned_to_fkey` but the FK targets `auth.users`. Fixed by fetching the operator profile in a second query.
+- **Light-mode factory reset** — `contexts/ThemeContext.tsx` gained a `theme.factory-reset=v1` sentinel that one-time wipes stale `theme=dark` from localStorage. Default is now explicit-opt-in light. `DarkModeIconToggle` added to admin topbar.
+- **Billing / Completed Jobs / Completed Job Tickets** — rewritten to match active-jobs light-default: gradient shells, white/90 ring-slate-200 cards, emerald/amber/rose/violet chip system, lucide icons, Link navigation.
+- **Schedule form step reorder** — Difficulty & Notes moved to step 5, Scheduling to step 6, Site Compliance to step 7. Scheduling preview already filters operators by `difficulty_rating`.
+- **Schedule board fix** — removed floating role badge that was overlapping the logout button.
+- **Approve Job modal — operator availability panel** — extended `/api/admin/schedule-board/skill-match` with optional `date` param (flags operators already assigned that day). New panel inside `ApprovalModal` groups operators as good / stretch / under-skilled / busy.
+- **Operator skills system** — per-scope skill levels stored in existing `profiles.skill_levels` jsonb (no migration needed; columns existed). Taxonomy at `lib/skills-taxonomy.ts`:
+  - Cutting scopes (0–10): core_drill, slab_saw, wall_saw, push_saw, chain_saw, hand_saw, removal, demo
+  - Equipment proficiency (0–5): mini_ex, skid_steer, lull, forklift
+  - Freeform `notes` text
+  - Service-code → scope map used by smart scheduling
+  - API: `GET/PUT /api/admin/team-profiles/[id]/skills` (operators + apprentices only)
+  - UI: new "Skills & Proficiency" tab in Team Profiles right panel
+  - Smart scheduling now uses the per-scope skill when a job's service codes map to a scope
+
+### Pending / next
+- Wire each operator's per-scope skill numbers into the Approve Job availability panel so the displayed match uses the scope-specific value (backend returns it once skill-match is updated to read `skill_levels` by scope).
+- Optionally render per-scope skill bars in the Team Profiles preview card for at-a-glance proficiency.
+- Continue Week 2 polish (end-to-end workflow test, mobile audit, loading/error pass, Patriot assets, prod deploy prep).
 
 ---
 
