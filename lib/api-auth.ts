@@ -298,31 +298,41 @@ export async function resolveTenantScope(
     return { tenantId: auth.tenantId };
   }
 
-  // super_admin: require explicit tenant via query string
+  // super_admin: prefer explicit tenantId param; auto-resolve from profile if absent
   const { searchParams } = new URL(request.url);
   const explicit = searchParams.get('tenantId') || searchParams.get('tenant_id');
-  if (!explicit) {
-    return {
-      response: NextResponse.json(
-        { error: 'tenantId query parameter is required for super_admin requests.' },
-        { status: 400 }
-      ),
-    };
+
+  if (explicit) {
+    // Explicit override — validate it exists
+    const { data: tenant, error } = await supabaseAdmin
+      .from('tenants')
+      .select('id')
+      .eq('id', explicit)
+      .maybeSingle();
+    if (error || !tenant) {
+      return { response: NextResponse.json({ error: 'Tenant not found.' }, { status: 404 }) };
+    }
+    return { tenantId: tenant.id };
   }
 
-  const { data: tenant, error } = await supabaseAdmin
-    .from('tenants')
-    .select('id')
-    .eq('id', explicit)
+  // No explicit tenantId — look up from super_admin's own profile
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('tenant_id')
+    .eq('id', auth.userId)
     .maybeSingle();
 
-  if (error || !tenant) {
-    return {
-      response: NextResponse.json({ error: 'Tenant not found.' }, { status: 404 }),
-    };
+  if (profile?.tenant_id) {
+    return { tenantId: profile.tenant_id };
   }
 
-  return { tenantId: tenant.id };
+  // Last resort: return 400
+  return {
+    response: NextResponse.json(
+      { error: 'Could not resolve tenant. Pass ?tenantId= or ensure your profile has a tenant_id.' },
+      { status: 400 }
+    ),
+  };
 }
 
 /**
