@@ -38,8 +38,8 @@ const STEPS = [
   { num: 1, title: 'Customer', icon: UserIcon, color: 'from-blue-500 to-blue-600' },
   { num: 2, title: 'Project & Contact', icon: MapPin, color: 'from-indigo-500 to-purple-600' },
   { num: 3, title: 'Scope of Work', icon: Wrench, color: 'from-violet-500 to-purple-600' },
-  { num: 4, title: 'Equipment', icon: HardHat, color: 'from-amber-500 to-orange-600' },
-  { num: 5, title: 'Difficulty & Notes', icon: BarChart3, color: 'from-rose-500 to-red-600' },
+  { num: 4, title: 'Difficulty & Notes', icon: BarChart3, color: 'from-rose-500 to-red-600' },
+  { num: 5, title: 'Equipment', icon: HardHat, color: 'from-amber-500 to-orange-600' },
   { num: 6, title: 'Scheduling', icon: Calendar, color: 'from-cyan-500 to-blue-600' },
   { num: 7, title: 'Site Compliance', icon: ShieldCheck, color: 'from-emerald-500 to-teal-600' },
   { num: 8, title: 'Jobsite Conditions', icon: Building2, color: 'from-orange-500 to-red-600' },
@@ -2598,8 +2598,8 @@ export default function ScheduleFormPage() {
           </div>
         );
 
-      // ── STEP 4: Equipment Requirements ────────────────────
-      case 4: {
+      // ── STEP 5: Equipment Requirements ────────────────────
+      case 5: {
         // Helper to get/set equipment selection values
         const getEquipVal = (serviceCode: string, itemId: string): string =>
           form.equipment_selections[serviceCode]?.[itemId] || '';
@@ -3288,8 +3288,8 @@ export default function ScheduleFormPage() {
           </div>
         );
 
-      // ── STEP 5: Job Difficulty & Notes ────────────────────
-      case 5:
+      // ── STEP 4: Job Difficulty & Notes ────────────────────
+      case 4:
         return (
           <div className="space-y-6">
             <div>
@@ -3657,8 +3657,8 @@ export default function ScheduleFormPage() {
                   {currentStep === 1 && 'Select an existing customer or create a new one'}
                   {currentStep === 2 && 'Project details, contacts, and site information'}
                   {currentStep === 3 && 'Define the services needed for this job'}
-                  {currentStep === 4 && 'Select equipment for this project'}
-                  {currentStep === 5 && 'Rate difficulty and add notes'}
+                  {currentStep === 4 && 'Rate difficulty and add notes'}
+                  {currentStep === 5 && 'Select equipment for this project'}
                   {currentStep === 6 && 'Set dates and scheduling flexibility'}
                   {currentStep === 7 && 'Site access and compliance requirements'}
                   {currentStep === 8 && 'Check all conditions that apply'}
