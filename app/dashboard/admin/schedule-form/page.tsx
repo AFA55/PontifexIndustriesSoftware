@@ -64,6 +64,16 @@ const SERVICE_TYPES = [
 // Service types that support flexible input modes (linear vs areas)
 const FLEXIBLE_SCOPE_TYPES = ['WS/TS', 'DFS', 'EFS', 'HHS/PS'];
 
+const PPE_ITEMS = [
+  { key: 'safety_harness', label: 'Safety Harness', icon: '🦺' },
+  { key: 'safety_glasses', label: 'Safety Glasses', icon: '🥽' },
+  { key: 'ear_plugs', label: 'Ear Plugs', icon: '🔇' },
+  { key: 'face_mask', label: 'Face Mask', icon: '😷' },
+  { key: 'face_shield', label: 'Face Shield', icon: '🛡️' },
+] as const;
+
+const GLOVE_CUT_LEVELS = [3, 4, 5] as const;
+
 // Equipment presets config moved to SERVICE_EQUIPMENT
 
 // ── Scope fields per service type (quantity inputs for Step 3) ──
@@ -335,6 +345,7 @@ interface FormData {
   custom_equipment_input: string;
   equipment_rentals: { name: string; pickup_required: boolean }[];
   rental_equipment_input: string;
+  ppe_required: string[];
   // Step 5
   start_date: string;
   end_date: string;
@@ -417,6 +428,7 @@ const initialFormData: FormData = {
   custom_equipment_input: '',
   equipment_rentals: [],
   rental_equipment_input: '',
+  ppe_required: [],
   start_date: '',
   end_date: '',
   special_arrival: false,
@@ -1006,6 +1018,7 @@ export default function ScheduleFormPage() {
         contact_name?: string;
         contact_phone?: string;
         equipment_needed?: string[];
+        ppe_required?: string[];
       };
       localStorage.removeItem('schedule-form-customer-prefill');
 
@@ -1018,6 +1031,7 @@ export default function ScheduleFormPage() {
       if (prefill.contact_name) updates.site_contact = prefill.contact_name;
       if (prefill.contact_phone) updates.contact_phone = prefill.contact_phone;
       if (prefill.equipment_needed?.length) updates.equipment_needed = prefill.equipment_needed;
+      if (prefill.ppe_required?.length) updates.ppe_required = prefill.ppe_required;
 
       updateForm(updates as Partial<FormData>);
 
@@ -1443,6 +1457,7 @@ export default function ScheduleFormPage() {
         equipment_details: Object.keys(form.equipment_details).length > 0 ? form.equipment_details : undefined,
         equipment_selections: Object.keys(form.equipment_selections).length > 0 ? form.equipment_selections : undefined,
         special_equipment: form.special_equipment || null,
+        ppe_required: form.ppe_required,
         equipment_rentals: form.equipment_rentals.map(r =>
           r.pickup_required ? `${r.name} (PICKUP REQUIRED)` : r.name
         ),
@@ -2882,6 +2897,102 @@ export default function ScheduleFormPage() {
                 value={form.special_equipment}
                 onChange={e => updateForm({ special_equipment: e.target.value })}
               />
+            </div>
+
+            {/* ── PPE Required ── */}
+            <div className="bg-white rounded-2xl ring-1 ring-slate-200 shadow-sm p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-md">
+                  ⚠️
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">PPE Required</h3>
+                  <p className="text-[11px] text-slate-500">Select personal protective equipment required for this job</p>
+                </div>
+              </div>
+
+              {/* Standard PPE toggles */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {PPE_ITEMS.map(item => {
+                  const active = form.ppe_required.includes(item.key);
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        const next = active
+                          ? form.ppe_required.filter(k => k !== item.key)
+                          : [...form.ppe_required, item.key];
+                        updateForm({ ppe_required: next });
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                        active
+                          ? 'bg-orange-500 border-orange-500 text-white shadow-md'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-orange-300 hover:text-orange-600'
+                      }`}
+                    >
+                      <span>{item.icon}</span>
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Gloves — cut level selector */}
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                <p className="text-xs font-bold text-slate-700 mb-2">Gloves — Cut Level</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-slate-500">Required level:</span>
+                  {GLOVE_CUT_LEVELS.map(level => {
+                    const key = `gloves_cut_${level}`;
+                    const active = form.ppe_required.includes(key);
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => {
+                          // Only one glove level at a time
+                          const withoutGloves = form.ppe_required.filter(k => !k.startsWith('gloves_cut_'));
+                          const next = active ? withoutGloves : [...withoutGloves, key];
+                          updateForm({ ppe_required: next });
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${
+                          active
+                            ? 'bg-orange-500 border-orange-500 text-white'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-orange-300 hover:text-orange-600'
+                        }`}
+                      >
+                        Level {level}
+                      </button>
+                    );
+                  })}
+                  {form.ppe_required.some(k => k.startsWith('gloves_cut_')) && (
+                    <button
+                      type="button"
+                      onClick={() => updateForm({ ppe_required: form.ppe_required.filter(k => !k.startsWith('gloves_cut_')) })}
+                      className="text-[10px] text-slate-400 hover:text-red-500 transition-colors px-1"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Summary chip strip */}
+              {form.ppe_required.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {form.ppe_required.map(key => {
+                    const item = PPE_ITEMS.find(p => p.key === key);
+                    const gloveMatch = key.match(/^gloves_cut_(\d)$/);
+                    const label = item ? `${item.icon} ${item.label}` : gloveMatch ? `🧤 Gloves Cut ${gloveMatch[1]}` : key;
+                    return (
+                      <span key={key} className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 border border-orange-200 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
+                        {label}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         );
