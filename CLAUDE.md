@@ -45,7 +45,14 @@ Next.js 15 (App Router) + React 19 + TypeScript + Supabase (PostgreSQL) + Tailwi
 - 70+ migrations in `supabase/migrations/`
 - 90+ tables in production
 - All tables have RLS enabled
-- New tables should use JWT metadata for RLS: `auth.jwt() -> 'user_metadata' ->> 'role'`
+- **DO NOT use `auth.jwt() -> 'user_metadata'` in RLS.** `user_metadata` is client-writable via `supabase.auth.updateUser({ data: { role: 'super_admin' } })`, so any operator could self-promote. Supabase's linter flags this as `rls_references_user_metadata` (ERROR).
+- For role/tenant checks in RLS, use the SECURITY DEFINER helpers that read from `public.profiles`:
+  - `public.is_admin()` — true for `admin` or `super_admin`
+  - `public.current_user_role()` — returns the caller's `profiles.role`
+  - `public.current_user_tenant_id()` — returns the caller's `profiles.tenant_id`
+  - `public.current_user_has_role(VARIADIC text[])` — membership check against an allowed list
+- Example: `USING ( public.current_user_has_role('admin','super_admin','operations_manager') AND tenant_id = public.current_user_tenant_id() )`
+- If you need immutable identity claims, `auth.jwt() -> 'app_metadata'` is acceptable (server-only writable) — `user_metadata` is never safe for authorization.
 
 ## Roles (priority order)
 super_admin > operations_manager > admin > salesman > shop_manager > inventory_manager > operator > apprentice
@@ -103,6 +110,22 @@ npm run build      # Production build check (must pass with 0 errors)
 - [x] Database audit (indexes, RLS, seeded defaults)
 - [x] Restored all 230+ files from unmerged worktree branches
 - [x] Fixed login (all 8 roles), RBAC (admin full access), dashboard branding
+
+### Session — April 24, 2026 — Jobs UI, Change Orders, Skills ✅ COMPLETE
+- [x] Active Jobs + Job Detail redesigned (light-default, gradient accent bars, 5 metric tiles, tabs: Scope & Progress / Change Orders / Daily Activity)
+- [x] Change Orders data model — new `change_orders` table (migration `20260423_change_orders.sql` applied), auto-numbered `CO-NNN`, separate from `job_scope_items`
+- [x] Change Orders API — `GET/POST /api/admin/jobs/[id]/change-orders` and `[coId]` approve/reject
+- [x] Multi-day progress analytics — `/api/admin/jobs/[id]/progress-by-day` with per-entry cumulative_quantity + cumulative_pct; in_route derived from daily_job_logs → timecards → job_status_history
+- [x] Fixed `/api/admin/jobs/[id]/summary` 404 (FK `assigned_to` targets `auth.users`, not `profiles`; second-query fetch for operator profile)
+- [x] Light-mode factory reset — `theme.factory-reset=v1` sentinel wipes stale `theme=dark`; DarkModeIconToggle added to admin topbar
+- [x] Billing / Completed Jobs / Completed Job Tickets rewritten to light-default (gradient shells, white/90 ring-slate-200, emerald/amber/rose/violet chips, lucide icons, Link navigation)
+- [x] Schedule form step reorder — Difficulty (5), Scheduling (6), Site Compliance (7); Scheduling preview filters by `difficulty_rating`
+- [x] Schedule board — removed floating role badge overlapping logout
+- [x] Approve Job modal — operator availability panel (good / stretch / under-skilled / busy); extended `/api/admin/schedule-board/skill-match` with optional `date` param
+- [x] Operator skills taxonomy — `lib/skills-taxonomy.ts` (cutting 0–10, equipment 0–5, notes); service-code → scope map; stored in existing `profiles.skill_levels` jsonb
+- [x] Skills API — `GET/PUT /api/admin/team-profiles/[id]/skills` (operators + apprentices only)
+- [x] Team Profiles — new "Skills & Proficiency" tab in right panel
+- [x] Smart scheduling — uses per-scope skill when a job's service codes map to a scope
 
 ### Week 2 — Final Polish & Launch (April 1-2)
 - [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)

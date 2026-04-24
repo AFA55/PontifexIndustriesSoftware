@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
@@ -23,10 +23,12 @@ export async function POST(
   try {
     const { id } = await params;
 
-    const auth = await requireSuperAdmin(request);
+    const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
     const { scheduled_date, is_will_call } = body;
 
@@ -35,7 +37,7 @@ export async function POST(
       .from('job_orders')
       .select('*, profiles:created_by(id, full_name, email)')
       .eq('id', id);
-    if (tenantId) { jobQuery = jobQuery.eq('tenant_id', tenantId); }
+    jobQuery = jobQuery.eq('tenant_id', tenantId);
     const { data: jobOrder, error: fetchError } = await jobQuery.single();
 
     if (fetchError || !jobOrder) {
@@ -129,7 +131,7 @@ export async function POST(
         job_number: jobOrder.job_number,
         changed_by: auth.userId,
         changed_by_name: approverName,
-        changed_by_role: 'super_admin',
+        changed_by_role: auth.role,
         change_type: 'approved',
         changes: {
           status: { old: jobOrder.status, new: 'scheduled' },

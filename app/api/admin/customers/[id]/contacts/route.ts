@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 
@@ -16,14 +16,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     // Verify customer belongs to tenant
-    if (tenantId) {
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    {
       const { data: customer } = await supabaseAdmin.from('customers').select('id').eq('id', id).eq('tenant_id', tenantId).single();
       if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
@@ -52,10 +55,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
     const body = await request.json();
 
@@ -64,7 +69,8 @@ export async function POST(
     }
 
     // Verify customer belongs to tenant
-    if (tenantId) {
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    {
       const { data: customer } = await supabaseAdmin.from('customers').select('id').eq('id', id).eq('tenant_id', tenantId).single();
       if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }

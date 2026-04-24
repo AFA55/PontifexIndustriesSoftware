@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getCurrentUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import {
   Briefcase,
@@ -31,14 +32,40 @@ interface ActiveJob {
   pending_completion_approval?: boolean;
 }
 
+// Status pill hues. Light: `bg-{hue}-100 text-{hue}-700 ring-{hue}-200`.
+// Dark: translucent versions on the dark purple backdrop.
 const STATUS_COLORS: Record<string, string> = {
-  scheduled: 'bg-blue-100 text-blue-700 border-blue-200',
-  assigned: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  in_route: 'bg-amber-100 text-amber-700 border-amber-200',
-  in_progress: 'bg-amber-100 text-amber-700 border-amber-200',
-  pending_approval: 'bg-purple-100 text-purple-700 border-purple-200',
-  completed: 'bg-green-100 text-green-700 border-green-200',
-  cancelled: 'bg-red-100 text-red-700 border-red-200',
+  scheduled:
+    'bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30',
+  assigned:
+    'bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30',
+  in_route:
+    'bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30',
+  on_site:
+    'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30',
+  in_progress:
+    'bg-violet-100 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30',
+  pending_approval:
+    'bg-orange-100 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-400/30',
+  pending_completion:
+    'bg-orange-100 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-400/30',
+  completed:
+    'bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white/80 dark:ring-white/10',
+  cancelled:
+    'bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-400/30',
+};
+
+// Top-accent bar hue per status — colorful stripe on the top edge of each card.
+const STATUS_ACCENT: Record<string, string> = {
+  scheduled: 'from-sky-400 to-blue-500',
+  assigned: 'from-sky-400 to-indigo-500',
+  in_route: 'from-amber-400 to-orange-500',
+  on_site: 'from-emerald-400 to-teal-500',
+  in_progress: 'from-violet-500 to-fuchsia-500',
+  pending_approval: 'from-orange-400 to-rose-500',
+  pending_completion: 'from-orange-400 to-rose-500',
+  completed: 'from-slate-300 to-slate-400',
+  cancelled: 'from-rose-400 to-red-500',
 };
 
 export default function ActiveJobsPage() {
@@ -109,155 +136,274 @@ export default function ActiveJobsPage() {
     ).length,
   };
 
+  const statTiles = [
+    {
+      label: 'Total Active',
+      value: stats.total,
+      icon: Briefcase,
+      tab: 'all' as const,
+      iconTile:
+        'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
+    },
+    {
+      label: 'Today',
+      value: stats.today,
+      icon: Calendar,
+      tab: 'today' as const,
+      iconTile:
+        'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
+    },
+    {
+      label: 'Coming Up',
+      value: stats.comingUp,
+      icon: ArrowRight,
+      tab: 'coming_up' as const,
+      iconTile:
+        'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300',
+    },
+    {
+      label: 'Needs Attention',
+      value: stats.needsAttention,
+      icon: AlertCircle,
+      tab: 'attention' as const,
+      iconTile:
+        'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300',
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div
+      className="
+        min-h-screen p-6
+        bg-gradient-to-b from-slate-50 to-white
+        dark:from-[#0b0618] dark:to-[#0e0720]
+      "
+    >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Active Jobs</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              Active Jobs
+            </h1>
+            <p className="text-slate-600 dark:text-white/60 mt-1">
               {viewAll ? 'All company jobs' : 'My assigned jobs'}
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setViewAll(!viewAll)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
                 ${viewAll
-                  ? 'bg-purple-50 border-purple-200 text-purple-700'
-                  : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200'
-                }`}
+                  ? 'bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-500/15 dark:border-violet-400/30 dark:text-violet-200'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10'
+                }
+              `}
             >
               {viewAll ? 'Showing All' : 'My Jobs Only'}
             </button>
             <button
               onClick={fetchJobs}
               disabled={loading}
-              className="p-2 bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+              className="
+                p-2 rounded-lg transition-colors disabled:opacity-50
+                bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50
+                dark:bg-white/5 dark:border-white/10 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10
+              "
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats / quick filters */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: 'Total Active', value: stats.total, icon: Briefcase, color: 'text-blue-600', tab: 'all' as const },
-            { label: 'Today', value: stats.today, icon: Calendar, color: 'text-green-600', tab: 'today' as const },
-            { label: 'Coming Up', value: stats.comingUp, icon: ArrowRight, color: 'text-indigo-600', tab: 'coming_up' as const },
-            { label: 'Needs Attention', value: stats.needsAttention, icon: AlertCircle, color: 'text-red-600', tab: 'attention' as const },
-          ].map(stat => (
-            <button
-              key={stat.tab}
-              onClick={() => setFilter(stat.tab)}
-              className={`bg-white border rounded-xl p-4 text-left transition-all shadow-sm ${
-                filter === stat.tab ? 'border-purple-500' : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-sm">{stat.label}</span>
-                <stat.icon className={`w-4 h-4 ${stat.color}`} />
-              </div>
-              <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-            </button>
-          ))}
+          {statTiles.map(stat => {
+            const active = filter === stat.tab;
+            return (
+              <button
+                key={stat.tab}
+                onClick={() => setFilter(stat.tab)}
+                className={`
+                  group relative overflow-hidden rounded-2xl p-4 text-left transition-all
+                  bg-white border shadow-sm hover:shadow-md
+                  dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80 dark:backdrop-blur
+                  ${active
+                    ? 'border-violet-400 ring-2 ring-violet-200 dark:border-violet-400/60 dark:ring-violet-500/30'
+                    : 'border-slate-200 hover:border-slate-300 dark:border-white/10 dark:hover:border-white/20'
+                  }
+                `}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-slate-500 dark:text-white/60 text-sm font-medium">
+                    {stat.label}
+                  </span>
+                  <span
+                    className={`
+                      inline-flex items-center justify-center w-9 h-9 rounded-xl
+                      ${stat.iconTile}
+                    `}
+                  >
+                    <stat.icon className="w-4 h-4" />
+                  </span>
+                </div>
+                <div className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums">
+                  {stat.value}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Filter tabs */}
+        {/* Filter tabs — pill style, active uses purple gradient */}
         <div className="flex gap-2 mb-4 flex-wrap">
           {([
             ['all', 'All'],
             ['today', 'Today'],
             ['coming_up', 'Coming Up'],
             ['attention', 'Needs Attention'],
-          ] as const).map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => setFilter(val)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative
-                ${filter === val ? 'bg-purple-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
-            >
-              {label}
-              {val === 'attention' && stats.needsAttention > 0 && (
-                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
-                  {stats.needsAttention}
-                </span>
-              )}
-            </button>
-          ))}
+          ] as const).map(([val, label]) => {
+            const active = filter === val;
+            return (
+              <button
+                key={val}
+                onClick={() => setFilter(val)}
+                className={`
+                  px-4 py-2 rounded-full text-sm font-medium transition-all relative
+                  ${active
+                    ? 'bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 text-white shadow-md shadow-violet-500/20'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10'
+                  }
+                `}
+              >
+                {label}
+                {val === 'attention' && stats.needsAttention > 0 && (
+                  <span className={`
+                    ml-2 text-xs rounded-full px-1.5 py-0.5 font-semibold
+                    ${active
+                      ? 'bg-white/25 text-white'
+                      : 'bg-rose-500 text-white'
+                    }
+                  `}>
+                    {stats.needsAttention}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Job list */}
         {loading ? (
           <div className="flex items-center justify-center h-40">
-            <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
-            <Briefcase className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No jobs match this filter</p>
+          <div className="
+            rounded-2xl p-12 text-center shadow-sm
+            bg-white border border-slate-200
+            dark:bg-white/5 dark:border-white/10 dark:backdrop-blur
+          ">
+            <Briefcase className="w-12 h-12 text-slate-300 dark:text-white/20 mx-auto mb-3" />
+            <p className="text-slate-500 dark:text-white/60">No jobs match this filter</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map(job => (
-              <button
-                key={job.id}
-                onClick={() => router.push(`/dashboard/admin/jobs/${job.id}`)}
-                className="w-full bg-white border border-gray-200 hover:border-gray-300 rounded-xl p-4 text-left transition-all shadow-sm hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <span className="text-xs font-mono text-gray-500">{job.job_number}</span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
-                          STATUS_COLORS[job.status] ?? STATUS_COLORS.scheduled
-                        }`}
-                      >
-                        {job.status?.replace(/_/g, ' ')}
-                      </span>
-                      {(job.pending_change_requests ?? 0) > 0 && (
-                        <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
-                          {job.pending_change_requests} change request{job.pending_change_requests !== 1 ? 's' : ''}
+            {filtered.map(job => {
+              const accent = STATUS_ACCENT[job.status] ?? STATUS_ACCENT.scheduled;
+              return (
+                <Link
+                  key={job.id}
+                  href={`/dashboard/admin/jobs/${job.id}`}
+                  className="
+                    group relative block w-full overflow-hidden rounded-2xl p-4 pt-5 text-left transition-all
+                    bg-white border border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md
+                    dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+                    dark:border-white/10 dark:hover:border-white/20 dark:backdrop-blur
+                  "
+                >
+                  {/* Top accent bar */}
+                  <span
+                    className={`
+                      absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${accent}
+                    `}
+                    aria-hidden
+                  />
+
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2 flex-wrap">
+                        <span className="text-xs font-mono text-slate-500 dark:text-white/50">
+                          {job.job_number}
                         </span>
-                      )}
-                      {job.pending_completion_approval && (
-                        <span className="text-xs bg-purple-100 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full">
-                          Awaiting approval
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            STATUS_COLORS[job.status] ?? STATUS_COLORS.scheduled
+                          }`}
+                        >
+                          {job.status?.replace(/_/g, ' ')}
                         </span>
-                      )}
-                    </div>
-                    <h3 className="text-gray-900 font-semibold truncate">
-                      {job.title || job.customer_name}
-                    </h3>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 flex-wrap">
-                      {job.customer_name && job.title && (
-                        <span className="text-gray-500 text-xs">{job.customer_name}</span>
-                      )}
-                      {job.address && (
+                        {(job.pending_change_requests ?? 0) > 0 && (
+                          <span className="
+                            text-xs px-2 py-0.5 rounded-full font-medium
+                            bg-amber-100 text-amber-700 ring-1 ring-amber-200
+                            dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30
+                          ">
+                            {job.pending_change_requests} change request{job.pending_change_requests !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {job.pending_completion_approval && (
+                          <span className="
+                            text-xs px-2 py-0.5 rounded-full font-medium
+                            bg-violet-100 text-violet-700 ring-1 ring-violet-200
+                            dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30
+                          ">
+                            Awaiting approval
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-slate-900 dark:text-white font-semibold truncate">
+                        {job.title || job.customer_name}
+                      </h3>
+                      <div className="flex items-center gap-4 mt-2 text-sm text-slate-600 dark:text-white/60 flex-wrap">
+                        {job.customer_name && job.title && (
+                          <span className="text-slate-500 dark:text-white/50 text-xs">
+                            {job.customer_name}
+                          </span>
+                        )}
+                        {job.address && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {job.address}
+                          </span>
+                        )}
+                        {job.assigned_operator_name && (
+                          <span className="flex items-center gap-1">
+                            {/* Operator initial bubble in purple gradient */}
+                            <span
+                              className="
+                                inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white
+                                bg-gradient-to-br from-violet-500 to-fuchsia-500
+                              "
+                              aria-hidden
+                            >
+                              {job.assigned_operator_name.trim().charAt(0).toUpperCase()}
+                            </span>
+                            {job.assigned_operator_name}
+                          </span>
+                        )}
                         <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {job.address}
+                          <Calendar className="w-3 h-3" />
+                          {job.scheduled_date}
                         </span>
-                      )}
-                      {job.assigned_operator_name && (
-                        <span className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          {job.assigned_operator_name}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {job.scheduled_date}
-                      </span>
+                      </div>
                     </div>
+                    <ChevronRight className="w-5 h-5 text-slate-400 dark:text-white/40 flex-shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" />
-                </div>
-              </button>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

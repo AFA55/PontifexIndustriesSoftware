@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
     const { jobId, type, title, message } = body;
 
@@ -29,7 +31,7 @@ export async function POST(request: NextRequest) {
       .from('job_orders')
       .select('id, customer_name, salesman_name, created_by')
       .eq('id', jobId);
-    if (tenantId) { jobQuery = jobQuery.eq('tenant_id', tenantId); }
+    jobQuery = jobQuery.eq('tenant_id', tenantId);
     const { data: job } = await jobQuery.single();
 
     if (!job) {

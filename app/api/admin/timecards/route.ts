@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = auth.tenantId;
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
@@ -40,9 +41,7 @@ export async function GET(request: NextRequest) {
       .order('clock_in_time', { ascending: false });
 
     // Scope to tenant
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     // Apply filters
     if (userId) {

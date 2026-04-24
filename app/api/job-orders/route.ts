@@ -38,6 +38,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
     const scheduledDate = searchParams.get('scheduled_date');
+    const includeHelperJobs = searchParams.get('include_helper_jobs') === 'true';
+    const dateFrom = searchParams.get('date_from');
+    const dateTo = searchParams.get('date_to');
 
     // Check if user is admin
     const { data: profile } = await supabaseAdmin
@@ -46,7 +49,8 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const isAdmin = ['super_admin', 'operations_manager', 'admin', 'salesman', 'shop_manager', 'inventory_manager'].includes(profile?.role || '');
+    const userRole = profile?.role || 'operator';
+    const isAdmin = ['super_admin', 'operations_manager', 'admin', 'salesman', 'shop_manager', 'inventory_manager'].includes(userRole);
     const tenantId = await getTenantId(user.id);
 
     // If ID is provided, fetch that specific job
@@ -73,8 +77,8 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // Check if user has access to this job
-      if (!isAdmin && specificJob.assigned_to !== user.id) {
+      // Check if user has access to this job (operator OR helper)
+      if (!isAdmin && specificJob.assigned_to !== user.id && specificJob.helper_assigned_to !== user.id) {
         return NextResponse.json(
           { error: 'Unauthorized to view this job' },
           { status: 403 }
@@ -110,6 +114,7 @@ export async function GET(request: NextRequest) {
         {
           success: true,
           data: [specificJob],
+          user_role: userRole,
           operator_profile: operatorProfile,
           assigned_operator_profile: assignedOperatorProfile
         },
@@ -127,14 +132,27 @@ export async function GET(request: NextRequest) {
       query = query.eq('tenant_id', tenantId);
     }
 
-    // If not admin, only show jobs assigned to this user
+    // If not admin, scope to jobs the user is operator OR helper on
     if (!isAdmin) {
-      query = query.eq('assigned_to', user.id);
+      if (includeHelperJobs) {
+        // Use OR filter: assigned_to = uid OR helper_assigned_to = uid
+        query = query.or(`assigned_to.eq.${user.id},helper_assigned_to.eq.${user.id}`);
+      } else {
+        query = query.eq('assigned_to', user.id);
+      }
     }
 
     // Filter by scheduled_date if provided
     if (scheduledDate) {
       query = query.eq('scheduled_date', scheduledDate);
+    }
+
+    // Date range filters (used by 7-day lookahead on my-jobs)
+    if (dateFrom) {
+      query = query.gte('scheduled_date', dateFrom);
+    }
+    if (dateTo) {
+      query = query.lte('scheduled_date', dateTo);
     }
 
     query = query.order('scheduled_date', { ascending: true });
@@ -172,6 +190,7 @@ export async function GET(request: NextRequest) {
       {
         success: true,
         data: jobOrders || [],
+        user_role: userRole,
       },
       { status: 200 }
     );

@@ -8,6 +8,10 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
+import {
+  resolveAllScopesForServiceCode,
+  type ScopeKey,
+} from '@/lib/skills-taxonomy';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +19,7 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const jobId = request.nextUrl.searchParams.get('jobId');
+    const date = request.nextUrl.searchParams.get('date'); // optional YYYY-MM-DD
     if (!jobId) {
       return NextResponse.json({ error: 'Missing required query param: jobId' }, { status: 400 });
     }
@@ -33,10 +38,21 @@ export async function GET(request: NextRequest) {
     const difficulty = job.difficulty_rating || 5; // default to 5 if not set
     const jobTypes = (job.job_type || '').split(',').map((t: string) => t.trim().toLowerCase()).filter(Boolean);
 
-    // Fetch all operators with skill levels and tasks_qualified_for
+    // Determine scope keys this job requires (primary + secondary mappings).
+    // jobTypes come in as lowercased service codes already.
+    const jobScopeSet = new Set<ScopeKey>();
+    let anyScopeMapped = false;
+    for (const jt of jobTypes) {
+      const scopes = resolveAllScopesForServiceCode(jt);
+      if (scopes.length > 0) anyScopeMapped = true;
+      for (const s of scopes) jobScopeSet.add(s);
+    }
+    const jobScopes = Array.from(jobScopeSet);
+
+    // Fetch all operators with skill levels, per-scope skill_levels, and tasks_qualified_for
     const { data: operators, error: opError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, skill_level_numeric, tasks_qualified_for')
+      .select('id, full_name, skill_level_numeric, tasks_qualified_for, skill_levels')
       .eq('role', 'operator')
       .order('full_name');
 
@@ -45,14 +61,55 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch operators' }, { status: 500 });
     }
 
+    // If date was provided, find operators busy that day (assigned or helper on active jobs)
+    const busyIds = new Set<string>();
+    if (date) {
+      const { data: busyJobs } = await supabaseAdmin
+        .from('job_orders')
+        .select('assigned_to, helper_assigned_to, scheduled_date, scheduled_end_date')
+        .in('status', ['scheduled', 'in_progress', 'pending'])
+        .lte('scheduled_date', date)
+        .or(`scheduled_end_date.gte.${date},scheduled_end_date.is.null`);
+      for (const j of busyJobs || []) {
+        const endDate = (j as any).scheduled_end_date || (j as any).scheduled_date;
+        if (endDate && endDate >= date) {
+          if (j.assigned_to) busyIds.add(j.assigned_to);
+          if ((j as any).helper_assigned_to) busyIds.add((j as any).helper_assigned_to);
+        }
+      }
+    }
+
     let qualifiedCount = 0;
     const totalOperators = (operators || []).length;
 
     // Calculate match quality for each operator
     const results = (operators || []).map((op) => {
-      const skill = op.skill_level_numeric || 5; // default to 5 if not set
-      let match_quality: 'good' | 'stretch' | 'over';
+      const perScope: Record<string, number> =
+        (op as any).skill_levels && typeof (op as any).skill_levels === 'object' && !Array.isArray((op as any).skill_levels)
+          ? ((op as any).skill_levels as Record<string, number>)
+          : {};
 
+      // If the job has any scope-mapped service code, use the best per-scope
+      // skill across the job's required scopes; otherwise fall back to the
+      // generic skill_level_numeric.
+      let skill: number;
+      if (anyScopeMapped && jobScopes.length > 0) {
+        let best = -Infinity;
+        for (const s of jobScopes) {
+          const v = typeof perScope[s] === 'number' ? perScope[s] : undefined;
+          if (typeof v === 'number' && v > best) best = v;
+        }
+        if (!Number.isFinite(best)) {
+          // operator has no rating for any mapped scope → use generic fallback
+          skill = op.skill_level_numeric || 5;
+        } else {
+          skill = best;
+        }
+      } else {
+        skill = op.skill_level_numeric || 5;
+      }
+
+      let match_quality: 'good' | 'stretch' | 'over';
       if (skill >= difficulty) {
         match_quality = 'good';
       } else if (skill >= difficulty - 2) {
@@ -64,7 +121,20 @@ export async function GET(request: NextRequest) {
       // Check task qualification
       const qualifiedFor: string[] = Array.isArray(op.tasks_qualified_for) ? op.tasks_qualified_for : [];
       const qualifiedLower = qualifiedFor.map((t: string) => t.toLowerCase());
-      const isQualified = jobTypes.length === 0 || jobTypes.some((jt: string) => qualifiedLower.includes(jt));
+
+      let isQualified: boolean;
+      if (anyScopeMapped && jobScopes.length > 0) {
+        // Qualified if per-scope skill >= 1 for at least one required scope,
+        // OR fall back to legacy tasks_qualified_for match on the raw job_type.
+        const hasScopeQual = jobScopes.some(
+          (s) => typeof perScope[s] === 'number' && perScope[s] >= 1
+        );
+        const hasLegacyQual =
+          jobTypes.length > 0 && jobTypes.some((jt: string) => qualifiedLower.includes(jt));
+        isQualified = hasScopeQual || hasLegacyQual;
+      } else {
+        isQualified = jobTypes.length === 0 || jobTypes.some((jt: string) => qualifiedLower.includes(jt));
+      }
 
       if (isQualified) qualifiedCount++;
 
@@ -74,9 +144,14 @@ export async function GET(request: NextRequest) {
         skill_level_numeric: op.skill_level_numeric,
         match_quality,
         is_qualified: isQualified,
+        is_available: date ? !busyIds.has(op.id) : true,
         tasks_qualified_for: qualifiedFor,
       };
     });
+
+    const availableQualified = date
+      ? results.filter((r) => r.is_available && r.is_qualified).length
+      : qualifiedCount;
 
     // Sort: good first, then stretch, then over
     const order = { good: 0, stretch: 1, over: 2 };
@@ -88,7 +163,9 @@ export async function GET(request: NextRequest) {
         job_difficulty: difficulty,
         job_types: jobTypes,
         qualified_count: qualifiedCount,
+        available_qualified_count: availableQualified,
         total_operators: totalOperators,
+        date: date || null,
         operators: results,
       },
     });

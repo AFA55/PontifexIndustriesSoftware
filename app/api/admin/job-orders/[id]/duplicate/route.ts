@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 
@@ -45,10 +45,12 @@ export async function POST(
   try {
     const { id } = await params;
 
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
     const { scheduled_date, end_date, notes } = body;
 
@@ -64,7 +66,7 @@ export async function POST(
       .from('job_orders')
       .select('*')
       .eq('id', id);
-    if (tenantId) { origQuery = origQuery.eq('tenant_id', tenantId); }
+    origQuery = origQuery.eq('tenant_id', tenantId);
     const { data: original, error: fetchError } = await origQuery.single();
 
     if (fetchError || !original) {

@@ -8,16 +8,17 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Auto-mark overdue: flip any sent invoices past due_date to 'overdue' (fire-and-forget)
     const today = new Date().toISOString().split('T')[0];
     Promise.resolve(
@@ -39,9 +40,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
@@ -101,7 +100,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
@@ -109,6 +108,11 @@ export async function POST(request: NextRequest) {
 
     if (!jobOrderId) {
       return NextResponse.json({ error: 'jobOrderId is required' }, { status: 400 });
+    }
+
+    const callerTenantId = await getTenantId(auth.userId);
+    if (!callerTenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     }
 
     // Fetch the completed job with all details
@@ -119,6 +123,12 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (jobError || !job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    // P0-3: Cross-tenant FK check — the fetched job must belong to caller's tenant.
+    // Return 404 (not 403) to avoid leaking existence across tenants.
+    if (job.tenant_id !== callerTenantId) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
@@ -207,14 +217,16 @@ export async function POST(request: NextRequest) {
     };
     const DEFAULT_LABOR_RATE = 125; // $/hr
 
-    // Build line items from work items
+    // Build line items — routed by billing_type to avoid double-billing
     const lineItems: any[] = [];
     let lineNumber = 1;
     let subtotal = 0;
 
-    // If there's an estimated cost, use that as a flat rate line item
-    if (job.estimated_cost && Number(job.estimated_cost) > 0) {
-      const amount = Number(job.estimated_cost);
+    const billingType = job.billing_type as string | null | undefined;
+
+    if (billingType === 'fixed') {
+      // Fixed price: use estimated_cost as a single flat-rate line item
+      const amount = Number(job.estimated_cost) || 0;
       lineItems.push({
         line_number: lineNumber++,
         description: `${job.title || job.job_number} — ${job.job_type || 'Concrete Cutting Services'}`,
@@ -226,8 +238,41 @@ export async function POST(request: NextRequest) {
         taxable: true,
       });
       subtotal += amount;
+
+    } else if (billingType === 'time_and_material') {
+      // T&M: labor hours only — per-unit rates are already embedded
+      if (laborHours > 0) {
+        const laborAmount = Number(laborHours.toFixed(2)) * DEFAULT_LABOR_RATE;
+        lineItems.push({
+          line_number: lineNumber++,
+          description: `Labor — ${laborHours.toFixed(1)} hours on-site`,
+          billing_type: 'labor',
+          quantity: Number(laborHours.toFixed(2)),
+          unit: 'hours',
+          unit_rate: DEFAULT_LABOR_RATE,
+          job_order_id: jobOrderId,
+          taxable: true,
+        });
+        subtotal += laborAmount;
+      }
+
+    } else if (billingType === 'cycle') {
+      // Cycle/milestone billing: use estimated_cost as milestone amount
+      const amount = Number(job.estimated_cost) || 0;
+      lineItems.push({
+        line_number: lineNumber++,
+        description: `${job.title || job.job_number} — Milestone Payment`,
+        billing_type: 'flat_rate',
+        quantity: 1,
+        unit: 'job',
+        unit_rate: amount,
+        job_order_id: jobOrderId,
+        taxable: true,
+      });
+      subtotal += amount;
+
     } else {
-      // Build from work items with default rates
+      // Default (null/unknown): per-unit work items only — no separate labor line
       if (workItems && workItems.length > 0) {
         for (const item of workItems) {
           let desc = item.work_type || 'Concrete Cutting';
@@ -264,23 +309,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Add labor hours line item
-      if (laborHours > 0) {
-        const laborAmount = Number(laborHours.toFixed(2)) * DEFAULT_LABOR_RATE;
-        lineItems.push({
-          line_number: lineNumber++,
-          description: `Labor — ${laborHours.toFixed(1)} hours on-site`,
-          billing_type: 'labor',
-          quantity: Number(laborHours.toFixed(2)),
-          unit: 'hours',
-          unit_rate: DEFAULT_LABOR_RATE,
-          job_order_id: jobOrderId,
-          taxable: true,
-        });
-        subtotal += laborAmount;
-      }
-
-      // If no work items and no labor, add a generic line item from job type
+      // Fallback: no work items — generic placeholder at $0 for admin to fill in
       if (lineItems.length === 0) {
         lineItems.push({
           line_number: lineNumber++,
@@ -295,7 +324,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const tenantIdForInsert = await getTenantId(auth.userId);
+    const tenantIdForInsert = callerTenantId;
 
     // Create the invoice
     const { data: invoice, error: invoiceError } = await supabaseAdmin

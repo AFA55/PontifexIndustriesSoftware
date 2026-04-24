@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
 
@@ -99,6 +101,7 @@ export async function PUT(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     if (!tenantId) {
       return NextResponse.json({ error: 'Could not determine tenant' }, { status: 400 });
     }
@@ -166,6 +169,8 @@ export async function DELETE(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
 

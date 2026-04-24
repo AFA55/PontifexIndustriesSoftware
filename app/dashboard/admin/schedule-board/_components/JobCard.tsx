@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, Edit3, FileText, Users, CheckCircle2 } from 'lucide-react';
+import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, Edit3, FileText, Users, CheckCircle2, Trash2 } from 'lucide-react';
 import { getDisplayName } from '@/lib/equipment-map';
 
 export interface JobCardData {
@@ -76,9 +76,10 @@ interface JobCardProps {
   onEdit?: (job: JobCardData) => void;
   onRequestChange?: (job: JobCardData) => void;
   onViewNotes?: (job: JobCardData) => void;
+  onRemove?: (job: JobCardData) => void;
 }
 
-export default function JobCard({ job, colorScheme, canEdit, assignedOperator, assignedHelper, onEdit, onRequestChange, onViewNotes }: JobCardProps) {
+export default function JobCard({ job, colorScheme, canEdit, assignedOperator, assignedHelper, onEdit, onRequestChange, onViewNotes, onRemove }: JobCardProps) {
   const router = useRouter();
   const isCompleted = job.status === 'completed';
   const statusColor = getStatusColor(job);
@@ -174,6 +175,15 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
                 title="Request Change"
               >
                 <FileText className="w-4 h-4" />
+              </button>
+            )}
+            {canEdit && onRemove && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemove(job); }}
+                className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition-colors"
+                title="Remove from Schedule"
+              >
+                <Trash2 className="w-4 h-4" />
               </button>
             )}
           </div>}

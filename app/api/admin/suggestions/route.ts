@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     // Resolve tenant scope
     const tenantId = await getTenantId(user.id);
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Get type from query params (job_titles, company_names, general_contractors, or locations)
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
@@ -77,9 +77,7 @@ export async function GET(request: NextRequest) {
         .not('location', 'is', null)
         .order('created_at', { ascending: false })
         .limit(100);
-      if (tenantId) {
-        locQuery = locQuery.eq('tenant_id', tenantId);
-      }
+      locQuery = locQuery.eq('tenant_id', tenantId);
       const { data: locations, error: fetchError } = await locQuery;
 
       if (fetchError) {
@@ -142,9 +140,7 @@ export async function GET(request: NextRequest) {
       .select(field)
       .order('usage_count', { ascending: false })
       .limit(20);
-    if (tenantId) {
-      suggestionsQuery = suggestionsQuery.eq('tenant_id', tenantId);
-    }
+    suggestionsQuery = suggestionsQuery.eq('tenant_id', tenantId);
     const { data: suggestions, error: fetchError } = await suggestionsQuery;
 
     if (fetchError) {
@@ -219,7 +215,7 @@ export async function POST(request: NextRequest) {
 
     // Resolve tenant scope
     const tenantId = await getTenantId(user.id);
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Parse request body
     const body = await request.json();
     const { type, value } = body;
@@ -267,9 +263,7 @@ export async function POST(request: NextRequest) {
       .from(table)
       .select('id, usage_count')
       .ilike(field, value);
-    if (tenantId) {
-      existingQuery = existingQuery.eq('tenant_id', tenantId);
-    }
+    existingQuery = existingQuery.eq('tenant_id', tenantId);
     const { data: existing } = await existingQuery.maybeSingle();
 
     if (existing) {

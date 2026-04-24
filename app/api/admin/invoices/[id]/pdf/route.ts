@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { renderToBuffer } from '@react-pdf/renderer';
 import InvoicePDF from '@/components/pdf/InvoicePDF';
@@ -19,10 +19,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
+
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { id } = await params;
 
     // Fetch invoice
@@ -30,7 +32,7 @@ export async function GET(
       .from('invoices')
       .select('*')
       .eq('id', id);
-    if (tenantId) { invoiceQuery = invoiceQuery.eq('tenant_id', tenantId); }
+    invoiceQuery = invoiceQuery.eq('tenant_id', tenantId);
     const { data: invoice, error } = await invoiceQuery.single();
 
     if (error || !invoice) {
@@ -65,7 +67,7 @@ export async function GET(
         .from('tenant_branding')
         .select('company_name, company_address, support_phone, support_email, pdf_footer_text, pdf_show_logo, primary_color, logo_url')
         .eq('is_active', true);
-      if (tenantId) { brandingQuery = brandingQuery.eq('tenant_id', tenantId); }
+      brandingQuery = brandingQuery.eq('tenant_id', tenantId);
       const { data: brandingRow } = await brandingQuery.limit(1).single();
 
       if (brandingRow) {

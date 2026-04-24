@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ChevronLeft, Building2, Edit, Trash2, Plus, Mail, Phone, MapPin,
+  ChevronLeft, ChevronRight, Building2, Edit, Trash2, Plus, Mail, Phone, MapPin,
   DollarSign, Briefcase, Loader2, User, FileText, Save, Star, Shield,
   CreditCard, Globe, Hash, TrendingUp, Calendar, ArrowUpRight, Clock,
   CheckCircle2, AlertCircle, ExternalLink, RefreshCw
@@ -37,6 +37,13 @@ interface Job {
   end_date: string | null;
   estimated_cost: number | null;
   created_at: string;
+  project_name: string | null;
+  address: string | null;
+  location: string | null;
+  customer_contact: string | null;
+  site_contact_phone: string | null;
+  equipment_needed: string[] | null;
+  description: string | null;
 }
 
 interface CustomerDetail {
@@ -151,6 +158,8 @@ export default function CustomerDetailPage() {
   const [userRole, setUserRole] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+  const toggleProject = (name: string) => setExpandedProjects(prev => ({ ...prev, [name]: !prev[name] }));
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -297,6 +306,38 @@ export default function CustomerDetailPage() {
   const customerSince = customer.created_at
     ? new Date(customer.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : null;
+
+  // Group jobs by project name for the project history section
+  const jobsByProject: Record<string, Job[]> = {};
+  for (const job of (customer?.jobs || [])) {
+    const key = job.project_name?.trim() || '(No Project Name)';
+    if (!jobsByProject[key]) jobsByProject[key] = [];
+    jobsByProject[key].push(job);
+  }
+  const projectNames = Object.keys(jobsByProject).sort((a, b) => {
+    if (a === '(No Project Name)') return 1;
+    if (b === '(No Project Name)') return -1;
+    // Sort by most recent job date
+    const latestA = jobsByProject[a][0]?.scheduled_date || '';
+    const latestB = jobsByProject[b][0]?.scheduled_date || '';
+    return latestB.localeCompare(latestA);
+  });
+
+  const handleAddJobForProject = (projectName: string, representativeJob?: Job) => {
+    // Store prefill data so the schedule form can pick it up
+    const prefill = {
+      customer_id: customer!.id,
+      customer_name: customer!.name || customer!.display_name || '',
+      project_name: projectName === '(No Project Name)' ? '' : projectName,
+      address: representativeJob?.address || customer!.address || '',
+      location: representativeJob?.location || '',
+      contact_name: representativeJob?.customer_contact || customer!.primary_contact_name || '',
+      contact_phone: representativeJob?.site_contact_phone || customer!.primary_contact_phone || '',
+      equipment_needed: representativeJob?.equipment_needed || [],
+    };
+    localStorage.setItem('schedule-form-customer-prefill', JSON.stringify(prefill));
+    router.push('/dashboard/admin/schedule-form');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -455,66 +496,124 @@ export default function CustomerDetailPage() {
               )}
             </div>
 
-            {/* Job History / Project Scope */}
+            {/* Project History — grouped by project name */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <h2 className="font-bold text-gray-900 flex items-center gap-2 mb-4">
-                <Briefcase className="w-4 h-4 text-purple-600" /> Project History ({customer.jobs.length} jobs)
-              </h2>
-
-              {/* Job Type Breakdown */}
-              {Object.keys(jobTypes).length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {Object.entries(jobTypes).sort(([, a], [, b]) => b - a).map(([type, count]) => (
-                    <span key={type} className="px-2.5 py-1 bg-gray-100 rounded-lg text-xs font-semibold text-gray-600 border border-gray-200">
-                      {type}: <span className="text-purple-600">{count}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-900 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-purple-600" />
+                  Project History
+                  <span className="text-sm font-normal text-gray-400">({customer.jobs.length} jobs · {projectNames.length} projects)</span>
+                </h2>
+                <button
+                  onClick={() => handleAddJobForProject('', undefined)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> New Job
+                </button>
+              </div>
 
               {customer.jobs.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <Briefcase className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                   <p className="text-sm">No projects yet</p>
+                  <button
+                    onClick={() => handleAddJobForProject('', undefined)}
+                    className="mt-3 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    + Create First Job
+                  </button>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
-                        <th className="pb-2 pr-3">Job #</th>
-                        <th className="pb-2 pr-3">Type</th>
-                        <th className="pb-2 pr-3">Date</th>
-                        <th className="pb-2 pr-3">Status</th>
-                        <th className="pb-2 text-right">Est. Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customer.jobs.map(job => (
-                        <tr key={job.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => router.push(`/dashboard/admin/schedule-board`)}>
-                          <td className="py-2.5 pr-3 font-mono text-xs text-purple-600">{job.job_number}</td>
-                          <td className="py-2.5 pr-3 text-gray-700">{job.job_type || '--'}</td>
-                          <td className="py-2.5 pr-3 text-gray-500">{formatDate(job.scheduled_date)}</td>
-                          <td className="py-2.5 pr-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[job.status] || 'bg-gray-100 text-gray-600'}`}>
-                              {job.status.replace(/_/g, ' ')}
-                            </span>
-                          </td>
-                          <td className="py-2.5 text-right text-gray-700">{job.estimated_cost ? `$${Number(job.estimated_cost).toLocaleString()}` : '--'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    {customer.jobs.length > 0 && (
-                      <tfoot>
-                        <tr className="border-t border-gray-200">
-                          <td colSpan={4} className="py-3 text-sm font-bold text-gray-700">Total</td>
-                          <td className="py-3 text-right text-sm font-bold text-emerald-600">
-                            ${customer.stats.total_revenue.toLocaleString()}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
+                <div className="space-y-3">
+                  {projectNames.map((projectName) => {
+                    const projectJobs = jobsByProject[projectName];
+                    const isExpanded = expandedProjects[projectName] ?? false;
+                    const totalValue = projectJobs.reduce((s, j) => s + (Number(j.estimated_cost) || 0), 0);
+                    const latestJob = projectJobs[0];
+                    const activeCount = projectJobs.filter(j => !['completed', 'cancelled', 'invoiced'].includes(j.status)).length;
+                    const representativeJob = projectJobs[0];
+
+                    return (
+                      <div key={projectName} className="border border-gray-200 rounded-xl overflow-hidden">
+                        {/* Project Header Row */}
+                        <div
+                          className="flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                          onClick={() => toggleProject(projectName)}
+                        >
+                          <ChevronRight className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-gray-900 text-sm truncate">{projectName}</span>
+                              {activeCount > 0 && (
+                                <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded-full">{activeCount} active</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                              <span>{projectJobs.length} job{projectJobs.length !== 1 ? 's' : ''}</span>
+                              {latestJob?.scheduled_date && <span>Last: {formatDate(latestJob.scheduled_date)}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <span className="text-sm font-bold text-emerald-600">${totalValue.toLocaleString()}</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleAddJobForProject(projectName, representativeJob); }}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
+                            >
+                              <Plus className="w-3 h-3" /> Add Job
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Expanded Job List */}
+                        {isExpanded && (
+                          <div className="border-t border-gray-200">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="text-left text-[11px] text-gray-400 uppercase tracking-wide border-b border-gray-100 bg-white">
+                                  <th className="px-4 py-2">Job #</th>
+                                  <th className="px-4 py-2">Type</th>
+                                  <th className="px-4 py-2">Date</th>
+                                  <th className="px-4 py-2">Status</th>
+                                  <th className="px-4 py-2 text-right">Cost</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {projectJobs.map((job, jIdx) => (
+                                  <tr
+                                    key={job.id}
+                                    className={`border-b border-gray-50 hover:bg-purple-50 cursor-pointer transition-colors ${jIdx === projectJobs.length - 1 ? 'border-0' : ''}`}
+                                    onClick={() => router.push(`/dashboard/admin/active-jobs/${job.id}`)}
+                                  >
+                                    <td className="px-4 py-2.5 font-mono text-xs text-purple-600 font-semibold">{job.job_number}</td>
+                                    <td className="px-4 py-2.5 text-gray-700 text-xs">{job.job_type || '--'}</td>
+                                    <td className="px-4 py-2.5 text-gray-500 text-xs">{formatDate(job.scheduled_date)}</td>
+                                    <td className="px-4 py-2.5">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[job.status] || 'bg-gray-100 text-gray-600'}`}>
+                                        {job.status.replace(/_/g, ' ')}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right text-gray-700 text-xs font-semibold">
+                                      {job.estimated_cost ? `$${Number(job.estimated_cost).toLocaleString()}` : '--'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                              <span className="text-xs text-gray-500">{projectJobs.length} job{projectJobs.length !== 1 ? 's' : ''}</span>
+                              <span className="text-xs font-bold text-emerald-700">Total: ${totalValue.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Grand Total */}
+                  <div className="flex justify-between items-center px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <span className="text-sm font-bold text-gray-700">All Projects Total</span>
+                    <span className="text-sm font-bold text-emerald-700">${customer.stats.total_revenue.toLocaleString()}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -669,6 +768,7 @@ export default function CustomerDetailPage() {
           onClose={() => { setShowContactForm(false); setEditingContact(null); }}
         />
       )}
+
     </div>
   );
 }

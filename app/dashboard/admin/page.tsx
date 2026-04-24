@@ -22,6 +22,9 @@ import {
   UserCircle2,
   Activity,
   Wrench,
+  MapPin,
+  User as UserIcon,
+  Tag,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
@@ -37,7 +40,15 @@ interface JobToday {
   scheduled_time: string | null;
   customer_name: string;
   operator_name: string | null;
+  helper_name: string | null;
   status: string;
+  job_type: string | null;
+  location: string | null;
+  equipment: string[];
+  is_will_call: boolean;
+  is_multi_day: boolean;
+  day_number: number | null;
+  total_days: number | null;
 }
 
 interface RevenueMtd {
@@ -168,6 +179,147 @@ function SkeletonRow({ cols = 3 }: { cols?: number }) {
         <div key={i} className="animate-pulse bg-gray-200 rounded h-4" style={{ flex: 1 }} />
       ))}
     </div>
+  );
+}
+
+// ─── rich schedule widget helpers ─────────────────────────────────────────────
+
+const JOB_TYPE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  'DFS':            { bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'DFS'      },
+  'EFS':            { bg: 'bg-purple-100', text: 'text-purple-700', label: 'EFS'      },
+  'Demo':           { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Demo'     },
+  'Core Drilling':  { bg: 'bg-amber-100',  text: 'text-amber-700',  label: 'Core'     },
+  'Wire Saw':       { bg: 'bg-teal-100',   text: 'text-teal-700',   label: 'Wire Saw' },
+  'Chain Saw':      { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Chain Saw'},
+  'Hand Saw':       { bg: 'bg-lime-100',   text: 'text-lime-700',   label: 'Hand Saw' },
+  'GPR':            { bg: 'bg-indigo-100', text: 'text-indigo-700', label: 'GPR'      },
+};
+
+function ServiceTypeBadge({ jobType }: { jobType: string | null }) {
+  if (!jobType) return null;
+  const style = JOB_TYPE_STYLES[jobType] ?? {
+    bg: 'bg-gray-100',
+    text: 'text-gray-600',
+    label: jobType,
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
+      <Tag className="w-2.5 h-2.5" />
+      {style.label}
+    </span>
+  );
+}
+
+const RICH_STATUS_STYLES: Record<string, { pill: string; label: string; border: string }> = {
+  scheduled:   { pill: 'bg-purple-100 text-purple-700', label: 'Scheduled',   border: 'border-l-purple-400' },
+  assigned:    { pill: 'bg-blue-100 text-blue-700',     label: 'Assigned',    border: 'border-l-blue-400'   },
+  in_route:    { pill: 'bg-amber-100 text-amber-700',   label: 'En Route',    border: 'border-l-amber-400'  },
+  on_site:     { pill: 'bg-green-100 text-green-700',   label: 'On Site',     border: 'border-l-green-400'  },
+  in_progress: { pill: 'bg-green-100 text-green-700',   label: 'In Progress', border: 'border-l-green-400'  },
+  completed:   { pill: 'bg-gray-100 text-gray-500',     label: 'Completed',   border: 'border-l-gray-300'   },
+  cancelled:   { pill: 'bg-red-100 text-red-600',       label: 'Cancelled',   border: 'border-l-red-400'    },
+};
+
+function getJobBorderClass(job: JobToday): string {
+  // Unassigned => orange
+  if (!job.operator_name) return 'border-l-orange-400';
+  const s = RICH_STATUS_STYLES[job.status];
+  return s?.border ?? 'border-l-gray-200';
+}
+
+function RichStatusPill({ status }: { status: string }) {
+  const s = RICH_STATUS_STYLES[status] ?? { pill: 'bg-gray-100 text-gray-500', label: status };
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.pill}`}>
+      {s.label}
+    </span>
+  );
+}
+
+function ScheduleJobCard({ job }: { job: JobToday }) {
+  const isUnassigned = !job.operator_name;
+  const borderClass = getJobBorderClass(job);
+
+  return (
+    <Link
+      href="/dashboard/admin/schedule-board"
+      className={`block bg-white/5 border border-white/10 rounded-xl p-3 hover:bg-gray-50 transition-colors border-l-4 ${borderClass}`}
+    >
+      {/* Top row: time + job number + status */}
+      <div className="flex items-center gap-2 mb-2">
+        {job.is_will_call ? (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
+            Will Call
+          </span>
+        ) : job.scheduled_time ? (
+          <span className="text-[10px] font-mono font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded flex-shrink-0">
+            {formatTime(job.scheduled_time)}
+          </span>
+        ) : (
+          <span className="text-[10px] font-mono text-gray-400 px-2 py-0.5 flex-shrink-0">--:--</span>
+        )}
+        <span className="text-[10px] text-gray-400 font-mono truncate">{job.job_number}</span>
+        <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+          {job.is_multi_day && job.day_number && job.total_days && (
+            <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+              Day {job.day_number}/{job.total_days}
+            </span>
+          )}
+          <RichStatusPill status={job.status} />
+        </div>
+      </div>
+
+      {/* Customer name + service type */}
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <p className="text-sm font-semibold text-gray-900 leading-tight truncate">{job.customer_name}</p>
+        <ServiceTypeBadge jobType={job.job_type} />
+      </div>
+
+      {/* Location */}
+      {job.location && (
+        <div className="flex items-center gap-1 mb-1.5">
+          <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+          <p className="text-[11px] text-gray-500 truncate">{job.location}</p>
+        </div>
+      )}
+
+      {/* Operators + equipment */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {isUnassigned ? (
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+            <UserIcon className="w-2.5 h-2.5" />
+            Unassigned
+          </span>
+        ) : (
+          <>
+            <span className="flex items-center gap-1 text-[10px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full truncate max-w-[120px]">
+              <UserIcon className="w-2.5 h-2.5 flex-shrink-0" />
+              {job.operator_name}
+            </span>
+            {job.helper_name && (
+              <span className="flex items-center gap-1 text-[10px] text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full truncate max-w-[100px]">
+                <Users className="w-2.5 h-2.5 flex-shrink-0" />
+                {job.helper_name}
+              </span>
+            )}
+          </>
+        )}
+
+        {/* Equipment tags (up to 3) */}
+        {job.equipment && job.equipment.length > 0 && (
+          <>
+            {job.equipment.slice(0, 3).map((eq, i) => (
+              <span key={i} className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded truncate max-w-[80px]">
+                {eq}
+              </span>
+            ))}
+            {job.equipment.length > 3 && (
+              <span className="text-[10px] text-gray-400">+{job.equipment.length - 3} more</span>
+            )}
+          </>
+        )}
+      </div>
+    </Link>
   );
 }
 
@@ -503,23 +655,27 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* Crew Utilization (team) / Your Active Jobs (personal) */}
+        {/* Crew Utilization (team) / Pending Timecards (personal) */}
         {scope === 'personal' ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <Link
+            href="/dashboard/admin/timecards"
+            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow group"
+          >
             <div className="flex items-start justify-between mb-4">
               <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-purple-600" />
+                <Clock className="w-5 h-5 text-purple-600" />
               </div>
+              <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-purple-500 transition-colors" />
             </div>
             {dashLoading ? (
               <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
             ) : (
               <p className="text-4xl font-bold text-gray-900">
-                {dashData?.jobs_today.count ?? 0}
+                {dashData?.open_items.pending_timecards ?? 0}
               </p>
             )}
-            <p className="text-sm text-gray-500 mt-1">Your Active Jobs</p>
-          </div>
+            <p className="text-sm text-gray-500 mt-1">Pending Timecards</p>
+          </Link>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-start justify-between mb-4">
@@ -551,7 +707,7 @@ export default function AdminDashboard() {
         {/* Left column — 3/5 */}
         <div className="xl:col-span-3 space-y-6">
 
-          {/* Today's Schedule */}
+          {/* Today's Schedule — rich quick-view */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
@@ -570,20 +726,31 @@ export default function AdminDashboard() {
               </Link>
             </div>
 
-            <div>
+            <div className="p-3 space-y-2">
               {dashLoading ? (
-                <>
-                  <SkeletonRow cols={4} />
-                  <SkeletonRow cols={4} />
-                  <SkeletonRow cols={4} />
-                </>
+                /* Loading skeletons */
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="rounded-xl border border-gray-100 border-l-4 border-l-gray-200 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-pulse bg-gray-200 rounded h-4 w-14" />
+                      <div className="animate-pulse bg-gray-200 rounded h-3 w-24" />
+                      <div className="ml-auto animate-pulse bg-gray-200 rounded-full h-4 w-16" />
+                    </div>
+                    <div className="animate-pulse bg-gray-200 rounded h-4 w-3/4" />
+                    <div className="animate-pulse bg-gray-200 rounded h-3 w-1/2" />
+                    <div className="flex gap-2">
+                      <div className="animate-pulse bg-gray-200 rounded-full h-4 w-20" />
+                      <div className="animate-pulse bg-gray-200 rounded h-4 w-16" />
+                    </div>
+                  </div>
+                ))
               ) : !dashData || dashData.jobs_today.jobs.length === 0 ? (
                 <div className="py-12 text-center">
                   <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                   <p className="text-sm text-gray-500 mb-3">
                     {scope === 'personal'
                       ? 'You have no jobs scheduled today'
-                      : 'No jobs scheduled today'}
+                      : 'No jobs scheduled for today'}
                   </p>
                   <Link
                     href="/dashboard/admin/schedule-form"
@@ -594,27 +761,19 @@ export default function AdminDashboard() {
                   </Link>
                 </div>
               ) : (
-                dashData.jobs_today.jobs.map((job) => (
-                  <Link
-                    key={job.id}
-                    href={`/dashboard/admin/schedule-board`}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors"
-                  >
-                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600 flex-shrink-0 w-20 text-center">
-                      {formatTime(job.scheduled_time)}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{job.job_number}</p>
-                      <p className="text-xs text-gray-500 truncate">{job.customer_name}</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {job.operator_name && (
-                        <span className="text-xs text-gray-500 hidden sm:inline">{job.operator_name}</span>
-                      )}
-                      <StatusPill status={job.status} />
-                    </div>
-                  </Link>
-                ))
+                <>
+                  {dashData.jobs_today.jobs.slice(0, 6).map((job) => (
+                    <ScheduleJobCard key={job.id} job={job} />
+                  ))}
+                  {dashData.jobs_today.jobs.length > 6 && (
+                    <Link
+                      href="/dashboard/admin/schedule-board"
+                      className="block text-center py-2 text-xs text-blue-500 hover:text-blue-600 font-medium transition-colors"
+                    >
+                      View {dashData.jobs_today.jobs.length - 6} more on board &rarr;
+                    </Link>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -785,11 +944,11 @@ export default function AdminDashboard() {
                 <span className="text-xs font-semibold">New Job</span>
               </Link>
               <Link
-                href="/dashboard/admin/schedule-form"
+                href="/dashboard/admin/completed-jobs"
                 className="flex flex-col items-center gap-2 p-4 bg-green-50 hover:bg-green-100 rounded-xl border border-green-200 text-green-700 transition-colors cursor-pointer"
               >
-                <Calendar className="w-5 h-5" />
-                <span className="text-xs font-semibold">Schedule Form</span>
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-xs font-semibold">Completed Jobs</span>
               </Link>
               <Link
                 href="/dashboard/admin/timecards"

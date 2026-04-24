@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get('active_only') !== 'false'; // default true
 
@@ -25,9 +26,7 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('name');
 
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     if (activeOnly) {
       query = query.eq('is_active', true);
@@ -61,6 +60,7 @@ export async function POST(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { data, error } = await supabaseAdmin
       .from('facilities')
       .insert({

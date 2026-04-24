@@ -39,9 +39,9 @@ const STEPS = [
   { num: 2, title: 'Project & Contact', icon: MapPin, color: 'from-indigo-500 to-purple-600' },
   { num: 3, title: 'Scope of Work', icon: Wrench, color: 'from-violet-500 to-purple-600' },
   { num: 4, title: 'Equipment', icon: HardHat, color: 'from-amber-500 to-orange-600' },
-  { num: 5, title: 'Scheduling', icon: Calendar, color: 'from-cyan-500 to-blue-600' },
-  { num: 6, title: 'Site Compliance', icon: ShieldCheck, color: 'from-emerald-500 to-teal-600' },
-  { num: 7, title: 'Difficulty & Notes', icon: BarChart3, color: 'from-rose-500 to-red-600' },
+  { num: 5, title: 'Difficulty & Notes', icon: BarChart3, color: 'from-rose-500 to-red-600' },
+  { num: 6, title: 'Scheduling', icon: Calendar, color: 'from-cyan-500 to-blue-600' },
+  { num: 7, title: 'Site Compliance', icon: ShieldCheck, color: 'from-emerald-500 to-teal-600' },
   { num: 8, title: 'Jobsite Conditions', icon: Building2, color: 'from-orange-500 to-red-600' },
 ];
 
@@ -769,10 +769,10 @@ export default function ScheduleFormPage() {
 
   // Schedule preview state
   const [showSchedulePreview, setShowSchedulePreview] = useState(false);
-  const [schedulePreviewData, setSchedulePreviewData] = useState<any[]>([]);
-  const [schedulePreviewOperators, setSchedulePreviewOperators] = useState<any[]>([]);
   const [schedulePreviewLoading, setSchedulePreviewLoading] = useState(false);
   const [schedulePreviewDate, setSchedulePreviewDate] = useState('');
+  const [schedulePreviewWeek, setSchedulePreviewWeek] = useState<any | null>(null);
+  const [schedulePreviewSelectedDay, setSchedulePreviewSelectedDay] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -990,6 +990,44 @@ export default function ScheduleFormPage() {
   const updateForm = useCallback((updates: Partial<FormData>) => {
     setForm(f => ({ ...f, ...updates }));
     setError('');
+  }, []);
+
+  // Pre-fill from customer page "Add Job" button
+  useEffect(() => {
+    const raw = localStorage.getItem('schedule-form-customer-prefill');
+    if (!raw) return;
+    try {
+      const prefill = JSON.parse(raw) as {
+        customer_id?: string;
+        customer_name?: string;
+        project_name?: string;
+        address?: string;
+        location?: string;
+        contact_name?: string;
+        contact_phone?: string;
+        equipment_needed?: string[];
+      };
+      localStorage.removeItem('schedule-form-customer-prefill');
+
+      const updates: Record<string, unknown> = {};
+      if (prefill.customer_name) updates.contractor_name = prefill.customer_name;
+      if (prefill.customer_id) updates.customer_id = prefill.customer_id;
+      if (prefill.project_name) updates.project_name = prefill.project_name;
+      if (prefill.address) updates.site_address = prefill.address;
+      if (prefill.location) updates.location_name = prefill.location;
+      if (prefill.contact_name) updates.site_contact = prefill.contact_name;
+      if (prefill.contact_phone) updates.contact_phone = prefill.contact_phone;
+      if (prefill.equipment_needed?.length) updates.equipment_needed = prefill.equipment_needed;
+
+      updateForm(updates as Partial<FormData>);
+
+      if (prefill.customer_id) {
+        fetchCustomerHistory(prefill.customer_id);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Filter customer suggestions as user types
@@ -1228,7 +1266,7 @@ export default function ScheduleFormPage() {
     } else if (fields.contractor_name || fields.site_address) {
       setCurrentStep(2); // Customer & location
     } else if (fields.start_date) {
-      setCurrentStep(5); // Scheduling
+      setCurrentStep(6); // Scheduling
     }
   }, []);
 
@@ -1296,7 +1334,7 @@ export default function ScheduleFormPage() {
       case 3:
         if (form.service_types.length === 0) return 'Select at least one service type.';
         break;
-      case 5:
+      case 6:
         if (!form.start_date) return 'Start date is required.';
         break;
     }
@@ -1327,39 +1365,33 @@ export default function ScheduleFormPage() {
       const previewDate = date || form.start_date || new Date().toISOString().split('T')[0];
       setSchedulePreviewDate(previewDate);
 
-      // Fetch a week of schedule data starting from the target date
-      const startDate = previewDate;
-      const endObj = new Date(previewDate);
-      endObj.setDate(endObj.getDate() + 6);
-      const endDate = endObj.toISOString().split('T')[0];
+      const params = new URLSearchParams({ start: previewDate });
+      if (form.service_types.length > 0) {
+        params.set('serviceType', form.service_types.join(','));
+      }
+      if (form.difficulty_rating) {
+        params.set('difficulty', String(form.difficulty_rating));
+      }
 
-      const res = await fetch(`/api/admin/schedule-board?startDate=${startDate}&endDate=${endDate}`, {
+      const res = await fetch(`/api/admin/schedule-board/week-capacity?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
 
       if (res.ok) {
-        const data = await res.json();
-        // API returns { assigned, unassigned, pending, willCall } — flatten into one array
-        const d = data.data || {};
-        const allJobs = [
-          ...(d.assigned || []),
-          ...(d.unassigned || []),
-          ...(d.pending || []),
-          ...(d.willCall || []),
-        ];
-        setSchedulePreviewData(allJobs);
+        const json = await res.json();
+        setSchedulePreviewWeek(json.data || null);
+        // Keep selection in-week if still valid, else clear
+        setSchedulePreviewSelectedDay(prev => {
+          if (!prev) return null;
+          const inWeek = (json.data?.days || []).some((d: any) => d.date === prev);
+          return inWeek ? prev : null;
+        });
+      } else {
+        setSchedulePreviewWeek(null);
       }
-
-      // Fetch all operators
-      const { data: operators } = await supabase
-        .from('profiles')
-        .select('id, full_name, role')
-        .in('role', ['operator', 'apprentice'])
-        .order('full_name');
-
-      setSchedulePreviewOperators(operators || []);
     } catch (err) {
       console.error('Error fetching schedule preview:', err);
+      setSchedulePreviewWeek(null);
     } finally {
       setSchedulePreviewLoading(false);
     }
@@ -1367,6 +1399,7 @@ export default function ScheduleFormPage() {
 
   const openSchedulePreview = () => {
     setShowSchedulePreview(true);
+    setSchedulePreviewSelectedDay(null);
     fetchSchedulePreview();
   };
 
@@ -1707,12 +1740,28 @@ export default function ScheduleFormPage() {
                       </button>
                     </div>
                   )}
-                  {filteredCrmCustomers.map(c => (
+                  {filteredCrmCustomers.map(c => {
+                    // Snapshot the customer object at render time so the click
+                    // handler always selects the customer displayed on THIS
+                    // tile, regardless of any concurrent list mutation (search
+                    // filtering, re-fetch, optimistic new-customer prepend,
+                    // etc.). Previously the closure captured `c` by reference
+                    // which — combined with list reordering — could cause a
+                    // tap on "tile 2" to select a different customer than the
+                    // label showed.
+                    const customerSnapshot = {
+                      id: c.id,
+                      company_name: c.company_name,
+                      primary_contact_name: c.primary_contact_name,
+                      primary_contact_phone: c.primary_contact_phone,
+                      address: c.address,
+                    };
+                    return (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => {
-                        selectCrmCustomer(c);
+                        selectCrmCustomer(customerSnapshot);
                         setCustomerSearch('');
                       }}
                       className="w-full flex items-center gap-4 px-5 py-4 bg-white border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm transition-all text-left group"
@@ -1729,7 +1778,8 @@ export default function ScheduleFormPage() {
                       </div>
                       <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Or type freely */}
@@ -2837,8 +2887,8 @@ export default function ScheduleFormPage() {
         );
       }
 
-      // ── STEP 5: Scheduling Details ────────────────────────
-      case 5:
+      // ── STEP 6: Scheduling Details ────────────────────────
+      case 6:
         return (
           <div className="space-y-6">
             {/* View Schedule Button */}
@@ -2936,8 +2986,8 @@ export default function ScheduleFormPage() {
           </div>
         );
 
-      // ── STEP 6: Site Access & Compliance ──────────────────
-      case 6:
+      // ── STEP 7: Site Access & Compliance ──────────────────
+      case 7:
         return (
           <div className="space-y-6">
             <SectionCard>
@@ -3238,8 +3288,8 @@ export default function ScheduleFormPage() {
           </div>
         );
 
-      // ── STEP 7: Job Difficulty & Notes ────────────────────
-      case 7:
+      // ── STEP 5: Job Difficulty & Notes ────────────────────
+      case 5:
         return (
           <div className="space-y-6">
             <div>
@@ -3608,9 +3658,9 @@ export default function ScheduleFormPage() {
                   {currentStep === 2 && 'Project details, contacts, and site information'}
                   {currentStep === 3 && 'Define the services needed for this job'}
                   {currentStep === 4 && 'Select equipment for this project'}
-                  {currentStep === 5 && 'Set dates and scheduling flexibility'}
-                  {currentStep === 6 && 'Site access and compliance requirements'}
-                  {currentStep === 7 && 'Rate difficulty and add notes'}
+                  {currentStep === 5 && 'Rate difficulty and add notes'}
+                  {currentStep === 6 && 'Set dates and scheduling flexibility'}
+                  {currentStep === 7 && 'Site access and compliance requirements'}
                   {currentStep === 8 && 'Check all conditions that apply'}
                 </p>
               </div>
@@ -3810,163 +3860,320 @@ export default function ScheduleFormPage() {
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {schedulePreviewLoading ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <Loader2 size={32} className="animate-spin text-blue-500" />
-                  <p className="text-sm text-slate-500 font-medium">Loading schedule...</p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-7 gap-2">
+                    {Array.from({ length: 7 }).map((_, i) => (
+                      <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/60 min-h-[140px] animate-pulse" />
+                    ))}
+                  </div>
+                  <div className="h-24 bg-slate-50 border border-slate-200 rounded-xl animate-pulse" />
                 </div>
+              ) : !schedulePreviewWeek ? (
+                <div className="text-center py-10 text-sm text-slate-400">Unable to load schedule data.</div>
               ) : (
                 <>
+                  {/* ── Required skill banner ────────────────── */}
+                  {schedulePreviewWeek.required_service_codes?.length > 0 && (
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0">
+                        <HardHat size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold uppercase text-indigo-500 tracking-wider">Required Skill</p>
+                        <p className="text-sm font-bold text-indigo-900 truncate">
+                          {(schedulePreviewWeek.required_service_labels || []).join(' · ')}
+                          {schedulePreviewWeek.required_difficulty ? ` · Difficulty ${schedulePreviewWeek.required_difficulty}` : ''}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold uppercase text-indigo-500">Qualified Crew</p>
+                        <p className="text-sm font-bold text-indigo-900">
+                          {schedulePreviewWeek.operators?.filter((o: any) => o.is_qualified).length || 0} of {schedulePreviewWeek.total_operators}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* ── Week Grid ─────────────────────────────── */}
                   <div>
                     <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
                       <Calendar size={15} className="text-blue-600" />
-                      Week View — Jobs Scheduled
+                      Week View — Click a day to inspect
                     </h4>
                     <div className="grid grid-cols-7 gap-2">
-                      {Array.from({ length: 7 }).map((_, i) => {
-                        const day = new Date(schedulePreviewDate + 'T00:00:00');
-                        day.setDate(day.getDate() + i);
-                        const dayStr = day.toISOString().split('T')[0];
-                        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-                        const dayJobs = schedulePreviewData.filter(j => {
-                          const jStart = j.scheduled_date?.split('T')[0];
-                          const jEnd = j.end_date?.split('T')[0] || jStart;
-                          return dayStr >= jStart && dayStr <= jEnd;
-                        });
-                        const isToday = dayStr === new Date().toISOString().split('T')[0];
+                      {(schedulePreviewWeek.days || []).map((d: any) => {
+                        const dayDate = new Date(d.date + 'T00:00:00');
+                        const isWeekend = dayDate.getDay() === 0 || dayDate.getDay() === 6;
+                        const isToday = d.date === new Date().toISOString().split('T')[0];
+                        const isSelected = schedulePreviewSelectedDay === d.date;
+                        const hasRequiredSkill = (schedulePreviewWeek.required_service_codes || []).length > 0;
+                        const noQualifiedFree = hasRequiredSkill && d.qualified_free_count === 0;
+                        const tightCapacity = d.free_count <= 1 && d.free_count >= 0;
+
+                        let tone = 'border-slate-200 bg-white';
+                        if (isSelected) tone = 'border-blue-500 bg-blue-50 ring-2 ring-blue-300';
+                        else if (noQualifiedFree) tone = 'border-red-300 bg-red-50/70';
+                        else if (hasRequiredSkill && d.qualified_free_count === 1) tone = 'border-amber-300 bg-amber-50/70';
+                        else if (tightCapacity) tone = 'border-amber-300 bg-amber-50/60';
+                        else if (isWeekend) tone = 'border-slate-200 bg-slate-50/60';
+                        else if (isToday && !isSelected) tone = 'border-blue-300 bg-blue-50/40';
 
                         return (
-                          <div
-                            key={dayStr}
-                            className={`rounded-xl border p-2 min-h-[100px] transition-all ${
-                              isToday
-                                ? 'border-blue-400 bg-blue-50/50 shadow-sm'
-                                : isWeekend
-                                  ? 'border-slate-200 bg-slate-50/50'
-                                  : 'border-slate-200 bg-white'
-                            }`}
+                          <button
+                            key={d.date}
+                            type="button"
+                            onClick={() => setSchedulePreviewSelectedDay(prev => prev === d.date ? null : d.date)}
+                            className={`text-left rounded-xl border p-2 min-h-[140px] transition-all hover:shadow-md ${tone}`}
                           >
                             <div className="text-center mb-1.5">
                               <p className={`text-[10px] font-bold uppercase ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>
-                                {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                                {dayDate.toLocaleDateString('en-US', { weekday: 'short' })}
                               </p>
-                              <p className={`text-lg font-bold ${isToday ? 'text-blue-700' : 'text-slate-800'}`}>
-                                {day.getDate()}
+                              <p className={`text-lg font-bold ${isSelected ? 'text-blue-700' : isToday ? 'text-blue-700' : 'text-slate-800'}`}>
+                                {dayDate.getDate()}
                               </p>
                             </div>
-                            {dayJobs.length === 0 ? (
-                              <div className="text-center py-1">
-                                <p className="text-[10px] text-emerald-500 font-semibold">Available</p>
-                              </div>
-                            ) : (
-                              <div className="space-y-1">
-                                {dayJobs.slice(0, 3).map((job: any, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className="px-1.5 py-1 rounded-md bg-gradient-to-r from-slate-700 to-slate-800 text-[9px] text-white font-medium truncate"
-                                    title={`${job.customer_name || 'Job'} — ${job.job_type || ''}`}
-                                  >
-                                    {job.customer_name?.split(' ')[0] || 'Job'}
-                                  </div>
-                                ))}
-                                {dayJobs.length > 3 && (
-                                  <p className="text-[9px] text-slate-500 text-center font-semibold">+{dayJobs.length - 3} more</p>
+
+                            {/* Capacity */}
+                            <div className="mb-1">
+                              <p className="text-[10px] font-bold text-slate-500 text-center">
+                                {d.free_count} <span className="text-slate-400 font-semibold">of</span> {d.total_operators}
+                              </p>
+                              <p className="text-[9px] text-slate-400 text-center uppercase tracking-wide">free</p>
+                            </div>
+
+                            {/* Skill chip */}
+                            {hasRequiredSkill && (
+                              <div className={`text-center rounded-md py-0.5 mb-1 text-[9px] font-bold ${
+                                noQualifiedFree
+                                  ? 'bg-red-100 text-red-700'
+                                  : d.qualified_free_count === 1
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {noQualifiedFree ? (
+                                  <span className="inline-flex items-center gap-0.5"><AlertTriangle size={9} /> 0 qualified</span>
+                                ) : (
+                                  `${d.qualified_free_count} qualified`
                                 )}
                               </div>
                             )}
-                          </div>
+
+                            {/* Jobs */}
+                            {d.jobs.length === 0 ? (
+                              <p className="text-[9px] text-emerald-500 font-semibold text-center">Open</p>
+                            ) : (
+                              <div className="space-y-0.5">
+                                {d.jobs.slice(0, 2).map((j: any) => (
+                                  <div
+                                    key={j.id}
+                                    className="px-1.5 py-0.5 rounded bg-slate-700 text-[9px] text-white font-medium truncate"
+                                    title={`${j.customer_name || 'Job'} — ${j.job_type || ''}`}
+                                  >
+                                    {j.customer_name?.split(' ')[0] || 'Job'}
+                                  </div>
+                                ))}
+                                {d.jobs.length > 2 && (
+                                  <p className="text-[9px] text-slate-500 text-center font-semibold">+{d.jobs.length - 2}</p>
+                                )}
+                              </div>
+                            )}
+                          </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* ── Talent Pool ────────────────────────────── */}
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <Users size={15} className="text-indigo-600" />
-                      Talent Pool — Operator Availability
-                    </h4>
-                    {schedulePreviewOperators.length === 0 ? (
-                      <p className="text-sm text-slate-400 italic">No operators found.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {schedulePreviewOperators.map((op: any) => {
-                          // Count how many jobs this operator is assigned to in the preview week
-                          const assignedJobs = schedulePreviewData.filter(j =>
-                            j.assigned_operators?.some((a: any) =>
-                              a.operator_id === op.id || a.id === op.id
-                            )
-                          );
-                          const assignedCount = assignedJobs.length;
-                          const isFree = assignedCount === 0;
+                  {/* ── Expanded day panel ────────────────────── */}
+                  {schedulePreviewSelectedDay && (() => {
+                    const d = (schedulePreviewWeek.days || []).find((x: any) => x.date === schedulePreviewSelectedDay);
+                    if (!d) return null;
+                    const dDate = new Date(d.date + 'T00:00:00');
+                    const hasRequiredSkill = (schedulePreviewWeek.required_service_codes || []).length > 0;
+                    const noQualifiedFree = hasRequiredSkill && d.qualified_free_count === 0;
+                    const operatorsById: Record<string, any> = {};
+                    for (const o of schedulePreviewWeek.operators || []) operatorsById[o.id] = o;
+                    const freeOps = (d.free_operator_ids || []).map((id: string) => operatorsById[id]).filter(Boolean);
+                    const bookedOps = (d.booked_operator_ids || []).map((id: string) => operatorsById[id]).filter(Boolean);
+                    const offSet = new Set<string>(d.time_off_operator_ids || []);
 
-                          return (
-                            <div
-                              key={op.id}
-                              className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
-                                isFree
-                                  ? 'bg-emerald-50/60 border-emerald-200'
-                                  : assignedCount >= 5
-                                    ? 'bg-red-50/60 border-red-200'
-                                    : 'bg-amber-50/60 border-amber-200'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white ${
-                                  isFree
-                                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
-                                    : assignedCount >= 5
-                                      ? 'bg-gradient-to-br from-red-500 to-rose-600'
-                                      : 'bg-gradient-to-br from-amber-500 to-orange-600'
-                                }`}>
-                                  {op.full_name?.charAt(0)?.toUpperCase() || '?'}
-                                </div>
-                                <div>
-                                  <p className="text-sm font-bold text-slate-800">{op.full_name || 'Unknown'}</p>
-                                  <p className="text-[10px] text-slate-500 uppercase font-semibold">{op.role}</p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                {isFree ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
-                                    <CheckCircle size={12} />
-                                    Available
+                    return (
+                      <div className={`rounded-2xl border-2 p-4 space-y-4 ${
+                        noQualifiedFree ? 'border-red-300 bg-red-50/30' : 'border-blue-200 bg-blue-50/20'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Selected Day</p>
+                            <h5 className="text-base font-bold text-slate-800">
+                              {dDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                            </h5>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700">
+                              {d.booked_count} booked · {d.free_count} free
+                            </span>
+                            {hasRequiredSkill && (
+                              <span className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                                noQualifiedFree ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'
+                              }`}>
+                                {noQualifiedFree
+                                  ? `No ${schedulePreviewWeek.required_skill_label || 'qualified'} free`
+                                  : `${d.qualified_free_count} qualified free`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Warning banner */}
+                        {noQualifiedFree && (
+                          <div className="flex items-start gap-2 px-3 py-2.5 bg-red-100 border border-red-300 rounded-lg">
+                            <AlertTriangle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-red-800 font-semibold leading-snug">
+                              No {schedulePreviewWeek.required_skill_label || 'qualified operator'} is free this day.
+                              You can still schedule, but dispatch will need to reassign work or pull from another day.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Jobs on this day */}
+                        <div>
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                            Jobs Scheduled ({d.jobs.length})
+                          </p>
+                          {d.jobs.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">No jobs on the board for this day.</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {d.jobs.map((j: any) => (
+                                <div key={j.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-white border border-slate-200 rounded-lg">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-bold text-slate-800 truncate">
+                                      {j.job_number && <span className="text-slate-500 font-mono mr-2">{j.job_number}</span>}
+                                      {j.customer_name || 'Unnamed customer'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 truncate">
+                                      {j.job_type || '—'}
+                                      {j.difficulty ? ` · Diff ${j.difficulty}` : ''}
+                                      {j.arrival_time ? ` · ${j.arrival_time}` : ''}
+                                    </p>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                                    {j.operator_ids?.length || 0} op{(j.operator_ids?.length || 0) === 1 ? '' : 's'}
                                   </span>
-                                ) : (
-                                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                                    assignedCount >= 5
-                                      ? 'bg-red-100 text-red-700'
-                                      : 'bg-amber-100 text-amber-700'
-                                  }`}>
-                                    {assignedCount} job{assignedCount !== 1 ? 's' : ''}
-                                  </span>
-                                )}
-                              </div>
+                                </div>
+                              ))}
                             </div>
-                          );
-                        })}
+                          )}
+                        </div>
+
+                        {/* Operator occupancy mini-grid */}
+                        <div>
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                            Operator Occupancy — {d.booked_count} of {d.total_operators} booked
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                            {(schedulePreviewWeek.operators || []).map((op: any) => {
+                              const isFree = (d.free_operator_ids || []).includes(op.id);
+                              const isOff = offSet.has(op.id);
+                              return (
+                                <div
+                                  key={op.id}
+                                  className={`flex items-center gap-2 px-2 py-1.5 rounded-md border text-[11px] ${
+                                    isOff
+                                      ? 'bg-slate-100 border-slate-300 text-slate-500'
+                                      : isFree
+                                        ? (op.is_qualified ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-600')
+                                        : 'bg-red-50 border-red-200 text-red-700'
+                                  }`}
+                                  title={
+                                    isOff ? 'Time off'
+                                    : isFree
+                                      ? (op.is_qualified ? 'Free · Qualified' : 'Free · Not qualified for this skill')
+                                      : 'Already booked'
+                                  }
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    isOff ? 'bg-slate-400' : isFree ? (op.is_qualified ? 'bg-emerald-500' : 'bg-slate-400') : 'bg-red-500'
+                                  }`} />
+                                  <span className="font-semibold truncate flex-1">{op.full_name}</span>
+                                  {hasRequiredSkill && op.is_qualified && (
+                                    <CheckCircle size={10} className="text-emerald-500 flex-shrink-0" />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Skill roster */}
+                        <div>
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                            Skill Roster — Free Today
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(d.skill_roster || [])
+                              .filter((r: any) => r.isPriority || r.freeCount > 0)
+                              .slice(0, 10)
+                              .map((r: any) => (
+                                <span
+                                  key={r.family}
+                                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                                    r.isPriority && r.freeCount === 0
+                                      ? 'bg-red-100 border-red-300 text-red-700'
+                                      : r.isPriority
+                                        ? 'bg-indigo-100 border-indigo-300 text-indigo-800'
+                                        : r.freeCount === 0
+                                          ? 'bg-slate-100 border-slate-200 text-slate-500'
+                                          : 'bg-white border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {r.isPriority && <span className="mr-1">★</span>}
+                                  {r.label}: {r.freeCount} free
+                                </span>
+                              ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => { updateForm({ start_date: d.date }); setShowSchedulePreview(false); }}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all active:scale-[0.98] ${
+                              noQualifiedFree
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                : 'bg-gradient-to-r from-blue-600 to-indigo-700 hover:shadow-lg text-white'
+                            }`}
+                          >
+                            {noQualifiedFree
+                              ? `Pick anyway — ${dDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                              : `Pick ${dDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* ── Summary Stats ──────────────────────────── */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
-                      <p className="text-2xl font-bold text-blue-700">{schedulePreviewData.length}</p>
-                      <p className="text-[10px] font-semibold text-blue-500 uppercase">Jobs This Week</p>
+                      <p className="text-2xl font-bold text-blue-700">
+                        {(schedulePreviewWeek.days || []).reduce((sum: number, d: any) => sum + d.jobs.length, 0)}
+                      </p>
+                      <p className="text-[10px] font-semibold text-blue-500 uppercase">Job-Days This Week</p>
                     </div>
                     <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-200">
                       <p className="text-2xl font-bold text-emerald-700">
-                        {schedulePreviewOperators.filter(op =>
-                          !schedulePreviewData.some(j =>
-                            j.assigned_operators?.some((a: any) => a.operator_id === op.id || a.id === op.id)
-                          )
-                        ).length}
+                        {(schedulePreviewWeek.days || []).filter((d: any) => {
+                          const needsSkill = (schedulePreviewWeek.required_service_codes || []).length > 0;
+                          return needsSkill ? d.qualified_free_count > 0 : d.free_count > 0;
+                        }).length}
                       </p>
-                      <p className="text-[10px] font-semibold text-emerald-500 uppercase">Available Operators</p>
+                      <p className="text-[10px] font-semibold text-emerald-500 uppercase">
+                        {(schedulePreviewWeek.required_service_codes || []).length > 0 ? 'Days With Qualified Crew' : 'Days With Free Crew'}
+                      </p>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
-                      <p className="text-2xl font-bold text-slate-700">{schedulePreviewOperators.length}</p>
+                      <p className="text-2xl font-bold text-slate-700">{schedulePreviewWeek.total_operators}</p>
                       <p className="text-[10px] font-semibold text-slate-500 uppercase">Total Crew</p>
                     </div>
                   </div>
@@ -3975,14 +4182,56 @@ export default function ScheduleFormPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
-              <p className="text-xs text-slate-400">Use this preview to pick the best date for your job</p>
-              <button
-                onClick={() => setShowSchedulePreview(false)}
-                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-bold text-sm rounded-xl hover:shadow-lg transition-all active:scale-[0.98]"
-              >
-                Close & Pick Date
-              </button>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
+              <p className="text-xs text-slate-400 hidden sm:block">Click a day to inspect capacity & skill coverage</p>
+              {(() => {
+                const selected = schedulePreviewSelectedDay
+                  ? (schedulePreviewWeek?.days || []).find((x: any) => x.date === schedulePreviewSelectedDay)
+                  : null;
+                const hasRequiredSkill = (schedulePreviewWeek?.required_service_codes || []).length > 0;
+                const isRisky = selected && hasRequiredSkill && selected.qualified_free_count === 0;
+
+                if (!selected) {
+                  return (
+                    <button
+                      onClick={() => setShowSchedulePreview(false)}
+                      className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-bold text-sm rounded-xl hover:shadow-lg transition-all active:scale-[0.98]"
+                    >
+                      Close
+                    </button>
+                  );
+                }
+
+                if (isRisky) {
+                  return (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSchedulePreviewSelectedDay(null)}
+                        className="px-4 py-2.5 bg-white text-slate-700 font-bold text-sm rounded-xl border border-slate-300 hover:bg-slate-50 transition-all"
+                      >
+                        Choose Different Day
+                      </button>
+                      <button
+                        onClick={() => { updateForm({ start_date: selected.date }); setShowSchedulePreview(false); }}
+                        className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-xl transition-all active:scale-[0.98]"
+                        title={`No ${schedulePreviewWeek.required_skill_label || 'qualified operator'} is free — pick anyway and reassign later`}
+                      >
+                        <AlertTriangle size={14} />
+                        Pick Anyway
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <button
+                    onClick={() => { updateForm({ start_date: selected.date }); setShowSchedulePreview(false); }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-bold text-sm rounded-xl hover:shadow-lg transition-all active:scale-[0.98]"
+                  >
+                    Close & Pick {new Date(selected.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>

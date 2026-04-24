@@ -18,13 +18,14 @@ export async function GET(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Fetch operators (role = 'operator')
     let opQuery = supabaseAdmin
       .from('profiles')
       .select('id, full_name, role')
       .eq('role', 'operator')
       .order('full_name');
-    if (tenantId) { opQuery = opQuery.eq('tenant_id', tenantId); }
+    opQuery = opQuery.eq('tenant_id', tenantId);
     const { data: operators, error: opError } = await opQuery;
 
     if (opError) {
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
       .select('id, full_name, role')
       .eq('role', 'apprentice')
       .order('full_name');
-    if (tenantId) { helpQuery = helpQuery.eq('tenant_id', tenantId); }
+    helpQuery = helpQuery.eq('tenant_id', tenantId);
     const { data: helpers, error: helpError } = await helpQuery;
 
     if (helpError) {

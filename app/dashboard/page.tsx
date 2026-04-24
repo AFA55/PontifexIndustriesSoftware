@@ -79,32 +79,12 @@ export default function Dashboard() {
   const [isDemoOperator, setIsDemoOperator] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isShopHours, setIsShopHours] = useState(false);
-  const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showNfcClockInModal, setShowNfcClockInModal] = useState(false);
   const [clockOutBlock, setClockOutBlock] = useState<{
     show: boolean;
     blockType: string;
     incompleteJobs: { id: string; job_number: string; customer_name: string }[];
   }>({ show: false, blockType: '', incompleteJobs: [] });
-  const [debugInfo, setDebugInfo] = useState<{
-    gpsStatus: string;
-    latitude: number | null;
-    longitude: number | null;
-    accuracy: number | null;
-    distanceFromShop: string;
-    lastError: string;
-    apiResponse: string;
-    timestamp: string;
-  }>({
-    gpsStatus: 'idle',
-    latitude: null,
-    longitude: null,
-    accuracy: null,
-    distanceFromShop: '-',
-    lastError: '',
-    apiResponse: '',
-    timestamp: '',
-  });
   const router = useRouter();
 
   useEffect(() => {
@@ -387,15 +367,6 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  // Lock all cards except Clock In/Out and View Timecard for ALL operators
-  // Building one feature at a time — everything else stays blurred
-  const isCardAccessible = (cardName: string) => {
-    const accessibleCards = [
-      'View Timecard',
-    ];
-    return accessibleCards.includes(cardName);
-  };
-
   // Open the NFC clock-in modal instead of directly clocking in
   const handleClockIn = () => {
     setShowNfcClockInModal(true);
@@ -422,15 +393,6 @@ export default function Dashboard() {
         throw new Error('Session expired');
       }
 
-      setDebugInfo(prev => ({
-        ...prev,
-        gpsStatus: `${data.method} verified ✅`,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        accuracy: data.accuracy || null,
-        timestamp: new Date().toISOString(),
-      }));
-
       const response = await fetch('/api/timecard/clock-in', {
         method: 'POST',
         headers: {
@@ -450,11 +412,6 @@ export default function Dashboard() {
       });
 
       const result = await response.json();
-
-      setDebugInfo(prev => ({
-        ...prev,
-        apiResponse: JSON.stringify(result, null, 2).substring(0, 500),
-      }));
 
       if (!response.ok) {
         const errorDetail = result.details ? `\n${result.details}` : '';
@@ -506,7 +463,6 @@ export default function Dashboard() {
     } catch (error: unknown) {
       console.error('Error clocking in:', error);
       const msg = error instanceof Error ? error.message : 'An error occurred';
-      setDebugInfo(prev => ({ ...prev, lastError: msg, gpsStatus: 'error' }));
       if (!clockMessage) {
         setClockMessage({ type: 'error', text: msg });
       }
@@ -521,30 +477,17 @@ export default function Dashboard() {
     setClockMessage(null);
 
     try {
-      setDebugInfo(prev => ({ ...prev, gpsStatus: 'requesting...', timestamp: new Date().toISOString() }));
-
       // Get Supabase session token
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
         setClockMessage({ type: 'error', text: 'Session expired. Please log in again.' });
-        setDebugInfo(prev => ({ ...prev, lastError: 'No session found', gpsStatus: 'error' }));
         setClockLoading(false);
         return;
       }
 
       // Verify location
       const verification = await verifyShopLocation();
-
-      setDebugInfo(prev => ({
-        ...prev,
-        gpsStatus: verification.verified ? 'verified ✅' : 'rejected ❌',
-        latitude: verification.location?.latitude || null,
-        longitude: verification.location?.longitude || null,
-        accuracy: verification.location?.accuracy || null,
-        distanceFromShop: verification.distanceFormatted || '-',
-        lastError: verification.error || '',
-      }));
 
       if (!verification.verified) {
         setClockMessage({
@@ -570,11 +513,6 @@ export default function Dashboard() {
       });
 
       const result = await response.json();
-
-      setDebugInfo(prev => ({
-        ...prev,
-        apiResponse: JSON.stringify(result, null, 2).substring(0, 500),
-      }));
 
       if (!response.ok) {
         // Check for work-performed block
@@ -612,7 +550,6 @@ export default function Dashboard() {
       setTimeout(() => setClockMessage(null), 5000);
     } catch (error: any) {
       console.error('Error clocking out:', error);
-      setDebugInfo(prev => ({ ...prev, lastError: error.message, gpsStatus: 'error' }));
       setClockMessage({
         type: 'error',
         text: error.message || 'An error occurred while clocking out',
@@ -1016,43 +953,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Debug Info Toggle */}
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <button
-                onClick={() => setShowDebugPanel(!showDebugPanel)}
-                className="text-xs text-gray-400 hover:text-gray-600 font-mono transition-colors"
-              >
-                {showDebugPanel ? '▼ Hide Debug Info' : '▶ Show Debug Info (GPS & Errors)'}
-              </button>
-
-              {showDebugPanel && (
-                <div className="mt-3 bg-gray-900 text-green-400 rounded-xl p-4 font-mono text-xs overflow-x-auto">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>GPS Status:</div><div className="text-white">{debugInfo.gpsStatus}</div>
-                    <div>Your Lat:</div><div className="text-white">{debugInfo.latitude?.toFixed(8) || 'N/A'}</div>
-                    <div>Your Lng:</div><div className="text-white">{debugInfo.longitude?.toFixed(8) || 'N/A'}</div>
-                    <div>GPS Accuracy:</div><div className="text-white">{debugInfo.accuracy ? `${debugInfo.accuracy.toFixed(1)}m` : 'N/A'}</div>
-                    <div>Distance from Shop:</div><div className="text-yellow-300 font-bold">{debugInfo.distanceFromShop}</div>
-                    <div>Shop Lat:</div><div className="text-white">34.76866502</div>
-                    <div>Shop Lng:</div><div className="text-white">-82.43563614</div>
-                    <div>Max Allowed:</div><div className="text-white">6.1m (20 feet)</div>
-                    <div>Timestamp:</div><div className="text-white">{debugInfo.timestamp || 'N/A'}</div>
-                  </div>
-                  {debugInfo.lastError && (
-                    <div className="mt-3 pt-3 border-t border-gray-700">
-                      <div className="text-red-400 font-bold mb-1">Last Error:</div>
-                      <div className="text-red-300 whitespace-pre-wrap">{debugInfo.lastError}</div>
-                    </div>
-                  )}
-                  {debugInfo.apiResponse && (
-                    <div className="mt-3 pt-3 border-t border-gray-700">
-                      <div className="text-blue-400 font-bold mb-1">API Response:</div>
-                      <pre className="text-blue-300 whitespace-pre-wrap text-[10px]">{debugInfo.apiResponse}</pre>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
@@ -1113,17 +1013,9 @@ export default function Dashboard() {
           </Link>
 
           {/* Request Time Off - Premium Purple Card */}
-          <div
-            onClick={() => {
-              if (isCardAccessible('Request Time Off')) {
-                router.push('/dashboard/request-time-off');
-              }
-            }}
-            className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-purple-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 text-left animate-fade-in-up delay-300 ${
-              isCardAccessible('Request Time Off')
-                ? 'hover:scale-[1.03] cursor-pointer'
-                : 'blur-sm opacity-50 cursor-not-allowed'
-            }`}
+          <Link
+            href="/dashboard/request-time-off"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-purple-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 text-left animate-fade-in-up delay-300 hover:scale-[1.03]"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
             <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
@@ -1133,9 +1025,6 @@ export default function Dashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <span className="px-4 py-2 bg-gradient-to-r from-purple-100 to-fuchsia-100 group-hover:bg-white/20 text-purple-700 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 shadow-md">
-                  AVAILABLE
-                </span>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
                 Request Time Off
@@ -1150,14 +1039,7 @@ export default function Dashboard() {
                 </svg>
               </div>
             </div>
-            {!isCardAccessible('Request Time Off') && (
-              <div className="absolute inset-0 bg-black/5 backdrop-blur-[1px] rounded-3xl flex items-center justify-center pointer-events-none">
-                <div className="bg-white/95 px-6 py-3 rounded-xl shadow-lg">
-                  <p className="text-sm font-bold text-gray-900">Available in Full Version</p>
-                </div>
-              </div>
-            )}
-          </div>
+          </Link>
 
         </div>
 
@@ -1189,12 +1071,15 @@ export default function Dashboard() {
                 </svg>
                 View Timecard
               </Link>
-              <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded-xl text-gray-400 font-medium whitespace-nowrap text-sm">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              <Link
+                href="/dashboard/request-time-off"
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-500 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                More actions coming soon
-              </div>
+                Time Off
+              </Link>
             </div>
           </div>
         </div>

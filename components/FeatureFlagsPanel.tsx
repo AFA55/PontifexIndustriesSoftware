@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Save, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export interface UserFeatureFlags {
   can_create_schedule_forms: boolean;
@@ -70,17 +71,11 @@ const FLAG_GROUPS = [
     flags: [
       { key: 'can_manage_team', label: 'Manage Team', desc: 'View and edit team profiles' },
       { key: 'can_manage_settings', label: 'Settings', desc: 'Access platform settings' },
-      { key: 'can_grant_super_admin', label: 'Grant Super Admin', desc: 'Elevate others to super admin (dangerous)' },
+      // 'can_grant_super_admin' — hidden until wired (no UI consumer reads it yet)
     ],
   },
-  {
-    label: 'Personal Metrics',
-    icon: '📊',
-    flags: [
-      { key: 'can_view_personal_hours', label: 'Personal Hours', desc: 'See their own hours on jobs' },
-      { key: 'can_view_personal_metrics', label: 'Personal Metrics', desc: 'View their own job performance metrics' },
-    ],
-  },
+  // 'Personal Metrics' group hidden until wired — 'can_view_personal_hours'
+  // and 'can_view_personal_metrics' currently have no UI consumers.
 ];
 
 const ADMIN_TYPE_PRESETS: Record<string, Partial<UserFeatureFlags>> = {
@@ -152,9 +147,14 @@ export default function FeatureFlagsPanel({ userId, initialFlags, onSave, readOn
   const handleSave = async () => {
     setSaving(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
       const res = await fetch(`/api/admin/user-flags/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(flags),
       });
       const json = await res.json();

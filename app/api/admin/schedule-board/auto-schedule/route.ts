@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  *   3. Travel optimization — minimize total travel distance (Google Maps Distance Matrix)
  *   4. Dispatcher preference learning — track historical assignments (future)
  *
- * Access: super_admin only
+ * Access: admin, operations_manager, super_admin
  *
  * Body: { date: 'YYYY-MM-DD', options?: { optimizeTravel?: boolean, maxJobsPerOperator?: number } }
  * Returns: { assignments: [{ jobId, jobNumber, operatorId, operatorName, reason }], skipped: [...] }
@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { logAuditEvent } from '@/lib/audit';
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ function scoreAssignment(
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireSuperAdmin(request);
+    const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();

@@ -136,14 +136,56 @@ function formatTime(time: string | null) {
   return `${displayHour}:${minutes} ${ampm}`;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  scheduled: { label: 'Scheduled', bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
-  assigned: { label: 'Assigned', bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500' },
-  in_route: { label: 'In Route', bg: 'bg-cyan-100', text: 'text-cyan-700', dot: 'bg-cyan-500' },
-  in_progress: { label: 'In Progress', bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500' },
-  pending_completion: { label: 'Pending Review', bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
-  completed: { label: 'Completed', bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500' },
-  cancelled: { label: 'Cancelled', bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400' },
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string; accent: string }> = {
+  scheduled: {
+    label: 'Scheduled',
+    bg: 'bg-sky-100 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:ring-sky-400/30',
+    text: 'text-sky-700 dark:text-sky-300',
+    dot: 'bg-sky-500',
+    accent: 'from-sky-400 to-blue-500',
+  },
+  assigned: {
+    label: 'Assigned',
+    bg: 'bg-sky-100 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:ring-sky-400/30',
+    text: 'text-sky-700 dark:text-sky-300',
+    dot: 'bg-sky-500',
+    accent: 'from-sky-400 to-indigo-500',
+  },
+  in_route: {
+    label: 'In Route',
+    bg: 'bg-amber-100 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:ring-amber-400/30',
+    text: 'text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+    accent: 'from-amber-400 to-orange-500',
+  },
+  in_progress: {
+    label: 'In Progress',
+    bg: 'bg-violet-100 ring-1 ring-violet-200 dark:bg-violet-500/15 dark:ring-violet-400/30',
+    text: 'text-violet-700 dark:text-violet-300',
+    dot: 'bg-violet-500',
+    accent: 'from-violet-500 to-fuchsia-500',
+  },
+  pending_completion: {
+    label: 'Pending Review',
+    bg: 'bg-orange-100 ring-1 ring-orange-200 dark:bg-orange-500/15 dark:ring-orange-400/30',
+    text: 'text-orange-700 dark:text-orange-300',
+    dot: 'bg-orange-500',
+    accent: 'from-orange-400 to-rose-500',
+  },
+  completed: {
+    label: 'Completed',
+    bg: 'bg-emerald-100 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:ring-emerald-400/30',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+    accent: 'from-emerald-400 to-teal-500',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    bg: 'bg-slate-100 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10',
+    text: 'text-slate-600 dark:text-white/70',
+    dot: 'bg-slate-400',
+    accent: 'from-slate-300 to-slate-400',
+  },
 };
 
 const WORK_TYPE_LABELS: Record<string, string> = {
@@ -161,13 +203,13 @@ const WORK_TYPE_LABELS: Record<string, string> = {
 function PageSkeleton() {
   return (
     <div className="animate-pulse space-y-6">
-      <div className="h-8 bg-gray-200 rounded w-64" />
+      <div className="h-8 w-64 rounded bg-slate-200 dark:bg-white/10" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="h-64 bg-gray-100 rounded-xl" />
-          <div className="h-48 bg-gray-100 rounded-xl" />
+          <div className="h-64 rounded-2xl bg-slate-100 dark:bg-white/5" />
+          <div className="h-48 rounded-2xl bg-slate-100 dark:bg-white/5" />
         </div>
-        <div className="h-80 bg-gray-100 rounded-xl" />
+        <div className="h-80 rounded-2xl bg-slate-100 dark:bg-white/5" />
       </div>
     </div>
   );
@@ -208,49 +250,76 @@ function EditScheduleModal({ job, onClose, onSaved }: EditScheduleModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/60">
+      <div className="
+        w-full max-w-sm p-6 rounded-2xl shadow-2xl
+        bg-white
+        dark:bg-gradient-to-br dark:from-[#180c2c] dark:to-[#0e0720] dark:border dark:border-white/10
+      ">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-semibold text-gray-900">Edit Schedule</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg">
-            <X className="w-4 h-4 text-gray-500" />
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">Edit Schedule</h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10"
+          >
+            <X className="w-4 h-4 text-slate-500 dark:text-white/60" />
           </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-white/80 mb-1">Start Date</label>
             <input
               type="date"
               value={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="
+                w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500
+                bg-white border border-slate-300 text-slate-900
+                dark:bg-white/5 dark:border-white/10 dark:text-white dark:[color-scheme:dark]
+              "
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">End Date (optional)</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-white/80 mb-1">End Date (optional)</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               min={scheduledDate}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="
+                w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500
+                bg-white border border-slate-300 text-slate-900
+                dark:bg-white/5 dark:border-white/10 dark:text-white dark:[color-scheme:dark]
+              "
             />
           </div>
         </div>
 
-        {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+        {error && <p className="text-sm text-rose-600 dark:text-rose-400 mt-3">{error}</p>}
 
         <div className="flex items-center gap-2 mt-6">
           <button
             onClick={handleSave}
             disabled={saving || !scheduledDate}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="
+              flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg
+              text-white bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500
+              hover:from-violet-700 hover:via-fuchsia-600 hover:to-pink-600
+              disabled:opacity-50 transition-all shadow-sm shadow-violet-500/20
+            "
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Save
           </button>
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+          <button
+            onClick={onClose}
+            className="
+              px-4 py-2 text-sm rounded-lg
+              text-slate-600 hover:bg-slate-100
+              dark:text-white/70 dark:hover:bg-white/10
+            "
+          >
             Cancel
           </button>
         </div>
@@ -422,7 +491,7 @@ export default function AdminJobDetailPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen p-6 bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
         <PageSkeleton />
       </div>
     );
@@ -430,13 +499,13 @@ export default function AdminJobDetailPage({
 
   if (pageError || !job) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-600">{pageError || 'Job not found.'}</p>
+          <AlertCircle className="w-12 h-12 text-slate-300 dark:text-white/20 mx-auto mb-3" />
+          <p className="text-slate-600 dark:text-white/70">{pageError || 'Job not found.'}</p>
           <Link
             href="/dashboard/admin/schedule-board"
-            className="mt-4 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
+            className="mt-4 inline-flex items-center gap-1.5 text-sm text-violet-600 hover:underline dark:text-violet-300"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Schedule Board
@@ -447,26 +516,44 @@ export default function AdminJobDetailPage({
   }
 
   const isPendingCompletion = job.status === 'pending_completion';
+  const heroAccent = statusConfig?.accent ?? 'from-violet-500 to-fuchsia-500';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         {/* Back link */}
         <Link
           href="/dashboard/admin/schedule-board"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors dark:text-white/60 dark:hover:text-white"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Schedule Board
         </Link>
 
-        {/* Header */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        {/* Hero card */}
+        <div className="
+          relative overflow-hidden rounded-2xl p-5 shadow-sm
+          bg-white border border-slate-200
+          dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+          dark:border-white/10 dark:backdrop-blur
+        ">
+          {/* Top accent stripe — color keyed to status, purple-pink for in_progress */}
+          <span
+            className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${heroAccent}`}
+            aria-hidden
+          />
           <div className="flex flex-col sm:flex-row sm:items-start gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap mb-1">
-                <h1 className="text-xl font-bold text-gray-900 font-mono">{job.job_number}</h1>
+                <h1 className="
+                  text-2xl font-extrabold font-mono tracking-tight
+                  bg-clip-text text-transparent
+                  bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500
+                  dark:from-violet-300 dark:via-fuchsia-300 dark:to-pink-300
+                ">
+                  {job.job_number}
+                </h1>
                 {statusConfig && (
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusConfig.bg} ${statusConfig.text}`}
@@ -476,14 +563,14 @@ export default function AdminJobDetailPage({
                   </span>
                 )}
               </div>
-              <p className="text-base font-semibold text-gray-700">
+              <p className="text-base font-semibold text-slate-700 dark:text-white/85">
                 {job.customer_name}
                 {job.job_type && (
-                  <span className="font-normal text-gray-500"> — {job.job_type}</span>
+                  <span className="font-normal text-slate-500 dark:text-white/55"> — {job.job_type}</span>
                 )}
               </p>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-sm text-gray-500">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-sm text-slate-500 dark:text-white/60">
                 {(job.scheduled_date || job.end_date) && (
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
@@ -492,8 +579,13 @@ export default function AdminJobDetailPage({
                   </span>
                 )}
                 {job.operator_name && (
-                  <span className="inline-flex items-center gap-1">
-                    <User className="w-4 h-4" />
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white bg-gradient-to-br from-violet-500 to-fuchsia-500"
+                      aria-hidden
+                    >
+                      {job.operator_name.trim().charAt(0).toUpperCase()}
+                    </span>
                     {job.operator_name}
                     {job.helper_name && ` + ${job.helper_name}`}
                   </span>
@@ -516,7 +608,11 @@ export default function AdminJobDetailPage({
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
               <button
                 onClick={() => setShowEditSchedule(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="
+                  inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors
+                  text-slate-700 bg-white border border-slate-200 hover:bg-slate-50
+                  dark:text-white/80 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10
+                "
               >
                 <Edit3 className="w-4 h-4" />
                 Edit Schedule
@@ -530,8 +626,8 @@ export default function AdminJobDetailPage({
           <div
             className={`rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2 ${
               actionFeedback.type === 'success'
-                ? 'bg-green-50 text-green-800 border border-green-200'
-                : 'bg-red-50 text-red-800 border border-red-200'
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-400/30'
+                : 'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:border-rose-400/30'
             }`}
           >
             {actionFeedback.type === 'success' ? (
@@ -565,17 +661,25 @@ export default function AdminJobDetailPage({
 
             {/* Completion Request Panel */}
             {isPendingCompletion && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+              <div className="
+                rounded-2xl p-5
+                bg-orange-50 border border-orange-200
+                dark:bg-orange-500/10 dark:border-orange-400/30
+              ">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <AlertCircle className="w-5 h-5 text-orange-500 dark:text-orange-300 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <h3 className="font-semibold text-amber-900">Completion Review Required</h3>
-                    <p className="text-sm text-amber-700 mt-1">
+                    <h3 className="font-semibold text-orange-900 dark:text-orange-200">Completion Review Required</h3>
+                    <p className="text-sm text-orange-700 dark:text-orange-300/80 mt-1">
                       {job.operator_name || 'Operator'} submitted on{' '}
                       {formatDateTime(job.completion_requested_at)}
                     </p>
                     {job.completion_request_notes && (
-                      <p className="text-sm text-gray-700 mt-2 bg-white border border-amber-200 rounded-lg p-3 italic">
+                      <p className="
+                        text-sm mt-2 rounded-lg p-3 italic
+                        bg-white border border-orange-200 text-slate-700
+                        dark:bg-white/5 dark:border-orange-400/20 dark:text-white/80
+                      ">
                         &ldquo;{job.completion_request_notes}&rdquo;
                       </p>
                     )}
@@ -584,13 +688,22 @@ export default function AdminJobDetailPage({
                       onChange={(e) => setReviewNotes(e.target.value)}
                       placeholder="Review notes (optional)..."
                       rows={3}
-                      className="mt-3 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none bg-white"
+                      className="
+                        mt-3 w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none
+                        bg-white border border-orange-200 text-slate-900
+                        dark:bg-white/5 dark:border-orange-400/20 dark:text-white dark:placeholder-white/40
+                      "
                     />
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
                       <button
                         onClick={handleApprove}
                         disabled={approving || rejecting}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                        className="
+                          inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors
+                          bg-emerald-600 text-white hover:bg-emerald-700
+                          dark:bg-emerald-500 dark:hover:bg-emerald-400
+                          disabled:opacity-50
+                        "
                       >
                         {approving ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -602,7 +715,12 @@ export default function AdminJobDetailPage({
                       <button
                         onClick={handleReject}
                         disabled={approving || rejecting}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors"
+                        className="
+                          inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors
+                          bg-rose-100 text-rose-700 hover:bg-rose-200
+                          dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/25
+                          disabled:opacity-50
+                        "
                       >
                         {rejecting ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -618,27 +736,34 @@ export default function AdminJobDetailPage({
             )}
 
             {/* Activity / Progress Log */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <div className="
+              rounded-2xl p-6 shadow-sm
+              bg-white border border-slate-200
+              dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+              dark:border-white/10 dark:backdrop-blur
+            ">
               <div className="flex items-center gap-2 mb-4">
-                <ClipboardList className="w-5 h-5 text-blue-600" />
-                <h2 className="text-base font-semibold text-gray-900">Activity &amp; Progress Log</h2>
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                  <ClipboardList className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Activity &amp; Progress Log</h2>
               </div>
 
               {activityLog.length === 0 ? (
                 <div className="text-center py-8">
-                  <ClipboardList className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500">No activity logged yet.</p>
+                  <ClipboardList className="w-10 h-10 text-slate-200 dark:text-white/15 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500 dark:text-white/50">No activity logged yet.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {job.completion_requested_at && (
                     <div className="flex items-start gap-3 text-sm">
-                      <div className="w-2 h-2 mt-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                      <div className="w-2 h-2 mt-1.5 rounded-full bg-orange-400 flex-shrink-0" />
                       <div>
-                        <span className="text-gray-400 text-xs">
+                        <span className="text-slate-400 dark:text-white/40 text-xs">
                           {formatDateTime(job.completion_requested_at)}
                         </span>
-                        <p className="text-gray-700">
+                        <p className="text-slate-700 dark:text-white/80">
                           <span className="font-medium">{job.operator_name || 'Operator'}</span>{' '}
                           submitted completion request
                         </p>
@@ -648,27 +773,27 @@ export default function AdminJobDetailPage({
 
                   {job.completion_approved_at && (
                     <div className="flex items-start gap-3 text-sm">
-                      <div className="w-2 h-2 mt-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                      <div className="w-2 h-2 mt-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
                       <div>
-                        <span className="text-gray-400 text-xs">
+                        <span className="text-slate-400 dark:text-white/40 text-xs">
                           {formatDateTime(job.completion_approved_at)}
                         </span>
-                        <p className="text-gray-700">Admin approved job completion</p>
+                        <p className="text-slate-700 dark:text-white/80">Admin approved job completion</p>
                       </div>
                     </div>
                   )}
 
                   {job.completion_rejected_at && !job.completion_requested_at && (
                     <div className="flex items-start gap-3 text-sm">
-                      <div className="w-2 h-2 mt-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                      <div className="w-2 h-2 mt-1.5 rounded-full bg-rose-400 flex-shrink-0" />
                       <div>
-                        <span className="text-gray-400 text-xs">
+                        <span className="text-slate-400 dark:text-white/40 text-xs">
                           {formatDateTime(job.completion_rejected_at)}
                         </span>
-                        <p className="text-gray-700">
+                        <p className="text-slate-700 dark:text-white/80">
                           Completion request rejected
                           {job.completion_rejection_notes && (
-                            <span className="text-gray-500 italic"> — &ldquo;{job.completion_rejection_notes}&rdquo;</span>
+                            <span className="text-slate-500 dark:text-white/50 italic"> — &ldquo;{job.completion_rejection_notes}&rdquo;</span>
                           )}
                         </p>
                       </div>
@@ -677,27 +802,27 @@ export default function AdminJobDetailPage({
 
                   {activityLog.map((entry) => (
                     <div key={entry.id} className="flex items-start gap-3 text-sm">
-                      <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                      <div className="w-2 h-2 mt-1.5 rounded-full bg-violet-400 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <span className="text-gray-400 text-xs">
+                        <span className="text-slate-400 dark:text-white/40 text-xs">
                           {formatDateTime(entry.timestamp)}
                           {entry.day_number && (
-                            <span className="ml-1 text-blue-500">Day {entry.day_number}</span>
+                            <span className="ml-1 text-violet-500 dark:text-violet-300">Day {entry.day_number}</span>
                           )}
                         </span>
-                        <p className="text-gray-700">
+                        <p className="text-slate-700 dark:text-white/80">
                           <span className="font-medium">{entry.operator_name}</span> logged{' '}
                           {entry.linear_feet
                             ? `${entry.linear_feet} linear ft`
                             : entry.cores
                             ? `${entry.cores} cores`
                             : `${entry.quantity} units`}{' '}
-                          <span className="text-gray-500">
+                          <span className="text-slate-500 dark:text-white/55">
                             {WORK_TYPE_LABELS[entry.work_type] || entry.work_type}
                           </span>
                         </p>
                         {entry.notes && (
-                          <p className="text-xs text-gray-400 italic mt-0.5 truncate">{entry.notes}</p>
+                          <p className="text-xs text-slate-400 dark:text-white/40 italic mt-0.5 truncate">{entry.notes}</p>
                         )}
                       </div>
                     </div>
@@ -709,30 +834,37 @@ export default function AdminJobDetailPage({
 
           {/* Right column: Job Details */}
           <div className="space-y-6">
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-              <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-blue-600" />
+            <div className="
+              rounded-2xl p-6 shadow-sm
+              bg-white border border-slate-200
+              dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+              dark:border-white/10 dark:backdrop-blur
+            ">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                  <FileText className="w-4 h-4" />
+                </span>
                 Job Details
               </h2>
 
               <dl className="space-y-3 text-sm">
                 <div>
-                  <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Customer</dt>
-                  <dd className="mt-0.5 text-gray-800 font-medium">{job.customer_name}</dd>
+                  <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Customer</dt>
+                  <dd className="mt-0.5 text-slate-800 dark:text-white font-medium">{job.customer_name}</dd>
                 </div>
 
                 {job.contact_name && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Contact</dt>
-                    <dd className="mt-0.5 text-gray-700">{job.contact_name}</dd>
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Contact</dt>
+                    <dd className="mt-0.5 text-slate-700 dark:text-white/80">{job.contact_name}</dd>
                   </div>
                 )}
 
                 {job.customer_phone && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Phone</dt>
-                    <dd className="mt-0.5 text-gray-700 flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-gray-400" />
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Phone</dt>
+                    <dd className="mt-0.5 text-slate-700 dark:text-white/80 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
                       {job.customer_phone}
                     </dd>
                   </div>
@@ -740,21 +872,21 @@ export default function AdminJobDetailPage({
 
                 {job.operator_name && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Operator</dt>
-                    <dd className="mt-0.5 text-gray-700 flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-gray-400" />
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Operator</dt>
+                    <dd className="mt-0.5 text-slate-700 dark:text-white/80 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
                       {job.operator_name}
                       {job.helper_name && (
-                        <span className="text-gray-400"> + {job.helper_name}</span>
+                        <span className="text-slate-400 dark:text-white/45"> + {job.helper_name}</span>
                       )}
                     </dd>
                   </div>
                 )}
 
                 <div>
-                  <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Scheduled</dt>
-                  <dd className="mt-0.5 text-gray-700 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                  <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Scheduled</dt>
+                  <dd className="mt-0.5 text-slate-700 dark:text-white/80 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
                     {formatDate(job.scheduled_date)}
                     {job.end_date && ` – ${formatDate(job.end_date)}`}
                   </dd>
@@ -762,16 +894,16 @@ export default function AdminJobDetailPage({
 
                 {job.arrival_time && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Arrival Time</dt>
-                    <dd className="mt-0.5 text-gray-700">{formatTime(job.arrival_time)}</dd>
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Arrival Time</dt>
+                    <dd className="mt-0.5 text-slate-700 dark:text-white/80">{formatTime(job.arrival_time)}</dd>
                   </div>
                 )}
 
                 {job.address && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Address</dt>
-                    <dd className="mt-0.5 text-gray-700 flex items-start gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Address</dt>
+                    <dd className="mt-0.5 text-slate-700 dark:text-white/80 flex items-start gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-white/40 mt-0.5 flex-shrink-0" />
                       <span>{job.address}</span>
                     </dd>
                   </div>
@@ -779,16 +911,16 @@ export default function AdminJobDetailPage({
 
                 {job.po_number && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">PO Number</dt>
-                    <dd className="mt-0.5 text-gray-700 font-mono">{job.po_number}</dd>
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">PO Number</dt>
+                    <dd className="mt-0.5 text-slate-700 dark:text-white/80 font-mono">{job.po_number}</dd>
                   </div>
                 )}
 
                 {(job.permit_required || job.permit_number) && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Permit</dt>
-                    <dd className="mt-0.5 text-gray-700 flex items-center gap-1.5">
-                      <Wrench className="w-3.5 h-3.5 text-gray-400" />
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Permit</dt>
+                    <dd className="mt-0.5 text-slate-700 dark:text-white/80 flex items-center gap-1.5">
+                      <Wrench className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
                       {job.permit_number || 'Required'}
                     </dd>
                   </div>
@@ -796,15 +928,19 @@ export default function AdminJobDetailPage({
 
                 {job.description && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Description</dt>
-                    <dd className="mt-0.5 text-gray-600 text-xs leading-relaxed">{job.description}</dd>
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Description</dt>
+                    <dd className="mt-0.5 text-slate-600 dark:text-white/70 text-xs leading-relaxed">{job.description}</dd>
                   </div>
                 )}
 
                 {job.notes && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide">Notes</dt>
-                    <dd className="mt-0.5 text-gray-600 text-xs leading-relaxed bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Notes</dt>
+                    <dd className="
+                      mt-0.5 text-xs leading-relaxed rounded-lg p-2.5
+                      text-slate-600 bg-slate-50 border border-slate-100
+                      dark:text-white/70 dark:bg-white/5 dark:border-white/10
+                    ">
                       {job.notes}
                     </dd>
                   </div>
@@ -812,8 +948,12 @@ export default function AdminJobDetailPage({
 
                 {job.internal_notes && (
                   <div>
-                    <dt className="text-xs font-medium text-amber-500 uppercase tracking-wide">Internal Notes</dt>
-                    <dd className="mt-0.5 text-gray-600 text-xs leading-relaxed bg-amber-50 rounded-lg p-2.5 border border-amber-100">
+                    <dt className="text-xs font-medium text-amber-500 dark:text-amber-300 uppercase tracking-wide">Internal Notes</dt>
+                    <dd className="
+                      mt-0.5 text-xs leading-relaxed rounded-lg p-2.5
+                      text-slate-600 bg-amber-50 border border-amber-100
+                      dark:text-white/80 dark:bg-amber-500/10 dark:border-amber-400/20
+                    ">
                       {job.internal_notes}
                     </dd>
                   </div>
@@ -822,12 +962,19 @@ export default function AdminJobDetailPage({
             </div>
 
             {/* Change Requests */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <div className="
+              rounded-2xl p-5 shadow-sm
+              bg-white border border-slate-200
+              dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+              dark:border-white/10 dark:backdrop-blur
+            ">
               <div className="flex items-center gap-2 mb-4">
-                <MessageSquare className="w-4 h-4 text-purple-600" />
-                <h2 className="text-base font-semibold text-gray-900">Change Requests</h2>
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-fuchsia-50 text-fuchsia-600 dark:bg-fuchsia-500/15 dark:text-fuchsia-300">
+                  <MessageSquare className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Change Requests</h2>
                 {changeRequests.filter(cr => cr.status === 'pending').length > 0 && (
-                  <span className="ml-auto px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
+                  <span className="ml-auto px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">
                     {changeRequests.filter(cr => cr.status === 'pending').length} pending
                   </span>
                 )}
@@ -835,35 +982,44 @@ export default function AdminJobDetailPage({
 
               {crLoading ? (
                 <div className="flex items-center justify-center py-6">
-                  <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-300 dark:text-white/30" />
                 </div>
               ) : changeRequests.length === 0 ? (
                 <div className="text-center py-6">
-                  <MessageSquare className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                  <p className="text-sm text-gray-400">No change requests for this job.</p>
+                  <MessageSquare className="w-8 h-8 text-slate-200 dark:text-white/15 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400 dark:text-white/45">No change requests for this job.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {changeRequests.map((cr) => (
-                    <div key={cr.id} className={`rounded-xl border p-3 text-sm ${
-                      cr.status === 'pending' ? 'border-amber-200 bg-amber-50' :
-                      cr.status === 'approved' ? 'border-green-200 bg-green-50' :
-                      'border-gray-200 bg-gray-50'
-                    }`}>
+                    <div
+                      key={cr.id}
+                      className={`rounded-xl border p-3 text-sm ${
+                        cr.status === 'pending'
+                          ? 'border-orange-200 bg-orange-50 dark:border-orange-400/30 dark:bg-orange-500/10'
+                          : cr.status === 'approved'
+                          ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-400/30 dark:bg-emerald-500/10'
+                          : 'border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5'
+                      }`}
+                    >
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <span className="font-semibold text-gray-800 capitalize">
+                        <span className="font-semibold text-slate-800 dark:text-white capitalize">
                           {cr.request_type.replace(/_/g, ' ')}
                         </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
-                          cr.status === 'pending' ? 'bg-amber-200 text-amber-800' :
-                          cr.status === 'approved' ? 'bg-green-200 text-green-800' :
-                          'bg-gray-200 text-gray-700'
-                        }`}>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
+                            cr.status === 'pending'
+                              ? 'bg-orange-200 text-orange-800 dark:bg-orange-500/25 dark:text-orange-200'
+                              : cr.status === 'approved'
+                              ? 'bg-emerald-200 text-emerald-800 dark:bg-emerald-500/25 dark:text-emerald-200'
+                              : 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-white/70'
+                          }`}
+                        >
                           {cr.status}
                         </span>
                       </div>
-                      <p className="text-gray-600 text-xs leading-relaxed mb-1">{cr.description}</p>
-                      <p className="text-gray-400 text-xs">
+                      <p className="text-slate-600 dark:text-white/70 text-xs leading-relaxed mb-1">{cr.description}</p>
+                      <p className="text-slate-400 dark:text-white/45 text-xs">
                         By {cr.requester?.full_name || 'Unknown'} &middot; {new Date(cr.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </p>
                       {cr.status === 'pending' && (userRole === 'super_admin' || userRole === 'operations_manager') && (
@@ -871,7 +1027,12 @@ export default function AdminJobDetailPage({
                           <button
                             onClick={() => handleReviewChangeRequest(cr.id, 'approved')}
                             disabled={crReviewing === cr.id}
-                            className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                            className="
+                              flex-1 inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                              bg-emerald-600 text-white hover:bg-emerald-700
+                              dark:bg-emerald-500 dark:hover:bg-emerald-400
+                              disabled:opacity-50
+                            "
                           >
                             {crReviewing === cr.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ThumbsUp className="w-3 h-3" />}
                             Approve
@@ -879,7 +1040,12 @@ export default function AdminJobDetailPage({
                           <button
                             onClick={() => handleReviewChangeRequest(cr.id, 'rejected')}
                             disabled={crReviewing === cr.id}
-                            className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 text-xs font-medium rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors"
+                            className="
+                              flex-1 inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                              bg-rose-100 text-rose-700 hover:bg-rose-200
+                              dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/25
+                              disabled:opacity-50
+                            "
                           >
                             {crReviewing === cr.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ThumbsDown className="w-3 h-3" />}
                             Reject
@@ -887,7 +1053,7 @@ export default function AdminJobDetailPage({
                         </div>
                       )}
                       {cr.status !== 'pending' && cr.reviewer && (
-                        <p className="text-xs text-gray-400 mt-1 italic">
+                        <p className="text-xs text-slate-400 dark:text-white/45 mt-1 italic">
                           {cr.status === 'approved' ? 'Approved' : 'Rejected'} by {cr.reviewer.full_name}
                           {cr.review_notes && ` — "${cr.review_notes}"`}
                         </p>
@@ -899,28 +1065,41 @@ export default function AdminJobDetailPage({
             </div>
 
             {/* Quick links */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick Links</h3>
+            <div className="
+              rounded-2xl p-4 shadow-sm
+              bg-white border border-slate-200
+              dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+              dark:border-white/10 dark:backdrop-blur
+            ">
+              <h3 className="text-xs font-semibold text-slate-500 dark:text-white/55 uppercase tracking-wide mb-3">Quick Links</h3>
               <div className="space-y-1">
                 <Link
                   href={`/dashboard/admin/completed-job-tickets/${jobId}`}
-                  className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors group"
+                  className="
+                    flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors group
+                    text-slate-700 hover:bg-slate-50
+                    dark:text-white/80 dark:hover:bg-white/5
+                  "
                 >
                   <span className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-gray-400" />
+                    <FileText className="w-4 h-4 text-slate-400 dark:text-white/45" />
                     View Dispatch Ticket
                   </span>
-                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500" />
+                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-white/30 group-hover:text-slate-500 dark:group-hover:text-white/60" />
                 </Link>
                 <Link
                   href="/dashboard/admin/billing"
-                  className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors group"
+                  className="
+                    flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors group
+                    text-slate-700 hover:bg-slate-50
+                    dark:text-white/80 dark:hover:bg-white/5
+                  "
                 >
                   <span className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-gray-400" />
+                    <FileText className="w-4 h-4 text-slate-400 dark:text-white/45" />
                     Billing
                   </span>
-                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500" />
+                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-white/30 group-hover:text-slate-500 dark:group-hover:text-white/60" />
                 </Link>
               </div>
             </div>

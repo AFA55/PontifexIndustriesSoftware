@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 import { Resend } from 'resend';
 
 export async function POST(
@@ -15,7 +16,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id } = await params;
@@ -47,14 +48,24 @@ export async function POST(
       );
     }
 
+    const callerTenantId = await getTenantId(auth.userId);
+    if (!callerTenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    }
+
     // Fetch current invoice
     const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from('invoices')
-      .select('id, balance_due, total_amount, status, customer_name, customer_email, invoice_number')
+      .select('id, balance_due, total_amount, status, customer_name, customer_email, invoice_number, tenant_id')
       .eq('id', id)
       .single();
 
     if (invoiceError || !invoice) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
+    }
+
+    // P0-3: Cross-tenant FK check
+    if (invoice.tenant_id !== callerTenantId) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 

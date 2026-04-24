@@ -19,15 +19,13 @@ export async function GET(
 
     const { id: timecardId } = await params;
     const tenantId = auth.tenantId;
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     // Fetch the timecard
     let query = supabaseAdmin
       .from('timecards')
       .select('*')
       .eq('id', timecardId);
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     const { data: timecard, error: fetchError } = await query.single();
 

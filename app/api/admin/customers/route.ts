@@ -7,17 +7,18 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const page = parseInt(searchParams.get('page') || '1', 10);
@@ -31,9 +32,7 @@ export async function GET(request: NextRequest) {
       .order('name', { ascending: true })
       .range(offset, offset + limit - 1);
 
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+    query = query.eq('tenant_id', tenantId);
 
     if (search.trim()) {
       query = query.ilike('name', `%${search.trim()}%`);
@@ -79,7 +78,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
@@ -90,6 +89,7 @@ export async function POST(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const insertData: Record<string, any> = {
       name: body.company_name.trim(),
       display_name: body.company_name.trim(),

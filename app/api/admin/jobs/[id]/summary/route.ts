@@ -33,35 +33,48 @@ export async function GET(request: NextRequest, context: RouteContext) {
         end_date,
         actual_end_date,
         customer_name,
-        customer_phone,
+        customer_contact,
         customer_email,
-        contact_name,
         job_type,
         location,
         address,
         description,
-        scope_of_work,
         arrival_time,
         is_will_call,
         po_number,
-        permit_number,
         permit_required,
-        notes,
-        internal_notes,
-        assigned_to,
+        permits,
+        completion_notes,
         completion_submitted_at,
-        completion_approved_at,
-        completion_rejected_at,
-        completion_rejection_notes,
-        profiles!job_orders_assigned_to_fkey(full_name)
+        rejection_reason,
+        rejection_notes,
+        rejected_at,
+        assigned_to,
+        helper_assigned_to,
+        foreman_name,
+        foreman_phone,
+        project_name
       `)
       .eq('id', jobId)
       .eq('tenant_id', tenantId)
       .single();
 
     if (jobError || !job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      console.error('[summary] job fetch failed', { jobId, tenantId, jobError });
+      return NextResponse.json({ error: 'Job not found', debug: jobError?.message }, { status: 404 });
     }
+
+    // Fetch operator profile separately (assigned_to → auth.users, not profiles)
+    let operatorProfile: { full_name: string } | null = null;
+    if ((job as any).assigned_to) {
+      const { data: opProf } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', (job as any).assigned_to)
+        .maybeSingle();
+      operatorProfile = opProf;
+    }
+    (job as any).profiles = operatorProfile;
 
     // ── 2. Fetch scope items ────────────────────────────────────────────────
     const { data: scopeItems } = await supabaseAdmin
@@ -227,33 +240,36 @@ export async function GET(request: NextRequest, context: RouteContext) {
           status: job.status,
           scheduled_date: job.scheduled_date,
           scheduled_end_date: job.scheduled_end_date,
-          end_date: (job as any).end_date ?? null,
+          end_date: (job as any).end_date ?? (job as any).scheduled_end_date ?? null,
           actual_end_date: job.actual_end_date,
           customer_name: job.customer_name,
-          customer_phone: (job as any).customer_phone ?? null,
+          customer_phone: (job as any).foreman_phone ?? null,
           customer_email: (job as any).customer_email ?? null,
-          contact_name: (job as any).contact_name ?? null,
+          contact_name: (job as any).customer_contact ?? (job as any).foreman_name ?? null,
           job_type: (job as any).job_type ?? null,
           location: (job as any).location ?? null,
           address: (job as any).address ?? null,
           description: (job as any).description ?? null,
-          scope_of_work: (job as any).scope_of_work ?? null,
+          scope_of_work: (job as any).description ?? null,
           arrival_time: (job as any).arrival_time ?? null,
           is_will_call: (job as any).is_will_call ?? false,
           po_number: (job as any).po_number ?? null,
-          permit_number: (job as any).permit_number ?? null,
+          permit_number: Array.isArray((job as any).permits)
+            ? ((job as any).permits[0]?.number ?? null)
+            : null,
           permit_required: (job as any).permit_required ?? false,
-          notes: (job as any).notes ?? null,
-          internal_notes: (job as any).internal_notes ?? null,
+          notes: (job as any).completion_notes ?? null,
+          internal_notes: null,
+          project_name: (job as any).project_name ?? null,
           assigned_to: job.assigned_to ?? null,
-          operator_name: (job.profiles as any)?.full_name ?? null,
+          operator_name: ((job as any).profiles as any)?.full_name ?? null,
           helper_name: null,
           completion_submitted_at: job.completion_submitted_at,
           completion_requested_at: completionRequest?.submitted_at ?? job.completion_submitted_at ?? null,
           completion_request_notes: completionRequest?.operator_notes ?? null,
-          completion_approved_at: (job as any).completion_approved_at ?? null,
-          completion_rejected_at: (job as any).completion_rejected_at ?? null,
-          completion_rejection_notes: (job as any).completion_rejection_notes ?? null,
+          completion_approved_at: null,
+          completion_rejected_at: (job as any).rejected_at ?? null,
+          completion_rejection_notes: (job as any).rejection_notes ?? (job as any).rejection_reason ?? null,
         },
         scope: {
           items: enrichedScopeItems,

@@ -28,6 +28,7 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
   const [summary, setSummary] = useState('');
   const [error, setError] = useState('');
   const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
+  const [micPermission, setMicPermission] = useState<'unknown' | 'denied' | 'granted'>('unknown');
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -62,9 +63,19 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
     plastic_needed: 'Plastic/Poly Needed',
   };
 
-  // Start speech recognition
-  const startListening = useCallback(() => {
+  // Request mic permission then start speech recognition
+  const startListening = useCallback(async () => {
     if (!speechSupported) return;
+
+    // Request microphone permission explicitly first
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMicPermission('granted');
+    } catch {
+      setMicPermission('denied');
+      setError('Microphone access was denied. Please allow microphone access in your browser settings, then try again.');
+      return;
+    }
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
@@ -88,7 +99,14 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
     };
 
     recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        setMicPermission('denied');
+        setError('Microphone access was denied. Please click the lock icon in your browser address bar and allow microphone access.');
+      } else if (event.error === 'no-speech') {
+        // Silently stop — user just didn't say anything
+      } else {
+        setError(`Voice input error: ${event.error}. Try typing your job details instead.`);
+      }
       setIsListening(false);
     };
 
@@ -254,14 +272,27 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
             <div className="absolute bottom-3 right-3 flex items-center gap-2">
               {speechSupported && (
                 <button
-                  onClick={isListening ? stopListening : startListening}
+                  onClick={micPermission === 'denied' ? undefined : (isListening ? stopListening : startListening)}
+                  title={
+                    micPermission === 'denied'
+                      ? 'Microphone access denied — click the lock icon in your address bar to allow it'
+                      : isListening
+                      ? 'Stop listening'
+                      : 'Click to speak your job description'
+                  }
                   className={`p-2.5 rounded-xl transition-all shadow-sm ${
-                    isListening
+                    micPermission === 'denied'
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : isListening
                       ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
                       : 'bg-orange-500 hover:bg-orange-600 text-white'
                   }`}
                 >
-                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  {micPermission === 'denied'
+                    ? <MicOff className="w-4 h-4" />
+                    : isListening
+                    ? <MicOff className="w-4 h-4" />
+                    : <Mic className="w-4 h-4" />}
                 </button>
               )}
               <button
@@ -306,20 +337,45 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
             </div>
           )}
 
-          {isListening && (
+          {isListening ? (
             <div className="mt-3 flex items-center gap-2 text-red-500">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
               <span className="text-sm font-medium">Listening... speak your job description</span>
+              <span className="text-xs text-gray-400 ml-1">(tap mic to stop)</span>
+            </div>
+          ) : micPermission === 'unknown' && speechSupported && !text && (
+            <div className="mt-2 flex items-center gap-1.5 text-gray-400">
+              <Mic className="w-3.5 h-3.5" />
+              <span className="text-xs">Tap the mic button to dictate your job description</span>
             </div>
           )}
         </div>
 
         {/* Results Section */}
         {error && (
-          <div className="px-6 py-3 bg-red-50 border-b border-red-100">
-            <div className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="w-4 h-4" />
-              <span className="text-sm font-medium">{error}</span>
+          <div className={`px-6 py-3 border-b ${micPermission === 'denied' ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100'}`}>
+            <div className="flex items-start gap-3">
+              <AlertTriangle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${micPermission === 'denied' ? 'text-amber-500' : 'text-red-500'}`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold ${micPermission === 'denied' ? 'text-amber-800' : 'text-red-700'}`}>
+                  {micPermission === 'denied' ? 'Microphone Access Required' : 'Voice Input Error'}
+                </p>
+                <p className={`text-xs mt-0.5 ${micPermission === 'denied' ? 'text-amber-700' : 'text-red-600'}`}>{error}</p>
+                {micPermission === 'denied' && (
+                  <div className="mt-2 text-xs text-amber-700 space-y-0.5">
+                    <p className="font-semibold">How to enable:</p>
+                    <p>🔒 Click the <strong>lock icon</strong> in your browser address bar</p>
+                    <p>🎙️ Set <strong>Microphone</strong> to <strong>Allow</strong></p>
+                    <p>🔄 Refresh the page and try again</p>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => { setError(''); if (micPermission === 'denied') setMicPermission('unknown'); }}
+                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}

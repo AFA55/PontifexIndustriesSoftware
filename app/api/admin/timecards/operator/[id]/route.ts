@@ -28,7 +28,7 @@ export async function GET(
 
     const { id: operatorId } = await params;
     const tenantId = auth.tenantId;
-
+    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const searchParams = request.nextUrl.searchParams;
     const weekStartParam = searchParams.get('weekStart');
 
@@ -73,9 +73,7 @@ export async function GET(
       .order('date', { ascending: true })
       .order('clock_in_time', { ascending: true });
 
-    if (tenantId) {
-      tcQuery = tcQuery.eq('tenant_id', tenantId);
-    }
+    tcQuery = tcQuery.eq('tenant_id', tenantId);
 
     const { data: timecards, error: tcError } = await tcQuery;
 
@@ -94,9 +92,7 @@ export async function GET(
       .gte('date', startDateStr)
       .lte('date', endDateStr);
 
-    if (tenantId) {
-      baseQuery = baseQuery.eq('tenant_id', tenantId);
-    }
+    baseQuery = baseQuery.eq('tenant_id', tenantId);
 
     const { data: baseTimecards } = await baseQuery;
     const baseMap = new Map((baseTimecards || []).map((b: any) => [b.id, b]));
