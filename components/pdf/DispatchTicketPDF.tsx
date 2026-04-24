@@ -116,11 +116,14 @@ interface DispatchTicketData {
   helper_name?: string;
   equipment_needed?: string[];
   equipment_rentals?: string[];
+  equipment_rental_flags?: Record<string, boolean>;
+  ppe_required?: string[];
   scope_details?: Record<string, any>;
   site_compliance?: Record<string, any>;
   jobsite_conditions?: Record<string, any>;
   additional_info?: string;
   job_difficulty_rating?: number;
+  difficulty_rating?: number;
   permit_required?: boolean;
   permits?: { type: string; details?: string }[];
   is_multi_day?: boolean;
@@ -138,11 +141,26 @@ function formatDate(d?: string) {
 }
 
 // ── Component ───────────────────────────────────────────────
+function getDifficultyLabel(rating: number): string {
+  if (rating >= 9) return 'Highly Complex';
+  if (rating >= 7) return 'Challenging';
+  if (rating >= 4) return 'Moderate';
+  if (rating >= 1) return 'Routine';
+  return '';
+}
+
+function getDifficultyColor(rating: number): string {
+  if (rating >= 9) return '#DC2626'; // red
+  if (rating >= 7) return '#EA580C'; // orange
+  if (rating >= 4) return '#D97706'; // amber
+  return '#16A34A'; // green
+}
+
 export default function DispatchTicketPDF({ job, branding }: { job: DispatchTicketData; branding?: PDFBranding }) {
   const today = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
   const conditions = job.jobsite_conditions || {};
   const compliance = job.site_compliance || {};
-  const difficulty = job.job_difficulty_rating || 0;
+  const difficulty = job.job_difficulty_rating || job.difficulty_rating || 0;
 
   // Condition checklist items
   const conditionItems: { label: string; key: string; detailKey?: string; detailSuffix?: string }[] = [
@@ -366,6 +384,18 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                   <Text style={s.fieldLabel}>Job Type</Text>
                   <Text style={s.fieldValue}>{job.job_type || '—'}</Text>
                 </View>
+                {difficulty > 0 && (
+                  <View style={{ ...s.fieldRow, marginTop: 3 }}>
+                    <Text style={s.fieldLabel}>Difficulty</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                      <View style={{ backgroundColor: getDifficultyColor(difficulty), borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#FFFFFF' }}>
+                          {difficulty}/10 — {getDifficultyLabel(difficulty)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -456,21 +486,36 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                 {job.equipment_needed && job.equipment_needed.length > 0 && (
                   <View style={{ marginTop: 4, borderTop: '0.5 solid #E2E8F0', paddingTop: 3 }}>
                     <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: '#64748B', marginBottom: 2 }}>SPECIFIED:</Text>
-                    <Text style={{ fontSize: 7.5, color: '#1E293B' }}>
-                      {job.equipment_needed.join(', ')}
-                    </Text>
+                    {job.equipment_needed.map((eq, i) => {
+                      const isRental = !!(job.equipment_rental_flags?.[eq]);
+                      return (
+                        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 1 }}>
+                          <Text style={{ fontSize: 7.5, color: '#1E293B' }}>• {eq}</Text>
+                          {isRental && (
+                            <View style={{ backgroundColor: '#FEE2E2', borderRadius: 2, paddingHorizontal: 3, paddingVertical: 1, marginLeft: 3, borderWidth: 0.5, borderColor: '#DC2626' }}>
+                              <Text style={{ fontSize: 6, fontWeight: 'bold', color: '#DC2626' }}>RENTAL</Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
                 )}
 
-                {/* Rentals */}
-                {job.equipment_rentals && job.equipment_rentals.length > 0 && (
-                  <View style={{ marginTop: 4, borderTop: '0.5 solid #E2E8F0', paddingTop: 3 }}>
-                    <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: '#DC2626', marginBottom: 2 }}>RENTALS:</Text>
-                    <Text style={{ fontSize: 7.5, color: '#DC2626' }}>
-                      {job.equipment_rentals.join(', ')}
-                    </Text>
-                  </View>
-                )}
+                {/* Rentals — from legacy equipment_rentals array or derived from flags */}
+                {(() => {
+                  const rentalList = job.equipment_rentals && job.equipment_rentals.length > 0
+                    ? job.equipment_rentals
+                    : job.equipment_needed?.filter(eq => job.equipment_rental_flags?.[eq]) || [];
+                  return rentalList.length > 0 ? (
+                    <View style={{ marginTop: 4, borderTop: '0.5 solid #E2E8F0', paddingTop: 3 }}>
+                      <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: '#DC2626', marginBottom: 2 }}>RENTALS:</Text>
+                      <Text style={{ fontSize: 7.5, color: '#DC2626' }}>
+                        {rentalList.join(', ')}
+                      </Text>
+                    </View>
+                  ) : null;
+                })()}
 
                 {/* Special equipment */}
                 <View style={{ marginTop: 4, borderTop: '0.5 solid #E2E8F0', paddingTop: 3 }}>
@@ -481,6 +526,28 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
             </View>
           </View>
         </View>
+
+        {/* ═══ PPE REQUIRED ═══ */}
+        {job.ppe_required && job.ppe_required.length > 0 && (
+          <View style={{ border: '1 solid #F59E0B', borderRadius: 3, marginBottom: 5, overflow: 'hidden' }}>
+            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 3, borderBottom: '0.75 solid #F59E0B', flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 7.5, fontWeight: 'bold', color: '#92400E', textTransform: 'uppercase', letterSpacing: 0.5 }}>PPE REQUIRED</Text>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 5 }}>
+              {job.ppe_required.map((item, i) => {
+                const gloveMatch = item.match(/^gloves_cut_(\d)$/);
+                const label = gloveMatch
+                  ? `Gloves Cut Level ${gloveMatch[1]}`
+                  : item.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                return (
+                  <View key={i} style={{ backgroundColor: '#FFF3CD', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2, marginRight: 4, marginBottom: 3, borderWidth: 0.75, borderColor: '#F59E0B' }}>
+                    <Text style={{ fontSize: 7.5, fontWeight: 'bold', color: '#92400E' }}>{label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* ═══ SCOPE TABLE ═══ */}
         {scopeRows.length > 0 && (
