@@ -32,7 +32,7 @@ interface CapacitySummary {
 
 interface ApprovalModalProps {
   job: PendingJob;
-  onConfirm: (data: { scheduledDate: string }) => void;
+  onConfirm: (data: { scheduledDate: string }) => Promise<void>;
   onClose: () => void;
 }
 
@@ -46,6 +46,7 @@ function getDifficultyInfo(rating: number): { color: string; bg: string; label: 
 }
 
 export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModalProps) {
+  const [approving, setApproving] = useState(false);
   const [scheduledDate, setScheduledDate] = useState(job.scheduled_date || '');
   const [capacityLoading, setCapacityLoading] = useState(false);
   const [capacityData, setCapacityData] = useState<Record<string, CapacityInfo> | null>(null);
@@ -264,7 +265,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
 
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
@@ -896,11 +897,23 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                 Cancel
               </button>
               <button
-                onClick={() => onConfirm({ scheduledDate })}
-                disabled={!canApprove || capacityLoading}
+                onClick={async () => {
+                  if (approving) return;
+                  setApproving(true);
+                  try {
+                    await onConfirm({ scheduledDate });
+                  } finally {
+                    setApproving(false);
+                  }
+                }}
+                disabled={!canApprove || capacityLoading || approving}
                 className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {capacityLoading ? (
+                {approving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Approving...
+                  </span>
+                ) : capacityLoading ? (
                   <span className="flex items-center justify-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> Checking...
                   </span>
@@ -910,6 +923,15 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
               </button>
             </div>
           </div>
+
+          {approving && (
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] rounded-2xl flex items-center justify-center z-10">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                <p className="text-sm font-semibold text-emerald-700">Approving job...</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>
