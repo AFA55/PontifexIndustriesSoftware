@@ -39,9 +39,9 @@ const STEPS = [
   { num: 2, title: 'Project & Contact', icon: MapPin, color: 'from-indigo-500 to-purple-600' },
   { num: 3, title: 'Scope of Work', icon: Wrench, color: 'from-violet-500 to-purple-600' },
   { num: 4, title: 'Equipment', icon: HardHat, color: 'from-amber-500 to-orange-600' },
-  { num: 5, title: 'Scheduling', icon: Calendar, color: 'from-cyan-500 to-blue-600' },
-  { num: 6, title: 'Site Compliance', icon: ShieldCheck, color: 'from-emerald-500 to-teal-600' },
-  { num: 7, title: 'Difficulty & Notes', icon: BarChart3, color: 'from-rose-500 to-red-600' },
+  { num: 5, title: 'Difficulty & Notes', icon: BarChart3, color: 'from-rose-500 to-red-600' },
+  { num: 6, title: 'Scheduling', icon: Calendar, color: 'from-cyan-500 to-blue-600' },
+  { num: 7, title: 'Site Compliance', icon: ShieldCheck, color: 'from-emerald-500 to-teal-600' },
   { num: 8, title: 'Jobsite Conditions', icon: Building2, color: 'from-orange-500 to-red-600' },
 ];
 
@@ -1266,7 +1266,7 @@ export default function ScheduleFormPage() {
     } else if (fields.contractor_name || fields.site_address) {
       setCurrentStep(2); // Customer & location
     } else if (fields.start_date) {
-      setCurrentStep(5); // Scheduling
+      setCurrentStep(6); // Scheduling
     }
   }, []);
 
@@ -1334,7 +1334,7 @@ export default function ScheduleFormPage() {
       case 3:
         if (form.service_types.length === 0) return 'Select at least one service type.';
         break;
-      case 5:
+      case 6:
         if (!form.start_date) return 'Start date is required.';
         break;
     }
@@ -2887,8 +2887,8 @@ export default function ScheduleFormPage() {
         );
       }
 
-      // ── STEP 5: Scheduling Details ────────────────────────
-      case 5:
+      // ── STEP 6: Scheduling Details ────────────────────────
+      case 6:
         return (
           <div className="space-y-6">
             {/* View Schedule Button */}
@@ -2986,8 +2986,8 @@ export default function ScheduleFormPage() {
           </div>
         );
 
-      // ── STEP 6: Site Access & Compliance ──────────────────
-      case 6:
+      // ── STEP 7: Site Access & Compliance ──────────────────
+      case 7:
         return (
           <div className="space-y-6">
             <SectionCard>
@@ -3288,8 +3288,8 @@ export default function ScheduleFormPage() {
           </div>
         );
 
-      // ── STEP 7: Job Difficulty & Notes ────────────────────
-      case 7:
+      // ── STEP 5: Job Difficulty & Notes ────────────────────
+      case 5:
         return (
           <div className="space-y-6">
             <div>
@@ -3658,9 +3658,9 @@ export default function ScheduleFormPage() {
                   {currentStep === 2 && 'Project details, contacts, and site information'}
                   {currentStep === 3 && 'Define the services needed for this job'}
                   {currentStep === 4 && 'Select equipment for this project'}
-                  {currentStep === 5 && 'Set dates and scheduling flexibility'}
-                  {currentStep === 6 && 'Site access and compliance requirements'}
-                  {currentStep === 7 && 'Rate difficulty and add notes'}
+                  {currentStep === 5 && 'Rate difficulty and add notes'}
+                  {currentStep === 6 && 'Set dates and scheduling flexibility'}
+                  {currentStep === 7 && 'Site access and compliance requirements'}
                   {currentStep === 8 && 'Check all conditions that apply'}
                 </p>
               </div>
