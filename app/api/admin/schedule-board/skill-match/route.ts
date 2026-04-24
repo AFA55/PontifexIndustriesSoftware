@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const jobId = request.nextUrl.searchParams.get('jobId');
+    const date = request.nextUrl.searchParams.get('date'); // optional YYYY-MM-DD
     if (!jobId) {
       return NextResponse.json({ error: 'Missing required query param: jobId' }, { status: 400 });
     }
@@ -43,6 +44,24 @@ export async function GET(request: NextRequest) {
     if (opError) {
       console.error('Error fetching operators for skill match:', opError);
       return NextResponse.json({ error: 'Failed to fetch operators' }, { status: 500 });
+    }
+
+    // If date was provided, find operators busy that day (assigned or helper on active jobs)
+    const busyIds = new Set<string>();
+    if (date) {
+      const { data: busyJobs } = await supabaseAdmin
+        .from('job_orders')
+        .select('assigned_to, helper_assigned_to, scheduled_date, scheduled_end_date')
+        .in('status', ['scheduled', 'in_progress', 'pending'])
+        .lte('scheduled_date', date)
+        .or(`scheduled_end_date.gte.${date},scheduled_end_date.is.null`);
+      for (const j of busyJobs || []) {
+        const endDate = (j as any).scheduled_end_date || (j as any).scheduled_date;
+        if (endDate && endDate >= date) {
+          if (j.assigned_to) busyIds.add(j.assigned_to);
+          if ((j as any).helper_assigned_to) busyIds.add((j as any).helper_assigned_to);
+        }
+      }
     }
 
     let qualifiedCount = 0;
@@ -74,9 +93,14 @@ export async function GET(request: NextRequest) {
         skill_level_numeric: op.skill_level_numeric,
         match_quality,
         is_qualified: isQualified,
+        is_available: date ? !busyIds.has(op.id) : true,
         tasks_qualified_for: qualifiedFor,
       };
     });
+
+    const availableQualified = date
+      ? results.filter((r) => r.is_available && r.is_qualified).length
+      : qualifiedCount;
 
     // Sort: good first, then stretch, then over
     const order = { good: 0, stretch: 1, over: 2 };
@@ -88,7 +112,9 @@ export async function GET(request: NextRequest) {
         job_difficulty: difficulty,
         job_types: jobTypes,
         qualified_count: qualifiedCount,
+        available_qualified_count: availableQualified,
         total_operators: totalOperators,
+        date: date || null,
         operators: results,
       },
     });
