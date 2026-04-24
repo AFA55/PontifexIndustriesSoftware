@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
-  UserCheck, UserX, Eye, FolderOpen, Timer, Loader2, Settings, Search, X,
+  UserCheck, UserX, FolderOpen, Timer, Loader2, Settings, Search, X,
   Megaphone, CheckCircle2, Sparkles, Zap, Brain, RefreshCw
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
@@ -2437,23 +2437,6 @@ export default function ScheduleBoardPage() {
       {/* ═══ TOASTS ═══════════════════════════════════════════════════ */}
       <Toast toasts={toasts} onRemove={removeToast} />
 
-      {/* ═══ ROLE INDICATOR ═════════════════════════════════════════════ */}
-      <div className="fixed bottom-4 left-4 z-50">
-        <div className={`px-4 py-2 rounded-xl text-sm font-bold shadow-lg ${canEdit ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
-          <Eye className="w-4 h-4 inline mr-1.5" />
-          {canEdit
-            ? userRole === 'super_admin'
-              ? 'Super Admin — Full Edit'
-              : userRole === 'operations_manager'
-              ? 'Operations Manager — Full Edit'
-              : userRole === 'admin'
-              ? 'Admin — Full Edit'
-              : 'Full Edit'
-            : userRole === 'salesman'
-            ? 'Salesman — View & Request'
-            : 'View & Request'}
-        </div>
-      </div>
     </div>
   );
 }
