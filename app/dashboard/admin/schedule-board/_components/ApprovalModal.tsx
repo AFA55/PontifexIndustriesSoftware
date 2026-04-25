@@ -1001,14 +1001,16 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                               className={`flex items-center justify-between rounded-lg px-3 py-2 ring-1 ${matchColor}`}
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-sm font-semibold truncate">{op.full_name}</span>
-                                {(op.scope_skill != null || op.skill_level_numeric != null) && (
-                                  <span className="text-[10px] opacity-70 font-medium">
-                                    {op.scope_skill != null && op.scope_skill !== op.skill_level_numeric
-                                      ? `scope ${op.scope_skill}`
-                                      : `skill ${op.skill_level_numeric}`}
-                                  </span>
-                                )}
+                                <span className="text-sm font-semibold truncate">
+                                  {op.full_name}
+                                  {(op.scope_skill != null || op.skill_level_numeric != null) && (
+                                    <span className="text-[10px] opacity-70 font-medium ml-1">
+                                      {op.scope_skill != null && op.scope_skill !== op.skill_level_numeric
+                                        ? `(scope ${op.scope_skill})`
+                                        : `(skill ${op.skill_level_numeric})`}
+                                    </span>
+                                  )}
+                                </span>
                               </div>
                               <span className="text-[10px] font-bold uppercase tracking-wider">
                                 {statusLabel}

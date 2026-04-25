@@ -840,82 +840,30 @@ function SkillSnapshotCard({
 
 // ─── Credentials Tab ──────────────────────────────────────────────────────────
 
-interface CertEntry {
-  name: string;
-  expiry: string | null;
-  issued_by: string | null;
+function ExpiryBadge({ dateStr }: { dateStr: string | null }) {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  const today = new Date();
+  const diffDays = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">EXPIRED</span>;
+  if (diffDays <= 30) return <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Expires in {diffDays}d</span>;
+  return <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Valid</span>;
 }
 
-interface CredentialsData {
+interface CertEntry {
+  id: string;
+  name: string;
+  issued_by: string;
+  expiry_date: string | null;
+}
+
+interface CredentialData {
   medical_card_expiry: string | null;
   drivers_license_expiry: string | null;
   drivers_license_class: string | null;
   osha_10_expiry: string | null;
   osha_30_expiry: string | null;
-  certifications: CertEntry[] | null;
-}
-
-function expiryStatus(dateStr: string | null): 'expired' | 'soon' | 'valid' | 'none' {
-  if (!dateStr) return 'none';
-  const d = new Date(dateStr);
-  const now = new Date();
-  if (d < now) return 'expired';
-  const days = (d.getTime() - now.getTime()) / 86400000;
-  return days <= 30 ? 'soon' : 'valid';
-}
-
-function ExpiryBadge({ dateStr }: { dateStr: string | null }) {
-  const status = expiryStatus(dateStr);
-  if (status === 'none') return null;
-  const map = {
-    expired: 'bg-red-50 text-red-700 border-red-200',
-    soon: 'bg-amber-50 text-amber-700 border-amber-200',
-    valid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  } as const;
-  const label = {
-    expired: 'EXPIRED',
-    soon: 'Expires soon',
-    valid: 'Valid',
-  } as const;
-  const Icon = status === 'expired' ? AlertTriangle : status === 'soon' ? AlertTriangle : CheckCircle;
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${map[status]}`}>
-      <Icon className="w-2.5 h-2.5" />
-      {label[status]}
-    </span>
-  );
-}
-
-function CredentialDateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const status = expiryStatus(value || null);
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">{label}</label>
-        <ExpiryBadge dateStr={value || null} />
-      </div>
-      <input
-        type="date"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition-colors ${
-          status === 'expired'
-            ? 'border-red-300 bg-red-50/40'
-            : status === 'soon'
-            ? 'border-amber-300 bg-amber-50/40'
-            : 'border-slate-200 bg-white'
-        }`}
-      />
-    </div>
-  );
+  certifications: CertEntry[];
 }
 
 function CredentialsTab({
@@ -925,17 +873,19 @@ function CredentialsTab({
   memberId: string;
   getAuthHeaders: () => Promise<Record<string, string>>;
 }) {
+  const [creds, setCreds] = useState<CredentialData>({
+    medical_card_expiry: null,
+    drivers_license_expiry: null,
+    drivers_license_class: null,
+    osha_10_expiry: null,
+    osha_30_expiry: null,
+    certifications: [],
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
-
-  const [medicalExpiry, setMedicalExpiry] = useState('');
-  const [dlExpiry, setDlExpiry] = useState('');
-  const [dlClass, setDlClass] = useState('');
-  const [osha10Expiry, setOsha10Expiry] = useState('');
-  const [osha30Expiry, setOsha30Expiry] = useState('');
-  const [certs, setCerts] = useState<CertEntry[]>([]);
+  const [newCert, setNewCert] = useState({ name: '', issued_by: '', expiry_date: '' });
 
   useEffect(() => {
     let cancelled = false;
@@ -946,20 +896,9 @@ function CredentialsTab({
         const headers = await getAuthHeaders();
         const res = await fetch(`/api/admin/team-profiles/${memberId}/credentials`, { headers });
         const json = await res.json();
-        if (cancelled) return;
-        if (!res.ok || json.success === false) {
-          setError(json.error || 'Failed to load credentials');
-        } else {
-          const d: CredentialsData = json.data || {};
-          setMedicalExpiry(d.medical_card_expiry || '');
-          setDlExpiry(d.drivers_license_expiry || '');
-          setDlClass(d.drivers_license_class || '');
-          setOsha10Expiry(d.osha_10_expiry || '');
-          setOsha30Expiry(d.osha_30_expiry || '');
-          setCerts(Array.isArray(d.certifications) ? d.certifications : []);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load');
+        if (!cancelled && json.data) setCreds(json.data);
+      } catch {
+        // silently fail, leave defaults
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -968,39 +907,15 @@ function CredentialsTab({
     return () => { cancelled = true; };
   }, [memberId, getAuthHeaders]);
 
-  const addCert = () => {
-    setCerts(prev => [...prev, { name: '', expiry: null, issued_by: null }]);
-  };
-
-  const removeCert = (idx: number) => {
-    setCerts(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const updateCert = (idx: number, patch: Partial<CertEntry>) => {
-    setCerts(prev => prev.map((c, i) => i === idx ? { ...c, ...patch } : c));
-  };
-
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
       const headers = await getAuthHeaders();
-      const payload = {
-        medical_card_expiry: medicalExpiry || null,
-        drivers_license_expiry: dlExpiry || null,
-        drivers_license_class: dlClass || null,
-        osha_10_expiry: osha10Expiry || null,
-        osha_30_expiry: osha30Expiry || null,
-        certifications: certs.filter(c => c.name.trim() !== '').map(c => ({
-          name: c.name.trim(),
-          expiry: c.expiry || null,
-          issued_by: c.issued_by?.trim() || null,
-        })),
-      };
       const res = await fetch(`/api/admin/team-profiles/${memberId}/credentials`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(payload),
+        body: JSON.stringify(creds),
       });
       const json = await res.json();
       if (!res.ok || json.success === false) {
@@ -1016,6 +931,22 @@ function CredentialsTab({
     }
   };
 
+  const addCert = () => {
+    if (!newCert.name.trim()) return;
+    const entry: CertEntry = {
+      id: crypto.randomUUID(),
+      name: newCert.name.trim(),
+      issued_by: newCert.issued_by.trim(),
+      expiry_date: newCert.expiry_date || null,
+    };
+    setCreds(prev => ({ ...prev, certifications: [...prev.certifications, entry] }));
+    setNewCert({ name: '', issued_by: '', expiry_date: '' });
+  };
+
+  const removeCert = (id: string) => {
+    setCreds(prev => ({ ...prev, certifications: prev.certifications.filter(c => c.id !== id) }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -1024,8 +955,10 @@ function CredentialsTab({
     );
   }
 
+  const inputCls = 'text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors w-full';
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {error && (
         <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -1034,158 +967,163 @@ function CredentialsTab({
       )}
 
       {/* Medical Card */}
-      <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 bg-gradient-to-br from-rose-500 to-pink-600 rounded-lg flex items-center justify-center">
-            <IdCard className="w-4 h-4 text-white" />
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Medical Card</h3>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex-1 min-w-[160px]">
+            <label className="text-xs text-gray-500 mb-1 block">Expiry Date</label>
+            <input
+              type="date"
+              value={creds.medical_card_expiry ?? ''}
+              onChange={e => setCreds(prev => ({ ...prev, medical_card_expiry: e.target.value || null }))}
+              className={inputCls}
+            />
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Medical Card</h3>
-            <p className="text-[11px] text-slate-500">DOT/operator medical certification</p>
+          <div className="pt-5">
+            <ExpiryBadge dateStr={creds.medical_card_expiry} />
           </div>
         </div>
-        <CredentialDateField
-          label="Expiry Date"
-          value={medicalExpiry}
-          onChange={setMedicalExpiry}
-        />
       </div>
 
       {/* Driver's License */}
-      <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-            <Truck className="w-4 h-4 text-white" />
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Driver&apos;s License</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Expiry Date</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={creds.drivers_license_expiry ?? ''}
+                onChange={e => setCreds(prev => ({ ...prev, drivers_license_expiry: e.target.value || null }))}
+                className={inputCls}
+              />
+              <div className="flex-shrink-0">
+                <ExpiryBadge dateStr={creds.drivers_license_expiry} />
+              </div>
+            </div>
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Driver&apos;s License</h3>
-            <p className="text-[11px] text-slate-500">License class and expiry</p>
-          </div>
-        </div>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">License Class</label>
+            <label className="text-xs text-gray-500 mb-1 block">License Class</label>
             <input
               type="text"
-              value={dlClass}
-              onChange={e => setDlClass(e.target.value)}
-              placeholder="e.g. CDL Class A, Class C"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-colors"
+              placeholder="e.g. Class A CDL"
+              value={creds.drivers_license_class ?? ''}
+              onChange={e => setCreds(prev => ({ ...prev, drivers_license_class: e.target.value || null }))}
+              className={inputCls}
             />
           </div>
-          <CredentialDateField
-            label="Expiry Date"
-            value={dlExpiry}
-            onChange={setDlExpiry}
-          />
         </div>
       </div>
 
       {/* OSHA Certifications */}
-      <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
-            <Award className="w-4 h-4 text-white" />
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">OSHA Certifications</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">OSHA 10 Expiry</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={creds.osha_10_expiry ?? ''}
+                onChange={e => setCreds(prev => ({ ...prev, osha_10_expiry: e.target.value || null }))}
+                className={inputCls}
+              />
+              <div className="flex-shrink-0">
+                <ExpiryBadge dateStr={creds.osha_10_expiry} />
+              </div>
+            </div>
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">OSHA Certifications</h3>
-            <p className="text-[11px] text-slate-500">OSHA 10 and OSHA 30 expiry dates</p>
+            <label className="text-xs text-gray-500 mb-1 block">OSHA 30 Expiry</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={creds.osha_30_expiry ?? ''}
+                onChange={e => setCreds(prev => ({ ...prev, osha_30_expiry: e.target.value || null }))}
+                className={inputCls}
+              />
+              <div className="flex-shrink-0">
+                <ExpiryBadge dateStr={creds.osha_30_expiry} />
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="space-y-3">
-          <CredentialDateField
-            label="OSHA-10 Expiry"
-            value={osha10Expiry}
-            onChange={setOsha10Expiry}
-          />
-          <CredentialDateField
-            label="OSHA-30 Expiry"
-            value={osha30Expiry}
-            onChange={setOsha30Expiry}
-          />
         </div>
       </div>
 
-      {/* Freeform Certifications */}
-      <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-5">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Other Certifications</h3>
-              <p className="text-[11px] text-slate-500">Any additional credentials or certifications</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={addCert}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-semibold transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add
-          </button>
-        </div>
-
-        {certs.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4 italic">No additional certifications added</p>
-        ) : (
-          <div className="space-y-3">
-            {certs.map((cert, idx) => (
-              <div key={idx} className="flex gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="flex-1 space-y-2 min-w-0">
-                  <input
-                    type="text"
-                    value={cert.name}
-                    onChange={e => updateCert(idx, { name: e.target.value })}
-                    placeholder="Certification name"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-colors"
-                  />
-                  <div className="flex gap-2">
-                    <div className="flex-1 space-y-0.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Expiry</label>
-                        <ExpiryBadge dateStr={cert.expiry} />
-                      </div>
-                      <input
-                        type="date"
-                        value={cert.expiry || ''}
-                        onChange={e => updateCert(idx, { expiry: e.target.value || null })}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-colors"
-                      />
-                    </div>
-                    <div className="flex-1 space-y-0.5">
-                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Issued By</label>
-                      <input
-                        type="text"
-                        value={cert.issued_by || ''}
-                        onChange={e => updateCert(idx, { issued_by: e.target.value || null })}
-                        placeholder="Issuing body"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-colors"
-                      />
-                    </div>
-                  </div>
+      {/* Additional Certifications */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Additional Certifications</h3>
+        {creds.certifications.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {creds.certifications.map(cert => (
+              <div key={cert.id} className="flex items-start gap-3 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{cert.name}</p>
+                  {cert.issued_by && (
+                    <p className="text-xs text-gray-500 mt-0.5">Issued by {cert.issued_by}</p>
+                  )}
+                  {cert.expiry_date && (
+                    <p className="text-xs text-gray-500 mt-0.5">Expires {cert.expiry_date}</p>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeCert(idx)}
-                  className="self-start mt-0.5 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Remove"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <ExpiryBadge dateStr={cert.expiry_date} />
+                  <button
+                    type="button"
+                    onClick={() => removeCert(cert.id)}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    title="Remove"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
+        {/* Add new cert form */}
+        <div className="border border-dashed border-gray-300 rounded-lg p-3 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add Certification</p>
+          <input
+            type="text"
+            placeholder="Certification name *"
+            value={newCert.name}
+            onChange={e => setNewCert(prev => ({ ...prev, name: e.target.value }))}
+            className={inputCls}
+          />
+          <input
+            type="text"
+            placeholder="Issued by (optional)"
+            value={newCert.issued_by}
+            onChange={e => setNewCert(prev => ({ ...prev, issued_by: e.target.value }))}
+            className={inputCls}
+          />
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Expiry Date (optional)</label>
+            <input
+              type="date"
+              value={newCert.expiry_date}
+              onChange={e => setNewCert(prev => ({ ...prev, expiry_date: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={addCert}
+            disabled={!newCert.name.trim()}
+            className="w-full mt-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            + Add Certification
+          </button>
+        </div>
       </div>
 
       {/* Save bar */}
       <div className="sticky bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent pt-4 pb-1 -mx-1 px-1">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-h-[28px]">
-            {savedAt && (
+            {!saving && savedAt && (
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
                 <CheckCircle className="w-3.5 h-3.5" />
                 Saved
