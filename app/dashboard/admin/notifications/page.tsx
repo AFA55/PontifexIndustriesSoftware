@@ -316,28 +316,28 @@ export default function AdminNotificationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
+      <div className="bg-white dark:bg-[#0e0720] border-b border-gray-200 dark:border-white/10 shadow-sm sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-                <ArrowLeft className="w-5 h-5 text-gray-500" />
+              <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
+                <ArrowLeft className="w-5 h-5 text-gray-500 dark:text-white/60" />
               </Link>
               <div>
-                <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Bell className="w-5 h-5 text-blue-600" />
+                <h1 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   Notification Center
                 </h1>
-                <p className="text-xs text-gray-500">Send notifications and manage settings</p>
+                <p className="text-xs text-gray-500 dark:text-white/40">Send notifications and manage settings</p>
               </div>
             </div>
 
@@ -345,7 +345,7 @@ export default function AdminNotificationsPage() {
             <button
               onClick={handleSendClockInReminder}
               disabled={sendingReminder}
-              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 rounded-xl text-sm font-semibold transition-all whitespace-nowrap"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-orange-50 hover:bg-orange-100 dark:bg-orange-500/15 dark:hover:bg-orange-500/25 border border-orange-200 dark:border-orange-400/30 text-orange-700 dark:text-orange-300 rounded-xl text-sm font-semibold transition-all whitespace-nowrap"
             >
               {sendingReminder ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
               <span className="hidden sm:inline">Send Clock-In Reminder</span>
@@ -365,8 +365,8 @@ export default function AdminNotificationsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab.id
-                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-400'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-white/40 dark:hover:text-white/70 dark:hover:bg-white/5'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
@@ -382,14 +382,14 @@ export default function AdminNotificationsPage() {
         {sendResult && (
           <div className={`mb-6 p-4 rounded-2xl border ${
             sendResult.type === 'success'
-              ? 'bg-green-50 border-green-200 text-green-700'
-              : 'bg-red-50 border-red-200 text-red-700'
+              ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-500/15 dark:border-green-400/30 dark:text-green-300'
+              : 'bg-red-50 border-red-200 text-red-700 dark:bg-red-500/15 dark:border-red-400/30 dark:text-red-300'
           } flex items-center justify-between`}>
             <div className="flex items-center gap-2">
               {sendResult.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
               <span className="text-sm font-semibold">{sendResult.text}</span>
             </div>
-            <button onClick={() => setSendResult(null)} className="p-1 hover:bg-gray-100 rounded-lg">
+            <button onClick={() => setSendResult(null)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -399,9 +399,9 @@ export default function AdminNotificationsPage() {
         {activeTab === 'send' && (
           <div className="space-y-6">
             {/* Recipient Selection */}
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-              <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-600" />
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 dark:bg-white/5 dark:border-white/10">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 Recipients
               </h3>
 
@@ -418,7 +418,7 @@ export default function AdminNotificationsPage() {
                     className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                       selectMode === opt.mode
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10'
                     }`}
                   >
                     {opt.label}
@@ -429,13 +429,13 @@ export default function AdminNotificationsPage() {
               {selectMode === 'individual' && (
                 <>
                   <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-white/40" />
                     <input
                       type="text"
                       placeholder="Search team members..."
                       value={userSearch}
                       onChange={e => setUserSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                     />
                   </div>
                   <div className="max-h-48 overflow-y-auto space-y-1">
@@ -444,8 +444,8 @@ export default function AdminNotificationsPage() {
                         key={member.id}
                         className={`flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-colors ${
                           selectedUsers.includes(member.id)
-                            ? 'bg-blue-50 border border-blue-200'
-                            : 'hover:bg-gray-50'
+                            ? 'bg-blue-50 border border-blue-200 dark:bg-blue-500/15 dark:border-blue-400/30'
+                            : 'hover:bg-gray-50 dark:hover:bg-white/5'
                         }`}
                       >
                         <input
@@ -455,34 +455,34 @@ export default function AdminNotificationsPage() {
                           className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600 focus:ring-blue-500"
                         />
                         <div className="flex-1">
-                          <span className="text-sm font-medium text-gray-900">{member.full_name}</span>
-                          <span className="text-xs text-gray-400 ml-2">{member.role}</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{member.full_name}</span>
+                          <span className="text-xs text-gray-400 dark:text-white/40 ml-2">{member.role}</span>
                         </div>
                       </label>
                     ))}
                   </div>
                   {selectedUsers.length > 0 && (
-                    <p className="text-xs text-blue-600 mt-2">{selectedUsers.length} selected</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">{selectedUsers.length} selected</p>
                   )}
                 </>
               )}
             </div>
 
             {/* Message Composition */}
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-              <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-blue-600" />
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 dark:bg-white/5 dark:border-white/10">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 Message
               </h3>
 
               <div className="space-y-4">
                 {/* Type Select */}
                 <div>
-                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Type</label>
+                  <label className="text-xs text-gray-500 dark:text-white/40 font-semibold mb-1.5 block">Type</label>
                   <select
                     value={notifType}
                     onChange={e => setNotifType(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:bg-white/5 dark:border-white/10 dark:text-white"
                   >
                     <option value="custom">Custom</option>
                     <option value="reminder">Reminder</option>
@@ -494,35 +494,35 @@ export default function AdminNotificationsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Title</label>
+                  <label className="text-xs text-gray-500 dark:text-white/40 font-semibold mb-1.5 block">Title</label>
                   <input
                     type="text"
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     placeholder="Notification title..."
-                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Message</label>
+                  <label className="text-xs text-gray-500 dark:text-white/40 font-semibold mb-1.5 block">Message</label>
                   <textarea
                     value={message}
                     onChange={e => setMessage(e.target.value)}
                     placeholder="Write your message..."
                     rows={4}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Action URL (optional)</label>
+                  <label className="text-xs text-gray-500 dark:text-white/40 font-semibold mb-1.5 block">Action URL (optional)</label>
                   <input
                     type="text"
                     value={actionUrl}
                     onChange={e => setActionUrl(e.target.value)}
                     placeholder="/dashboard/timecard"
-                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                   />
                 </div>
 
@@ -535,7 +535,7 @@ export default function AdminNotificationsPage() {
                       onChange={e => setBypassNfc(e.target.checked)}
                       className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-600">Bypass NFC</span>
+                    <span className="text-sm text-gray-600 dark:text-white/60">Bypass NFC</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -544,7 +544,7 @@ export default function AdminNotificationsPage() {
                       onChange={e => setSendEmailToo(e.target.checked)}
                       className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-600">Also send email</span>
+                    <span className="text-sm text-gray-600 dark:text-white/60">Also send email</span>
                   </label>
                 </div>
               </div>
@@ -563,22 +563,22 @@ export default function AdminNotificationsPage() {
 
         {/* Settings Tab */}
         {activeTab === 'settings' && (
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-            <h3 className="text-sm font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Settings className="w-4 h-4 text-blue-600" />
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 dark:bg-white/5 dark:border-white/10">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+              <Settings className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               Auto-Notification Settings
             </h3>
 
             <div className="space-y-6">
               {/* Auto Clock-In Reminder */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Auto Clock-In Reminder</p>
-                  <p className="text-xs text-gray-400 mt-1">Send reminder to operators who haven't clocked in</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Auto Clock-In Reminder</p>
+                  <p className="text-xs text-gray-400 dark:text-white/40 mt-1">Send reminder to operators who haven't clocked in</p>
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_clock_in_reminder: !s.auto_clock_in_reminder }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_clock_in_reminder ? 'text-blue-600' : 'text-gray-400'}`}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_clock_in_reminder ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-white/30'}`}
                 >
                   {settings.auto_clock_in_reminder
                     ? <ToggleRight className="w-8 h-8" />
@@ -589,25 +589,25 @@ export default function AdminNotificationsPage() {
 
               {settings.auto_clock_in_reminder && (
                 <div className="pl-4">
-                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">Reminder Time</label>
+                  <label className="text-xs text-gray-500 dark:text-white/40 font-semibold mb-1.5 block">Reminder Time</label>
                   <input
                     type="time"
                     value={settings.clock_in_reminder_time}
                     onChange={e => setSettings(s => ({ ...s, clock_in_reminder_time: e.target.value }))}
-                    className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:bg-white/5 dark:border-white/10 dark:text-white"
                   />
                 </div>
               )}
 
               {/* Auto Overtime Alert */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Auto Overtime Alert</p>
-                  <p className="text-xs text-gray-400 mt-1">Alert when operator approaches overtime threshold</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Auto Overtime Alert</p>
+                  <p className="text-xs text-gray-400 dark:text-white/40 mt-1">Alert when operator approaches overtime threshold</p>
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_overtime_alert: !s.auto_overtime_alert }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_overtime_alert ? 'text-blue-600' : 'text-gray-400'}`}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_overtime_alert ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-white/30'}`}
                 >
                   {settings.auto_overtime_alert
                     ? <ToggleRight className="w-8 h-8" />
@@ -618,25 +618,25 @@ export default function AdminNotificationsPage() {
 
               {settings.auto_overtime_alert && (
                 <div className="pl-4">
-                  <label className="text-xs text-gray-500 font-semibold mb-1.5 block">OT Threshold (hours)</label>
+                  <label className="text-xs text-gray-500 dark:text-white/40 font-semibold mb-1.5 block">OT Threshold (hours)</label>
                   <input
                     type="number"
                     value={settings.overtime_alert_threshold}
                     onChange={e => setSettings(s => ({ ...s, overtime_alert_threshold: parseFloat(e.target.value) || 40 }))}
-                    className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 w-32"
+                    className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 w-32 dark:bg-white/5 dark:border-white/10 dark:text-white"
                   />
                 </div>
               )}
 
               {/* Auto Timecard Approval Reminder */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Weekly Approval Reminder</p>
-                  <p className="text-xs text-gray-400 mt-1">Send weekly reminder to approve pending timecards</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Weekly Approval Reminder</p>
+                  <p className="text-xs text-gray-400 dark:text-white/40 mt-1">Send weekly reminder to approve pending timecards</p>
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_timecard_approval_reminder: !s.auto_timecard_approval_reminder }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_timecard_approval_reminder ? 'text-blue-600' : 'text-gray-400'}`}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_timecard_approval_reminder ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-white/30'}`}
                 >
                   {settings.auto_timecard_approval_reminder
                     ? <ToggleRight className="w-8 h-8" />
@@ -659,10 +659,10 @@ export default function AdminNotificationsPage() {
 
         {/* History Tab */}
         {activeTab === 'history' && (
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-blue-600" />
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden dark:bg-white/5 dark:border-white/10">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 Recently Sent Notifications
               </h3>
             </div>
@@ -672,32 +672,34 @@ export default function AdminNotificationsPage() {
                 <Loader2 className="w-6 h-6 text-blue-600 animate-spin mx-auto" />
               </div>
             ) : sentNotifications.length === 0 ? (
-              <div className="py-10 text-center text-gray-500 text-sm">
+              <div className="py-10 text-center text-gray-500 dark:text-white/40 text-sm">
                 No sent notifications found
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-white/5">
                 {sentNotifications.map(notif => (
-                  <div key={notif.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                  <div key={notif.id} className={`px-6 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${
+                    !notif.is_read ? 'dark:bg-violet-500/10 dark:border-l-2 dark:border-l-violet-400/40' : ''
+                  }`}>
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-900">{notif.title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{notif.title}</p>
+                        <p className="text-xs text-gray-400 dark:text-white/40 mt-0.5">
                           To: {profileMap[notif.user_id] || notif.user_id.slice(0, 8)}
                           <span className="mx-2">|</span>
-                          Type: <span className="text-blue-600">{notif.type}</span>
+                          Type: <span className="text-blue-600 dark:text-blue-400">{notif.type}</span>
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="flex items-center gap-2">
                           {notif.is_read && (
-                            <span className="text-[10px] text-green-700 font-semibold px-2 py-0.5 bg-green-100 border border-green-200 rounded-full">Read</span>
+                            <span className="text-[10px] text-green-700 font-semibold px-2 py-0.5 bg-green-100 border border-green-200 rounded-full dark:bg-green-500/15 dark:text-green-300 dark:border-green-400/30">Read</span>
                           )}
                           {notif.is_email_sent && (
-                            <span className="text-[10px] text-blue-700 font-semibold px-2 py-0.5 bg-blue-100 border border-blue-200 rounded-full">Emailed</span>
+                            <span className="text-[10px] text-blue-700 font-semibold px-2 py-0.5 bg-blue-100 border border-blue-200 rounded-full dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-400/30">Emailed</span>
                           )}
                         </div>
-                        <p className="text-[10px] text-gray-600 mt-1">
+                        <p className="text-[10px] text-gray-600 dark:text-white/40 mt-1">
                           {new Date(notif.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                         </p>
                       </div>

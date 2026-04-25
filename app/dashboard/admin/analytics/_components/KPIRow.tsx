@@ -56,11 +56,11 @@ const CELLS = [
 export default function KPIRow({ data, isLoading }: KPIRowProps) {
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex divide-x divide-gray-100">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex divide-x divide-gray-100 dark:bg-white/5 dark:border-white/10 dark:divide-white/5">
         {CELLS.map((cell) => (
           <div key={cell.key} className="flex-1 px-4 py-3">
-            <div className="h-2.5 w-16 bg-gray-200 rounded animate-pulse mb-2" />
-            <div className="h-6 w-12 bg-gray-200 rounded animate-pulse" />
+            <div className="h-2.5 w-16 bg-gray-200 dark:bg-white/10 rounded animate-pulse mb-2" />
+            <div className="h-6 w-12 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
           </div>
         ))}
       </div>
@@ -68,7 +68,7 @@ export default function KPIRow({ data, isLoading }: KPIRowProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex divide-x divide-gray-100">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex divide-x divide-gray-100 dark:bg-white/5 dark:border-white/10 dark:divide-white/5">
       {CELLS.map((cell) => {
         const value = data?.[cell.key] ?? 0;
         const trend = data?.[cell.trendKey] ?? 0;
@@ -78,18 +78,18 @@ export default function KPIRow({ data, isLoading }: KPIRowProps) {
           <div key={cell.key} className="flex-1 px-4 py-3">
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className={`w-2 h-2 rounded-full ${cell.dotColor}`} />
-              <span className="text-[11px] text-gray-500 font-medium uppercase tracking-wider">
+              <span className="text-[11px] text-gray-500 dark:text-white/40 font-medium uppercase tracking-wider">
                 {cell.label}
               </span>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-gray-900">
+              <span className="text-xl font-bold text-gray-900 dark:text-white">
                 {cell.format(value)}
               </span>
               {trend !== 0 && (
                 <span
                   className={`text-[10px] font-semibold ${
-                    isUp ? 'text-green-600' : 'text-red-500'
+                    isUp ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'
                   }`}
                 >
                   {isUp ? '▲' : '▼'} {Math.abs(trend)}%
