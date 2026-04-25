@@ -11,6 +11,7 @@ import {
   AlertTriangle, CheckCircle2, Mail, Phone, Calendar,
   Loader2, ChevronRight, Activity, Clock, UserCheck, Pencil,
   Wrench, Save, CheckCircle, Award, Truck,
+  Plus, Trash2, IdCard,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
@@ -178,22 +179,22 @@ function GrantSuperAdminDialog({
 }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xl w-full max-w-sm">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xl w-full max-w-sm">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
               <Crown className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Grant Super Admin</h3>
-              <p className="text-sm text-gray-500">This action cannot be undone easily</p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Grant Super Admin</h3>
+              <p className="text-sm text-gray-500 dark:text-slate-400">This action cannot be undone easily</p>
             </div>
           </div>
 
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl p-4 mb-5">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-red-700">
+              <div className="text-sm text-red-700 dark:text-red-300">
                 <strong>{member.full_name}</strong> will gain full unrestricted access to all
                 platform features, data, and admin controls. This should only be granted to
                 trusted senior staff.
@@ -205,7 +206,7 @@ function GrantSuperAdminDialog({
             <button
               onClick={onCancel}
               disabled={saving}
-              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-3 font-semibold transition-colors"
+              className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 rounded-xl py-3 font-semibold transition-colors"
             >
               Cancel
             </button>
@@ -229,10 +230,10 @@ function GrantSuperAdminDialog({
 function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | null | undefined }) {
   return (
     <div className="flex items-start gap-3">
-      <Icon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+      <Icon className="w-4 h-4 text-gray-400 dark:text-slate-500 flex-shrink-0 mt-0.5" />
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
-        <p className="text-sm text-gray-700 break-all">{value || '—'}</p>
+        <p className="text-[10px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
+        <p className="text-sm text-gray-700 dark:text-white break-all">{value || '—'}</p>
       </div>
     </div>
   );
@@ -292,9 +293,9 @@ function EditableDateRow({
 
   return (
     <div className="flex items-start gap-3">
-      <Icon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+      <Icon className="w-4 h-4 text-gray-400 dark:text-slate-500 flex-shrink-0 mt-0.5" />
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
+        <p className="text-[10px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
         {editing ? (
           <div className="flex items-center gap-2">
             <input
@@ -303,7 +304,7 @@ function EditableDateRow({
               onChange={e => setInputVal(e.target.value)}
               onKeyDown={handleKeyDown}
               autoFocus
-              className="text-sm border border-violet-400 rounded-md px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-violet-500/30 text-gray-900"
+              className="text-sm border border-violet-400 dark:border-violet-500 dark:bg-slate-700 dark:text-white rounded-md px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-violet-500/30 text-gray-900"
             />
             <button
               onClick={handleSave}
@@ -314,20 +315,20 @@ function EditableDateRow({
             </button>
             <button
               onClick={() => setEditing(false)}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
             >
               Cancel
             </button>
           </div>
         ) : (
           <div className="flex items-center gap-1.5 group/date">
-            <p className="text-sm text-gray-700">{value ? formatDate(value) : '—'}</p>
+            <p className="text-sm text-gray-700 dark:text-white">{value ? formatDate(value) : '—'}</p>
             <button
               onClick={startEditing}
-              className="opacity-0 group-hover/date:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-100"
+              className="opacity-0 group-hover/date:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700"
               title="Edit hire date"
             >
-              <Pencil className="w-3 h-3 text-gray-400 hover:text-violet-500 transition-colors" />
+              <Pencil className="w-3 h-3 text-gray-400 dark:text-slate-500 hover:text-violet-500 transition-colors" />
             </button>
             {saved && (
               <span className="text-xs text-emerald-600 font-semibold flex items-center gap-0.5">
@@ -356,24 +357,24 @@ function ActionButton({
 }) {
   const cls = `flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-sm font-medium group ${
     variant === 'danger'
-      ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
+      ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50'
       : variant === 'success'
-      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
-      : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200'
+      ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
+      : 'bg-gray-50 hover:bg-gray-100 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-600'
   }`;
 
   if (href) {
     return (
       <Link href={href} className={cls}>
         <span>{label}</span>
-        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+        <ChevronRight className="w-4 h-4 text-gray-400 dark:text-slate-500 group-hover:text-gray-600 dark:group-hover:text-slate-300 transition-colors" />
       </Link>
     );
   }
   return (
     <button onClick={onClick} className={cls}>
       <span>{label}</span>
-      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+      <ChevronRight className="w-4 h-4 text-gray-400 dark:text-slate-500 group-hover:text-gray-600 dark:group-hover:text-slate-300 transition-colors" />
     </button>
   );
 }
@@ -442,7 +443,7 @@ function QuickActionsSection({
 
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Quick Actions</h3>
+      <h3 className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">Quick Actions</h3>
       <ActionButton label="Edit Permissions" onClick={onEditPermissions} />
       {member.role === 'operator' && (
         <ActionButton label="View Timecards" href="/dashboard/admin/timecards" />
@@ -766,9 +767,387 @@ function SkillsTab({
   );
 }
 
+// ─── Skill Snapshot Card (compact summary for info tab) ──────────────────────
+
+function SkillSnapshotCard({
+  memberId,
+  getAuthHeaders,
+}: {
+  memberId: string;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+}) {
+  const [skillLevels, setSkillLevels] = useState<Record<string, number>>({});
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAuthHeaders().then(headers =>
+      fetch(`/api/admin/team-profiles/${memberId}/skills`, { headers })
+        .then(r => r.json())
+        .then(json => {
+          if (!cancelled) {
+            setSkillLevels(json.data?.skill_levels || {});
+            setLoaded(true);
+          }
+        })
+        .catch(() => { if (!cancelled) setLoaded(true); })
+    );
+    return () => { cancelled = true; };
+  }, [memberId, getAuthHeaders]);
+
+  if (!loaded) return null;
+
+  const cuttingItems = CUTTING_SCOPES.filter(s => (skillLevels[s.key] ?? 0) > 0);
+  const equipItems = HEAVY_EQUIPMENT.filter(s => (skillLevels[s.key] ?? 0) > 0);
+
+  if (cuttingItems.length === 0 && equipItems.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Skill Snapshot</h3>
+        <span className="text-[10px] text-gray-400">out of 10 / 5</span>
+      </div>
+      <div className="space-y-2">
+        {cuttingItems.map(s => {
+          const val = skillLevels[s.key] ?? 0;
+          return (
+            <div key={s.key} className="flex items-center gap-2">
+              <span className="text-xs text-gray-600 w-24 truncate">{s.label}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                <div className="bg-violet-500 h-1.5 rounded-full" style={{ width: `${(val / 10) * 100}%` }} />
+              </div>
+              <span className="text-[11px] font-bold text-gray-700 w-4 text-right">{val}</span>
+            </div>
+          );
+        })}
+        {equipItems.map(s => {
+          const val = skillLevels[s.key] ?? 0;
+          return (
+            <div key={s.key} className="flex items-center gap-2">
+              <span className="text-xs text-gray-600 w-24 truncate">{s.label}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${(val / 5) * 100}%` }} />
+              </div>
+              <span className="text-[11px] font-bold text-gray-700 w-4 text-right">{val}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Credentials Tab ──────────────────────────────────────────────────────────
+
+function ExpiryBadge({ dateStr }: { dateStr: string | null }) {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  const today = new Date();
+  const diffDays = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">EXPIRED</span>;
+  if (diffDays <= 30) return <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Expires in {diffDays}d</span>;
+  return <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Valid</span>;
+}
+
+interface CertEntry {
+  id: string;
+  name: string;
+  issued_by: string;
+  expiry_date: string | null;
+}
+
+interface CredentialData {
+  medical_card_expiry: string | null;
+  drivers_license_expiry: string | null;
+  drivers_license_class: string | null;
+  osha_10_expiry: string | null;
+  osha_30_expiry: string | null;
+  certifications: CertEntry[];
+}
+
+function CredentialsTab({
+  memberId,
+  getAuthHeaders,
+}: {
+  memberId: string;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+}) {
+  const [creds, setCreds] = useState<CredentialData>({
+    medical_card_expiry: null,
+    drivers_license_expiry: null,
+    drivers_license_class: null,
+    osha_10_expiry: null,
+    osha_30_expiry: null,
+    certifications: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [newCert, setNewCert] = useState({ name: '', issued_by: '', expiry_date: '' });
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/admin/team-profiles/${memberId}/credentials`, { headers });
+        const json = await res.json();
+        if (!cancelled && json.data) setCreds(json.data);
+      } catch {
+        // silently fail, leave defaults
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [memberId, getAuthHeaders]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/team-profiles/${memberId}/credentials`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(creds),
+      });
+      const json = await res.json();
+      if (!res.ok || json.success === false) {
+        setError(json.error || 'Failed to save');
+      } else {
+        setSavedAt(Date.now());
+        setTimeout(() => setSavedAt(null), 2500);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addCert = () => {
+    if (!newCert.name.trim()) return;
+    const entry: CertEntry = {
+      id: crypto.randomUUID(),
+      name: newCert.name.trim(),
+      issued_by: newCert.issued_by.trim(),
+      expiry_date: newCert.expiry_date || null,
+    };
+    setCreds(prev => ({ ...prev, certifications: [...prev.certifications, entry] }));
+    setNewCert({ name: '', issued_by: '', expiry_date: '' });
+  };
+
+  const removeCert = (id: string) => {
+    setCreds(prev => ({ ...prev, certifications: prev.certifications.filter(c => c.id !== id) }));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+      </div>
+    );
+  }
+
+  const inputCls = 'text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors w-full';
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Medical Card */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Medical Card</h3>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex-1 min-w-[160px]">
+            <label className="text-xs text-gray-500 mb-1 block">Expiry Date</label>
+            <input
+              type="date"
+              value={creds.medical_card_expiry ?? ''}
+              onChange={e => setCreds(prev => ({ ...prev, medical_card_expiry: e.target.value || null }))}
+              className={inputCls}
+            />
+          </div>
+          <div className="pt-5">
+            <ExpiryBadge dateStr={creds.medical_card_expiry} />
+          </div>
+        </div>
+      </div>
+
+      {/* Driver's License */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Driver&apos;s License</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Expiry Date</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={creds.drivers_license_expiry ?? ''}
+                onChange={e => setCreds(prev => ({ ...prev, drivers_license_expiry: e.target.value || null }))}
+                className={inputCls}
+              />
+              <div className="flex-shrink-0">
+                <ExpiryBadge dateStr={creds.drivers_license_expiry} />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">License Class</label>
+            <input
+              type="text"
+              placeholder="e.g. Class A CDL"
+              value={creds.drivers_license_class ?? ''}
+              onChange={e => setCreds(prev => ({ ...prev, drivers_license_class: e.target.value || null }))}
+              className={inputCls}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* OSHA Certifications */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">OSHA Certifications</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">OSHA 10 Expiry</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={creds.osha_10_expiry ?? ''}
+                onChange={e => setCreds(prev => ({ ...prev, osha_10_expiry: e.target.value || null }))}
+                className={inputCls}
+              />
+              <div className="flex-shrink-0">
+                <ExpiryBadge dateStr={creds.osha_10_expiry} />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">OSHA 30 Expiry</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={creds.osha_30_expiry ?? ''}
+                onChange={e => setCreds(prev => ({ ...prev, osha_30_expiry: e.target.value || null }))}
+                className={inputCls}
+              />
+              <div className="flex-shrink-0">
+                <ExpiryBadge dateStr={creds.osha_30_expiry} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Certifications */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Additional Certifications</h3>
+        {creds.certifications.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {creds.certifications.map(cert => (
+              <div key={cert.id} className="flex items-start gap-3 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{cert.name}</p>
+                  {cert.issued_by && (
+                    <p className="text-xs text-gray-500 mt-0.5">Issued by {cert.issued_by}</p>
+                  )}
+                  {cert.expiry_date && (
+                    <p className="text-xs text-gray-500 mt-0.5">Expires {cert.expiry_date}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <ExpiryBadge dateStr={cert.expiry_date} />
+                  <button
+                    type="button"
+                    onClick={() => removeCert(cert.id)}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    title="Remove"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Add new cert form */}
+        <div className="border border-dashed border-gray-300 rounded-lg p-3 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add Certification</p>
+          <input
+            type="text"
+            placeholder="Certification name *"
+            value={newCert.name}
+            onChange={e => setNewCert(prev => ({ ...prev, name: e.target.value }))}
+            className={inputCls}
+          />
+          <input
+            type="text"
+            placeholder="Issued by (optional)"
+            value={newCert.issued_by}
+            onChange={e => setNewCert(prev => ({ ...prev, issued_by: e.target.value }))}
+            className={inputCls}
+          />
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Expiry Date (optional)</label>
+            <input
+              type="date"
+              value={newCert.expiry_date}
+              onChange={e => setNewCert(prev => ({ ...prev, expiry_date: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={addCert}
+            disabled={!newCert.name.trim()}
+            className="w-full mt-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            + Add Certification
+          </button>
+        </div>
+      </div>
+
+      {/* Save bar */}
+      <div className="sticky bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent pt-4 pb-1 -mx-1 px-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-h-[28px]">
+            {!saving && savedAt && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Saved
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 text-white text-sm font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? 'Saving...' : 'Save Credentials'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 
-type DetailTab = 'info' | 'skills' | 'permissions';
+type DetailTab = 'info' | 'skills' | 'credentials' | 'permissions';
 
 function MemberDetailPanel({
   member,
@@ -828,17 +1207,20 @@ function MemberDetailPanel({
   const canGrant = isSuperAdmin && !isOwnProfile && member.role !== 'super_admin';
   const showPermissionsTab = member.role !== 'super_admin';
   const showSkillsTab = member.role === 'operator' || member.role === 'apprentice';
-  const showTabBar = showPermissionsTab || showSkillsTab;
+  const showCredentialsTab = member.role === 'operator' || member.role === 'apprentice';
+  const showTabBar = showPermissionsTab || showSkillsTab || showCredentialsTab;
 
   const visibleTabs: DetailTab[] = [
     'info',
     ...(showSkillsTab ? (['skills'] as DetailTab[]) : []),
+    ...(showCredentialsTab ? (['credentials'] as DetailTab[]) : []),
     ...(showPermissionsTab ? (['permissions'] as DetailTab[]) : []),
   ];
 
   const tabLabel: Record<DetailTab, string> = {
     info: 'Profile Info',
     skills: 'Skills',
+    credentials: 'Credentials',
     permissions: 'Feature Permissions',
   };
 
@@ -874,15 +1256,15 @@ function MemberDetailPanel({
 
       {/* Tab bar */}
       {showTabBar && (
-        <div className="flex gap-1 px-4 pt-4 flex-shrink-0 border-b border-gray-200 pb-0 overflow-x-auto">
+        <div className="flex gap-1 px-4 pt-4 flex-shrink-0 border-b border-gray-200 dark:border-slate-700 pb-0 overflow-x-auto">
           {visibleTabs.map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-all whitespace-nowrap ${
                 tab === t
-                  ? 'bg-violet-600 text-white'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                  ? 'bg-violet-600 dark:bg-violet-700 text-white'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800'
               }`}
             >
               {tabLabel[t]}
@@ -892,14 +1274,19 @@ function MemberDetailPanel({
       )}
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-gray-50 dark:bg-slate-900">
         {(tab === 'info' || !showTabBar) && (
           <>
             {/* Profile Info */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Profile Info</h3>
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Profile Info</h3>
               <ProfileInfoSection member={member} onSaveHireDate={handleSaveHireDate} />
             </div>
+
+            {/* Skill Snapshot — operators/apprentices only */}
+            {showSkillsTab && (
+              <SkillSnapshotCard memberId={member.id} getAuthHeaders={getAuthHeaders} />
+            )}
 
             {/* Quick Actions */}
             <QuickActionsSection
@@ -911,13 +1298,13 @@ function MemberDetailPanel({
 
             {/* Grant Super Admin — only for super admins editing non-super-admin users */}
             {canGrant && (
-              <div className="pt-2 border-t border-gray-200">
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="pt-2 border-t border-gray-200 dark:border-slate-700">
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl p-4">
                   <div className="flex items-start gap-3">
                     <Crown className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-gray-900 mb-1">Elevate to Super Admin</h4>
-                      <p className="text-xs text-gray-600 mb-3">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Elevate to Super Admin</h4>
+                      <p className="text-xs text-gray-600 dark:text-slate-400 mb-3">
                         Grants full unrestricted platform access. Cannot be undone without manual database access.
                       </p>
                       <button
@@ -937,6 +1324,10 @@ function MemberDetailPanel({
 
         {tab === 'skills' && showSkillsTab && (
           <SkillsTab memberId={member.id} getAuthHeaders={getAuthHeaders} />
+        )}
+
+        {tab === 'credentials' && showCredentialsTab && (
+          <CredentialsTab memberId={member.id} getAuthHeaders={getAuthHeaders} />
         )}
 
         {tab === 'permissions' && showPermissionsTab && (
@@ -1110,7 +1501,7 @@ export default function TeamProfilesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <Users className="w-6 h-6 text-white" />
@@ -1122,14 +1513,14 @@ export default function TeamProfilesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-40 shadow-sm">
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/admin"
-              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-600"
+              className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors text-gray-600 dark:text-slate-400"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
@@ -1138,8 +1529,8 @@ export default function TeamProfilesPage() {
                 <Users className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h1 className="text-base sm:text-lg font-bold text-gray-900">Team Profiles</h1>
-                <p className="text-xs text-gray-500 hidden sm:block">
+                <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Team Profiles</h1>
+                <p className="text-xs text-gray-500 dark:text-slate-400 hidden sm:block">
                   {members.length} members &middot; Manage access &amp; feature permissions
                 </p>
               </div>
@@ -1161,9 +1552,9 @@ export default function TeamProfilesPage() {
       {/* ── Success banner ──────────────────────────────────────── */}
       {successMsg && (
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pt-4">
-          <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-            <p className="text-emerald-700 text-sm">{successMsg}</p>
+          <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl px-4 py-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+            <p className="text-emerald-700 dark:text-emerald-300 text-sm">{successMsg}</p>
           </div>
         </div>
       )}
@@ -1173,19 +1564,19 @@ export default function TeamProfilesPage() {
         {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {[
-            { label: 'Total Staff', value: members.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: 'Active', value: members.filter(m => m.active).length, icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'Super Admins', value: members.filter(m => m.role === 'super_admin').length, icon: Crown, color: 'text-violet-600', bg: 'bg-violet-50' },
-            { label: 'Roles In Use', value: allRoles.filter(r => roleBreakdown[r] > 0).length, icon: Shield, color: 'text-orange-600', bg: 'bg-orange-50' },
+            { label: 'Total Staff', value: members.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/15', darkColor: 'dark:text-blue-300' },
+            { label: 'Active', value: members.filter(m => m.active).length, icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/15', darkColor: 'dark:text-emerald-300' },
+            { label: 'Super Admins', value: members.filter(m => m.role === 'super_admin').length, icon: Crown, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-500/15', darkColor: 'dark:text-violet-300' },
+            { label: 'Roles In Use', value: allRoles.filter(r => roleBreakdown[r] > 0).length, icon: Shield, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-500/15', darkColor: 'dark:text-orange-300' },
           ].map(stat => (
-            <div key={stat.label} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div key={stat.label} className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{stat.label}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                  <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">{stat.label}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stat.value}</p>
                 </div>
                 <div className={`w-9 h-9 ${stat.bg} rounded-lg flex items-center justify-center`}>
-                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                  <stat.icon className={`w-4 h-4 ${stat.color} ${stat.darkColor}`} />
                 </div>
               </div>
             </div>
@@ -1196,17 +1587,17 @@ export default function TeamProfilesPage() {
         <div className={`grid gap-6 ${selectedMember ? 'lg:grid-cols-[1fr,400px]' : 'grid-cols-1'}`}>
 
           {/* ── Member List ──────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
             {/* Search + filter toolbar */}
-            <div className="p-4 border-b border-gray-200 space-y-3">
+            <div className="p-4 border-b border-gray-200 dark:border-slate-700 space-y-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search by name or email..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full bg-white border border-gray-300 rounded-lg pl-9 pr-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors"
+                  className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg pl-9 pr-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors"
                 />
               </div>
 
@@ -1216,7 +1607,7 @@ export default function TeamProfilesPage() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     roleFilter === 'all'
                       ? 'bg-violet-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                      : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   All ({members.length})
@@ -1228,7 +1619,7 @@ export default function TeamProfilesPage() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       roleFilter === role
                         ? `bg-gradient-to-r ${ROLE_GRADIENT[role] || 'from-gray-500 to-gray-600'} text-white`
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                        : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white'
                     }`}
                   >
                     {getRoleLabel(role)} ({roleBreakdown[role]})
@@ -1240,13 +1631,13 @@ export default function TeamProfilesPage() {
             {/* Member rows */}
             {filtered.length === 0 ? (
               <div className="p-10 text-center">
-                <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">
+                <Users className="w-8 h-8 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
+                <p className="text-gray-500 dark:text-slate-400 text-sm">
                   {search || roleFilter !== 'all' ? 'No members match your filters.' : 'No team members yet.'}
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-slate-700">
                 {filtered.map(member => {
                   const isSelected = selectedMember?.id === member.id;
                   return (
@@ -1255,26 +1646,26 @@ export default function TeamProfilesPage() {
                       onClick={() => setSelectedMember(isSelected ? null : member)}
                       className={`w-full px-4 py-3.5 flex items-center gap-3 text-left transition-colors border-l-2 ${
                         isSelected
-                          ? 'bg-violet-50 border-violet-500'
-                          : 'border-transparent hover:bg-gray-50 hover:border-violet-300'
+                          ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-500'
+                          : 'border-transparent hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:border-violet-300'
                       }`}
                     >
                       <MemberAvatar member={member} size="md" />
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-gray-900 text-sm">{member.full_name}</span>
+                          <span className="font-semibold text-gray-900 dark:text-white text-sm">{member.full_name}</span>
                           {member.role === 'super_admin' && (
-                            <Crown className="w-3 h-3 text-violet-600" />
+                            <Crown className="w-3 h-3 text-violet-600 dark:text-violet-400" />
                           )}
                           <RolePill role={member.role} />
                         </div>
-                        <p className="text-xs text-gray-500 truncate mt-0.5">{member.email}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-0.5">{member.email}</p>
                       </div>
 
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={`w-2 h-2 rounded-full ${member.active ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                        <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isSelected ? 'rotate-90' : ''}`} />
+                        <span className={`w-2 h-2 rounded-full ${member.active ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-slate-600'}`} />
+                        <ChevronRight className={`w-4 h-4 text-gray-400 dark:text-slate-500 transition-transform ${isSelected ? 'rotate-90' : ''}`} />
                       </div>
                     </button>
                   );
@@ -1285,7 +1676,7 @@ export default function TeamProfilesPage() {
 
           {/* ── Detail Panel ─────────────────────────────────────── */}
           {selectedMember && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-200px)] sticky top-24">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-200px)] sticky top-24">
               <MemberDetailPanel
                 member={selectedMember}
                 isSuperAdmin={isSuperAdmin}

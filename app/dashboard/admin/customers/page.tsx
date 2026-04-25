@@ -105,20 +105,20 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
       <div className="container mx-auto px-4 md:px-6 py-6 max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
+              <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-white/60" />
             </Link>
             <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900">
-                <Building2 className="w-6 h-6 text-purple-600" />
+              <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+                <Building2 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                 Customer Profiles
               </h1>
-              <p className="text-sm text-gray-500">Manage customers, contacts, and job history</p>
+              <p className="text-sm text-gray-500 dark:text-white/40">Manage customers, contacts, and job history</p>
             </div>
           </div>
           <button
@@ -133,17 +133,17 @@ export default function CustomersPage() {
         {/* Stats */}
         <RevealSection index={0}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-            <p className="text-2xl font-bold text-gray-900">{totalCount}</p>
-            <p className="text-xs text-gray-500">Customers</p>
+          <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-gray-200 dark:border-white/10 shadow-sm">
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalCount}</p>
+            <p className="text-xs text-gray-500 dark:text-white/40">Customers</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-            <p className="text-2xl font-bold text-purple-600">{totalJobs}</p>
-            <p className="text-xs text-gray-500">Total Jobs</p>
+          <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-gray-200 dark:border-white/10 shadow-sm">
+            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{totalJobs}</p>
+            <p className="text-xs text-gray-500 dark:text-white/40">Total Jobs</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-            <p className="text-2xl font-bold text-emerald-600">${totalRevenue.toLocaleString()}</p>
-            <p className="text-xs text-gray-500">Total Revenue</p>
+          <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-gray-200 dark:border-white/10 shadow-sm">
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${totalRevenue.toLocaleString()}</p>
+            <p className="text-xs text-gray-500 dark:text-white/40">Total Revenue</p>
           </div>
         </div>
         </RevealSection>
@@ -152,13 +152,13 @@ export default function CustomersPage() {
         <RevealSection index={1}>
         <div className="mb-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-white/30" />
             <input
               type="text"
               placeholder="Search customers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all shadow-sm"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 dark:focus:border-violet-400 focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-violet-500/20 transition-all shadow-sm"
             />
           </div>
         </div>
@@ -166,10 +166,10 @@ export default function CustomersPage() {
 
         {/* Error Banner */}
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-            <p className="text-sm text-red-700 flex-1">{error}</p>
-            <button onClick={() => { setError(null); fetchCustomers(); }} className="text-sm font-semibold text-red-600 hover:text-red-700 transition-colors">
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-400/30 rounded-xl flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0" />
+            <p className="text-sm text-red-700 dark:text-red-300 flex-1">{error}</p>
+            <button onClick={() => { setError(null); fetchCustomers(); }} className="text-sm font-semibold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors">
               Retry
             </button>
           </div>
@@ -182,9 +182,9 @@ export default function CustomersPage() {
           </div>
         ) : customers.length === 0 ? (
           <div className="text-center py-20">
-            <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="font-semibold text-gray-600">No customers found</p>
-            <p className="text-sm text-gray-400">{search ? 'Try a different search' : 'Add your first customer to get started'}</p>
+            <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
+            <p className="font-semibold text-gray-600 dark:text-white/60">No customers found</p>
+            <p className="text-sm text-gray-400 dark:text-white/40">{search ? 'Try a different search' : 'Add your first customer to get started'}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

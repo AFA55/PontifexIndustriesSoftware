@@ -32,7 +32,7 @@ interface CapacitySummary {
 
 interface ApprovalModalProps {
   job: PendingJob;
-  onConfirm: (data: { scheduledDate: string }) => void;
+  onConfirm: (data: { scheduledDate: string }) => Promise<void>;
   onClose: () => void;
 }
 
@@ -46,6 +46,7 @@ function getDifficultyInfo(rating: number): { color: string; bg: string; label: 
 }
 
 export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModalProps) {
+  const [approving, setApproving] = useState(false);
   const [scheduledDate, setScheduledDate] = useState(job.scheduled_date || '');
   const [capacityLoading, setCapacityLoading] = useState(false);
   const [capacityData, setCapacityData] = useState<Record<string, CapacityInfo> | null>(null);
@@ -57,6 +58,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
     conditions: true,
     compliance: true,
     equipment: true,
+    weekSchedule: true,
   });
 
   const isMultiDay = !!(job.end_date && job.scheduled_date && job.end_date !== job.scheduled_date);
@@ -143,6 +145,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
       id: string;
       full_name: string;
       skill_level_numeric: number | null;
+      scope_skill?: number;
       match_quality: 'good' | 'stretch' | 'over';
       is_qualified: boolean;
       is_available: boolean;
@@ -170,6 +173,40 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
       } finally {
         if (!cancelled) setSkillMatchLoading(false);
       }
+    })();
+    return () => { cancelled = true; };
+  }, [scheduledDate, job.id]);
+
+  // ── Week snapshot state + fetch ──
+  const [weekSnapshot, setWeekSnapshot] = useState<{
+    week_days: string[];
+    operators: Array<{
+      id: string;
+      name: string;
+      skill_level_numeric: number | null;
+      days: Record<string, Array<{ id: string; customer_name: string; status: string }>>;
+    }>;
+    job_difficulty: number;
+  } | null>(null);
+  const [weekSnapshotLoading, setWeekSnapshotLoading] = useState(false);
+
+  useEffect(() => {
+    if (!scheduledDate || !job.id) return;
+    let cancelled = false;
+    (async () => {
+      setWeekSnapshotLoading(true);
+      try {
+        const token = await getToken();
+        const res = await fetch(
+          `/api/admin/schedule-board/week-snapshot?date=${scheduledDate}&jobId=${job.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok && !cancelled) {
+          const json = await res.json();
+          setWeekSnapshot(json.data);
+        }
+      } catch { /* ignore */ }
+      finally { if (!cancelled) setWeekSnapshotLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [scheduledDate, job.id]);
@@ -263,7 +300,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
 
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
@@ -800,6 +837,116 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
               </div>
             )}
 
+            {/* ── Week Schedule Quick-View ── */}
+            {scheduledDate && (
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <button
+                  className="w-full px-4 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 flex items-center justify-between"
+                  onClick={() => toggleSection('weekSchedule')}
+                >
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-slate-500" />
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Week Schedule</span>
+                    {weekSnapshot && (
+                      <span className="text-[10px] text-slate-500">
+                        {weekSnapshot.week_days[0]} – {weekSnapshot.week_days[6]}
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedSections.weekSchedule ? 'rotate-180' : ''}`} />
+                </button>
+
+                {expandedSections.weekSchedule && (
+                  <div className="p-3">
+                    {weekSnapshotLoading ? (
+                      <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading schedule...
+                      </div>
+                    ) : !weekSnapshot ? (
+                      <p className="text-xs text-slate-400">No schedule data available.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[10px]">
+                          <thead>
+                            <tr>
+                              <th className="text-left text-slate-500 font-semibold pb-2 pr-2 min-w-[80px]">Operator</th>
+                              {weekSnapshot.week_days.map(day => {
+                                const isTarget = day === scheduledDate;
+                                const d = new Date(day + 'T12:00:00');
+                                const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
+                                const dateLabel = d.getDate();
+                                return (
+                                  <th key={day} className={`text-center pb-2 px-1 min-w-[36px] rounded-t-lg ${isTarget ? 'bg-blue-50 text-blue-700' : 'text-slate-500'}`}>
+                                    <div className="font-bold">{dayLabel}</div>
+                                    <div className={`text-[9px] ${isTarget ? 'text-blue-500 font-bold' : 'text-slate-400'}`}>{dateLabel}</div>
+                                  </th>
+                                );
+                              })}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {weekSnapshot.operators.map(op => {
+                              const match = skillMatch?.operators.find(m => m.id === op.id);
+                              const dotColor = !match ? 'bg-slate-300' :
+                                !match.is_available ? 'bg-slate-300' :
+                                !match.is_qualified ? 'bg-rose-400' :
+                                match.match_quality === 'good' ? 'bg-emerald-400' :
+                                match.match_quality === 'stretch' ? 'bg-amber-400' :
+                                'bg-rose-400';
+
+                              return (
+                                <tr key={op.id} className="border-t border-slate-100">
+                                  <td className="py-1.5 pr-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
+                                      <span className="text-slate-700 font-medium truncate max-w-[70px]" title={op.name}>
+                                        {op.name.split(' ')[0]}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  {weekSnapshot.week_days.map(day => {
+                                    const jobs = op.days[day] || [];
+                                    const isTarget = day === scheduledDate;
+                                    const isBusy = jobs.length > 0;
+                                    return (
+                                      <td key={day} className={`py-1.5 px-1 text-center ${isTarget ? 'bg-blue-50' : ''}`}>
+                                        {isBusy ? (
+                                          <div className="flex flex-col gap-0.5 items-center">
+                                            {jobs.slice(0, 2).map(j => (
+                                              <span
+                                                key={j.id}
+                                                title={j.customer_name}
+                                                className="inline-block bg-amber-100 text-amber-800 rounded px-1 py-0.5 text-[9px] font-bold truncate max-w-[32px]"
+                                              >
+                                                {j.customer_name.slice(0, 5)}
+                                              </span>
+                                            ))}
+                                            {jobs.length > 2 && <span className="text-[9px] text-slate-400">+{jobs.length - 2}</span>}
+                                          </div>
+                                        ) : (
+                                          <div className={`w-2 h-2 rounded-full mx-auto ${isTarget ? 'bg-blue-200' : 'bg-emerald-200'}`} />
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        <p className="text-[9px] text-slate-400 mt-2">
+                          <span className="inline-block w-2 h-2 bg-emerald-400 rounded-full mr-1" />Good match &nbsp;
+                          <span className="inline-block w-2 h-2 bg-amber-400 rounded-full mr-1" />Stretch &nbsp;
+                          <span className="inline-block w-2 h-2 bg-rose-400 rounded-full mr-1" />Not qualified &nbsp;
+                          <span className="inline-block w-2 h-2 bg-slate-300 rounded-full mr-1" />Unknown
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── Operator Availability ── */}
             {scheduledDate && (
               <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -854,12 +1001,16 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                               className={`flex items-center justify-between rounded-lg px-3 py-2 ring-1 ${matchColor}`}
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-sm font-semibold truncate">{op.full_name}</span>
-                                {op.skill_level_numeric != null && (
-                                  <span className="text-[10px] opacity-70 font-medium">
-                                    skill {op.skill_level_numeric}
-                                  </span>
-                                )}
+                                <span className="text-sm font-semibold truncate">
+                                  {op.full_name}
+                                  {(op.scope_skill != null || op.skill_level_numeric != null) && (
+                                    <span className="text-[10px] opacity-70 font-medium ml-1">
+                                      {op.scope_skill != null && op.scope_skill !== op.skill_level_numeric
+                                        ? `(scope ${op.scope_skill})`
+                                        : `(skill ${op.skill_level_numeric})`}
+                                    </span>
+                                  )}
+                                </span>
                               </div>
                               <span className="text-[10px] font-bold uppercase tracking-wider">
                                 {statusLabel}
@@ -893,11 +1044,23 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                 Cancel
               </button>
               <button
-                onClick={() => onConfirm({ scheduledDate })}
-                disabled={!canApprove || capacityLoading}
+                onClick={async () => {
+                  if (approving) return;
+                  setApproving(true);
+                  try {
+                    await onConfirm({ scheduledDate });
+                  } finally {
+                    setApproving(false);
+                  }
+                }}
+                disabled={!canApprove || capacityLoading || approving}
                 className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {capacityLoading ? (
+                {approving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Approving...
+                  </span>
+                ) : capacityLoading ? (
                   <span className="flex items-center justify-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> Checking...
                   </span>
@@ -907,6 +1070,15 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
               </button>
             </div>
           </div>
+
+          {approving && (
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] rounded-2xl flex items-center justify-center z-10">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                <p className="text-sm font-semibold text-emerald-700">Approving job...</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

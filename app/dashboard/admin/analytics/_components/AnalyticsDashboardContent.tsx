@@ -265,31 +265,31 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
 
   if (loading) {
     return (
-      <div className={`${embedded ? '' : 'min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50'} flex items-center justify-center py-20`}>
+      <div className={`${embedded ? '' : 'min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]'} flex items-center justify-center py-20`}>
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading analytics...</p>
+          <p className="text-gray-600 dark:text-white/60 font-medium">Loading analytics...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={embedded ? '' : 'min-h-screen bg-gray-50'}>
+    <div className={embedded ? '' : 'min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]'}>
 
       {embedded ? (
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-gray-800">Analytics Overview</h2>
-            <div className="inline-flex bg-gray-100 rounded-lg p-0.5">
+            <h2 className="text-lg font-bold text-gray-800 dark:text-white">Analytics Overview</h2>
+            <div className="inline-flex bg-gray-100 dark:bg-white/10 rounded-lg p-0.5">
               {(['daily', 'weekly', 'monthly'] as const).map((range) => (
                 <button
                   key={range}
                   onClick={() => setTimeRange(range)}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                     timeRange === range
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-white text-blue-600 shadow-sm dark:bg-white/20 dark:text-white'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-white/50 dark:hover:text-white/80'
                   }`}
                 >
                   {range.charAt(0).toUpperCase() + range.slice(1)}
@@ -300,7 +300,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
           <div className="flex items-center gap-2">
             <button
               onClick={fetchStats}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all dark:text-white/50 dark:hover:text-white/80 dark:hover:bg-white/10"
               title="Refresh data"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,14 +312,14 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 editMode
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10'
               }`}
             >
               {editMode ? 'Done' : 'Customize'}
             </button>
             <button
               onClick={() => setShowSettings(true)}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all dark:text-white/50 dark:hover:text-white/80 dark:hover:bg-white/10"
               title="Dashboard settings"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -392,8 +392,8 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
 
         {editMode && (
           <div className="text-center py-4">
-            <p className="text-sm text-gray-500">
-              Drag widgets to rearrange. Resize by pulling edges. Click <strong>Done</strong> when finished.
+            <p className="text-sm text-gray-500 dark:text-white/40">
+              Drag widgets to rearrange. Resize by pulling edges. Click <strong className="dark:text-white/70">Done</strong> when finished.
             </p>
           </div>
         )}

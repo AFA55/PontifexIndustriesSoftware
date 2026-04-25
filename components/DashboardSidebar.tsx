@@ -221,9 +221,9 @@ function NavItemRow({ item, isActive, collapsed, badge, onClick }: NavItemRowPro
   const baseClasses =
     'relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 group cursor-pointer select-none';
   const activeClasses =
-    'bg-slate-800 border-l-2 border-blue-500 text-white pl-[10px]';
+    'bg-slate-100 border-l-2 border-blue-500 text-slate-900 pl-[10px] dark:bg-slate-800 dark:text-white dark:border-blue-500';
   const inactiveClasses =
-    'text-slate-400 hover:text-white hover:bg-slate-800 border-l-2 border-transparent';
+    'text-slate-500 hover:text-slate-900 hover:bg-slate-100 border-l-2 border-transparent dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800';
 
   return (
     <Link
@@ -301,7 +301,7 @@ function SidebarContent({
       {/* Logo / brand header */}
       {/* ------------------------------------------------------------------ */}
       <div
-        className={`flex items-center gap-3 px-4 py-4 border-b border-slate-800 flex-shrink-0 ${
+        className={`flex items-center gap-3 px-4 py-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0 ${
           collapsed ? 'justify-center' : ''
         }`}
       >
@@ -310,10 +310,10 @@ function SidebarContent({
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="text-white text-sm font-bold truncate leading-tight">
+            <p className="text-slate-900 dark:text-white text-sm font-bold truncate leading-tight">
               {branding.company_short_name || branding.company_name}
             </p>
-            <p className="text-slate-500 text-[10px] leading-tight">Admin Portal</p>
+            <p className="text-slate-400 dark:text-slate-500 text-[10px] leading-tight">Admin Portal</p>
           </div>
         )}
         {/* Collapse toggle — only shown on desktop sidebar */}
@@ -321,7 +321,7 @@ function SidebarContent({
           <button
             onClick={onToggleCollapse}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className={`flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-white hover:bg-slate-700 transition-colors ${
+            className={`flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-white dark:hover:bg-slate-700 transition-colors ${
               collapsed ? 'mt-0' : 'ml-auto'
             }`}
           >
@@ -337,7 +337,7 @@ function SidebarContent({
       {/* ------------------------------------------------------------------ */}
       {/* Nav sections — scrollable */}
       {/* ------------------------------------------------------------------ */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
         {NAV_SECTIONS.map(section => {
           // While flags are loading, show all items so there's no flash-hide.
           // Once loaded, filter items whose flagKey is false.
@@ -408,7 +408,7 @@ function SidebarContent({
           href="/dashboard"
           onClick={onNavClick}
           title={collapsed ? 'Operator View' : undefined}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 text-xs font-medium transition-colors border-l-2 border-transparent"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800 text-xs font-medium transition-colors border-l-2 border-transparent"
         >
           <ArrowLeft className="w-4 h-4 flex-shrink-0" />
           {!collapsed && <span>Operator View</span>}
@@ -418,7 +418,7 @@ function SidebarContent({
       {/* ------------------------------------------------------------------ */}
       {/* Bottom: User profile + sign out */}
       {/* ------------------------------------------------------------------ */}
-      <div className="border-t border-slate-800 px-2 py-3 flex-shrink-0">
+      <div className="border-t border-slate-200 dark:border-slate-800 px-2 py-3 flex-shrink-0">
         {user ? (
           <div
             className={`flex items-center gap-3 px-2 py-1.5 ${
@@ -428,10 +428,10 @@ function SidebarContent({
             <UserAvatar name={user.name} avatarUrl={avatarUrl} />
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-white text-xs font-semibold truncate leading-tight">
+                <p className="text-slate-900 dark:text-white text-xs font-semibold truncate leading-tight">
                   {user.name}
                 </p>
-                <p className="text-purple-400 text-[10px] leading-tight truncate">
+                <p className="text-purple-600 dark:text-purple-400 text-[10px] leading-tight truncate">
                   {formatRole(user.role)}
                 </p>
               </div>
@@ -439,15 +439,15 @@ function SidebarContent({
             <button
               onClick={onSignOut}
               title="Sign out"
-              className="flex-shrink-0 p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors"
+              className="flex-shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-red-400 dark:hover:bg-slate-800 transition-colors"
             >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
         ) : (
           <div className={`flex items-center gap-2 px-2 py-1.5 ${collapsed ? 'justify-center' : ''}`}>
-            <div className="w-8 h-8 rounded-lg bg-slate-700 animate-pulse" />
-            {!collapsed && <div className="flex-1 h-4 rounded bg-slate-700 animate-pulse" />}
+            <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse" />
+            {!collapsed && <div className="flex-1 h-4 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" />}
           </div>
         )}
       </div>
@@ -545,7 +545,7 @@ export default function DashboardSidebar() {
       {/* Desktop sidebar */}
       {/* ------------------------------------------------------------------ */}
       <aside
-        className={`hidden lg:flex flex-col h-screen bg-slate-900 border-r border-slate-800 transition-all duration-300 flex-shrink-0 ${
+        className={`hidden lg:flex flex-col h-screen bg-white border-r border-slate-200 dark:bg-slate-900 dark:border-slate-800 transition-all duration-300 flex-shrink-0 ${
           collapsed ? 'w-16' : 'w-60'
         }`}
       >
@@ -565,7 +565,7 @@ export default function DashboardSidebar() {
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation menu"
-            className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 shadow-lg transition-colors border border-slate-700"
+            className="p-2 rounded-lg bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 shadow-lg transition-colors border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700 dark:border-slate-700"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -585,12 +585,12 @@ export default function DashboardSidebar() {
           />
 
           {/* Drawer panel */}
-          <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl">
+          <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 dark:bg-slate-900 dark:border-slate-800 flex flex-col shadow-2xl">
             {/* Close button */}
             <button
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation menu"
-              className="absolute top-3 right-3 p-1.5 rounded-md text-slate-500 hover:text-white hover:bg-slate-700 transition-colors z-10"
+              className="absolute top-3 right-3 p-1.5 rounded-md text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-white dark:hover:bg-slate-700 transition-colors z-10"
             >
               <X className="w-4 h-4" />
             </button>

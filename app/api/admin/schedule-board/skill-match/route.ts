@@ -142,6 +142,7 @@ export async function GET(request: NextRequest) {
         id: op.id,
         full_name: op.full_name,
         skill_level_numeric: op.skill_level_numeric,
+        scope_skill: skill,
         match_quality,
         is_qualified: isQualified,
         is_available: date ? !busyIds.has(op.id) : true,

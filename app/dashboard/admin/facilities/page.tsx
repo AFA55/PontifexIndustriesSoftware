@@ -83,11 +83,11 @@ function formatDate(d: string | null) {
 
 function expiryColor(status: string) {
   switch (status) {
-    case 'valid': return 'bg-green-100 text-green-700 border-green-200';
-    case 'expiring_soon': return 'bg-amber-100 text-amber-700 border-amber-200';
-    case 'expired': return 'bg-red-100 text-red-700 border-red-200';
-    case 'no_expiry': return 'bg-gray-100 text-gray-600 border-gray-200';
-    default: return 'bg-gray-100 text-gray-600 border-gray-200';
+    case 'valid': return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-500/15 dark:text-green-300 dark:border-green-400/30';
+    case 'expiring_soon': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-400/30';
+    case 'expired': return 'bg-red-100 text-red-700 border-red-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-400/30';
+    case 'no_expiry': return 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/10 dark:text-white/60 dark:border-white/10';
+    default: return 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/10 dark:text-white/60 dark:border-white/10';
   }
 }
 
@@ -103,11 +103,11 @@ function expiryLabel(status: string) {
 
 function badgeStatusColor(status: string) {
   switch (status) {
-    case 'active': return 'bg-green-100 text-green-700';
-    case 'expired': return 'bg-red-100 text-red-700';
-    case 'revoked': return 'bg-gray-100 text-gray-700';
-    case 'pending': return 'bg-yellow-100 text-yellow-700';
-    default: return 'bg-gray-100 text-gray-700';
+    case 'active': return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300';
+    case 'expired': return 'bg-red-100 text-red-700 dark:bg-rose-500/15 dark:text-rose-300';
+    case 'revoked': return 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-white/60';
+    case 'pending': return 'bg-yellow-100 text-yellow-700 dark:bg-amber-500/15 dark:text-amber-300';
+    default: return 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-white/60';
   }
 }
 
@@ -148,76 +148,76 @@ function AddFacilityModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between p-5 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <div className="bg-white dark:bg-[#1a1035] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-transparent dark:border-white/10">
+          <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-white/10">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Building2 className="w-5 h-5 text-purple-600" />
               Add Facility
             </h2>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <X className="w-5 h-5 text-gray-400" />
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
+              <X className="w-5 h-5 text-gray-400 dark:text-white/40" />
             </button>
           </div>
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 dark:bg-rose-500/15 dark:border-rose-400/30 dark:text-rose-300">{error}</div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Facility Name *</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Facility Name *</label>
               <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="e.g., Intel D1X Fab" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" placeholder="e.g., Intel D1X Fab" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Address</label>
               <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="Street address" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" placeholder="Street address" />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">City</label>
                 <input type="text" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">State</label>
                 <input type="text" value={form.state} onChange={e => setForm({ ...form, state: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={2} placeholder="OR" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" maxLength={2} placeholder="OR" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">ZIP</label>
                 <input type="text" value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={10} />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" maxLength={10} />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Special Requirements</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Special Requirements</label>
               <textarea value={form.special_requirements} onChange={e => setForm({ ...form, special_requirements: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" rows={2}
                 placeholder="PPE requirements, site rules, etc." />
             </div>
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
                 <button type="button" onClick={() => setForm({ ...form, orientation_required: !form.orientation_required })}
                   className="text-purple-600">
-                  {form.orientation_required ? <ToggleRight className="w-8 h-5" /> : <ToggleLeft className="w-8 h-5 text-gray-400" />}
+                  {form.orientation_required ? <ToggleRight className="w-8 h-5" /> : <ToggleLeft className="w-8 h-5 text-gray-400 dark:text-white/30" />}
                 </button>
-                <span className="text-sm text-gray-700">Orientation Required</span>
+                <span className="text-sm text-gray-700 dark:text-white/80">Orientation Required</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <button type="button" onClick={() => setForm({ ...form, badging_required: !form.badging_required })}
                   className="text-purple-600">
-                  {form.badging_required ? <ToggleRight className="w-8 h-5" /> : <ToggleLeft className="w-8 h-5 text-gray-400" />}
+                  {form.badging_required ? <ToggleRight className="w-8 h-5" /> : <ToggleLeft className="w-8 h-5 text-gray-400 dark:text-white/30" />}
                 </button>
-                <span className="text-sm text-gray-700">Badging Required</span>
+                <span className="text-sm text-gray-700 dark:text-white/80">Badging Required</span>
               </label>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Notes</label>
               <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -277,75 +277,75 @@ function EditFacilityModal({ facility, onClose, onSaved }: { facility: Facility;
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between p-5 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <div className="bg-white dark:bg-[#1a1035] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-transparent dark:border-white/10">
+          <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-white/10">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Edit2 className="w-5 h-5 text-purple-600" />
               Edit Facility
             </h2>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <X className="w-5 h-5 text-gray-400" />
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
+              <X className="w-5 h-5 text-gray-400 dark:text-white/40" />
             </button>
           </div>
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 dark:bg-rose-500/15 dark:border-rose-400/30 dark:text-rose-300">{error}</div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Facility Name *</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Facility Name *</label>
               <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Address</label>
               <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">City</label>
                 <input type="text" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">State</label>
                 <input type="text" value={form.state} onChange={e => setForm({ ...form, state: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={2} />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" maxLength={2} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">ZIP</label>
                 <input type="text" value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={10} />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" maxLength={10} />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Special Requirements</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Special Requirements</label>
               <textarea value={form.special_requirements} onChange={e => setForm({ ...form, special_requirements: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" rows={2} />
             </div>
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
                 <button type="button" onClick={() => setForm({ ...form, orientation_required: !form.orientation_required })}
                   className="text-purple-600">
-                  {form.orientation_required ? <ToggleRight className="w-8 h-5" /> : <ToggleLeft className="w-8 h-5 text-gray-400" />}
+                  {form.orientation_required ? <ToggleRight className="w-8 h-5" /> : <ToggleLeft className="w-8 h-5 text-gray-400 dark:text-white/30" />}
                 </button>
-                <span className="text-sm text-gray-700">Orientation Required</span>
+                <span className="text-sm text-gray-700 dark:text-white/80">Orientation Required</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <button type="button" onClick={() => setForm({ ...form, badging_required: !form.badging_required })}
                   className="text-purple-600">
-                  {form.badging_required ? <ToggleRight className="w-8 h-5" /> : <ToggleLeft className="w-8 h-5 text-gray-400" />}
+                  {form.badging_required ? <ToggleRight className="w-8 h-5" /> : <ToggleLeft className="w-8 h-5 text-gray-400 dark:text-white/30" />}
                 </button>
-                <span className="text-sm text-gray-700">Badging Required</span>
+                <span className="text-sm text-gray-700 dark:text-white/80">Badging Required</span>
               </label>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Notes</label>
               <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -415,24 +415,24 @@ function AddBadgeModal({
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-          <div className="flex items-center justify-between p-5 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <div className="bg-white dark:bg-[#1a1035] rounded-2xl shadow-2xl w-full max-w-lg border border-transparent dark:border-white/10">
+          <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-white/10">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <BadgeCheck className="w-5 h-5 text-purple-600" />
               Add Badge
             </h2>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <X className="w-5 h-5 text-gray-400" />
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
+              <X className="w-5 h-5 text-gray-400 dark:text-white/40" />
             </button>
           </div>
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 dark:bg-rose-500/15 dark:border-rose-400/30 dark:text-rose-300">{error}</div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Operator *</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Operator *</label>
               <select value={form.operator_id} onChange={e => setForm({ ...form, operator_id: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400">
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white">
                 <option value="">Select operator...</option>
                 {operators.map(op => (
                   <option key={op.id} value={op.id}>{op.full_name} ({op.email})</option>
@@ -440,9 +440,9 @@ function AddBadgeModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Facility *</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Facility *</label>
               <select value={form.facility_id} onChange={e => setForm({ ...form, facility_id: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400">
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white">
                 <option value="">Select facility...</option>
                 {facilities.map(f => (
                   <option key={f.id} value={f.id}>{f.name}</option>
@@ -450,29 +450,29 @@ function AddBadgeModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Badge Number</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Badge Number</label>
               <input type="text" value={form.badge_number} onChange={e => setForm({ ...form, badge_number: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="e.g., B-12345" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" placeholder="e.g., B-12345" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Issued Date</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Issued Date</label>
                 <input type="date" value={form.issued_date} onChange={e => setForm({ ...form, issued_date: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Expiry Date</label>
                 <input type="date" value={form.expiry_date} onChange={e => setForm({ ...form, expiry_date: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white" />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Notes</label>
               <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -541,60 +541,60 @@ function FacilityRow({ facility, onEdit, onDelete, onAddBadge }: {
   const address = [facility.address, facility.city, facility.state, facility.zip].filter(Boolean).join(', ');
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+    <div className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
       <div
-        className="p-5 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="p-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/8 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-1">
-              <h3 className="text-base font-bold text-gray-900 truncate">{facility.name}</h3>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white truncate">{facility.name}</h3>
               <div className="flex items-center gap-1.5">
                 {facility.badging_required && (
-                  <span className="px-2 py-0.5 text-[10px] font-bold bg-purple-100 text-purple-700 rounded-full flex items-center gap-1">
+                  <span className="px-2 py-0.5 text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 rounded-full flex items-center gap-1">
                     <BadgeCheck className="w-3 h-3" /> Badging
                   </span>
                 )}
                 {facility.orientation_required && (
-                  <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded-full flex items-center gap-1">
+                  <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 rounded-full flex items-center gap-1">
                     <Shield className="w-3 h-3" /> Orientation
                   </span>
                 )}
               </div>
             </div>
             {address && (
-              <p className="text-sm text-gray-500 flex items-center gap-1">
+              <p className="text-sm text-gray-500 dark:text-white/60 flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 flex-shrink-0" /> {address}
               </p>
             )}
             {facility.special_requirements && (
-              <p className="text-xs text-gray-400 mt-1 line-clamp-1">{facility.special_requirements}</p>
+              <p className="text-xs text-gray-400 dark:text-white/40 mt-1 line-clamp-1">{facility.special_requirements}</p>
             )}
           </div>
           <div className="flex items-center gap-2 ml-4">
             <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="p-2 hover:bg-gray-100 rounded-xl transition-colors" title="Edit facility">
-              <Edit2 className="w-4 h-4 text-gray-400" />
+              className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors" title="Edit facility">
+              <Edit2 className="w-4 h-4 text-gray-400 dark:text-white/40" />
             </button>
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="p-2 hover:bg-red-50 rounded-xl transition-colors" title="Deactivate facility">
-              <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+              className="p-2 hover:bg-red-50 dark:hover:bg-rose-500/15 rounded-xl transition-colors" title="Deactivate facility">
+              <Trash2 className="w-4 h-4 text-gray-400 dark:text-white/40 hover:text-red-500" />
             </button>
-            {expanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+            {expanded ? <ChevronUp className="w-5 h-5 text-gray-400 dark:text-white/40" /> : <ChevronDown className="w-5 h-5 text-gray-400 dark:text-white/40" />}
           </div>
         </div>
       </div>
 
       {expanded && (
-        <div className="border-t border-gray-100 bg-gray-50 p-5">
+        <div className="border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/3 p-5">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+            <h4 className="text-sm font-bold text-gray-700 dark:text-white/80 flex items-center gap-2">
               <Users className="w-4 h-4 text-purple-500" />
               Badged Operators
             </h4>
             <button onClick={onAddBadge}
-              className="text-xs font-medium text-purple-600 hover:text-purple-800 flex items-center gap-1">
+              className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 flex items-center gap-1">
               <Plus className="w-3.5 h-3.5" /> Add Badge
             </button>
           </div>
@@ -603,16 +603,16 @@ function FacilityRow({ facility, onEdit, onDelete, onAddBadge }: {
               <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
             </div>
           ) : badges.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">No badges issued for this facility</p>
+            <p className="text-sm text-gray-400 dark:text-white/40 text-center py-4">No badges issued for this facility</p>
           ) : (
             <div className="space-y-2">
               {badges.map(badge => (
-                <div key={badge.id} className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between">
+                <div key={badge.id} className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 p-3 flex items-center justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{badge.operator_name}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{badge.operator_name}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {badge.badge_number && (
-                        <span className="text-xs text-gray-500">#{badge.badge_number}</span>
+                        <span className="text-xs text-gray-500 dark:text-white/40">#{badge.badge_number}</span>
                       )}
                       <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full border ${expiryColor(badge.expiry_status)}`}>
                         {expiryLabel(badge.expiry_status)}
@@ -621,7 +621,7 @@ function FacilityRow({ facility, onEdit, onDelete, onAddBadge }: {
                         {badge.status}
                       </span>
                       {badge.expiry_date && (
-                        <span className="text-[10px] text-gray-400">Exp: {formatDate(badge.expiry_date)}</span>
+                        <span className="text-[10px] text-gray-400 dark:text-white/40">Exp: {formatDate(badge.expiry_date)}</span>
                       )}
                     </div>
                   </div>
@@ -629,7 +629,7 @@ function FacilityRow({ facility, onEdit, onDelete, onAddBadge }: {
                     <button
                       onClick={() => handleRevoke(badge.id)}
                       disabled={revoking === badge.id}
-                      className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 dark:hover:bg-rose-500/15 rounded-lg transition-colors disabled:opacity-50"
                     >
                       {revoking === badge.id ? 'Revoking...' : 'Revoke'}
                     </button>
@@ -768,40 +768,40 @@ export default function FacilitiesPage() {
   const expiredBadges = badges.filter(b => b.expiry_status === 'expired' && b.status === 'active');
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="bg-white dark:bg-white/5 border-b border-gray-200 dark:border-white/10 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center gap-3 mb-4">
-            <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            <Link href="/dashboard/admin" className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
+              <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-white/60" />
             </Link>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <Building2 className="w-6 h-6 text-purple-600" />
                 Facilities & Badges
               </h1>
-              <p className="text-gray-500 text-sm">Manage facility compliance and operator badging</p>
+              <p className="text-gray-500 dark:text-white/60 text-sm">Manage facility compliance and operator badging</p>
             </div>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-gray-900">{facilities.filter(f => f.is_active).length}</p>
-              <p className="text-xs text-gray-500">Active Facilities</p>
+            <div className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{facilities.filter(f => f.is_active).length}</p>
+              <p className="text-xs text-gray-500 dark:text-white/40">Active Facilities</p>
             </div>
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-gray-900">{activeBadges.length}</p>
-              <p className="text-xs text-gray-500">Active Badges</p>
+            <div className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{activeBadges.length}</p>
+              <p className="text-xs text-gray-500 dark:text-white/40">Active Badges</p>
             </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-amber-600">{expiringBadges.length}</p>
-              <p className="text-xs text-amber-600">Expiring Soon</p>
+            <div className="bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-400/30 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-300">{expiringBadges.length}</p>
+              <p className="text-xs text-amber-600 dark:text-amber-300">Expiring Soon</p>
             </div>
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-red-600">{expiredBadges.length}</p>
-              <p className="text-xs text-red-500">Expired (Active)</p>
+            <div className="bg-red-50 dark:bg-rose-500/15 border border-red-200 dark:border-rose-400/30 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-red-600 dark:text-rose-300">{expiredBadges.length}</p>
+              <p className="text-xs text-red-500 dark:text-rose-300">Expired (Active)</p>
             </div>
           </div>
         </div>
@@ -810,11 +810,11 @@ export default function FacilitiesPage() {
       {/* Tabs + Search */}
       <div className="max-w-6xl mx-auto px-4 pt-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1">
+          <div className="flex gap-1 bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 p-1">
             <button
               onClick={() => setActiveTab('facilities')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'facilities' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                activeTab === 'facilities' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-white/60 dark:hover:bg-white/10'
               }`}
             >
               Facilities
@@ -822,7 +822,7 @@ export default function FacilitiesPage() {
             <button
               onClick={() => setActiveTab('badges')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'badges' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                activeTab === 'badges' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-white/60 dark:hover:bg-white/10'
               }`}
             >
               Badging Overview
@@ -830,11 +830,11 @@ export default function FacilitiesPage() {
           </div>
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-white/30" />
               <input
                 type="text" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder={activeTab === 'facilities' ? 'Search facilities...' : 'Search by facility...'}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
               />
             </div>
             <button
@@ -856,9 +856,9 @@ export default function FacilitiesPage() {
           /* Facilities Tab */
           <div className="space-y-3 pb-8">
             {filteredFacilities.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-                <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-gray-500 text-sm">
+              <div className="bg-white dark:bg-white/3 rounded-2xl border border-gray-200 dark:border-white/10 p-12 text-center">
+                <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
+                <p className="text-gray-500 dark:text-white/40 text-sm">
                   {search ? 'No facilities match your search' : 'No facilities yet. Add your first facility to get started.'}
                 </p>
               </div>
@@ -881,32 +881,32 @@ export default function FacilitiesPage() {
           /* Badging Overview Tab */
           <div className="space-y-4 pb-8">
             {filteredBadgeGroups.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-                <BadgeCheck className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-gray-500 text-sm">
+              <div className="bg-white dark:bg-white/3 rounded-2xl border border-gray-200 dark:border-white/10 p-12 text-center">
+                <BadgeCheck className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
+                <p className="text-gray-500 dark:text-white/40 text-sm">
                   {search ? 'No badges match your search' : 'No badges issued yet.'}
                 </p>
               </div>
             ) : (
               filteredBadgeGroups.map(([facilityName, facilityBadges]) => (
-                <div key={facilityName} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                  <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <div key={facilityName} className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
+                  <div className="bg-gray-50 dark:bg-white/5 px-5 py-3 border-b border-gray-200 dark:border-white/10">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-purple-500" />
                       {facilityName}
-                      <span className="px-2 py-0.5 bg-purple-100 rounded-full text-xs text-purple-700 font-bold">
+                      <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-500/15 rounded-full text-xs text-purple-700 dark:text-purple-300 font-bold">
                         {facilityBadges.length}
                       </span>
                     </h3>
                   </div>
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-gray-100 dark:divide-white/5">
                     {facilityBadges.map(badge => (
-                      <div key={badge.id} className="px-5 py-3 flex items-center justify-between">
+                      <div key={badge.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900">{badge.operator_name}</p>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{badge.operator_name}</p>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             {badge.badge_number && (
-                              <span className="text-xs text-gray-500">#{badge.badge_number}</span>
+                              <span className="text-xs text-gray-500 dark:text-white/40">#{badge.badge_number}</span>
                             )}
                             <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full border ${expiryColor(badge.expiry_status)}`}>
                               {expiryLabel(badge.expiry_status)}
@@ -915,17 +915,17 @@ export default function FacilitiesPage() {
                               {badge.status}
                             </span>
                             {badge.issued_date && (
-                              <span className="text-[10px] text-gray-400">Issued: {formatDate(badge.issued_date)}</span>
+                              <span className="text-[10px] text-gray-400 dark:text-white/40">Issued: {formatDate(badge.issued_date)}</span>
                             )}
                             {badge.expiry_date && (
-                              <span className="text-[10px] text-gray-400">Exp: {formatDate(badge.expiry_date)}</span>
+                              <span className="text-[10px] text-gray-400 dark:text-white/40">Exp: {formatDate(badge.expiry_date)}</span>
                             )}
                           </div>
                         </div>
                         {badge.status === 'active' && (
                           <button
                             onClick={() => handleRevokeBadge(badge.id)}
-                            className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 rounded-lg transition-colors"
+                            className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 dark:hover:bg-rose-500/15 rounded-lg transition-colors"
                           >
                             Revoke
                           </button>

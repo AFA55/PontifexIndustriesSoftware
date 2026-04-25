@@ -216,31 +216,31 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-3" />
-          <p className="text-gray-600 font-medium">Loading settings...</p>
+          <p className="text-gray-600 dark:text-white/60 font-medium">Loading settings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
       {/* Header */}
-      <div className="backdrop-blur-xl bg-white/90 border-b border-gray-200 sticky top-0 z-30 shadow-lg">
+      <div className="backdrop-blur-xl bg-white/90 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-30 shadow-lg">
         <div className="container mx-auto px-4 md:px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link href="/dashboard/admin" className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all hover:scale-105">
-                <ChevronLeft className="w-5 h-5 text-gray-700" />
+              <Link href="/dashboard/admin" className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl transition-all hover:scale-105">
+                <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-white/80" />
               </Link>
               <div>
-                <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-gray-600" />
+                <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-gray-600 dark:text-white/60" />
                   Admin Settings
                 </h1>
-                <p className="text-gray-500 text-xs">Configure schedule board, capacity, and system preferences</p>
+                <p className="text-gray-500 dark:text-white/60 text-xs">Configure schedule board, capacity, and system preferences</p>
               </div>
             </div>
 
@@ -259,13 +259,13 @@ export default function SettingsPage() {
       <div className="container mx-auto px-4 md:px-6 py-6 max-w-4xl">
         {/* Success / Error Messages */}
         {saved && (
-          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-semibold animate-in slide-in-from-top duration-200">
+          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-semibold animate-in slide-in-from-top duration-200 dark:bg-emerald-500/15 dark:border-emerald-400/30 dark:text-emerald-300">
             <CheckCircle className="w-4 h-4" />
             Settings saved successfully!
           </div>
         )}
         {error && (
-          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
+          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold dark:bg-rose-500/15 dark:border-rose-400/30 dark:text-rose-300">
             <AlertTriangle className="w-4 h-4" />
             {error}
           </div>
@@ -311,7 +311,7 @@ export default function SettingsPage() {
           {/* ══════════════════════════════════════════════
               SCHEDULE BOARD CONFIGURATION
              ══════════════════════════════════════════════ */}
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
@@ -326,9 +326,9 @@ export default function SettingsPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <LayoutGrid className="w-4 h-4 text-purple-600" />
-                    <label className="text-sm font-bold text-gray-900">Available Schedule Spots</label>
+                    <label className="text-sm font-bold text-gray-900 dark:text-white">Available Schedule Spots</label>
                   </div>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-white/60">
                     Number of operator rows on the schedule board. Each spot = one operator assignment for the day.
                   </p>
                 </div>
@@ -336,60 +336,60 @@ export default function SettingsPage() {
                   <button
                     onClick={() => adjustSlots(-1)}
                     disabled={settings.max_slots <= 1}
-                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30"
+                    className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30"
                   >
-                    <Minus className="w-4 h-4 text-gray-700" />
+                    <Minus className="w-4 h-4 text-gray-700 dark:text-white/80" />
                   </button>
-                  <div className="w-16 h-12 flex items-center justify-center bg-purple-50 border-2 border-purple-200 rounded-xl">
-                    <span className="text-xl font-bold text-purple-700">{settings.max_slots}</span>
+                  <div className="w-16 h-12 flex items-center justify-center bg-purple-50 border-2 border-purple-200 dark:bg-purple-500/15 dark:border-purple-400/30 rounded-xl">
+                    <span className="text-xl font-bold text-purple-700 dark:text-purple-300">{settings.max_slots}</span>
                   </div>
                   <button
                     onClick={() => adjustSlots(1)}
                     disabled={settings.max_slots >= 50}
-                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30"
+                    className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30"
                   >
-                    <Plus className="w-4 h-4 text-gray-700" />
+                    <Plus className="w-4 h-4 text-gray-700 dark:text-white/80" />
                   </button>
                 </div>
               </div>
 
               {/* Visual preview */}
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <div className="text-[10px] font-bold text-gray-400 uppercase mb-2">Preview — Schedule Rows</div>
+              <div className="bg-gray-50 dark:bg-white/3 rounded-xl p-4 border border-gray-200 dark:border-white/10">
+                <div className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase mb-2">Preview — Schedule Rows</div>
                 <div className="space-y-1">
                   {Array.from({ length: Math.min(settings.max_slots, 12) }, (_, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${
                         i < settings.warning_threshold
-                          ? 'bg-purple-100 text-purple-700'
-                          : 'bg-amber-100 text-amber-700'
+                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
                       }`}>
                         {i + 1}
                       </div>
                       <div className={`flex-1 h-6 rounded-lg ${
                         i < settings.warning_threshold
-                          ? 'bg-purple-50 border border-purple-200'
-                          : 'bg-amber-50 border border-amber-200'
+                          ? 'bg-purple-50 border border-purple-200 dark:bg-purple-500/10 dark:border-purple-400/20'
+                          : 'bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-400/20'
                       }`}>
-                        <div className="px-2 py-0.5 text-[10px] text-gray-400">
+                        <div className="px-2 py-0.5 text-[10px] text-gray-400 dark:text-white/40">
                           {i < settings.warning_threshold ? 'Operator slot' : 'Warning zone'}
                         </div>
                       </div>
                     </div>
                   ))}
                   {settings.max_slots > 12 && (
-                    <div className="text-[10px] text-gray-400 text-center py-1">
+                    <div className="text-[10px] text-gray-400 dark:text-white/40 text-center py-1">
                       ... +{settings.max_slots - 12} more slots
                     </div>
                   )}
                   {/* Shop / Notes Row */}
                   {settings.shop_notes_enabled && (
-                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-300">
-                      <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-blue-100">
-                        <StickyNote className="w-3.5 h-3.5 text-blue-600" />
+                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-300 dark:border-white/10">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-blue-100 dark:bg-blue-500/15">
+                        <StickyNote className="w-3.5 h-3.5 text-blue-600 dark:text-blue-300" />
                       </div>
-                      <div className="flex-1 h-6 rounded-lg bg-blue-50 border border-blue-200 border-dashed">
-                        <div className="px-2 py-0.5 text-[10px] text-blue-600 font-semibold">
+                      <div className="flex-1 h-6 rounded-lg bg-blue-50 border border-blue-200 border-dashed dark:bg-blue-500/10 dark:border-blue-400/20">
+                        <div className="px-2 py-0.5 text-[10px] text-blue-600 dark:text-blue-300 font-semibold">
                           {settings.shop_notes_label}
                         </div>
                       </div>
@@ -398,16 +398,16 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-6" />
+              <div className="border-t border-gray-200 dark:border-white/10 pt-6" />
 
               {/* Warning Threshold */}
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <Bell className="w-4 h-4 text-amber-600" />
-                    <label className="text-sm font-bold text-gray-900">Capacity Warning Threshold</label>
+                    <label className="text-sm font-bold text-gray-900 dark:text-white">Capacity Warning Threshold</label>
                   </div>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-white/60">
                     When this many slots are filled, show a warning during job approval. Helps prevent over-scheduling.
                   </p>
                 </div>
@@ -415,32 +415,32 @@ export default function SettingsPage() {
                   <button
                     onClick={() => adjustThreshold(-1)}
                     disabled={settings.warning_threshold <= 1}
-                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30"
+                    className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30"
                   >
-                    <Minus className="w-4 h-4 text-gray-700" />
+                    <Minus className="w-4 h-4 text-gray-700 dark:text-white/80" />
                   </button>
-                  <div className="w-16 h-12 flex items-center justify-center bg-amber-50 border-2 border-amber-200 rounded-xl">
-                    <span className="text-xl font-bold text-amber-700">{settings.warning_threshold}</span>
+                  <div className="w-16 h-12 flex items-center justify-center bg-amber-50 border-2 border-amber-200 dark:bg-amber-500/15 dark:border-amber-400/30 rounded-xl">
+                    <span className="text-xl font-bold text-amber-700 dark:text-amber-300">{settings.warning_threshold}</span>
                   </div>
                   <button
                     onClick={() => adjustThreshold(1)}
                     disabled={settings.warning_threshold >= settings.max_slots}
-                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30"
+                    className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30"
                   >
-                    <Plus className="w-4 h-4 text-gray-700" />
+                    <Plus className="w-4 h-4 text-gray-700 dark:text-white/80" />
                   </button>
                 </div>
               </div>
 
               {/* Info callout */}
-              <div className="bg-amber-50 rounded-xl p-3 border border-amber-200 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-amber-700">
+              <div className="bg-amber-50 rounded-xl p-3 border border-amber-200 flex items-start gap-2 dark:bg-amber-500/15 dark:border-amber-400/30">
+                <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-300 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-700 dark:text-amber-300">
                   When <strong>{settings.warning_threshold}</strong> of <strong>{settings.max_slots}</strong> slots are filled, the approval modal will show an &ldquo;Approaching Capacity&rdquo; warning. At <strong>{settings.max_slots}/{settings.max_slots}</strong>, approval is blocked.
                 </p>
               </div>
 
-              <div className="border-t border-gray-200 pt-6" />
+              <div className="border-t border-gray-200 dark:border-white/10 pt-6" />
 
               {/* Shop / Notes Row */}
               <div>
@@ -448,9 +448,9 @@ export default function SettingsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <StickyNote className="w-4 h-4 text-blue-600" />
-                      <label className="text-sm font-bold text-gray-900">Shop / Notes Row</label>
+                      <label className="text-sm font-bold text-gray-900 dark:text-white">Shop / Notes Row</label>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 dark:text-white/60">
                       Extra row at the bottom of the schedule for shop work notes, who&apos;s working in the shop, and general day-of notes.
                     </p>
                   </div>
@@ -461,24 +461,24 @@ export default function SettingsPage() {
                       onChange={(e) => setSettings(prev => ({ ...prev, shop_notes_enabled: e.target.checked }))}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+                    <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
                   </label>
                 </div>
 
                 {settings.shop_notes_enabled && (
                   <div className="pl-6 space-y-3">
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">Row Label</label>
+                      <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Row Label</label>
                       <input
                         type="text"
                         value={settings.shop_notes_label}
                         onChange={(e) => setSettings(prev => ({ ...prev, shop_notes_label: e.target.value }))}
                         placeholder="Shop / Notes"
-                        className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                       />
                     </div>
-                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
-                      <p className="text-xs text-blue-700">
+                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 dark:bg-blue-500/15 dark:border-blue-400/30">
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
                         This row appears below all operator slots. Use it for shop assignments, daily notes, or special instructions for the team.
                       </p>
                     </div>
@@ -491,7 +491,7 @@ export default function SettingsPage() {
           {/* ══════════════════════════════════════════════
               NFC CLOCK-IN TAGS
              ══════════════════════════════════════════════ */}
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
             <div className="bg-gradient-to-r from-cyan-600 to-blue-700 px-6 py-4 text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -500,18 +500,18 @@ export default function SettingsPage() {
               <p className="text-cyan-100 text-sm mt-1">Manage NFC tags for operator clock-in verification</p>
             </div>
             <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600 dark:text-white/60 mb-4">
                 Keep an NFC tag on your keychain or mount one on the shop wall.
                 All operators scan it when they arrive. Out-of-town crews use remote clock-in with selfie + GPS.
               </p>
               <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="text-center p-3 bg-cyan-50 rounded-xl border border-cyan-200">
-                  <div className="text-xs font-bold text-cyan-600 uppercase">🔑 NFC Scan</div>
-                  <p className="text-[10px] text-cyan-500 mt-1">Keychain or wall tag</p>
+                <div className="text-center p-3 bg-cyan-50 border border-cyan-200 dark:bg-cyan-500/15 dark:border-cyan-400/30 rounded-xl">
+                  <div className="text-xs font-bold text-cyan-600 dark:text-cyan-300 uppercase">🔑 NFC Scan</div>
+                  <p className="text-[10px] text-cyan-500 dark:text-cyan-300/70 mt-1">Keychain or wall tag</p>
                 </div>
-                <div className="text-center p-3 bg-amber-50 rounded-xl border border-amber-200">
-                  <div className="text-xs font-bold text-amber-600 uppercase">📷 Remote</div>
-                  <p className="text-[10px] text-amber-500 mt-1">Selfie + GPS (needs approval)</p>
+                <div className="text-center p-3 bg-amber-50 border border-amber-200 dark:bg-amber-500/15 dark:border-amber-400/30 rounded-xl">
+                  <div className="text-xs font-bold text-amber-600 dark:text-amber-300 uppercase">📷 Remote</div>
+                  <p className="text-[10px] text-amber-500 dark:text-amber-300/70 mt-1">Selfie + GPS (needs approval)</p>
                 </div>
               </div>
               <Link
@@ -526,7 +526,7 @@ export default function SettingsPage() {
           {/* ══════════════════════════════════════════════
               DATA BACKUPS
              ══════════════════════════════════════════════ */}
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
             <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-6 py-4 text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
@@ -535,7 +535,7 @@ export default function SettingsPage() {
               <p className="text-violet-100 text-sm mt-1">Export and protect your customer and contact data</p>
             </div>
             <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600 dark:text-white/60 mb-4">
                 Download a CSV backup of all your customer contacts any time. Daily database backups
                 run automatically — your data is always safe and exportable.
               </p>
@@ -552,7 +552,7 @@ export default function SettingsPage() {
               OPERATOR SKILL LEVELS (super_admin only)
              ══════════════════════════════════════════════ */}
           {isSuperAdmin && (
-            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
               <div className="bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-4 text-white">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <Users className="w-5 h-5" />
@@ -562,26 +562,26 @@ export default function SettingsPage() {
               </div>
               <div className="p-6">
                 {operators.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-4">No operators found</p>
+                  <p className="text-sm text-gray-500 dark:text-white/40 text-center py-4">No operators found</p>
                 ) : (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-[1fr_auto] gap-3 items-center px-3 pb-2 border-b border-gray-200">
-                      <span className="text-xs font-bold text-gray-500 uppercase">Operator</span>
-                      <span className="text-xs font-bold text-gray-500 uppercase w-24 text-center">Skill Level</span>
+                    <div className="grid grid-cols-[1fr_auto] gap-3 items-center px-3 pb-2 border-b border-gray-200 dark:border-white/10">
+                      <span className="text-xs font-bold text-gray-500 dark:text-white/40 uppercase">Operator</span>
+                      <span className="text-xs font-bold text-gray-500 dark:text-white/40 uppercase w-24 text-center">Skill Level</span>
                     </div>
                     {operators.map((op) => {
                       const currentSkill = skillChanges[op.id] !== undefined ? skillChanges[op.id] : op.skill_level_numeric;
                       return (
-                        <div key={op.id} className="grid grid-cols-[1fr_auto] gap-3 items-center px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div key={op.id} className="grid grid-cols-[1fr_auto] gap-3 items-center px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                           <div>
-                            <span className="text-sm font-semibold text-gray-900">{op.full_name}</span>
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white">{op.full_name}</span>
                             {currentSkill !== null && currentSkill !== undefined && (
                               <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                 currentSkill >= 7
-                                  ? 'bg-green-100 text-green-700'
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300'
                                   : currentSkill >= 4
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : 'bg-red-100 text-red-700'
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                                    : 'bg-red-100 text-red-700 dark:bg-rose-500/15 dark:text-rose-300'
                               }`}>
                                 {currentSkill >= 7 ? 'Expert' : currentSkill >= 4 ? 'Intermediate' : 'Beginner'}
                               </span>
@@ -593,7 +593,7 @@ export default function SettingsPage() {
                               const val = e.target.value === '' ? null : parseInt(e.target.value);
                               setSkillChanges(prev => ({ ...prev, [op.id]: val }));
                             }}
-                            className="w-24 px-3 py-2 border border-gray-300 rounded-xl text-sm text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                            className="w-24 px-3 py-2 border border-gray-300 rounded-xl text-sm text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
                           >
                             <option value="">--</option>
                             {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
@@ -607,8 +607,8 @@ export default function SettingsPage() {
                 )}
 
                 {Object.keys(skillChanges).length > 0 && (
-                  <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-200">
-                    <p className="text-xs text-gray-500">{Object.keys(skillChanges).length} change(s) pending</p>
+                  <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-200 dark:border-white/10">
+                    <p className="text-xs text-gray-500 dark:text-white/40">{Object.keys(skillChanges).length} change(s) pending</p>
                     <button
                       onClick={handleSaveSkills}
                       disabled={savingSkills}
@@ -621,14 +621,14 @@ export default function SettingsPage() {
                 )}
 
                 {skillsSaved && (
-                  <div className="mt-3 flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-semibold">
+                  <div className="mt-3 flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-semibold dark:bg-emerald-500/15 dark:border-emerald-400/30 dark:text-emerald-300">
                     <CheckCircle className="w-4 h-4" />
                     Operator skill levels saved successfully!
                   </div>
                 )}
 
-                <div className="mt-4 bg-emerald-50 rounded-xl p-3 border border-emerald-200">
-                  <p className="text-xs text-emerald-700">
+                <div className="mt-4 bg-emerald-50 rounded-xl p-3 border border-emerald-200 dark:bg-emerald-500/15 dark:border-emerald-400/30">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
                     <strong>How it works:</strong> Each job has a difficulty rating (1-10). When assigning operators, the schedule board will show match quality indicators — green for good matches, yellow for stretch assignments, and red when an operator is under-skilled for the job.
                   </p>
                 </div>
@@ -639,7 +639,7 @@ export default function SettingsPage() {
           {/* ══════════════════════════════════════════════
               QUICK REFERENCE
              ══════════════════════════════════════════════ */}
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
             <div className="bg-gradient-to-r from-slate-600 to-slate-800 px-6 py-4 text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Hash className="w-5 h-5" />
@@ -648,21 +648,21 @@ export default function SettingsPage() {
             </div>
             <div className="p-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-purple-50 rounded-xl border border-purple-200">
-                  <div className="text-2xl font-bold text-purple-700">{settings.max_slots}</div>
-                  <div className="text-[10px] font-bold text-purple-500 uppercase mt-1">Max Daily Slots</div>
+                <div className="text-center p-4 bg-purple-50 border border-purple-200 dark:bg-purple-500/15 dark:border-purple-400/30 rounded-xl">
+                  <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{settings.max_slots}</div>
+                  <div className="text-[10px] font-bold text-purple-500 dark:text-purple-400 uppercase mt-1">Max Daily Slots</div>
                 </div>
-                <div className="text-center p-4 bg-amber-50 rounded-xl border border-amber-200">
-                  <div className="text-2xl font-bold text-amber-700">{settings.warning_threshold}</div>
-                  <div className="text-[10px] font-bold text-amber-500 uppercase mt-1">Warning At</div>
+                <div className="text-center p-4 bg-amber-50 border border-amber-200 dark:bg-amber-500/15 dark:border-amber-400/30 rounded-xl">
+                  <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{settings.warning_threshold}</div>
+                  <div className="text-[10px] font-bold text-amber-500 dark:text-amber-400 uppercase mt-1">Warning At</div>
                 </div>
-                <div className="text-center p-4 bg-green-50 rounded-xl border border-green-200">
-                  <div className="text-2xl font-bold text-green-700">{settings.max_slots - settings.warning_threshold}</div>
-                  <div className="text-[10px] font-bold text-green-500 uppercase mt-1">Buffer Slots</div>
+                <div className="text-center p-4 bg-green-50 border border-green-200 dark:bg-emerald-500/15 dark:border-emerald-400/30 rounded-xl">
+                  <div className="text-2xl font-bold text-green-700 dark:text-emerald-300">{settings.max_slots - settings.warning_threshold}</div>
+                  <div className="text-[10px] font-bold text-green-500 dark:text-emerald-400 uppercase mt-1">Buffer Slots</div>
                 </div>
-                <div className="text-center p-4 bg-blue-50 rounded-xl border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-700">{settings.shop_notes_enabled ? 'On' : 'Off'}</div>
-                  <div className="text-[10px] font-bold text-blue-500 uppercase mt-1">Notes Row</div>
+                <div className="text-center p-4 bg-blue-50 border border-blue-200 dark:bg-blue-500/15 dark:border-blue-400/30 rounded-xl">
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{settings.shop_notes_enabled ? 'On' : 'Off'}</div>
+                  <div className="text-[10px] font-bold text-blue-500 dark:text-blue-400 uppercase mt-1">Notes Row</div>
                 </div>
               </div>
             </div>
