@@ -258,10 +258,10 @@ export default function InRoutePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading...</p>
+          <p className="text-gray-600 dark:text-white/60 font-medium">Loading...</p>
         </div>
       </div>
     );
@@ -269,9 +269,9 @@ export default function InRoutePage() {
 
   if (!job || !equipmentChecklistComplete) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Loading...</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Loading...</h1>
         </div>
       </div>
     );
@@ -287,7 +287,7 @@ export default function InRoutePage() {
           onClose={() => setNotification(null)}
         />
       )}
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-[#0b0618] dark:to-[#0e0720]">
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white sticky top-0 z-10 shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
@@ -304,16 +304,16 @@ export default function InRoutePage() {
 
       <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
         {/* Job Information */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 mb-5">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Job Details</h2>
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 dark:bg-white/5 p-5 mb-5">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-4 sm:mb-6">Job Details</h2>
           <div className="space-y-4">
             <div>
-              <p className="text-sm text-gray-600">Customer</p>
-              <p className="text-lg font-semibold text-gray-900">{job.customer_name}</p>
+              <p className="text-sm text-gray-600 dark:text-white/60">Customer</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">{job.customer_name}</p>
             </div>
             {job.job_type && (
               <div>
-                <p className="text-sm text-gray-600">Service Type</p>
+                <p className="text-sm text-gray-600 dark:text-white/60">Service Type</p>
                 <p className="text-lg font-semibold text-purple-700">{job.job_type}</p>
               </div>
             )}
@@ -327,9 +327,9 @@ export default function InRoutePage() {
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
                 <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Work Description</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">Work Description</h2>
             </div>
-            <p className="text-gray-800 text-base leading-relaxed whitespace-pre-wrap">{job.description}</p>
+            <p className="text-gray-800 dark:text-white/80 text-base leading-relaxed whitespace-pre-wrap">{job.description}</p>
 
             {/* Work Differs Button */}
             <button
@@ -344,20 +344,20 @@ export default function InRoutePage() {
 
         {/* Project Manager */}
         {(job.salesman_name || job.created_by_name) && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 sm:p-6 mb-5">
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 dark:bg-white/5 p-5 sm:p-6 mb-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
                 <Briefcase className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-800">Project Manager</h3>
-                <p className="text-sm text-gray-500">Contact if you have questions about the work</p>
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white">Project Manager</h3>
+                <p className="text-sm text-gray-500 dark:text-white/60">Contact if you have questions about the work</p>
               </div>
             </div>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-3 min-w-0">
-                <User className="w-5 h-5 text-gray-500 flex-shrink-0" />
-                <span className="font-semibold text-gray-900 truncate">{job.salesman_name || job.created_by_name}</span>
+                <User className="w-5 h-5 text-gray-500 dark:text-white/60 flex-shrink-0" />
+                <span className="font-semibold text-gray-900 dark:text-white truncate">{job.salesman_name || job.created_by_name}</span>
               </div>
               {job.created_by_email && (
                 <a
@@ -379,20 +379,20 @@ export default function InRoutePage() {
               <MapPin className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Location Details</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Location Details</h2>
               <p className="text-sm text-green-700">Equipment checklist completed ✓</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-semibold text-gray-600 mb-1">Location Name</p>
-              <p className="text-xl font-bold text-gray-900">{job.location}</p>
+              <p className="text-sm font-semibold text-gray-600 dark:text-white/60 mb-1">Location Name</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{job.location}</p>
             </div>
 
             <div>
-              <p className="text-sm font-semibold text-gray-600 mb-1">Full Address</p>
-              <p className="text-lg font-semibold text-gray-900 mb-3">{job.address}</p>
+              <p className="text-sm font-semibold text-gray-600 dark:text-white/60 mb-1">Full Address</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white mb-3">{job.address}</p>
               <a
                 href={getDirectionsUrl(job.address)}
                 target="_blank"
@@ -406,14 +406,14 @@ export default function InRoutePage() {
 
             {/* Contact Information */}
             {(job.contact_on_site || job.foreman_name) && (
-              <div className="pt-4 border-t border-green-200">
-                <p className="text-sm font-semibold text-gray-600 mb-3">Contact Information</p>
+              <div className="pt-4 border-t border-green-200 dark:border-white/10">
+                <p className="text-sm font-semibold text-gray-600 dark:text-white/60 mb-3">Contact Information</p>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <User className="w-5 h-5 text-gray-600" />
+                    <User className="w-5 h-5 text-gray-600 dark:text-white/60" />
                     <div>
-                      <p className="text-sm text-gray-600">Contact Name</p>
-                      <p className="font-semibold text-gray-900">
+                      <p className="text-sm text-gray-600 dark:text-white/60">Contact Name</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">
                         {job.contact_on_site || job.foreman_name || 'N/A'}
                       </p>
                     </div>
@@ -421,9 +421,9 @@ export default function InRoutePage() {
 
                   {(job.contact_phone || job.foreman_phone) && (
                     <div className="flex items-center gap-3">
-                      <Phone className="w-5 h-5 text-gray-600" />
+                      <Phone className="w-5 h-5 text-gray-600 dark:text-white/60" />
                       <div>
-                        <p className="text-sm text-gray-600">Phone Number</p>
+                        <p className="text-sm text-gray-600 dark:text-white/60">Phone Number</p>
                         <a
                           href={`tel:${job.contact_phone || job.foreman_phone}`}
                           className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
@@ -440,12 +440,12 @@ export default function InRoutePage() {
         </div>
 
         {/* Start In Process Button */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5 sm:p-8">
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 dark:bg-white/5 p-5 sm:p-8">
           <div className="text-center mb-5">
-            <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white mb-2">
               Ready to Start Work?
             </h3>
-            <p className="text-gray-600 text-sm sm:text-base">
+            <p className="text-gray-600 dark:text-white/60 text-sm sm:text-base">
               Click below when you arrive at the job site to log your arrival time
             </p>
           </div>
@@ -472,7 +472,7 @@ export default function InRoutePage() {
             )}
           </button>
 
-          <p className="text-sm text-gray-500 text-center mt-4">
+          <p className="text-sm text-gray-500 dark:text-white/40 text-center mt-4">
             This will log your jobsite arrival time and proceed to the work performed form
           </p>
         </div>
@@ -497,13 +497,13 @@ export default function InRoutePage() {
       {/* Work Differs Modal */}
       {showWorkDiffersModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto transform transition-all">
+          <div className="bg-white dark:bg-[#1a1030] rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="w-8 h-8 text-amber-600" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Work Differs?</h3>
-              <p className="text-gray-600 text-sm">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Work Differs?</h3>
+              <p className="text-gray-600 dark:text-white/60 text-sm">
                 If the actual work at the jobsite differs from the description, contact the Project Manager before proceeding.
               </p>
             </div>
@@ -529,7 +529,7 @@ export default function InRoutePage() {
 
             <button
               onClick={() => setShowWorkDiffersModal(false)}
-              className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
+              className="w-full px-6 py-3 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold"
             >
               Close
             </button>
@@ -540,21 +540,21 @@ export default function InRoutePage() {
       {/* Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto transform transition-all">
+          <div className="bg-white dark:bg-[#1a1030] rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirm Jobsite Arrival Time</h3>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Confirm Jobsite Arrival Time</h3>
               <p className="text-gray-600 text-sm">
                 Please confirm the time you arrived at the jobsite
               </p>
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-white/80 mb-2">
                 Arrival Time
               </label>
               <div className="relative">
@@ -575,10 +575,10 @@ export default function InRoutePage() {
                   className="w-full px-4 py-4 text-2xl font-bold text-center text-blue-600 bg-blue-50 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
                 />
               </div>
-              <p className="text-sm text-gray-600 mt-3 text-center font-medium">
+              <p className="text-sm text-gray-600 dark:text-white/60 mt-3 text-center font-medium">
                 Selected Time: <span className="text-blue-600">{displayTime}</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1 text-center">
+              <p className="text-xs text-gray-500 dark:text-white/40 mt-1 text-center">
                 This time will be recorded as your official arrival at the jobsite
               </p>
             </div>
@@ -597,7 +597,7 @@ export default function InRoutePage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowConfirmModal(false)}
-                className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
+                className="flex-1 px-6 py-3 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold"
               >
                 Cancel
               </button>

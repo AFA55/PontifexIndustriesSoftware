@@ -20,7 +20,7 @@ export default function SiteConditionsPanel({ job }: SiteConditionsPanelProps) {
       {/* Required Documents / Compliance */}
       {docs.length > 0 && (
         <div>
-          <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-2">
+          <h4 className="text-sm font-bold text-gray-700 dark:text-white/80 flex items-center gap-2 mb-2">
             <FileText className="w-4 h-4 text-blue-600" />
             Required Documents
           </h4>
@@ -38,7 +38,7 @@ export default function SiteConditionsPanel({ job }: SiteConditionsPanelProps) {
       {/* Scheduling Flexibility */}
       {flexibility && (
         <div>
-          <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-2">
+          <h4 className="text-sm font-bold text-gray-700 dark:text-white/80 flex items-center gap-2 mb-2">
             <HardHat className="w-4 h-4 text-amber-600" />
             Scheduling Notes
           </h4>
@@ -50,32 +50,32 @@ export default function SiteConditionsPanel({ job }: SiteConditionsPanelProps) {
 
       {/* Safety Reminders */}
       <div>
-        <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-2">
+        <h4 className="text-sm font-bold text-gray-700 dark:text-white/80 flex items-center gap-2 mb-2">
           <AlertTriangle className="w-4 h-4 text-red-500" />
           Safety Reminders
         </h4>
         <div className="grid grid-cols-2 gap-2">
-          <div className="flex items-center gap-2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl">
+          <div className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
             <Droplets className="w-4 h-4 text-blue-500" />
-            <span className="text-xs font-medium text-gray-700">Water Control</span>
+            <span className="text-xs font-medium text-gray-700 dark:text-white/80">Water Control</span>
           </div>
           <div className="flex items-center gap-2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl">
             <Zap className="w-4 h-4 text-yellow-500" />
-            <span className="text-xs font-medium text-gray-700">Electrical Safety</span>
+            <span className="text-xs font-medium text-gray-700 dark:text-white/80">Electrical Safety</span>
           </div>
           <div className="flex items-center gap-2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl">
             <Wind className="w-4 h-4 text-cyan-500" />
-            <span className="text-xs font-medium text-gray-700">Dust/Ventilation</span>
+            <span className="text-xs font-medium text-gray-700 dark:text-white/80">Dust/Ventilation</span>
           </div>
           <div className="flex items-center gap-2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl">
             <HardHat className="w-4 h-4 text-orange-500" />
-            <span className="text-xs font-medium text-gray-700">PPE Required</span>
+            <span className="text-xs font-medium text-gray-700 dark:text-white/80">PPE Required</span>
           </div>
         </div>
       </div>
 
       {docs.length === 0 && !flexibility && (
-        <div className="text-center py-4 text-gray-400 text-sm">
+        <div className="text-center py-4 text-gray-400 dark:text-white/40 text-sm">
           No additional site conditions specified
         </div>
       )}

@@ -101,7 +101,7 @@ export default function PendingQueueSidebar({
       <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={onClose} />
 
       {/* Sidebar */}
-      <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[420px] bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[420px] bg-white dark:bg-[#0e0720] dark:border-l dark:border-white/10 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-5 text-white">
           <div className="flex items-center justify-between">
@@ -121,25 +121,25 @@ export default function PendingQueueSidebar({
         {/* Job list */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {pendingJobs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-              <CheckCircle className="w-12 h-12 mb-3 text-green-300" />
-              <p className="font-semibold text-gray-500">All caught up!</p>
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-white/40">
+              <CheckCircle className="w-12 h-12 mb-3 text-green-300 dark:text-green-500/50" />
+              <p className="font-semibold text-gray-500 dark:text-white/60">All caught up!</p>
               <p className="text-sm">No pending forms to review</p>
             </div>
           ) : (
             pendingJobs.map((job) => (
               <div
                 key={job.id}
-                className={`bg-white rounded-xl border-2 shadow-sm hover:shadow-md transition-all ${
+                className={`bg-white dark:bg-white/5 rounded-xl border-2 shadow-sm hover:shadow-md transition-all ${
                   job.missing_info_flagged
-                    ? 'border-red-300 hover:border-red-400'
-                    : 'border-orange-200 hover:border-orange-300'
+                    ? 'border-red-300 dark:border-red-500/40 hover:border-red-400'
+                    : 'border-orange-200 dark:border-orange-500/30 hover:border-orange-300'
                 }`}
               >
                 <div className="p-4">
                   {/* Missing Info Banner */}
                   {job.missing_info_flagged && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-lg mb-2 text-xs text-red-700 font-semibold">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg mb-2 text-xs text-red-700 dark:text-red-400 font-semibold">
                       <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                       <span>Missing Info — awaiting update from {job.submitted_by}</span>
                     </div>
@@ -148,20 +148,20 @@ export default function PendingQueueSidebar({
                   {/* Customer + Job type + Quoted */}
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="font-bold text-gray-900">{job.customer_name}</h3>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mt-1">
+                      <h3 className="font-bold text-gray-900 dark:text-white">{job.customer_name}</h3>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 mt-1">
                         {job.job_type?.split(',')[0]?.trim()}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {job.estimated_cost && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200 flex items-center gap-0.5">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/30 flex items-center gap-0.5">
                           <DollarSign className="w-3 h-3" />
                           {Number(job.estimated_cost).toLocaleString('en-US', { minimumFractionDigits: 0 })}
                         </span>
                       )}
                       {job.is_will_call && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-300">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30">
                           <Phone className="w-3 h-3 inline mr-1" />
                           Will Call
                         </span>
@@ -171,8 +171,8 @@ export default function PendingQueueSidebar({
 
                   {/* Date range */}
                   {(job.scheduled_date || job.end_date) && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                      <CalendarDays className="w-3.5 h-3.5 text-gray-400" />
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-white/60 mb-2">
+                      <CalendarDays className="w-3.5 h-3.5 text-gray-400 dark:text-white/40" />
                       <span>
                         {job.scheduled_date ? new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
                         {job.end_date && job.end_date !== job.scheduled_date && (
@@ -184,8 +184,8 @@ export default function PendingQueueSidebar({
 
                   {/* Location */}
                   {job.location && (
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/60 mb-2">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 dark:text-white/40" />
                       <span className="truncate">{job.location}</span>
                     </div>
                   )}
@@ -194,7 +194,7 @@ export default function PendingQueueSidebar({
                   {job.equipment_needed && job.equipment_needed.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-2">
                       {job.equipment_needed.map((eq) => (
-                        <span key={eq} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 rounded-md text-xs text-indigo-600">
+                        <span key={eq} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-500/15 rounded-md text-xs text-indigo-600 dark:text-indigo-400">
                           <Wrench className="w-3 h-3" />
                           {getDisplayName(eq)}
                         </span>
@@ -204,24 +204,24 @@ export default function PendingQueueSidebar({
 
                   {/* Description preview */}
                   {job.description && (
-                    <p className="text-xs text-gray-500 mb-3 line-clamp-2 italic">
+                    <p className="text-xs text-gray-500 dark:text-white/50 mb-3 line-clamp-2 italic">
                       &ldquo;{job.description}&rdquo;
                     </p>
                   )}
 
                   {/* Submitted by + time */}
-                  <div className="flex items-center gap-2 text-xs text-gray-400 mb-3 pb-3 border-b border-gray-100">
+                  <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-white/40 mb-3 pb-3 border-b border-gray-100 dark:border-white/10">
                     <User className="w-3.5 h-3.5" />
-                    <span>Submitted by <strong className="text-gray-600">{job.submitted_by}</strong></span>
-                    <span className="text-gray-300">•</span>
+                    <span>Submitted by <strong className="text-gray-600 dark:text-white/70">{job.submitted_by}</strong></span>
+                    <span className="text-gray-300 dark:text-white/20">•</span>
                     <Clock className="w-3.5 h-3.5" />
                     <span>{formatDate(job.submitted_at)}</span>
                   </div>
 
                   {/* Requested date info */}
                   {job.scheduled_date && (
-                    <div className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-gray-400" />
+                    <div className="text-xs text-gray-500 dark:text-white/60 mb-3 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-gray-400 dark:text-white/40" />
                       Requested start: <strong>{new Date(job.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong>
                     </div>
                   )}

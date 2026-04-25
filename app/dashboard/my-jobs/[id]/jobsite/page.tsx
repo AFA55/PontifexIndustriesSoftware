@@ -91,7 +91,7 @@ export default function JobsitePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 text-lg font-medium">Loading jobsite info...</p>
@@ -102,7 +102,7 @@ export default function JobsitePage() {
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="text-center">
           <Inbox className="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <p className="text-gray-600 text-lg font-medium">Job not found</p>
@@ -151,7 +151,7 @@ export default function JobsitePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-[#0b0618] dark:to-[#0e0720]">
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-10 shadow-2xl">
         <div className="container mx-auto px-4 py-4 max-w-lg">
@@ -176,16 +176,16 @@ export default function JobsitePage() {
       <div className="container mx-auto px-4 py-5 max-w-lg space-y-4">
 
         {/* Jobsite Address */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+        <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
               <MapPin className="w-6 h-6 text-red-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-base font-bold text-gray-800 mb-1">Jobsite Address</h3>
-              <p className="text-base text-gray-700 font-medium">{job.address || job.location || 'No address provided'}</p>
+              <h3 className="text-base font-bold text-gray-800 dark:text-white mb-1">Jobsite Address</h3>
+              <p className="text-base text-gray-700 dark:text-white/80 font-medium">{job.address || job.location || 'No address provided'}</p>
               {job.location && job.address && job.location !== job.address && (
-                <p className="text-sm text-gray-500 mt-1">{job.location}</p>
+                <p className="text-sm text-gray-500 dark:text-white/60 mt-1">{job.location}</p>
               )}
             </div>
           </div>
@@ -203,17 +203,17 @@ export default function JobsitePage() {
 
         {/* Contact Info */}
         {(job.foreman_name || job.customer_contact || job.site_contact_phone) && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+          <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
             <div className="flex items-center gap-2 mb-3">
               <User className="w-5 h-5 text-blue-600" />
-              <h3 className="text-base font-bold text-gray-800">Site Contact</h3>
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">Site Contact</h3>
             </div>
             <div className="space-y-3">
               {job.foreman_name && (
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl">
                   <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Foreman / Contact</p>
-                    <p className="text-lg font-bold text-gray-900">{job.foreman_name}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/60 dark:text-white/60 font-semibold uppercase tracking-wider">Foreman / Contact</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">{job.foreman_name}</p>
                   </div>
                   {job.foreman_phone && (
                     <a
@@ -226,16 +226,16 @@ export default function JobsitePage() {
                 </div>
               )}
               {job.customer_contact && job.customer_contact !== job.foreman_name && (
-                <div className="p-4 bg-gray-50 rounded-xl">
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Customer Contact</p>
-                  <p className="text-lg font-bold text-gray-900">{job.customer_contact}</p>
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl">
+                  <p className="text-xs text-gray-500 dark:text-white/60 dark:text-white/60 font-semibold uppercase tracking-wider">Customer Contact</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{job.customer_contact}</p>
                 </div>
               )}
               {job.site_contact_phone && (
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl">
                   <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Site Phone</p>
-                    <p className="text-lg font-bold text-gray-900">{job.site_contact_phone}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/60 dark:text-white/60 font-semibold uppercase tracking-wider">Site Phone</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">{job.site_contact_phone}</p>
                   </div>
                   <a
                     href={`tel:${job.site_contact_phone}`}
@@ -251,10 +251,10 @@ export default function JobsitePage() {
 
         {/* Jobsite Conditions - Only shows filled fields */}
         {hasConditions && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+          <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle className="w-5 h-5 text-amber-600" />
-              <h3 className="text-base font-bold text-gray-800">Jobsite Conditions</h3>
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">Jobsite Conditions</h3>
             </div>
             <div className="space-y-2">
               {filledConditions.map(([key, value]) => {
@@ -267,7 +267,7 @@ export default function JobsitePage() {
                 if (isLongText) {
                   return (
                     <div key={key} className="p-4 bg-amber-50 rounded-xl border border-amber-100">
-                      <p className="text-xs text-gray-600 font-semibold uppercase tracking-wider mb-1">{label}</p>
+                      <p className="text-xs text-gray-600 dark:text-white/60 font-semibold uppercase tracking-wider mb-1">{label}</p>
                       <p className="text-base text-gray-800">{displayValue}</p>
                     </div>
                   );
@@ -275,8 +275,8 @@ export default function JobsitePage() {
 
                 return (
                   <div key={key} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
-                    <span className="text-sm text-gray-600 font-semibold capitalize">{label}</span>
-                    <span className="text-base font-bold text-gray-900">{displayValue}</span>
+                    <span className="text-sm text-gray-600 dark:text-white/60 font-semibold capitalize">{label}</span>
+                    <span className="text-base font-bold text-gray-900 dark:text-white">{displayValue}</span>
                   </div>
                 );
               })}
@@ -286,16 +286,16 @@ export default function JobsitePage() {
 
         {/* Site Compliance - Only shows filled fields */}
         {hasCompliance && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+          <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
             <div className="flex items-center gap-2 mb-4">
               <Shield className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-base font-bold text-gray-800">Site Compliance</h3>
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">Site Compliance</h3>
             </div>
             <div className="space-y-2">
               {filledCompliance.map(([key, value]) => (
                 <div key={key} className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                  <span className="text-sm text-gray-600 font-semibold capitalize">{key.replace(/_/g, ' ')}</span>
-                  <span className="text-base font-bold text-gray-900">
+                  <span className="text-sm text-gray-600 dark:text-white/60 font-semibold capitalize">{key.replace(/_/g, ' ')}</span>
+                  <span className="text-base font-bold text-gray-900 dark:text-white">
                     {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
                   </span>
                 </div>
@@ -306,28 +306,28 @@ export default function JobsitePage() {
 
         {/* Additional Notes from Schedule Form */}
         {(job.additional_info || job.special_equipment_notes || job.description) && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+          <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-5 h-5 text-purple-600" />
-              <h3 className="text-base font-bold text-gray-800">Additional Notes</h3>
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">Additional Notes</h3>
             </div>
             <div className="space-y-3">
               {job.description && (
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-                  <p className="text-xs text-gray-500 font-semibold mb-1">Job Description</p>
-                  <p className="text-base text-gray-800 whitespace-pre-wrap">{job.description}</p>
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200">
+                  <p className="text-xs text-gray-500 dark:text-white/60 font-semibold mb-1">Job Description</p>
+                  <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap">{job.description}</p>
                 </div>
               )}
               {job.additional_info && (
                 <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
                   <p className="text-xs text-purple-600 font-semibold mb-1">Additional Info</p>
-                  <p className="text-base text-gray-800 whitespace-pre-wrap">{job.additional_info}</p>
+                  <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap">{job.additional_info}</p>
                 </div>
               )}
               {job.special_equipment_notes && (
                 <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
                   <p className="text-xs text-purple-600 font-semibold mb-1">Special Equipment Notes</p>
-                  <p className="text-base text-gray-800 whitespace-pre-wrap">{job.special_equipment_notes}</p>
+                  <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap">{job.special_equipment_notes}</p>
                 </div>
               )}
             </div>
@@ -353,7 +353,7 @@ export default function JobsitePage() {
                     href={doc.file_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block bg-white rounded-2xl border border-gray-200 shadow-sm p-4 hover:bg-gray-50 transition-colors"
+                    className="block bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm p-4 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
                   >
                     <div className="flex items-start gap-4">
                       <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -362,13 +362,13 @@ export default function JobsitePage() {
                         {isImage ? <Image className="w-7 h-7 text-indigo-500" /> : <File className="w-7 h-7 text-gray-400" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-base font-bold text-gray-900 truncate">{doc.file_name}</p>
+                        <p className="text-base font-bold text-gray-900 dark:text-white truncate">{doc.file_name}</p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className="text-xs font-semibold text-white bg-indigo-500 px-2 py-0.5 rounded-full">
                             {categoryLabels[doc.category] || doc.category}
                           </span>
                           {doc.uploaded_by_name && (
-                            <span className="text-xs text-gray-500">by {doc.uploaded_by_name}</span>
+                            <span className="text-xs text-gray-500 dark:text-white/60">by {doc.uploaded_by_name}</span>
                           )}
                         </div>
                         {doc.notes && (

@@ -148,7 +148,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* ---------------------------------------------------------------- */}
         {/* Scrollable page content                                          */}
         {/* ---------------------------------------------------------------- */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-900">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#0b0618]">
           {children}
         </main>
 

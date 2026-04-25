@@ -1612,7 +1612,7 @@ export default function ScheduleBoardPage() {
   // ═══ LOADING STATE ═══
   if (loading && Object.keys(operatorJobs).length === 0 && unassignedJobs.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-3" />
           <p className="text-gray-600 dark:text-slate-400 font-medium">Loading schedule...</p>
@@ -1622,7 +1622,7 @@ export default function ScheduleBoardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720]">
       {/* ═══ STICKY HEADER ════════════════════════════════════════════════ */}
       <div className="backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-30 shadow-lg">
         <div className="container mx-auto px-4 md:px-6 py-3">
@@ -1835,16 +1835,16 @@ export default function ScheduleBoardPage() {
                 {willCallJobs.map((job) => {
                   const daysWaiting = job.scheduled_date ? daysAgo(job.scheduled_date) : 0;
                   return (
-                    <div key={job.id} className="bg-white rounded-xl border-2 border-amber-300 p-3 hover:shadow-md transition-all">
+                    <div key={job.id} className="bg-white dark:bg-white/5 rounded-xl border-2 border-amber-300 dark:border-amber-500/30 p-3 hover:shadow-md transition-all">
                       <div className="flex items-start justify-between mb-1">
-                        <h4 className="font-bold text-gray-900 text-sm">{job.customer_name}</h4>
+                        <h4 className="font-bold text-gray-900 dark:text-white text-sm">{job.customer_name}</h4>
                         <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold whitespace-nowrap">WILL CALL</span>
                       </div>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mb-1">{job.job_type}</span>
-                      <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><MapPin className="w-3 h-3" /> {job.location}</p>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 mb-1">{job.job_type}</span>
+                      <p className="text-xs text-gray-500 dark:text-white/60 flex items-center gap-1 mb-1"><MapPin className="w-3 h-3" /> {job.location}</p>
 
                       <div className="flex items-center justify-between mt-2 mb-2">
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-gray-400 dark:text-white/40">
                           Tentative: {job.scheduled_date ? parseLocalDate(job.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
                         </span>
                         <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -2187,17 +2187,17 @@ export default function ScheduleBoardPage() {
 
             {/* Stats */}
             <div className="px-6 py-4 grid grid-cols-3 gap-3 border-b border-gray-100 dark:border-slate-700">
-              <div className="text-center p-3 bg-green-50 rounded-xl">
-                <div className="text-2xl font-bold text-green-600">{autoScheduleResults.totalAssigned}</div>
-                <div className="text-xs font-semibold text-green-500 uppercase">Assigned</div>
+              <div className="text-center p-3 bg-green-50 dark:bg-green-500/10 rounded-xl">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{autoScheduleResults.totalAssigned}</div>
+                <div className="text-xs font-semibold text-green-500 dark:text-green-500 uppercase">Assigned</div>
               </div>
-              <div className="text-center p-3 bg-amber-50 rounded-xl">
-                <div className="text-2xl font-bold text-amber-600">{autoScheduleResults.totalSkipped}</div>
-                <div className="text-xs font-semibold text-amber-500 uppercase">Skipped</div>
+              <div className="text-center p-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl">
+                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{autoScheduleResults.totalSkipped}</div>
+                <div className="text-xs font-semibold text-amber-500 dark:text-amber-500 uppercase">Skipped</div>
               </div>
-              <div className="text-center p-3 bg-purple-50 rounded-xl">
-                <div className="text-2xl font-bold text-purple-600">{autoScheduleResults.totalUnassigned}</div>
-                <div className="text-xs font-semibold text-purple-500 uppercase">Total Jobs</div>
+              <div className="text-center p-3 bg-purple-50 dark:bg-purple-500/10 rounded-xl">
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{autoScheduleResults.totalUnassigned}</div>
+                <div className="text-xs font-semibold text-purple-500 dark:text-purple-500 uppercase">Total Jobs</div>
               </div>
             </div>
 
@@ -2205,7 +2205,7 @@ export default function ScheduleBoardPage() {
             <div className="px-6 py-4 overflow-y-auto max-h-[45vh] space-y-2">
               {autoScheduleResults.assignments.length > 0 && (
                 <>
-                  <h3 className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2 mb-2">
+                  <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase flex items-center gap-2 mb-2">
                     <Zap className="w-4 h-4 text-green-500" /> Assignments
                   </h3>
                   {autoScheduleResults.assignments.map((a, i) => (
@@ -2231,16 +2231,16 @@ export default function ScheduleBoardPage() {
 
               {autoScheduleResults.skipped.length > 0 && (
                 <>
-                  <h3 className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2 mt-4 mb-2">
+                  <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase flex items-center gap-2 mt-4 mb-2">
                     <AlertCircle className="w-4 h-4 text-amber-500" /> Skipped
                   </h3>
                   {autoScheduleResults.skipped.map((s, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
+                    <div key={i} className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl border border-amber-100 dark:border-amber-500/20">
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 text-sm truncate">{s.customerName}</div>
-                        <div className="text-xs text-gray-500">{s.jobNumber}</div>
+                        <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">{s.customerName}</div>
+                        <div className="text-xs text-gray-500 dark:text-white/50">{s.jobNumber}</div>
                       </div>
-                      <span className="text-xs text-amber-600 font-medium ml-3">{s.reason}</span>
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium ml-3">{s.reason}</span>
                     </div>
                   ))}
                 </>
@@ -2248,8 +2248,8 @@ export default function ScheduleBoardPage() {
 
               {autoScheduleResults.assignments.length === 0 && autoScheduleResults.skipped.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <Sparkles className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p>No unassigned jobs to schedule</p>
+                  <Sparkles className="w-8 h-8 text-gray-300 dark:text-white/20 mx-auto mb-2" />
+                  <p className="dark:text-white/50">No unassigned jobs to schedule</p>
                 </div>
               )}
             </div>
@@ -2314,13 +2314,13 @@ export default function ScheduleBoardPage() {
       {/* ═══ NEXT AVAILABLE DATE BANNER ════════════════════════════════ */}
       {nextAvailableDate && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl border-2 border-purple-200 p-4 flex items-center gap-4 max-w-md">
+          <div className="bg-white dark:bg-[#0e0720] dark:border-white/10 rounded-2xl shadow-2xl border-2 border-purple-200 p-4 flex items-center gap-4 max-w-md">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
               <CalendarDays className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-gray-900">Next Available Date</p>
-              <p className="text-xs text-gray-600">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">Next Available Date</p>
+              <p className="text-xs text-gray-600 dark:text-white/60">
                 {new Date(nextAvailableDate.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                 <span className="text-purple-600 font-semibold"> — {nextAvailableDate.availableSlots} slots open</span>
               </p>
@@ -2383,11 +2383,11 @@ export default function ScheduleBoardPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-xl">
-                        <Megaphone className="w-6 h-6 text-orange-600 flex-shrink-0" />
+                      <div className="flex items-center gap-3 p-4 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded-xl">
+                        <Megaphone className="w-6 h-6 text-orange-600 dark:text-orange-400 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-bold text-orange-800">{dispatchInfo.total} job(s) will be dispatched</p>
-                          <p className="text-xs text-orange-600">All assigned operators and helpers will be notified.</p>
+                          <p className="text-sm font-bold text-orange-800 dark:text-orange-400">{dispatchInfo.total} job(s) will be dispatched</p>
+                          <p className="text-xs text-orange-600 dark:text-orange-500">All assigned operators and helpers will be notified.</p>
                         </div>
                       </div>
                     )}

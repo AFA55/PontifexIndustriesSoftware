@@ -74,13 +74,13 @@ export default function DayNavigator({ selectedDate, onChange, hasLongDurationJo
   });
 
   return (
-    <div className="flex items-center justify-between bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-3">
+    <div className="flex items-center justify-between bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-3">
       <button
         onClick={goBack}
         disabled={!canGoBack()}
-        className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
       >
-        <ChevronLeft className="w-5 h-5 text-gray-700" />
+        <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-white/80" />
       </button>
 
       <div className="flex-1 text-center">
@@ -109,9 +109,9 @@ export default function DayNavigator({ selectedDate, onChange, hasLongDurationJo
       <button
         onClick={goForward}
         disabled={!canGoForward()}
-        className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
       >
-        <ChevronRight className="w-5 h-5 text-gray-700" />
+        <ChevronRight className="w-5 h-5 text-gray-700 dark:text-white/80" />
       </button>
     </div>
   );

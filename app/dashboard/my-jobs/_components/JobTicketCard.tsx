@@ -107,7 +107,7 @@ export default function JobTicketCard({ job }: JobTicketCardProps) {
   return (
     <Link
       href={`/dashboard/my-jobs/${job.id}`}
-      className={`block w-full text-left bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border-2 transition-all duration-200 hover:shadow-2xl hover:scale-[1.01] border-gray-200/50 hover:border-blue-300 ${isCompleted ? 'opacity-70' : ''}`}
+      className={`block w-full text-left bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border-2 transition-all duration-200 hover:shadow-2xl hover:scale-[1.01] border-gray-200/50 dark:border-white/10 hover:border-blue-300 dark:hover:border-white/30 ${isCompleted ? 'opacity-70' : ''}`}
     >
       {/* Special Arrival Time Banner */}
       {(arrivalDisplay || shopArrival) && !isCompleted && (
@@ -131,7 +131,7 @@ export default function JobTicketCard({ job }: JobTicketCardProps) {
           <div className="flex-1 min-w-0">
             {/* Job Number + Status */}
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="text-xs font-bold text-gray-400">#{job.job_number}</span>
+              <span className="text-xs font-bold text-gray-400 dark:text-white/40">#{job.job_number}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getStatusStyle(job.status)}`}>
                 {job.readable_status}
               </span>
@@ -148,11 +148,11 @@ export default function JobTicketCard({ job }: JobTicketCardProps) {
             </div>
 
             {/* Customer Name */}
-            <h3 className="text-base font-bold text-gray-900 truncate">{job.customer_name}</h3>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white truncate">{job.customer_name}</h3>
 
             {/* Location + Type */}
             <div className="flex items-center gap-3 mt-1.5">
-              <div className="flex items-center gap-1 text-sm text-gray-600 truncate">
+              <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-white/60 truncate">
                 <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-red-400" />
                 <span className="truncate">{job.location || job.address}</span>
               </div>
@@ -164,13 +164,13 @@ export default function JobTicketCard({ job }: JobTicketCardProps) {
 
             {/* Estimated Hours */}
             {job.estimated_hours && (
-              <div className="text-xs text-gray-500 mt-1 font-medium">
+              <div className="text-xs text-gray-500 dark:text-white/60 mt-1 font-medium">
                 Est. {job.estimated_hours} hrs
               </div>
             )}
           </div>
 
-          <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+          <ChevronRight className="w-5 h-5 text-gray-400 dark:text-white/40 flex-shrink-0" />
         </div>
       </div>
     </Link>

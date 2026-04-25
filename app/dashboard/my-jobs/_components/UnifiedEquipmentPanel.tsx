@@ -121,7 +121,7 @@ export default function UnifiedEquipmentPanel({
 
   if (totalItems === 0) {
     return (
-      <div className="text-center py-6 text-gray-400 text-sm">
+      <div className="text-center py-6 text-gray-400 dark:text-white/40 text-sm">
         No equipment required for this job.
       </div>
     );
@@ -132,7 +132,7 @@ export default function UnifiedEquipmentPanel({
       {/* ── Progress Header ────────────────────────── */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className={`font-bold ${allDone ? 'text-green-600' : 'text-gray-700'}`}>
+          <span className={`font-bold ${allDone ? 'text-green-600' : 'text-gray-700 dark:text-white/80'}`}>
             {checkedCount} / {totalItems} confirmed
           </span>
           {allDone && (
@@ -141,7 +141,7 @@ export default function UnifiedEquipmentPanel({
             </span>
           )}
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
+        <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-2.5">
           <div
             className={`h-2.5 rounded-full transition-all duration-500 ${
               allDone ? 'bg-green-500' : checkedCount > 0 ? 'bg-amber-500' : 'bg-gray-300'
@@ -162,7 +162,7 @@ export default function UnifiedEquipmentPanel({
         return (
           <div
             key={category}
-            className={`rounded-xl border border-gray-200 overflow-hidden ${colors.border} border-l-4`}
+            className={`rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden ${colors.border} border-l-4`}
           >
             {/* Category Header */}
             <button
@@ -181,13 +181,13 @@ export default function UnifiedEquipmentPanel({
                 {catChecked}/{items.length}
               </span>
               <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                className={`w-4 h-4 text-gray-400 dark:text-white/40 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
               />
             </button>
 
             {/* Equipment Rows */}
             {!isCollapsed && (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-white/5">
                 {items.map(item => (
                   <EquipmentCheckRow
                     key={item.id}
@@ -236,15 +236,15 @@ function EquipmentCheckRow({
       disabled={disabled}
       className={`w-full flex items-center gap-3 px-3 py-3 transition-all ${
         isChecked
-          ? 'bg-green-50 text-green-800'
-          : 'bg-white text-gray-700 hover:bg-gray-50'
+          ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
+          : 'bg-white dark:bg-transparent text-gray-700 dark:text-white/80 hover:bg-gray-50 dark:hover:bg-white/5'
       } ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'}`}
     >
       {/* Checkbox */}
       {isChecked ? (
         <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
       ) : (
-        <Circle className="w-5 h-5 text-gray-300 flex-shrink-0" />
+        <Circle className="w-5 h-5 text-gray-300 dark:text-white/20 flex-shrink-0" />
       )}
 
       {/* Label + Quantity */}

@@ -90,7 +90,7 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="w-5 h-5 animate-spin text-purple-500" />
-        <span className="ml-2 text-sm text-gray-500">Loading work history...</span>
+        <span className="ml-2 text-sm text-gray-500 dark:text-white/50">Loading work history...</span>
       </div>
     );
   }
@@ -98,9 +98,9 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
   if (logs.length === 0 && workItems.length === 0) {
     return (
       <div className="text-center py-8">
-        <CalendarDays className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-        <p className="text-sm text-gray-500 font-medium">No work history recorded yet</p>
-        <p className="text-xs text-gray-400 mt-1">History will appear once operator starts work</p>
+        <CalendarDays className="w-8 h-8 text-gray-300 dark:text-white/20 mx-auto mb-2" />
+        <p className="text-sm text-gray-500 dark:text-white/50 font-medium">No work history recorded yet</p>
+        <p className="text-xs text-gray-400 dark:text-white/30 mt-1">History will appear once operator starts work</p>
       </div>
     );
   }
@@ -134,29 +134,29 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
           <div key={log.id} className="relative">
             {/* Timeline connector */}
             {idx < logs.length - 1 && (
-              <div className="absolute left-5 top-12 bottom-0 w-0.5 bg-gray-200" />
+              <div className="absolute left-5 top-12 bottom-0 w-0.5 bg-gray-200 dark:bg-white/10" />
             )}
 
             <div className="flex gap-3">
               {/* Day marker */}
-              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                <span className="text-sm font-bold text-purple-700">{log.day_number}</span>
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                <span className="text-sm font-bold text-purple-700 dark:text-purple-400">{log.day_number}</span>
               </div>
 
               {/* Day content */}
-              <div className="flex-1 bg-gray-50 rounded-xl border border-gray-200 p-3">
+              <div className="flex-1 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 p-3">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-900">
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">
                       Day {log.day_number}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-white/50">
                       {log.log_date ? formatDate(log.log_date) : '--'}
                     </span>
                   </div>
                   {log.hours_worked && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold">
                       <Clock className="w-3 h-3" />
                       {log.hours_worked}h
                     </span>
@@ -166,22 +166,22 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
                 {/* Timestamps */}
                 <div className="flex flex-wrap gap-2 mb-2">
                   {log.route_started_at && (
-                    <span className="text-[10px] px-2 py-0.5 bg-blue-50 rounded text-blue-600 font-medium">
+                    <span className="text-[10px] px-2 py-0.5 bg-blue-50 dark:bg-blue-500/15 rounded text-blue-600 dark:text-blue-400 font-medium">
                       Route: {formatTime(log.route_started_at)}
                     </span>
                   )}
                   {log.work_started_at && (
-                    <span className="text-[10px] px-2 py-0.5 bg-orange-50 rounded text-orange-600 font-medium">
+                    <span className="text-[10px] px-2 py-0.5 bg-orange-50 dark:bg-orange-500/15 rounded text-orange-600 dark:text-orange-400 font-medium">
                       Start: {formatTime(log.work_started_at)}
                     </span>
                   )}
                   {log.work_completed_at && (
-                    <span className="text-[10px] px-2 py-0.5 bg-green-50 rounded text-green-600 font-medium">
+                    <span className="text-[10px] px-2 py-0.5 bg-green-50 dark:bg-green-500/15 rounded text-green-600 dark:text-green-400 font-medium">
                       Done: {formatTime(log.work_completed_at)}
                     </span>
                   )}
                   {log.done_for_day_at && !log.work_completed_at && (
-                    <span className="text-[10px] px-2 py-0.5 bg-emerald-50 rounded text-emerald-600 font-medium">
+                    <span className="text-[10px] px-2 py-0.5 bg-emerald-50 dark:bg-emerald-500/15 rounded text-emerald-600 dark:text-emerald-400 font-medium">
                       Done for Day: {formatTime(log.done_for_day_at)}
                     </span>
                   )}
@@ -190,15 +190,15 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
                 {/* Work performed */}
                 {workList.length > 0 && (
                   <div className="mb-2">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-1">
+                    <div className="text-[10px] font-bold text-gray-400 dark:text-white/30 uppercase mb-1 flex items-center gap-1">
                       <Wrench className="w-3 h-3" /> Work Performed
                     </div>
                     <ul className="space-y-0.5 pl-4">
                       {workList.map((item, i) => (
-                        <li key={i} className="text-xs text-gray-700 list-disc">
+                        <li key={i} className="text-xs text-gray-700 dark:text-white/70 list-disc">
                           {item.description}
                           {item.quantity && item.unit && (
-                            <span className="text-gray-400 ml-1">({item.quantity} {item.unit})</span>
+                            <span className="text-gray-400 dark:text-white/30 ml-1">({item.quantity} {item.unit})</span>
                           )}
                         </li>
                       ))}
@@ -208,9 +208,9 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
 
                 {/* Notes */}
                 {log.notes && (
-                  <div className="flex items-start gap-1.5 mt-2 px-2 py-1.5 bg-white rounded-lg border border-gray-100">
-                    <MessageSquare className="w-3 h-3 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-gray-600">{log.notes}</p>
+                  <div className="flex items-start gap-1.5 mt-2 px-2 py-1.5 bg-white dark:bg-white/5 rounded-lg border border-gray-100 dark:border-white/10">
+                    <MessageSquare className="w-3 h-3 text-gray-400 dark:text-white/30 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-gray-600 dark:text-white/60">{log.notes}</p>
                   </div>
                 )}
               </div>
@@ -221,16 +221,16 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
 
       {/* Work items (if any, separate from daily logs) */}
       {workItems.length > 0 && logs.length === 0 && (
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
-          <div className="text-[10px] font-bold text-gray-400 uppercase mb-2 flex items-center gap-1">
+        <div className="bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 p-3">
+          <div className="text-[10px] font-bold text-gray-400 dark:text-white/30 uppercase mb-2 flex items-center gap-1">
             <FileText className="w-3 h-3" /> Work Items
           </div>
           <ul className="space-y-1 pl-4">
             {workItems.map((item) => (
-              <li key={item.id} className="text-xs text-gray-700 list-disc">
+              <li key={item.id} className="text-xs text-gray-700 dark:text-white/70 list-disc">
                 {item.description}
                 {item.quantity && item.unit && (
-                  <span className="text-gray-400 ml-1">({item.quantity} {item.unit})</span>
+                  <span className="text-gray-400 dark:text-white/30 ml-1">({item.quantity} {item.unit})</span>
                 )}
               </li>
             ))}

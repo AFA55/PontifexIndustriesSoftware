@@ -528,7 +528,7 @@ function Toggle({ checked, onChange, label, icon: Icon }: { checked: boolean; on
       <div className={`relative w-12 h-7 rounded-full transition-all duration-200 flex-shrink-0 ${checked ? 'bg-blue-600 shadow-inner' : 'bg-slate-300 dark:bg-white/20'}`}>
         <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-200 ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
       </div>
-      {Icon && <Icon size={18} className={`flex-shrink-0 ${checked ? 'text-blue-600' : 'text-slate-400'}`} />}
+      {Icon && <Icon size={18} className={`flex-shrink-0 ${checked ? 'text-blue-600' : 'text-slate-400 dark:text-white/40'}`} />}
       <span className={`text-base font-medium ${checked ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-white/60'}`}>{label}</span>
     </button>
   );
@@ -559,12 +559,12 @@ function ConditionCheck({ checked, onChange, label, icon: Icon, showFt, ftValue,
         type="button"
         onClick={() => onChange(!checked)}
         className={`flex-shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${
-          checked ? `${c.check} shadow-sm` : 'border-slate-300 bg-white hover:border-blue-400'
+          checked ? `${c.check} shadow-sm` : 'border-slate-300 dark:border-white/20 bg-white dark:bg-transparent hover:border-blue-400'
         }`}
       >
         {checked && <Check size={18} className="text-white" />}
       </button>
-      {Icon && <Icon size={20} className={`flex-shrink-0 ${checked ? c.icon : 'text-slate-400'}`} />}
+      {Icon && <Icon size={20} className={`flex-shrink-0 ${checked ? c.icon : 'text-slate-400 dark:text-white/40'}`} />}
       <span className={`text-base sm:text-lg flex-1 ${checked ? `${c.text} font-semibold` : 'text-slate-600 dark:text-white/60'}`}>{label}</span>
       {showFt && checked && (
         <div className="flex items-center gap-2">
@@ -573,9 +573,9 @@ function ConditionCheck({ checked, onChange, label, icon: Icon, showFt, ftValue,
             value={ftValue || ''}
             onChange={(e) => onFtChange?.(e.target.value)}
             placeholder="0"
-            className={`w-24 sm:w-28 px-4 py-2.5 sm:py-3 border-2 ${c.ftBorder} ${c.ftBg} rounded-xl text-base sm:text-lg font-bold text-slate-800 text-center ${c.ftRing} focus:ring-2 focus:outline-none transition-all`}
+            className={`w-24 sm:w-28 px-4 py-2.5 sm:py-3 border-2 ${c.ftBorder} ${c.ftBg} rounded-xl text-base sm:text-lg font-bold text-slate-800 dark:text-white text-center ${c.ftRing} focus:ring-2 focus:outline-none transition-all`}
           />
-          <span className="text-sm sm:text-base text-slate-600 font-bold">ft.</span>
+          <span className="text-sm sm:text-base text-slate-600 dark:text-white/60 font-bold">ft.</span>
         </div>
       )}
     </div>
@@ -1732,7 +1732,7 @@ export default function ScheduleFormPage() {
                 {/* Customer list */}
                 <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
                   {filteredCrmCustomers.length === 0 && customerSearch.trim() && (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-8 text-slate-400 dark:text-white/40">
                       <p className="text-sm font-medium">No customers matching &quot;{customerSearch}&quot;</p>
                       <button
                         type="button"
@@ -1747,7 +1747,7 @@ export default function ScheduleFormPage() {
                     </div>
                   )}
                   {filteredCrmCustomers.length === 0 && !customerSearch.trim() && (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-8 text-slate-400 dark:text-white/40">
                       <p className="text-sm">No customers in database yet.</p>
                       <button
                         type="button"
@@ -1818,9 +1818,9 @@ export default function ScheduleFormPage() {
                         type="checkbox"
                         checked={form.save_as_customer}
                         onChange={e => updateForm({ save_as_customer: e.target.checked })}
-                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        className="w-3.5 h-3.5 rounded border-slate-300 dark:border-white/20 text-blue-600 focus:ring-blue-500 dark:bg-white/5"
                       />
-                      <span className="text-xs text-slate-500">Save as new customer on submit</span>
+                      <span className="text-xs text-slate-500 dark:text-white/40">Save as new customer on submit</span>
                     </label>
                   )}
                 </div>
@@ -1872,10 +1872,10 @@ export default function ScheduleFormPage() {
                 </p>
               )}
               {poMatch && (
-                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                  <p className="text-xs font-bold text-blue-700 mb-1">Found existing job with this PO</p>
-                  <p className="text-xs text-blue-600">Customer: <span className="font-semibold">{poMatch.customer_name}</span></p>
-                  {poMatch.address && <p className="text-xs text-blue-600">Address: {poMatch.address}</p>}
+                <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-400/30 rounded-xl">
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-1">Found existing job with this PO</p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400">Customer: <span className="font-semibold">{poMatch.customer_name}</span></p>
+                  {poMatch.address && <p className="text-xs text-blue-600 dark:text-blue-400">Address: {poMatch.address}</p>}
                   <button
                     type="button"
                     onClick={applyPoAutofill}
@@ -1902,7 +1902,7 @@ export default function ScheduleFormPage() {
                 onAddNew={(val) => updateForm({ project_name: val })}
                 loading={historyLoading}
               />
-              <p className="text-xs text-slate-400 mt-1">Groups multiple jobs at the same site. If existing project, it will auto-populate address.</p>
+              <p className="text-xs text-slate-400 dark:text-white/30 mt-1">Groups multiple jobs at the same site. If existing project, it will auto-populate address.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -2018,7 +2018,7 @@ export default function ScheduleFormPage() {
                       className={`flex items-center gap-3 px-4 py-3.5 sm:py-4 rounded-xl text-sm sm:text-base font-semibold border-2 transition-all duration-200 ${
                         isSelected
                           ? `bg-gradient-to-r ${st.gradient} text-white border-transparent shadow-lg`
-                          : `bg-white ${st.lightBg} border-2 hover:shadow-md hover:scale-[1.02]`
+                          : `bg-white dark:bg-white/5 ${st.lightBg} dark:border-white/10 dark:text-white/70 border-2 hover:shadow-md hover:scale-[1.02]`
                       }`}
                     >
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0 ${
@@ -2068,7 +2068,7 @@ export default function ScheduleFormPage() {
                             className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                               currentMode === 'linear'
                                 ? 'bg-blue-600 text-white shadow-md'
-                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-600'
+                                : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-white/50 hover:bg-slate-200 dark:hover:bg-white/15 hover:text-slate-600 dark:hover:text-white/70'
                             }`}
                           >
                             Linear Ft + Cut Depth
@@ -2079,7 +2079,7 @@ export default function ScheduleFormPage() {
                             className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                               currentMode === 'areas'
                                 ? 'bg-blue-600 text-white shadow-md'
-                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-600'
+                                : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-white/50 hover:bg-slate-200 dark:hover:bg-white/15 hover:text-slate-600 dark:hover:text-white/70'
                             }`}
                           >
                             {config.altLabel || 'Areas + Thickness'}
@@ -2107,12 +2107,12 @@ export default function ScheduleFormPage() {
                           return (
                             <div className="space-y-3">
                               {holes.map((hole, idx) => (
-                                <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100' : ''}`}>
+                                <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100 dark:border-white/5' : ''}`}>
                                   {idx === 0 && (
                                     <div className="grid grid-cols-3 gap-3 mb-1.5">
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest"># of Holes</label>
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Bit Size</label>
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Depth</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest"># of Holes</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Bit Size</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Depth</label>
                                     </div>
                                   )}
                                   <div className="flex items-center gap-2">
@@ -2139,9 +2139,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], bit_size: e.target.value };
                                             updateHoles(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">&quot;</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">&quot;</span>
                                       </div>
                                       <div className="relative">
                                         <input
@@ -2153,9 +2153,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], depth: e.target.value };
                                             updateHoles(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">in.</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">in.</span>
                                       </div>
                                     </div>
                                     {holes.length > 1 && (
@@ -2183,11 +2183,11 @@ export default function ScheduleFormPage() {
 
                               {/* Summary */}
                               {totalHoles > 0 && (
-                                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
-                                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total:</span>
-                                  <span className="text-sm font-bold text-slate-800">{totalHoles} hole{totalHoles !== 1 ? 's' : ''}</span>
+                                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                                  <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-wider">Total:</span>
+                                  <span className="text-sm font-bold text-slate-800 dark:text-white">{totalHoles} hole{totalHoles !== 1 ? 's' : ''}</span>
                                   {uniqueSizes.length > 0 && (
-                                    <span className="text-xs text-slate-400">Sizes: {uniqueSizes.map(s => `${s}"`).join(', ')}</span>
+                                    <span className="text-xs text-slate-400 dark:text-white/30">Sizes: {uniqueSizes.map(s => `${s}"`).join(', ')}</span>
                                   )}
                                 </div>
                               )}
@@ -2212,7 +2212,7 @@ export default function ScheduleFormPage() {
                           return (
                             <div className="space-y-3">
                               {cuts.map((cut, idx) => (
-                                <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100' : ''}`}>
+                                <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100 dark:border-white/5' : ''}`}>
                                   {idx === 0 && (
                                     <div className="grid grid-cols-3 gap-3 mb-1.5">
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Linear Feet</label>
@@ -2318,7 +2318,7 @@ export default function ScheduleFormPage() {
                           return (
                             <div className="space-y-3">
                               {areas.map((area, idx) => (
-                                <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100' : ''}`}>
+                                <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100 dark:border-white/5' : ''}`}>
                                   {idx === 0 && (
                                     <div className="grid grid-cols-4 gap-3 mb-1.5">
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Length</label>
@@ -2739,7 +2739,7 @@ export default function ScheduleFormPage() {
                                     value={val === 'yes' ? '' : val}
                                     placeholder="Qty"
                                     onChange={e => setEquipVal(code, item.id, e.target.value || '1')}
-                                    className="w-16 px-2 py-1.5 bg-white border border-blue-300 rounded-lg text-sm font-bold text-slate-800 text-center focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+                                    className="w-16 px-2 py-1.5 bg-white dark:bg-white/5 border border-blue-300 dark:border-blue-400/40 rounded-lg text-sm font-bold text-slate-800 dark:text-white text-center focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
                                   />
                                   {item.qtyUnit && <span className="text-xs font-bold text-slate-400">{item.qtyUnit}</span>}
                                 </div>
@@ -2896,7 +2896,7 @@ export default function ScheduleFormPage() {
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
                             rental.pickup_required
                               ? 'bg-amber-100 border-amber-300 text-amber-700'
-                              : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-amber-50'
+                              : 'bg-slate-100 dark:bg-white/10 border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/40 hover:bg-amber-50 dark:hover:bg-amber-500/10'
                           }`}
                         >
                           Pickup: {rental.pickup_required ? 'Yes' : 'No'}
@@ -3064,7 +3064,7 @@ export default function ScheduleFormPage() {
             </div>
 
             <SectionCard>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Scheduling Flexibility</p>
+              <p className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Scheduling Flexibility</p>
               <Toggle
                 checked={form.special_arrival}
                 onChange={v => updateForm({ special_arrival: v })}
@@ -3126,7 +3126,7 @@ export default function ScheduleFormPage() {
         return (
           <div className="space-y-6">
             <SectionCard>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Access Requirements</p>
+              <p className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Access Requirements</p>
               <Toggle
                 checked={form.orientation_required}
                 onChange={v => {
@@ -3195,7 +3195,7 @@ export default function ScheduleFormPage() {
 
             {/* ── Permits Required ────────────── */}
             <SectionCard>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Permits</p>
+              <p className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Permits</p>
               <Toggle
                 checked={form.permit_required}
                 onChange={v => {
@@ -3208,7 +3208,7 @@ export default function ScheduleFormPage() {
               />
               {form.permit_required && (
                 <div className="pl-4 border-l-2 border-amber-200 ml-2 space-y-3">
-                  <p className="text-xs text-slate-500">Select all permits required for this job:</p>
+                  <p className="text-xs text-slate-500 dark:text-white/40">Select all permits required for this job:</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {[
                       { type: 'work_permit', label: 'Work Permit', color: 'border-blue-300 bg-blue-50 text-blue-800' },
@@ -3232,11 +3232,11 @@ export default function ScheduleFormPage() {
                           className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
                             isSelected
                               ? `${p.color} ring-2 ring-offset-1 ring-current`
-                              : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                              : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-500 dark:text-white/50 hover:border-slate-300 dark:hover:border-white/20'
                           }`}
                         >
                           <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                            isSelected ? 'border-current bg-current' : 'border-slate-300'
+                            isSelected ? 'border-current bg-current' : 'border-slate-300 dark:border-white/20'
                           }`}>
                             {isSelected && <CheckCircle size={10} className="text-white" />}
                           </div>
@@ -3268,7 +3268,7 @@ export default function ScheduleFormPage() {
                   {/* Permit details per selected type */}
                   {form.permits.filter(p => p.type !== 'other').length > 0 && (
                     <div className="space-y-2 mt-2">
-                      <p className="text-xs text-slate-400 font-semibold">Permit Details (optional)</p>
+                      <p className="text-xs text-slate-400 dark:text-white/30 font-semibold">Permit Details (optional)</p>
                       {form.permits.filter(p => p.type !== 'other').map(p => (
                         <InputField
                           key={p.type}
@@ -3300,8 +3300,8 @@ export default function ScheduleFormPage() {
 
             {/* ── Create Compliance Documents ────────────── */}
             <SectionCard>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Compliance Documents</p>
-              <p className="text-xs text-slate-400 -mt-2">Create or select facility compliance requirements</p>
+              <p className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Compliance Documents</p>
+              <p className="text-xs text-slate-400 dark:text-white/30 -mt-2">Create or select facility compliance requirements</p>
 
               {/* Select existing facility */}
               {facilities.length > 0 && !showCreateFacility && (
@@ -3353,7 +3353,7 @@ export default function ScheduleFormPage() {
 
             {/* ── Forms & Signatures ────────────── */}
             <SectionCard>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Forms & Signatures</p>
+              <p className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Forms & Signatures</p>
               <Toggle
                 checked={form.require_waiver_signature}
                 onChange={v => updateForm({ require_waiver_signature: v })}
@@ -3369,7 +3369,7 @@ export default function ScheduleFormPage() {
 
               {formTemplates.length > 0 && (
                 <div className="mt-2 space-y-2">
-                  <p className="text-xs text-slate-400 font-semibold">Assign Form Templates</p>
+                  <p className="text-xs text-slate-400 dark:text-white/30 font-semibold">Assign Form Templates</p>
                   {formTemplates.map(t => {
                     const isSelected = form.assigned_form_template_ids.includes(t.id);
                     const typeLabel = t.form_type === 'pre_work' ? 'Pre-Work' : t.form_type === 'post_work' ? 'Post-Work' : 'Custom';
@@ -3391,13 +3391,13 @@ export default function ScheduleFormPage() {
                         }`}
                       >
                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                          isSelected ? 'border-purple-500 bg-purple-500' : 'border-slate-300'
+                          isSelected ? 'border-purple-500 bg-purple-500' : 'border-slate-300 dark:border-white/20'
                         }`}>
                           {isSelected && <Check size={12} className="text-white" />}
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-semibold">{t.name}</p>
-                          <p className="text-xs text-slate-400">{typeLabel}{t.description ? ` — ${t.description}` : ''}</p>
+                          <p className="text-xs text-slate-400 dark:text-white/30">{typeLabel}{t.description ? ` — ${t.description}` : ''}</p>
                         </div>
                       </button>
                     );
@@ -3429,7 +3429,7 @@ export default function ScheduleFormPage() {
           <div className="space-y-6">
             <div>
               <Label>Job Difficulty Rating (1–10)</Label>
-              <p className="text-xs text-slate-400 mb-4 -mt-1">1 = Routine &nbsp;|&nbsp; 5 = Moderate &nbsp;|&nbsp; 10 = Highly Complex</p>
+              <p className="text-xs text-slate-400 dark:text-white/30 mb-4 -mt-1">1 = Routine &nbsp;|&nbsp; 5 = Moderate &nbsp;|&nbsp; 10 = Highly Complex</p>
               <div className="flex gap-2 sm:gap-2.5">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => {
                   const isActive = form.difficulty_rating === n;
@@ -3446,7 +3446,7 @@ export default function ScheduleFormPage() {
                             : colorClass === 'amber'
                               ? 'bg-amber-500 text-white shadow-lg shadow-amber-200 scale-110'
                               : 'bg-red-600 text-white shadow-lg shadow-red-200 scale-110'
-                          : 'bg-white border-2 border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                          : 'bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/40 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50 dark:hover:bg-white/8'
                       }`}
                     >
                       {n}
@@ -3998,10 +3998,10 @@ export default function ScheduleFormPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-7 gap-2">
                     {Array.from({ length: 7 }).map((_, i) => (
-                      <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/60 min-h-[140px] animate-pulse" />
+                      <div key={i} className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-white/5 min-h-[140px] animate-pulse" />
                     ))}
                   </div>
-                  <div className="h-24 bg-slate-50 border border-slate-200 rounded-xl animate-pulse" />
+                  <div className="h-24 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl animate-pulse" />
                 </div>
               ) : !schedulePreviewWeek ? (
                 <div className="text-center py-10 text-sm text-slate-400">Unable to load schedule data.</div>

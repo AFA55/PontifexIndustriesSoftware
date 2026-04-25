@@ -224,9 +224,9 @@ export default function StandbyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-orange-50">
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-orange-50 dark:from-[#0b0618] dark:to-[#0e0720]">
       {/* Header */}
-      <div className="bg-white border-b-4 border-yellow-500 shadow-lg sticky top-0 z-10">
+      <div className="bg-white dark:bg-white/5 border-b-4 border-yellow-500 shadow-lg sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-2">
             <Link
@@ -239,7 +239,7 @@ export default function StandbyPage() {
               Back
             </Link>
 
-            <h1 className="text-base sm:text-xl font-bold text-gray-800 text-center flex-1 mx-2 truncate">
+            <h1 className="text-base sm:text-xl font-bold text-gray-800 dark:text-white text-center flex-1 mx-2 truncate">
               Standby Time
             </h1>
 
@@ -269,9 +269,9 @@ export default function StandbyPage() {
 
         {/* Step 1: Select Reason */}
         {step === 'reason' && (
-          <div className="bg-white rounded-2xl shadow-xl border-2 border-yellow-100 p-5 sm:p-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">Report Standby Time</h2>
-            <p className="text-gray-600 mb-6">
+          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-5 sm:p-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-2">Report Standby Time</h2>
+            <p className="text-gray-600 dark:text-white/60 mb-6">
               Please select the reason why work cannot proceed at this time.
             </p>
 
@@ -283,14 +283,14 @@ export default function StandbyPage() {
                   className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
                     selectedReason === reason.value
                       ? 'bg-yellow-50 border-yellow-500 shadow-md'
-                      : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                      : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/30'
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                       selectedReason === reason.value
                         ? 'border-yellow-500 bg-yellow-500'
-                        : 'border-gray-300 bg-white'
+                        : 'border-gray-300 dark:border-white/20 bg-white dark:bg-transparent'
                     }`}>
                       {selectedReason === reason.value && (
                         <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,8 +299,8 @@ export default function StandbyPage() {
                       )}
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-800">{reason.label}</h3>
-                      <p className="text-sm text-gray-600">{reason.description}</p>
+                      <h3 className="font-bold text-gray-800 dark:text-white">{reason.label}</h3>
+                      <p className="text-sm text-gray-600 dark:text-white/60">{reason.description}</p>
                     </div>
                   </div>
                 </button>
@@ -309,14 +309,14 @@ export default function StandbyPage() {
 
             {selectedReason === 'other' && (
               <div className="mt-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-white/80 mb-2">
                   Please describe the reason:
                 </label>
                 <textarea
                   value={customReason}
                   onChange={(e) => setCustomReason(e.target.value)}
                   placeholder="Enter detailed description..."
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent dark:bg-white/5 dark:text-white"
                   rows={4}
                 />
               </div>
@@ -333,9 +333,9 @@ export default function StandbyPage() {
 
         {/* Step 2: Policy Acknowledgment */}
         {step === 'policy' && (
-          <div className="bg-white rounded-2xl shadow-xl border-2 border-yellow-100 p-5 sm:p-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">Standby Time Policy</h2>
-            <p className="text-gray-600 mb-6">
+          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-5 sm:p-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-2">Standby Time Policy</h2>
+            <p className="text-gray-600 dark:text-white/60 mb-6">
               The client representative must acknowledge the standby policy before the timer begins.
             </p>
 
@@ -349,11 +349,11 @@ export default function StandbyPage() {
             </div>
 
             {/* Full Policy */}
-            <details className="mb-6 bg-gray-50 rounded-xl p-4">
-              <summary className="font-bold text-gray-800 cursor-pointer hover:text-yellow-600 transition-colors">
+            <details className="mb-6 bg-gray-50 dark:bg-white/5 rounded-xl p-4">
+              <summary className="font-bold text-gray-800 dark:text-white cursor-pointer hover:text-yellow-600 transition-colors">
                 View Full Policy Document
               </summary>
-              <div className="mt-4 text-sm text-gray-700 whitespace-pre-line max-h-96 overflow-y-auto border-2 border-gray-200 rounded-lg p-4 bg-white">
+              <div className="mt-4 text-sm text-gray-700 dark:text-white/80 whitespace-pre-line max-h-96 overflow-y-auto border-2 border-gray-200 dark:border-white/10 rounded-lg p-4 bg-white dark:bg-white/5">
                 {STANDBY_POLICY_FULL}
               </div>
             </details>
@@ -361,7 +361,7 @@ export default function StandbyPage() {
             {/* Client Acknowledgment Form */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-white/80 mb-2">
                   Client Representative Name *
                 </label>
                 <input
@@ -369,12 +369,12 @@ export default function StandbyPage() {
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   placeholder="Enter full name"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent dark:bg-white/5 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-white/80 mb-2">
                   Client Representative Signature *
                 </label>
                 <input
@@ -382,17 +382,17 @@ export default function StandbyPage() {
                   value={clientSignature}
                   onChange={(e) => setClientSignature(e.target.value)}
                   placeholder="Type signature here"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent font-signature text-xl"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent font-signature text-xl dark:bg-white/5 dark:text-white"
                   style={{ fontFamily: 'cursive' }}
                 />
-                <p className="text-xs text-gray-500 mt-1">By typing your name, you agree to the terms above</p>
+                <p className="text-xs text-gray-500 dark:text-white/40 mt-1">By typing your name, you agree to the terms above</p>
               </div>
             </div>
 
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setStep('reason')}
-                className="flex-1 px-4 py-3 min-h-[44px] bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold text-base transition-all duration-200"
+                className="flex-1 px-4 py-3 min-h-[44px] bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-800 dark:text-white rounded-xl font-bold text-base transition-all duration-200"
                 disabled={submitting}
               >
                 Back
@@ -412,25 +412,25 @@ export default function StandbyPage() {
         {step === 'timer' && standbyStartTime && (
           <div className="space-y-6">
             {/* Timer Card */}
-            <div className="bg-white rounded-2xl shadow-xl border-2 border-yellow-100 p-8 text-center">
-              <div className="inline-block p-4 bg-yellow-100 rounded-full mb-4">
+            <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-8 text-center">
+              <div className="inline-block p-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-full mb-4">
                 <svg className="w-16 h-16 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Standby Time Active</h2>
-              <p className="text-gray-600 mb-6">Timer started at {standbyStartTime.toLocaleTimeString()}</p>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Standby Time Active</h2>
+              <p className="text-gray-600 dark:text-white/60 mb-6">Timer started at {standbyStartTime.toLocaleTimeString()}</p>
 
               {/* Large Timer Display */}
               <div className="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-2xl p-5 sm:p-8 mb-6">
                 <div className="text-4xl sm:text-6xl font-bold text-yellow-900 font-mono">
                   {formatDuration()}
                 </div>
-                <p className="text-gray-700 font-semibold mt-4">
+                <p className="text-gray-700 dark:text-white/80 font-semibold mt-4">
                   Current Charge: ${calculateCurrentCharge().toFixed(2)}
                 </p>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-600 dark:text-white/60 mt-1">
                   @ ${STANDBY_HOURLY_RATE}/hour (minimum 1 hour)
                 </p>
               </div>

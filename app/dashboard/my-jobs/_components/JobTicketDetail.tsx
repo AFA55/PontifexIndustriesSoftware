@@ -103,7 +103,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
       ];
 
   return (
-    <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-blue-200/60 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+    <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-blue-200/60 dark:border-white/10 overflow-hidden animate-in slide-in-from-top-2 duration-200">
       {/* Multi-day continuation banner */}
       {isMultiDayContinuation && (
         <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-4 py-2 text-sm font-semibold flex items-center gap-2">
@@ -113,9 +113,9 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
       )}
 
       {/* Location Quick Info */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+      <div className="px-4 py-3 bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10">
         <div className="flex items-center gap-3 text-sm">
-          <div className="flex items-center gap-1.5 text-gray-700 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 text-gray-700 dark:text-white/80 flex-1 min-w-0">
             <MapPin className="w-4 h-4 text-red-500 flex-shrink-0" />
             <span className="truncate font-medium">{job.address || job.location}</span>
           </div>
@@ -134,7 +134,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
         {(job.foreman_name || job.customer_contact) && (
           <div className="flex items-center gap-4 mt-2 text-sm">
             {job.foreman_name && (
-              <div className="flex items-center gap-1.5 text-gray-600">
+              <div className="flex items-center gap-1.5 text-gray-600 dark:text-white/60">
                 <User className="w-3.5 h-3.5" />
                 <span>{job.foreman_name}</span>
                 {job.foreman_phone && (
@@ -149,18 +149,18 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
       </div>
 
       {/* Collapsible Panels */}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-gray-100 dark:divide-white/10">
         {panels.map(({ key, label, icon: Icon, color }) => {
           const isOpen = openPanels.has(key);
           return (
             <div key={key}>
               <button
                 onClick={() => togglePanel(key)}
-                className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors`}
+                className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors`}
               >
                 <div className="flex items-center gap-2">
                   <Icon className={`w-4 h-4 text-${color}-600`} />
-                  <span className="text-sm font-bold text-gray-800">{label}</span>
+                  <span className="text-sm font-bold text-gray-800 dark:text-white">{label}</span>
                   {key === 'equipment' && !isMultiDayContinuation && !isCompleted && allEquipment.length > 0 && (
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                       mandatoryComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
@@ -181,15 +181,15 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
                           {job.job_type}
                         </span>
                         {job.estimated_hours && (
-                          <span className="text-sm text-gray-500">Est. {job.estimated_hours} hrs</span>
+                          <span className="text-sm text-gray-500 dark:text-white/60">Est. {job.estimated_hours} hrs</span>
                         )}
                         {job.po_number && (
                           <span className="text-xs text-gray-500">PO: {job.po_number}</span>
                         )}
                       </div>
                       {/* Work Description */}
-                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                      <div className="p-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
+                        <p className="text-sm text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">
                           {job.description || 'No description provided'}
                         </p>
                       </div>
@@ -223,7 +223,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
 
       {/* Helper Work Log */}
       {isHelper && !isCompleted && (
-        <div className="px-4 py-3 border-t border-gray-100">
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-white/10">
           <HelperWorkLog
             jobId={job.id}
             jobNumber={job.job_number}
@@ -250,7 +250,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
               className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2 ${
                 canStartRoute
                   ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-white/40 cursor-not-allowed'
               }`}
             >
               {startingRoute ? (
@@ -270,7 +270,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
         <div className="px-4 pb-4 pt-2">
           <button
             onClick={handleViewCompleted}
-            className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2"
+            className="w-full py-3 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-700 dark:text-white/80 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2"
           >
             <FileText className="w-4 h-4" /> View Work Performed
           </button>

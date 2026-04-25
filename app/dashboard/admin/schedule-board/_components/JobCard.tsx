@@ -51,7 +51,7 @@ function getStatusColor(job: JobCardData): { border: string; dot: string; bg: st
     return { border: 'border-amber-400', dot: 'bg-amber-400', bg: '' };
   }
   // scheduled or assigned with no activity
-  return { border: '', dot: 'bg-gray-300', bg: '' };
+  return { border: '', dot: 'bg-gray-300 dark:bg-white/30', bg: '' };
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -107,12 +107,12 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
     <div
       className={`relative group rounded-xl border-2 transition-all duration-200 hover:shadow-lg hover:scale-[1.01] cursor-pointer ${
         isCompleted
-          ? `${statusColor.border} ${statusColor.bg || 'bg-green-50/70'}`
+          ? `${statusColor.border} ${statusColor.bg || 'bg-green-50/70'} dark:bg-green-500/10`
           : job.is_will_call
-            ? 'border-amber-400 bg-amber-50/50'
+            ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-500/10'
             : statusColor.border
-              ? `${statusColor.border} ${statusColor.bg || 'bg-white'}`
-              : `${colorScheme.border} bg-white`
+              ? `${statusColor.border} ${statusColor.bg || 'bg-white dark:bg-white/5'}`
+              : `${colorScheme.border} bg-white dark:bg-white/5`
       }`}
       onClick={handleClick}
     >
@@ -130,7 +130,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
         {/* Top row: Customer + badges */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
-            <h4 className="font-bold text-gray-900 text-sm sm:text-base truncate flex items-center gap-1.5">
+            <h4 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base truncate flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColor.dot}`} title={statusLabel} />
               {job.customer_name}
             </h4>
@@ -139,19 +139,19 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
                 {job.job_type?.split(',')[0]?.trim()}
               </span>
               {isCompleted && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-300">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/40">
                   <CheckCircle2 className="w-3 h-3" />
                   COMPLETED
                 </span>
               )}
               {job.is_will_call && !isCompleted && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-300">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/40">
                   <Phone className="w-3 h-3" />
                   WILL CALL
                 </span>
               )}
               {job.day_label && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400">
                   {job.day_label}
                 </span>
               )}
@@ -163,7 +163,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
             {canEdit ? (
               <button
                 onClick={(e) => { e.stopPropagation(); onEdit?.(job); }}
-                className="p-1.5 rounded-lg hover:bg-purple-100 text-purple-600 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-purple-100 dark:hover:bg-white/10 text-purple-600 dark:text-purple-400 transition-colors"
                 title="Edit Job"
               >
                 <Edit3 className="w-4 h-4" />
@@ -171,7 +171,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
             ) : (
               <button
                 onClick={(e) => { e.stopPropagation(); onRequestChange?.(job); }}
-                className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-white/10 text-blue-600 dark:text-blue-400 transition-colors"
                 title="Request Change"
               >
                 <FileText className="w-4 h-4" />
@@ -180,7 +180,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
             {canEdit && onRemove && (
               <button
                 onClick={(e) => { e.stopPropagation(); onRemove(job); }}
-                className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-white/10 text-red-500 dark:text-red-400 transition-colors"
                 title="Remove from Schedule"
               >
                 <Trash2 className="w-4 h-4" />
@@ -191,21 +191,21 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
 
         {/* Location row */}
         {job.location && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-            <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/60 mb-2">
+            <MapPin className="w-3.5 h-3.5 text-gray-400 dark:text-white/40 flex-shrink-0" />
             <span className="truncate">{job.location}</span>
           </div>
         )}
 
         {/* Operator/Helper info — shown inside the card */}
         {assignedOperator && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2 bg-gray-50 rounded-lg px-2 py-1.5 border border-gray-100">
-            <Users className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-            <span className="font-medium text-gray-700">{assignedOperator}</span>
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/60 mb-2 bg-gray-50 dark:bg-white/5 rounded-lg px-2 py-1.5 border border-gray-100 dark:border-white/10">
+            <Users className="w-3.5 h-3.5 text-gray-400 dark:text-white/40 flex-shrink-0" />
+            <span className="font-medium text-gray-700 dark:text-white/80">{assignedOperator}</span>
             {assignedHelper && (
               <>
-                <span className="text-gray-300">+</span>
-                <span className="text-gray-500">{assignedHelper}</span>
+                <span className="text-gray-300 dark:text-white/20">+</span>
+                <span className="text-gray-500 dark:text-white/60">{assignedHelper}</span>
               </>
             )}
           </div>
@@ -215,7 +215,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
         <div className="flex flex-wrap items-center gap-1.5">
           {/* Arrival time */}
           {job.arrival_time && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded-md text-xs text-gray-600">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-white/10 rounded-md text-xs text-gray-600 dark:text-white/70">
               <Clock className="w-3 h-3" />
               {formatTime(job.arrival_time)}
             </span>
@@ -223,14 +223,14 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
 
           {/* PO Number */}
           {job.po_number && (
-            <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 rounded-md text-xs text-gray-600">
+            <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 dark:bg-white/10 rounded-md text-xs text-gray-600 dark:text-white/70">
               PO: {job.po_number}
             </span>
           )}
 
           {/* Equipment */}
           {job.equipment_needed && job.equipment_needed.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 rounded-md text-xs text-indigo-600">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-500/15 rounded-md text-xs text-indigo-600 dark:text-indigo-400">
               <Wrench className="w-3 h-3" />
               {job.equipment_needed.slice(0, 2).map(getDisplayName).join(', ')}
               {job.equipment_needed.length > 2 && ` +${job.equipment_needed.length - 2}`}
@@ -239,7 +239,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
 
           {/* Difficulty */}
           {job.difficulty_rating && job.difficulty_rating >= 7 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 rounded-md text-xs text-red-600">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 dark:bg-red-500/15 rounded-md text-xs text-red-600 dark:text-red-400">
               <AlertTriangle className="w-3 h-3" />
               {job.difficulty_rating}/10
             </span>
@@ -249,7 +249,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
           {job.notes_count > 0 && (
             <button
               onClick={(e) => { e.stopPropagation(); onViewNotes?.(job); }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 hover:bg-green-100 rounded-md text-xs text-green-600 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-500/15 hover:bg-green-100 dark:hover:bg-green-500/25 rounded-md text-xs text-green-600 dark:text-green-400 transition-colors"
             >
               <MessageSquare className="w-3 h-3" />
               {job.notes_count}
@@ -258,7 +258,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
 
           {/* Change request badge */}
           {job.change_requests_count > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 rounded-md text-xs text-orange-700 font-semibold animate-pulse">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 dark:bg-orange-500/20 rounded-md text-xs text-orange-700 dark:text-orange-400 font-semibold animate-pulse">
               {job.change_requests_count} change req
             </span>
           )}
@@ -266,9 +266,9 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
 
         {/* Scope progress bar — only shown when overall_pct is set */}
         {job.overall_pct != null && (
-          <div className="mt-3 pt-2.5 border-t border-gray-100">
+          <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-white/10">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">Scope progress</span>
+              <span className="text-xs text-gray-400 dark:text-white/40">Scope progress</span>
               <span className={`text-xs font-semibold tabular-nums ${
                 job.overall_pct >= 75 ? 'text-green-600' :
                 job.overall_pct >= 25 ? 'text-amber-600' : 'text-red-500'
@@ -276,7 +276,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
                 {job.overall_pct}%
               </span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-1.5">
+            <div className="w-full bg-gray-100 dark:bg-white/10 rounded-full h-1.5">
               <div
                 className={`h-1.5 rounded-full transition-all duration-300 ${
                   job.overall_pct >= 75 ? 'bg-green-500' :

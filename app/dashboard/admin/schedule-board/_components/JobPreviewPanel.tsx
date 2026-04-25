@@ -29,7 +29,7 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
 
       {/* Panel */}
       <div
-        className="relative w-full max-w-md bg-white/95 backdrop-blur-xl shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-200"
+        className="relative w-full max-w-md bg-white/95 dark:bg-[#0e0720]/95 dark:border-l dark:border-white/10 backdrop-blur-xl shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -53,12 +53,12 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
         <div className="p-6 space-y-6">
           {/* Location */}
           <div>
-            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Location</h3>
+            <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider mb-2">Location</h3>
             <div className="flex items-start gap-2">
               <MapPin className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-gray-900">{job.location}</p>
-                <p className="text-sm text-gray-600">{job.address}</p>
+                <p className="font-semibold text-gray-900 dark:text-white">{job.location}</p>
+                <p className="text-sm text-gray-600 dark:text-white/60">{job.address}</p>
                 <a
                   href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
                   target="_blank"
@@ -74,11 +74,11 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
           {/* Timing */}
           {(job.arrival_time || job.is_will_call) && (
             <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Timing</h3>
+              <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider mb-2">Timing</h3>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-orange-500" />
                 {job.arrival_time ? (
-                  <span className="font-semibold text-gray-900">Arrival: {formatTime(job.arrival_time)}</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">Arrival: {formatTime(job.arrival_time)}</span>
                 ) : (
                   <span className="font-semibold text-amber-700">Will Call</span>
                 )}
@@ -89,9 +89,9 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
           {/* Description */}
           {job.description && (
             <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Work Description</h3>
-              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{job.description}</p>
+              <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider mb-2">Work Description</h3>
+              <div className="p-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
+                <p className="text-sm text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.description}</p>
               </div>
             </div>
           )}
@@ -99,29 +99,29 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
           {/* Scope Details */}
           {(job as any).scope_details && Object.keys((job as any).scope_details).length > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Scope Quantities</h3>
+              <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider mb-2">Scope Quantities</h3>
               <ScopeDetailsDisplay scopeDetails={(job as any).scope_details} />
             </div>
           )}
 
           {/* Crew */}
           <div>
-            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Crew</h3>
+            <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider mb-2">Crew</h3>
             <div className="space-y-2">
               {operatorName ? (
                 <div className="flex items-center gap-2 text-sm">
                   <User className="w-4 h-4 text-blue-500" />
-                  <span className="font-semibold text-gray-900">{operatorName}</span>
-                  <span className="text-xs text-gray-500">Operator</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{operatorName}</span>
+                  <span className="text-xs text-gray-500 dark:text-white/50">Operator</span>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400 italic">No operator assigned</p>
+                <p className="text-sm text-gray-400 dark:text-white/30 italic">No operator assigned</p>
               )}
               {helperName && (
                 <div className="flex items-center gap-2 text-sm">
                   <User className="w-4 h-4 text-indigo-500" />
-                  <span className="font-semibold text-gray-900">{helperName}</span>
-                  <span className="text-xs text-gray-500">Helper</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{helperName}</span>
+                  <span className="text-xs text-gray-500 dark:text-white/50">Helper</span>
                 </div>
               )}
             </div>
@@ -130,10 +130,10 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
           {/* Equipment */}
           {job.equipment_needed && job.equipment_needed.length > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Equipment</h3>
+              <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider mb-2">Equipment</h3>
               <div className="flex flex-wrap gap-1.5">
                 {job.equipment_needed.map((item, i) => (
-                  <span key={i} className="px-2 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium">
+                  <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-lg text-xs font-medium">
                     {getDisplayName(item)}
                   </span>
                 ))}
@@ -144,17 +144,17 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
           {/* PO Number */}
           {job.po_number && (
             <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">PO Number</h3>
-              <p className="text-sm font-semibold text-gray-900">{job.po_number}</p>
+              <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider mb-2">PO Number</h3>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{job.po_number}</p>
             </div>
           )}
 
           {/* Multi-day info */}
           {job.day_label && (
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
-              <p className="text-sm font-bold text-purple-700">{job.day_label}</p>
+            <div className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 rounded-xl p-3">
+              <p className="text-sm font-bold text-purple-700 dark:text-purple-400">{job.day_label}</p>
               {job.end_date && (
-                <p className="text-xs text-purple-600">
+                <p className="text-xs text-purple-600 dark:text-purple-500">
                   Ends: {new Date(job.end_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                 </p>
               )}

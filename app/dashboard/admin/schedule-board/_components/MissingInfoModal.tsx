@@ -38,7 +38,7 @@ export default function MissingInfoModal({ job, onConfirm, onClose }: MissingInf
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
 
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="bg-white dark:bg-[#0e0720] dark:border dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
@@ -57,15 +57,15 @@ export default function MissingInfoModal({ job, onConfirm, onClose }: MissingInf
 
           <div className="p-5 space-y-4">
             {/* Job summary */}
-            <div className="bg-orange-50 rounded-xl p-3 border border-orange-200">
-              <h3 className="font-bold text-gray-900 text-sm">{job.customer_name}</h3>
+            <div className="bg-orange-50 dark:bg-orange-500/10 rounded-xl p-3 border border-orange-200 dark:border-orange-500/30">
+              <h3 className="font-bold text-gray-900 dark:text-white text-sm">{job.customer_name}</h3>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-gray-500">{job.job_type}</span>
-                <span className="text-gray-300">•</span>
-                <span className="text-xs text-gray-500">by {job.submitted_by}</span>
+                <span className="text-xs text-gray-500 dark:text-white/60">{job.job_type}</span>
+                <span className="text-gray-300 dark:text-white/20">•</span>
+                <span className="text-xs text-gray-500 dark:text-white/60">by {job.submitted_by}</span>
               </div>
               {job.location && (
-                <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                <p className="text-xs text-gray-400 dark:text-white/40 flex items-center gap-1 mt-1">
                   <MapPin className="w-3 h-3" /> {job.location}
                 </p>
               )}
@@ -73,7 +73,7 @@ export default function MissingInfoModal({ job, onConfirm, onClose }: MissingInf
 
             {/* What's missing checklist */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/80 mb-2">
                 What information is missing?
               </label>
               <div className="grid grid-cols-2 gap-1.5">
@@ -83,17 +83,17 @@ export default function MissingInfoModal({ job, onConfirm, onClose }: MissingInf
                     onClick={() => toggleItem(item.id)}
                     className={`text-left px-3 py-2 rounded-xl border-2 transition-all text-xs ${
                       selectedItems.includes(item.id)
-                        ? 'border-orange-500 bg-orange-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-500/10'
+                        : 'border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
                     }`}
                   >
                     <div className="flex items-center gap-1.5">
                       <CheckSquare className={`w-3.5 h-3.5 flex-shrink-0 ${
-                        selectedItems.includes(item.id) ? 'text-orange-600' : 'text-gray-300'
+                        selectedItems.includes(item.id) ? 'text-orange-600' : 'text-gray-300 dark:text-white/20'
                       }`} />
-                      <span className="font-bold text-gray-900">{item.label}</span>
+                      <span className="font-bold text-gray-900 dark:text-white">{item.label}</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-0.5 ml-5">{item.desc}</p>
+                    <p className="text-[10px] text-gray-400 dark:text-white/30 mt-0.5 ml-5">{item.desc}</p>
                   </button>
                 ))}
               </div>
@@ -101,25 +101,25 @@ export default function MissingInfoModal({ job, onConfirm, onClose }: MissingInf
 
             {/* Additional note */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">
-                Additional Note to Salesman <span className="text-gray-400 font-normal">(optional)</span>
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/80 mb-1.5">
+                Additional Note to Salesman <span className="text-gray-400 dark:text-white/40 font-normal">(optional)</span>
               </label>
               <textarea
                 value={customNote}
                 onChange={(e) => setCustomNote(e.target.value)}
                 placeholder="Any specific instructions for the salesman..."
                 rows={2}
-                className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 text-sm text-gray-900 bg-white placeholder:text-gray-400 transition-all resize-none"
+                className="w-full px-4 py-2.5 border-2 border-gray-300 dark:border-white/10 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/5 placeholder:text-gray-400 dark:placeholder:text-white/30 transition-all resize-none"
               />
             </div>
 
             {/* Preview of notification */}
             {selectedItems.length > 0 && (
-              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Salesman will be notified to provide:</p>
+              <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3 border border-gray-200 dark:border-white/10">
+                <p className="text-[10px] text-gray-400 dark:text-white/40 uppercase font-bold mb-1">Salesman will be notified to provide:</p>
                 <ul className="space-y-0.5">
                   {selectedLabels.map(label => (
-                    <li key={label} className="text-xs text-gray-700 flex items-center gap-1.5">
+                    <li key={label} className="text-xs text-gray-700 dark:text-white/70 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                       {label}
                     </li>
@@ -132,7 +132,7 @@ export default function MissingInfoModal({ job, onConfirm, onClose }: MissingInf
             <div className="flex items-center gap-3 pt-1">
               <button
                 onClick={onClose}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-all"
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-700 dark:text-white/80 rounded-xl font-bold text-sm transition-all"
               >
                 Cancel
               </button>

@@ -123,17 +123,17 @@ export default function OperatorRowView({
     <div className="space-y-3">
       {/* Unassigned row */}
       <DroppableOperatorRow operatorId="unassigned" operatorName="Unassigned">
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition-all">
+        <div className="bg-white dark:bg-white/5 rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition-all">
           <div className="p-4">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                <Users className="w-5 h-5 text-orange-600" />
+              <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center">
+                <Users className="w-5 h-5 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
-                <h3 className="font-bold text-gray-900 text-sm">Unassigned</h3>
-                <p className="text-[10px] text-gray-500">Jobs awaiting operator assignment</p>
+                <h3 className="font-bold text-gray-900 dark:text-white text-sm">Unassigned</h3>
+                <p className="text-[10px] text-gray-500 dark:text-white/60">Jobs awaiting operator assignment</p>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400">
                 {unassignedJobs.length} {unassignedJobs.length === 1 ? 'job' : 'jobs'}
               </span>
             </div>
@@ -156,8 +156,8 @@ export default function OperatorRowView({
                 ))}
               </div>
             ) : (
-              <div className="flex items-center justify-center py-3 rounded-lg border-2 border-dashed border-orange-200 bg-orange-50/30">
-                <p className="text-sm text-orange-400 font-medium">No unassigned jobs</p>
+              <div className="flex items-center justify-center py-3 rounded-lg border-2 border-dashed border-orange-200 dark:border-orange-500/30 bg-orange-50/30 dark:bg-orange-500/5">
+                <p className="text-sm text-orange-400 dark:text-orange-500 font-medium">No unassigned jobs</p>
               </div>
             )}
           </div>
@@ -169,7 +169,7 @@ export default function OperatorRowView({
         const colorScheme = OPERATOR_COLORS[idx % OPERATOR_COLORS.length];
         return (
           <DroppableOperatorRow key={op.id} operatorId={op.id} operatorName={op.name}>
-            <div className={`bg-white rounded-xl shadow-sm border-l-4 ${colorScheme.border} hover:shadow-md transition-all`}>
+            <div className={`bg-white dark:bg-white/5 rounded-xl shadow-sm border-l-4 ${colorScheme.border} hover:shadow-md transition-all`}>
               <div className="p-4">
                 {/* Operator header */}
                 <div className="flex items-center gap-3 mb-3">
@@ -182,34 +182,34 @@ export default function OperatorRowView({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-gray-900 text-sm truncate">{op.name}</h3>
+                      <h3 className="font-bold text-gray-900 dark:text-white text-sm truncate">{op.name}</h3>
                       {/* Skill badge */}
                       {op.skillLevel !== null && (
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           op.skillLevel >= 7
-                            ? 'bg-green-100 text-green-700 border border-green-200'
+                            ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/30'
                             : op.skillLevel >= 4
-                              ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                              : 'bg-red-100 text-red-700 border border-red-200'
+                              ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30'
+                              : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/30'
                         }`}>
                           Skill {op.skillLevel}
                         </span>
                       )}
                     </div>
                     {op.helper && (
-                      <p className="text-[10px] text-gray-500">+ {op.helper}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-white/60">+ {op.helper}</p>
                     )}
                   </div>
 
                   {(op as any).timeOff ? (
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-600">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/60">
                       {TIME_OFF_LABELS[(op as any).timeOff.type] || (op as any).timeOff.type}
                     </span>
                   ) : (
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                       op.jobs.length > 0
                         ? `${colorScheme.bg} ${colorScheme.text}`
-                        : 'bg-green-100 text-green-700'
+                        : 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'
                     }`}>
                       {op.jobs.length > 0
                         ? `${op.jobs.length} ${op.jobs.length === 1 ? 'job' : 'jobs'}`
@@ -220,13 +220,13 @@ export default function OperatorRowView({
 
                 {/* Time-off block */}
                 {(op as any).timeOff ? (
-                  <div className="flex items-center gap-3 py-3 px-4 rounded-lg bg-gray-100 border border-gray-200 text-gray-700">
-                    <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                  <div className="flex items-center gap-3 py-3 px-4 rounded-lg bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-white/80">
+                    <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
                       <span className="text-sm">&#128564;</span>
                     </div>
                     <div>
                       <span className="text-sm font-bold">{TIME_OFF_LABELS[(op as any).timeOff.type] || (op as any).timeOff.type}</span>
-                      {(op as any).timeOff.notes && <p className="text-xs text-gray-500 mt-0.5">{(op as any).timeOff.notes}</p>}
+                      {(op as any).timeOff.notes && <p className="text-xs text-gray-500 dark:text-white/60 mt-0.5">{(op as any).timeOff.notes}</p>}
                     </div>
                   </div>
                 ) : op.jobs.length > 0 ? (
@@ -250,7 +250,7 @@ export default function OperatorRowView({
                     ))}
                   </div>
                 ) : (
-                  <div className={`flex items-center justify-center py-3 rounded-lg border-2 border-dashed transition-all bg-green-50/50 border-green-200`}>
+                  <div className={`flex items-center justify-center py-3 rounded-lg border-2 border-dashed transition-all bg-green-50/50 dark:bg-green-500/5 border-green-200 dark:border-green-500/30`}>
                     <p className="text-sm text-green-500 font-medium flex items-center gap-2">
                       <span className="w-2 h-2 bg-green-400 rounded-full" />
                       Available
@@ -265,9 +265,9 @@ export default function OperatorRowView({
 
       {/* Empty state if no operators */}
       {operators.length === 0 && unassignedJobs.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-          <Briefcase className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-gray-500 font-medium">No operators or jobs for this date</p>
+        <div className="bg-white dark:bg-white/5 rounded-xl shadow-sm p-8 text-center">
+          <Briefcase className="w-8 h-8 text-gray-300 dark:text-white/20 mx-auto mb-2" />
+          <p className="text-gray-500 dark:text-white/60 font-medium">No operators or jobs for this date</p>
         </div>
       )}
     </div>

@@ -245,35 +245,35 @@ export default function MyJobsPage() {
 
   if (loading && jobs.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto mb-4" />
-          <p className="text-gray-600 text-lg font-medium">Loading your schedule...</p>
+          <p className="text-gray-600 dark:text-white/60 text-lg font-medium">Loading your schedule...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+      <div className="bg-white dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
-              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl border border-gray-200 transition-all"
+              className="p-2 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-xl border border-gray-200 dark:border-white/10 transition-all"
             >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
+              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-white/80" />
             </Link>
             <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-purple-600" />
             </div>
             <div className="flex-1">
-              <h1 className="text-lg font-bold text-gray-900">
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">
                 {isHelper ? 'My Schedule' : 'My Schedule'}
               </h1>
-              <p className="text-gray-500 text-xs">
+              <p className="text-gray-500 dark:text-white/60 text-xs">
                 {isHelper ? 'Team member duties for the day' : 'Dispatched job tickets'}
               </p>
             </div>
@@ -374,12 +374,12 @@ export default function MyJobsPage() {
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           </div>
         ) : jobs.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Inbox className="w-8 h-8 text-gray-400" />
+          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 p-10 text-center">
+            <div className="w-16 h-16 bg-gray-100 dark:bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Inbox className="w-8 h-8 text-gray-400 dark:text-white/60" />
             </div>
-            <h3 className="text-lg font-bold text-gray-700 mb-2">No jobs for this day</h3>
-            <p className="text-sm text-gray-500">
+            <h3 className="text-lg font-bold text-gray-700 dark:text-white/80 mb-2">No jobs for this day</h3>
+            <p className="text-sm text-gray-500 dark:text-white/60">
               {selectedDate === toDateString(new Date())
                 ? 'Check back later — your schedule may not be dispatched yet.'
                 : 'No jobs are scheduled for this date.'}
@@ -401,7 +401,7 @@ export default function MyJobsPage() {
                 <Building2 className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-gray-900">Working in Shop</h3>
+                <h3 className="font-bold text-gray-900 dark:text-white">Working in Shop</h3>
                 <p className="text-xs text-amber-700 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   Started {new Date(activeShopTicket.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -413,7 +413,7 @@ export default function MyJobsPage() {
               onChange={(e) => setShopDescription(e.target.value)}
               placeholder="Describe shop work..."
               rows={2}
-              className="w-full px-3 py-2 border border-amber-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-200 outline-none text-sm resize-none mb-3"
+              className="w-full px-3 py-2 border border-amber-300 dark:border-white/10 rounded-xl text-gray-900 dark:text-white dark:bg-white/5 placeholder-gray-400 dark:placeholder-white/40 focus:border-amber-500 focus:ring-1 focus:ring-amber-200 outline-none text-sm resize-none mb-3"
             />
             <button
               onClick={handleCompleteShopTicket}
@@ -432,7 +432,7 @@ export default function MyJobsPage() {
 
         {/* Job Count */}
         {jobs.length > 0 && (
-          <div className="mt-4 text-center text-sm text-gray-400 font-medium">
+          <div className="mt-4 text-center text-sm text-gray-400 dark:text-white/40 font-medium">
             {jobs.length} job{jobs.length !== 1 ? 's' : ''} for this day
           </div>
         )}
