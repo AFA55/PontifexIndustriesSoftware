@@ -766,9 +766,315 @@ function SkillsTab({
   );
 }
 
+// ─── Credentials Tab ─────────────────────────────────────────────────────────
+
+function ExpiryBadge({ dateStr }: { dateStr: string | null }) {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  const today = new Date();
+  const diffDays = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">EXPIRED</span>;
+  if (diffDays <= 30) return <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Expires in {diffDays}d</span>;
+  return <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Valid</span>;
+}
+
+interface CertEntry {
+  id: string;
+  name: string;
+  issued_by: string;
+  expiry_date: string | null;
+}
+
+interface CredentialData {
+  medical_card_expiry: string | null;
+  drivers_license_expiry: string | null;
+  drivers_license_class: string | null;
+  osha_10_expiry: string | null;
+  osha_30_expiry: string | null;
+  certifications: CertEntry[];
+}
+
+function CredentialsTab({
+  memberId,
+  getAuthHeaders,
+}: {
+  memberId: string;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+}) {
+  const [creds, setCreds] = useState<CredentialData>({
+    medical_card_expiry: null,
+    drivers_license_expiry: null,
+    drivers_license_class: null,
+    osha_10_expiry: null,
+    osha_30_expiry: null,
+    certifications: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [newCert, setNewCert] = useState({ name: '', issued_by: '', expiry_date: '' });
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/admin/team-profiles/${memberId}/credentials`, { headers });
+        const json = await res.json();
+        if (!cancelled && json.data) setCreds(json.data);
+      } catch {
+        // silently fail, leave defaults
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [memberId, getAuthHeaders]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/team-profiles/${memberId}/credentials`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(creds),
+      });
+      const json = await res.json();
+      if (!res.ok || json.success === false) {
+        setError(json.error || 'Failed to save');
+      } else {
+        setSavedAt(Date.now());
+        setTimeout(() => setSavedAt(null), 2500);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addCert = () => {
+    if (!newCert.name.trim()) return;
+    const entry: CertEntry = {
+      id: crypto.randomUUID(),
+      name: newCert.name.trim(),
+      issued_by: newCert.issued_by.trim(),
+      expiry_date: newCert.expiry_date || null,
+    };
+    setCreds(prev => ({ ...prev, certifications: [...prev.certifications, entry] }));
+    setNewCert({ name: '', issued_by: '', expiry_date: '' });
+  };
+
+  const removeCert = (id: string) => {
+    setCreds(prev => ({ ...prev, certifications: prev.certifications.filter(c => c.id !== id) }));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+      </div>
+    );
+  }
+
+  const inputCls = 'text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors w-full';
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Medical Card */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Medical Card</h3>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex-1 min-w-[160px]">
+            <label className="text-xs text-gray-500 mb-1 block">Expiry Date</label>
+            <input
+              type="date"
+              value={creds.medical_card_expiry ?? ''}
+              onChange={e => setCreds(prev => ({ ...prev, medical_card_expiry: e.target.value || null }))}
+              className={inputCls}
+            />
+          </div>
+          <div className="pt-5">
+            <ExpiryBadge dateStr={creds.medical_card_expiry} />
+          </div>
+        </div>
+      </div>
+
+      {/* Driver's License */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Driver&apos;s License</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Expiry Date</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={creds.drivers_license_expiry ?? ''}
+                onChange={e => setCreds(prev => ({ ...prev, drivers_license_expiry: e.target.value || null }))}
+                className={inputCls}
+              />
+              <div className="flex-shrink-0">
+                <ExpiryBadge dateStr={creds.drivers_license_expiry} />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">License Class</label>
+            <input
+              type="text"
+              placeholder="e.g. Class A CDL"
+              value={creds.drivers_license_class ?? ''}
+              onChange={e => setCreds(prev => ({ ...prev, drivers_license_class: e.target.value || null }))}
+              className={inputCls}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* OSHA Certifications */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">OSHA Certifications</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">OSHA 10 Expiry</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={creds.osha_10_expiry ?? ''}
+                onChange={e => setCreds(prev => ({ ...prev, osha_10_expiry: e.target.value || null }))}
+                className={inputCls}
+              />
+              <div className="flex-shrink-0">
+                <ExpiryBadge dateStr={creds.osha_10_expiry} />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">OSHA 30 Expiry</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={creds.osha_30_expiry ?? ''}
+                onChange={e => setCreds(prev => ({ ...prev, osha_30_expiry: e.target.value || null }))}
+                className={inputCls}
+              />
+              <div className="flex-shrink-0">
+                <ExpiryBadge dateStr={creds.osha_30_expiry} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Certifications */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Additional Certifications</h3>
+        {creds.certifications.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {creds.certifications.map(cert => (
+              <div key={cert.id} className="flex items-start gap-3 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{cert.name}</p>
+                  {cert.issued_by && (
+                    <p className="text-xs text-gray-500 mt-0.5">Issued by {cert.issued_by}</p>
+                  )}
+                  {cert.expiry_date && (
+                    <p className="text-xs text-gray-500 mt-0.5">Expires {cert.expiry_date}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <ExpiryBadge dateStr={cert.expiry_date} />
+                  <button
+                    type="button"
+                    onClick={() => removeCert(cert.id)}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    title="Remove"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Add new cert form */}
+        <div className="border border-dashed border-gray-300 rounded-lg p-3 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add Certification</p>
+          <input
+            type="text"
+            placeholder="Certification name *"
+            value={newCert.name}
+            onChange={e => setNewCert(prev => ({ ...prev, name: e.target.value }))}
+            className={inputCls}
+          />
+          <input
+            type="text"
+            placeholder="Issued by (optional)"
+            value={newCert.issued_by}
+            onChange={e => setNewCert(prev => ({ ...prev, issued_by: e.target.value }))}
+            className={inputCls}
+          />
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Expiry Date (optional)</label>
+            <input
+              type="date"
+              value={newCert.expiry_date}
+              onChange={e => setNewCert(prev => ({ ...prev, expiry_date: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={addCert}
+            disabled={!newCert.name.trim()}
+            className="w-full mt-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            + Add Certification
+          </button>
+        </div>
+      </div>
+
+      {/* Save bar */}
+      <div className="sticky bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent pt-4 pb-1 -mx-1 px-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-h-[28px]">
+            {!saving && savedAt && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Saved
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold shadow-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? 'Saving...' : 'Save Credentials'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 
-type DetailTab = 'info' | 'skills' | 'permissions';
+type DetailTab = 'info' | 'skills' | 'credentials' | 'permissions';
 
 function MemberDetailPanel({
   member,
@@ -828,17 +1134,20 @@ function MemberDetailPanel({
   const canGrant = isSuperAdmin && !isOwnProfile && member.role !== 'super_admin';
   const showPermissionsTab = member.role !== 'super_admin';
   const showSkillsTab = member.role === 'operator' || member.role === 'apprentice';
-  const showTabBar = showPermissionsTab || showSkillsTab;
+  const showCredentialsTab = member.role === 'operator' || member.role === 'apprentice';
+  const showTabBar = showPermissionsTab || showSkillsTab || showCredentialsTab;
 
   const visibleTabs: DetailTab[] = [
     'info',
     ...(showSkillsTab ? (['skills'] as DetailTab[]) : []),
+    ...(showCredentialsTab ? (['credentials'] as DetailTab[]) : []),
     ...(showPermissionsTab ? (['permissions'] as DetailTab[]) : []),
   ];
 
   const tabLabel: Record<DetailTab, string> = {
     info: 'Profile Info',
     skills: 'Skills',
+    credentials: 'Credentials',
     permissions: 'Feature Permissions',
   };
 
@@ -937,6 +1246,10 @@ function MemberDetailPanel({
 
         {tab === 'skills' && showSkillsTab && (
           <SkillsTab memberId={member.id} getAuthHeaders={getAuthHeaders} />
+        )}
+
+        {tab === 'credentials' && showCredentialsTab && (
+          <CredentialsTab memberId={member.id} getAuthHeaders={getAuthHeaders} />
         )}
 
         {tab === 'permissions' && showPermissionsTab && (
