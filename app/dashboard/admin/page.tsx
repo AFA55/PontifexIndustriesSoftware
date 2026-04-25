@@ -155,18 +155,18 @@ function ActivityIcon({ type }: { type: string }) {
   const base = 'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0';
   switch (type) {
     case 'job_completed':
-      return <div className={`${base} bg-emerald-100`}><CheckCircle2 className="w-4 h-4 text-emerald-600" /></div>;
+      return <div className={`${base} bg-emerald-100 dark:bg-emerald-900/40`}><CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /></div>;
     case 'invoice_paid':
-      return <div className={`${base} bg-green-100`}><DollarSign className="w-4 h-4 text-green-600" /></div>;
+      return <div className={`${base} bg-green-100 dark:bg-green-900/40`}><DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" /></div>;
     case 'invoice_created':
-      return <div className={`${base} bg-blue-100`}><FileText className="w-4 h-4 text-blue-600" /></div>;
+      return <div className={`${base} bg-blue-100 dark:bg-blue-900/40`}><FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" /></div>;
     case 'job_created':
-      return <div className={`${base} bg-purple-100`}><Calendar className="w-4 h-4 text-purple-600" /></div>;
+      return <div className={`${base} bg-purple-100 dark:bg-purple-900/40`}><Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" /></div>;
     case 'timecard_approved':
     case 'timecard_submitted':
-      return <div className={`${base} bg-amber-100`}><Clock className="w-4 h-4 text-amber-600" /></div>;
+      return <div className={`${base} bg-amber-100 dark:bg-amber-900/40`}><Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" /></div>;
     default:
-      return <div className={`${base} bg-gray-100`}><Briefcase className="w-4 h-4 text-gray-500" /></div>;
+      return <div className={`${base} bg-gray-100 dark:bg-slate-700`}><Briefcase className="w-4 h-4 text-gray-500 dark:text-slate-400" /></div>;
   }
 }
 
@@ -174,9 +174,9 @@ function ActivityIcon({ type }: { type: string }) {
 
 function SkeletonRow({ cols = 3 }: { cols?: number }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 dark:border-slate-700 last:border-0">
       {Array.from({ length: cols }).map((_, i) => (
-        <div key={i} className="animate-pulse bg-gray-200 rounded h-4" style={{ flex: 1 }} />
+        <div key={i} className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-4" style={{ flex: 1 }} />
       ))}
     </div>
   );
@@ -243,7 +243,7 @@ function ScheduleJobCard({ job }: { job: JobToday }) {
   return (
     <Link
       href="/dashboard/admin/schedule-board"
-      className={`block bg-white/5 border border-white/10 rounded-xl p-3 hover:bg-gray-50 transition-colors border-l-4 ${borderClass}`}
+      className={`block bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors border-l-4 ${borderClass}`}
     >
       {/* Top row: time + job number + status */}
       <div className="flex items-center gap-2 mb-2">
@@ -252,16 +252,16 @@ function ScheduleJobCard({ job }: { job: JobToday }) {
             Will Call
           </span>
         ) : job.scheduled_time ? (
-          <span className="text-[10px] font-mono font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded flex-shrink-0">
+          <span className="text-[10px] font-mono font-bold bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2 py-0.5 rounded flex-shrink-0">
             {formatTime(job.scheduled_time)}
           </span>
         ) : (
-          <span className="text-[10px] font-mono text-gray-400 px-2 py-0.5 flex-shrink-0">--:--</span>
+          <span className="text-[10px] font-mono text-gray-400 dark:text-slate-500 px-2 py-0.5 flex-shrink-0">--:--</span>
         )}
-        <span className="text-[10px] text-gray-400 font-mono truncate">{job.job_number}</span>
+        <span className="text-[10px] text-gray-400 dark:text-slate-500 font-mono truncate">{job.job_number}</span>
         <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
           {job.is_multi_day && job.day_number && job.total_days && (
-            <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+            <span className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-1.5 py-0.5 rounded">
               Day {job.day_number}/{job.total_days}
             </span>
           )}
@@ -271,33 +271,33 @@ function ScheduleJobCard({ job }: { job: JobToday }) {
 
       {/* Customer name + service type */}
       <div className="flex items-start justify-between gap-2 mb-1.5">
-        <p className="text-sm font-semibold text-gray-900 leading-tight truncate">{job.customer_name}</p>
+        <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight truncate">{job.customer_name}</p>
         <ServiceTypeBadge jobType={job.job_type} />
       </div>
 
       {/* Location */}
       {job.location && (
         <div className="flex items-center gap-1 mb-1.5">
-          <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-          <p className="text-[11px] text-gray-500 truncate">{job.location}</p>
+          <MapPin className="w-3 h-3 text-gray-400 dark:text-slate-500 flex-shrink-0" />
+          <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate">{job.location}</p>
         </div>
       )}
 
       {/* Operators + equipment */}
       <div className="flex items-center gap-2 flex-wrap">
         {isUnassigned ? (
-          <span className="flex items-center gap-1 text-[10px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-orange-600 bg-orange-50 dark:bg-orange-900/30 px-2 py-0.5 rounded-full">
             <UserIcon className="w-2.5 h-2.5" />
             Unassigned
           </span>
         ) : (
           <>
-            <span className="flex items-center gap-1 text-[10px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full truncate max-w-[120px]">
+            <span className="flex items-center gap-1 text-[10px] text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded-full truncate max-w-[120px]">
               <UserIcon className="w-2.5 h-2.5 flex-shrink-0" />
               {job.operator_name}
             </span>
             {job.helper_name && (
-              <span className="flex items-center gap-1 text-[10px] text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full truncate max-w-[100px]">
+              <span className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-700/60 px-2 py-0.5 rounded-full truncate max-w-[100px]">
                 <Users className="w-2.5 h-2.5 flex-shrink-0" />
                 {job.helper_name}
               </span>
@@ -309,12 +309,12 @@ function ScheduleJobCard({ job }: { job: JobToday }) {
         {job.equipment && job.equipment.length > 0 && (
           <>
             {job.equipment.slice(0, 3).map((eq, i) => (
-              <span key={i} className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded truncate max-w-[80px]">
+              <span key={i} className="text-[10px] text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-700/60 border border-gray-200 dark:border-slate-600 px-1.5 py-0.5 rounded truncate max-w-[80px]">
                 {eq}
               </span>
             ))}
             {job.equipment.length > 3 && (
-              <span className="text-[10px] text-gray-400">+{job.equipment.length - 3} more</span>
+              <span className="text-[10px] text-gray-400 dark:text-slate-500">+{job.equipment.length - 3} more</span>
             )}
           </>
         )}
@@ -481,10 +481,10 @@ export default function AdminDashboard() {
   // ── loading screen ────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
-          <p className="text-gray-500 text-sm">Loading dashboard...</p>
+          <p className="text-gray-500 dark:text-slate-400 text-sm">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -511,15 +511,15 @@ export default function AdminDashboard() {
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-full">
+    <div className="p-6 space-y-6 bg-gray-50 dark:bg-slate-900 min-h-full">
 
       {/* ── Scope toggle header ───────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             {scope === 'personal' ? 'Your Dashboard' : 'Team Dashboard'}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
             {scope === 'personal'
               ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
               : `All operators · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
@@ -529,13 +529,13 @@ export default function AdminDashboard() {
 
         {/* Toggle — senior roles only */}
         {isSeniorRole && (
-          <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-800 rounded-xl p-1">
             <button
               onClick={() => handleScopeChange('personal')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 scope === 'personal'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
               }`}
             >
               <UserCircle2 className="w-4 h-4" />
@@ -545,8 +545,8 @@ export default function AdminDashboard() {
               onClick={() => handleScopeChange('team')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 scope === 'team'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
               }`}
             >
               <Users className="w-4 h-4" />
@@ -558,18 +558,18 @@ export default function AdminDashboard() {
 
       {/* ── Personal identity banner (personal scope only) ────────────────── */}
       {scope === 'personal' && (
-        <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl px-4 py-3">
+        <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border border-blue-100 dark:border-blue-900/50 rounded-xl px-4 py-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
             {user?.name?.charAt(0) || '?'}
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-            <p className="text-xs text-gray-500 capitalize">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">{user?.name}</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 capitalize">
               {user?.role?.replace(/_/g, ' ')} · Viewing your personal metrics
             </p>
           </div>
           <div className="ml-auto">
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+            <span className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full font-medium">
               Personal View
             </span>
           </div>
@@ -582,29 +582,29 @@ export default function AdminDashboard() {
         {/* Jobs Today */}
         <Link
           href="/dashboard/admin/schedule-board"
-          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow group"
+          className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 hover:shadow-md transition-shadow group"
         >
           <div className="flex items-start justify-between mb-4">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center">
+              <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-blue-500 transition-colors" />
           </div>
           {dashLoading ? (
-            <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
+            <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-16 mb-2" />
           ) : (
-            <p className="text-4xl font-bold text-gray-900">{dashData?.jobs_today.count ?? 0}</p>
+            <p className="text-4xl font-bold text-gray-900 dark:text-white">{dashData?.jobs_today.count ?? 0}</p>
           )}
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
             {scope === 'personal' ? 'Your Jobs Today' : 'Jobs Today'}
           </p>
         </Link>
 
         {/* Revenue MTD */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
           <div className="flex items-start justify-between mb-4">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-green-600" />
+            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
             {!dashLoading && dashData && (
               <span
@@ -624,33 +624,33 @@ export default function AdminDashboard() {
             )}
           </div>
           {dashLoading ? (
-            <div className="animate-pulse bg-gray-200 rounded h-8 w-24 mb-2" />
+            <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-24 mb-2" />
           ) : (
-            <p className="text-4xl font-bold text-gray-900">
+            <p className="text-4xl font-bold text-gray-900 dark:text-white">
               {formatCurrency(dashData?.revenue_mtd.total ?? 0)}
             </p>
           )}
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
             {scope === 'personal' ? 'Your Revenue MTD' : 'Revenue MTD'}
           </p>
         </div>
 
         {/* Open Items */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
           <div className="flex items-start justify-between mb-4">
-            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-amber-600" />
+            <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/40 rounded-full flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             </div>
             {!dashLoading && openItemsTotal > 0 && (
               <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
             )}
           </div>
           {dashLoading ? (
-            <div className="animate-pulse bg-gray-200 rounded h-8 w-12 mb-2" />
+            <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-12 mb-2" />
           ) : (
-            <p className="text-4xl font-bold text-gray-900">{openItemsTotal}</p>
+            <p className="text-4xl font-bold text-gray-900 dark:text-white">{openItemsTotal}</p>
           )}
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
             {scope === 'personal' ? 'Your Open Items' : 'Open Items'}
           </p>
         </div>
@@ -659,40 +659,40 @@ export default function AdminDashboard() {
         {scope === 'personal' ? (
           <Link
             href="/dashboard/admin/timecards"
-            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow group"
+            className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 hover:shadow-md transition-shadow group"
           >
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <Clock className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center">
+                <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-purple-500 transition-colors" />
+              <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-purple-500 transition-colors" />
             </div>
             {dashLoading ? (
-              <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
+              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-16 mb-2" />
             ) : (
-              <p className="text-4xl font-bold text-gray-900">
+              <p className="text-4xl font-bold text-gray-900 dark:text-white">
                 {dashData?.open_items.pending_timecards ?? 0}
               </p>
             )}
-            <p className="text-sm text-gray-500 mt-1">Pending Timecards</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Pending Timecards</p>
           </Link>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <Users className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center">
+                <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
             {dashLoading ? (
-              <div className="animate-pulse bg-gray-200 rounded h-8 w-16 mb-2" />
+              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-16 mb-2" />
             ) : (
-              <p className="text-4xl font-bold text-gray-900">
+              <p className="text-4xl font-bold text-gray-900 dark:text-white">
                 {dashData?.crew_utilization.pct ?? 0}%
               </p>
             )}
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
               {dashLoading ? (
-                <span className="inline-block animate-pulse bg-gray-200 rounded h-3 w-20" />
+                <span className="inline-block animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-3 w-20" />
               ) : (
                 `${dashData?.crew_utilization.active ?? 0} of ${dashData?.crew_utilization.total ?? 0} active`
               )}
@@ -708,18 +708,18 @@ export default function AdminDashboard() {
         <div className="xl:col-span-3 space-y-6">
 
           {/* Today's Schedule — rich quick-view */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
               <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-gray-400" />
-                <h2 className="text-sm font-semibold text-gray-900">
+                <Calendar className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                   {scope === 'personal' ? 'Your Schedule Today' : "Today's Schedule"}
                 </h2>
-                <span className="text-xs text-gray-400">{today}</span>
+                <span className="text-xs text-gray-400 dark:text-slate-500">{today}</span>
               </div>
               <Link
                 href="/dashboard/admin/schedule-board"
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                className="text-xs text-blue-600 dark:text-violet-400 hover:text-blue-700 dark:hover:text-violet-300 font-medium flex items-center gap-1"
               >
                 View Full Board
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -730,24 +730,24 @@ export default function AdminDashboard() {
               {dashLoading ? (
                 /* Loading skeletons */
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="rounded-xl border border-gray-100 border-l-4 border-l-gray-200 p-3 space-y-2">
+                  <div key={i} className="rounded-xl border border-gray-100 dark:border-slate-700 border-l-4 border-l-gray-200 dark:border-l-slate-600 p-3 space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="animate-pulse bg-gray-200 rounded h-4 w-14" />
-                      <div className="animate-pulse bg-gray-200 rounded h-3 w-24" />
-                      <div className="ml-auto animate-pulse bg-gray-200 rounded-full h-4 w-16" />
+                      <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-4 w-14" />
+                      <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-3 w-24" />
+                      <div className="ml-auto animate-pulse bg-gray-200 dark:bg-slate-700 rounded-full h-4 w-16" />
                     </div>
-                    <div className="animate-pulse bg-gray-200 rounded h-4 w-3/4" />
-                    <div className="animate-pulse bg-gray-200 rounded h-3 w-1/2" />
+                    <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-4 w-3/4" />
+                    <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-3 w-1/2" />
                     <div className="flex gap-2">
-                      <div className="animate-pulse bg-gray-200 rounded-full h-4 w-20" />
-                      <div className="animate-pulse bg-gray-200 rounded h-4 w-16" />
+                      <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded-full h-4 w-20" />
+                      <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-4 w-16" />
                     </div>
                   </div>
                 ))
               ) : !dashData || dashData.jobs_today.jobs.length === 0 ? (
                 <div className="py-12 text-center">
-                  <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500 mb-3">
+                  <Calendar className="w-10 h-10 text-gray-200 dark:text-slate-700 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">
                     {scope === 'personal'
                       ? 'You have no jobs scheduled today'
                       : 'No jobs scheduled for today'}
@@ -768,7 +768,7 @@ export default function AdminDashboard() {
                   {dashData.jobs_today.jobs.length > 6 && (
                     <Link
                       href="/dashboard/admin/schedule-board"
-                      className="block text-center py-2 text-xs text-blue-500 hover:text-blue-600 font-medium transition-colors"
+                      className="block text-center py-2 text-xs text-blue-500 dark:text-violet-400 hover:text-blue-600 dark:hover:text-violet-300 font-medium transition-colors"
                     >
                       View {dashData.jobs_today.jobs.length - 6} more on board &rarr;
                     </Link>
@@ -787,10 +787,10 @@ export default function AdminDashboard() {
         <div className="xl:col-span-2 space-y-6">
 
           {/* Action Required */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
-              <AlertCircle className="w-5 h-5 text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-900">Action Required</h2>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 dark:border-slate-700">
+              <AlertCircle className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Action Required</h2>
             </div>
 
             <div>
@@ -805,11 +805,11 @@ export default function AdminDashboard() {
                   {/* Pending Timecards / Your Pending Timecard */}
                   <Link
                     href="/dashboard/admin/timecards"
-                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 transition-colors group"
+                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-50 dark:border-slate-700 transition-colors group"
                   >
                     <div className="flex items-center gap-3">
                       <Clock className="w-4 h-4 text-amber-500" />
-                      <span className="text-sm text-gray-700">
+                      <span className="text-sm text-gray-700 dark:text-slate-300">
                         {scope === 'personal' ? 'Your Pending Timecard' : 'Pending Timecards'}
                       </span>
                     </div>
@@ -818,12 +818,12 @@ export default function AdminDashboard() {
                         className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                           (dashData?.open_items.pending_timecards ?? 0) > 0
                             ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-gray-400'
+                            : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500'
                         }`}
                       >
                         {dashData?.open_items.pending_timecards ?? 0}
                       </span>
-                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                      <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-gray-500 dark:group-hover:text-slate-400 transition-colors" />
                     </div>
                   </Link>
 
@@ -831,23 +831,23 @@ export default function AdminDashboard() {
                   {scope === 'team' && (
                     <Link
                       href="/dashboard/admin/schedule-board"
-                      className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 transition-colors group"
+                      className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-50 dark:border-slate-700 transition-colors group"
                     >
                       <div className="flex items-center gap-3">
                         <Calendar className="w-4 h-4 text-blue-500" />
-                        <span className="text-sm text-gray-700">Unassigned Jobs</span>
+                        <span className="text-sm text-gray-700 dark:text-slate-300">Unassigned Jobs</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span
                           className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                             (dashData?.open_items.unassigned_jobs ?? 0) > 0
                               ? 'bg-red-100 text-red-700'
-                              : 'bg-gray-100 text-gray-400'
+                              : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500'
                           }`}
                         >
                           {dashData?.open_items.unassigned_jobs ?? 0}
                         </span>
-                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                        <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-gray-500 dark:group-hover:text-slate-400 transition-colors" />
                       </div>
                     </Link>
                   )}
@@ -855,11 +855,11 @@ export default function AdminDashboard() {
                   {/* Overdue Invoices / Your Overdue Invoices */}
                   <Link
                     href="/dashboard/admin/billing"
-                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors group"
+                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer transition-colors group"
                   >
                     <div className="flex items-center gap-3">
                       <DollarSign className="w-4 h-4 text-red-500" />
-                      <span className="text-sm text-gray-700">
+                      <span className="text-sm text-gray-700 dark:text-slate-300">
                         {scope === 'personal' ? 'Your Overdue Invoices' : 'Overdue Invoices'}
                       </span>
                     </div>
@@ -868,12 +868,12 @@ export default function AdminDashboard() {
                         className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                           (dashData?.open_items.overdue_invoices ?? 0) > 0
                             ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-gray-400'
+                            : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500'
                         }`}
                       >
                         {dashData?.open_items.overdue_invoices ?? 0}
                       </span>
-                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                      <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-gray-500 dark:group-hover:text-slate-400 transition-colors" />
                     </div>
                   </Link>
                 </>
@@ -882,10 +882,10 @@ export default function AdminDashboard() {
           </div>
 
           {/* Team Status / Your Status */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
-              <Users className="w-5 h-5 text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-900">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 dark:border-slate-700">
+              <Users className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {scope === 'personal' ? 'Your Status' : 'Team Status'}
               </h2>
             </div>
@@ -894,36 +894,36 @@ export default function AdminDashboard() {
               {dashLoading ? (
                 Array.from({ length: scope === 'personal' ? 1 : 4 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-2 py-2">
-                    <div className="animate-pulse bg-gray-200 rounded-full w-2.5 h-2.5" />
-                    <div className="animate-pulse bg-gray-200 rounded h-3 flex-1" />
-                    <div className="animate-pulse bg-gray-200 rounded h-3 w-16" />
+                    <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded-full w-2.5 h-2.5" />
+                    <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-3 flex-1" />
+                    <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-3 w-16" />
                   </div>
                 ))
               ) : !dashData || dashData.team_status.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-400">
+                <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">
                   {scope === 'personal' ? 'No status available' : 'No crew data available'}
                 </div>
               ) : (
                 <>
                   {dashData.team_status.slice(0, scope === 'personal' ? 1 : 8).map((member) => (
-                    <div key={member.id} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div key={member.id} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
                       <span
                         className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
                           member.status === 'active'
                             ? 'bg-green-500'
                             : member.status === 'off'
                             ? 'bg-blue-400'
-                            : 'bg-gray-300'
+                            : 'bg-gray-300 dark:bg-slate-600'
                         }`}
                       />
-                      <span className="text-sm font-medium text-gray-800 flex-1 truncate">{member.name}</span>
-                      <span className="text-xs text-gray-400 truncate max-w-[80px]">
+                      <span className="text-sm font-medium text-gray-800 dark:text-slate-300 flex-1 truncate">{member.name}</span>
+                      <span className="text-xs text-gray-400 dark:text-slate-500 truncate max-w-[80px]">
                         {member.current_job ?? (member.status === 'off' ? 'Time Off' : 'Idle')}
                       </span>
                     </div>
                   ))}
                   {scope === 'team' && dashData.team_status.length > 8 && (
-                    <p className="text-xs text-gray-400 text-center py-2">
+                    <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-2">
                       +{dashData.team_status.length - 8} more
                     </p>
                   )}
@@ -933,33 +933,33 @@ export default function AdminDashboard() {
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h2>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-2">
               <Link
                 href="/dashboard/admin/schedule-form"
-                className="flex flex-col items-center gap-2 p-4 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-200 text-blue-700 transition-colors cursor-pointer"
+                className="flex flex-col items-center gap-2 p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 transition-colors cursor-pointer"
               >
                 <Plus className="w-5 h-5" />
                 <span className="text-xs font-semibold">New Job</span>
               </Link>
               <Link
                 href="/dashboard/admin/completed-jobs"
-                className="flex flex-col items-center gap-2 p-4 bg-green-50 hover:bg-green-100 rounded-xl border border-green-200 text-green-700 transition-colors cursor-pointer"
+                className="flex flex-col items-center gap-2 p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 rounded-xl border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 transition-colors cursor-pointer"
               >
                 <CheckCircle2 className="w-5 h-5" />
                 <span className="text-xs font-semibold">Completed Jobs</span>
               </Link>
               <Link
                 href="/dashboard/admin/timecards"
-                className="flex flex-col items-center gap-2 p-4 bg-purple-50 hover:bg-purple-100 rounded-xl border border-purple-200 text-purple-700 transition-colors cursor-pointer"
+                className="flex flex-col items-center gap-2 p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-xl border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-400 transition-colors cursor-pointer"
               >
                 <Clock className="w-5 h-5" />
                 <span className="text-xs font-semibold">Timecards</span>
               </Link>
               <Link
                 href="/dashboard/admin/billing"
-                className="flex flex-col items-center gap-2 p-4 bg-amber-50 hover:bg-amber-100 rounded-xl border border-amber-200 text-amber-700 transition-colors cursor-pointer"
+                className="flex flex-col items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 transition-colors cursor-pointer"
               >
                 <CreditCard className="w-5 h-5" />
                 <span className="text-xs font-semibold">Billing</span>
@@ -970,15 +970,15 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── View Active Jobs ─────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Activity className="w-4 h-4 text-purple-600" />
+            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/40 rounded-lg flex items-center justify-center">
+              <Activity className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-900">View Active Jobs</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Jobs currently in progress or assigned</p>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">View Active Jobs</h2>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Jobs currently in progress or assigned</p>
             </div>
           </div>
           <Link
@@ -994,18 +994,18 @@ export default function AdminDashboard() {
           {activeJobsLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map(i => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
-                  <div className="animate-pulse bg-gray-200 rounded w-20 h-4" />
-                  <div className="animate-pulse bg-gray-200 rounded flex-1 h-4" />
-                  <div className="animate-pulse bg-gray-200 rounded w-16 h-4" />
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/50">
+                  <div className="animate-pulse bg-gray-200 dark:bg-slate-600 rounded w-20 h-4" />
+                  <div className="animate-pulse bg-gray-200 dark:bg-slate-600 rounded flex-1 h-4" />
+                  <div className="animate-pulse bg-gray-200 dark:bg-slate-600 rounded w-16 h-4" />
                 </div>
               ))}
             </div>
           ) : activeJobs.length === 0 ? (
             <div className="py-10 text-center">
-              <CheckCircle2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-gray-500 mb-1">No active jobs right now</p>
-              <p className="text-xs text-gray-400">Jobs with status &ldquo;assigned&rdquo; or &ldquo;in progress&rdquo; will appear here</p>
+              <CheckCircle2 className="w-10 h-10 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
+              <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">No active jobs right now</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500">Jobs with status &ldquo;assigned&rdquo; or &ldquo;in progress&rdquo; will appear here</p>
               <Link
                 href="/dashboard/admin/schedule-form"
                 className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-lg transition-colors"
@@ -1020,18 +1020,18 @@ export default function AdminDashboard() {
                 <Link
                   key={job.id}
                   href={`/dashboard/admin/active-jobs`}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-purple-300 transition-all group"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 hover:border-purple-300 dark:hover:border-purple-600 transition-all group"
                 >
                   {/* Job number */}
-                  <span className="text-xs font-mono bg-purple-100 px-2 py-1 rounded text-purple-700 flex-shrink-0 min-w-[72px] text-center">
+                  <span className="text-xs font-mono bg-purple-100 dark:bg-purple-900/40 px-2 py-1 rounded text-purple-700 dark:text-purple-300 flex-shrink-0 min-w-[72px] text-center">
                     {job.job_number}
                   </span>
 
                   {/* Customer + operator */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{job.customer_name}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{job.customer_name}</p>
                     {job.operator_name && (
-                      <p className="text-xs text-gray-500 truncate flex items-center gap-1 mt-0.5">
+                      <p className="text-xs text-gray-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
                         <Users className="w-3 h-3 inline flex-shrink-0" />
                         {job.operator_name}
                       </p>
@@ -1062,7 +1062,7 @@ export default function AdminDashboard() {
                       : 'Assigned'}
                   </span>
 
-                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-purple-500 transition-colors flex-shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-gray-400 dark:text-slate-500 group-hover:text-purple-500 transition-colors flex-shrink-0" />
                 </Link>
               ))}
 
@@ -1080,33 +1080,33 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Recent Activity ──────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
-          <Clock className="w-5 h-5 text-gray-400" />
-          <h2 className="text-sm font-semibold text-gray-900">Recent Activity</h2>
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
+        <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 dark:border-slate-700">
+          <Clock className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
         </div>
 
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-gray-50 dark:divide-slate-700">
           {dashLoading ? (
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-4 px-6 py-3">
-                <div className="animate-pulse bg-gray-200 rounded-full w-8 h-8 flex-shrink-0" />
+                <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded-full w-8 h-8 flex-shrink-0" />
                 <div className="flex-1 space-y-1.5">
-                  <div className="animate-pulse bg-gray-200 rounded h-3 w-3/4" />
-                  <div className="animate-pulse bg-gray-200 rounded h-3 w-1/4" />
+                  <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-3 w-3/4" />
+                  <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-3 w-1/4" />
                 </div>
               </div>
             ))
           ) : !dashData || dashData.recent_activity.length === 0 ? (
-            <div className="py-12 text-center text-sm text-gray-400">No recent activity</div>
+            <div className="py-12 text-center text-sm text-gray-400 dark:text-slate-500">No recent activity</div>
           ) : (
             dashData.recent_activity.slice(0, 8).map((item) => (
-              <div key={item.id} className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 transition-colors">
+              <div key={item.id} className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                 <ActivityIcon type={item.type} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-700 truncate">{item.description}</p>
+                  <p className="text-sm text-gray-700 dark:text-slate-300 truncate">{item.description}</p>
                 </div>
-                <span className="text-xs text-gray-400 flex-shrink-0">{relativeTime(item.created_at)}</span>
+                <span className="text-xs text-gray-400 dark:text-slate-500 flex-shrink-0">{relativeTime(item.created_at)}</span>
               </div>
             ))
           )}
