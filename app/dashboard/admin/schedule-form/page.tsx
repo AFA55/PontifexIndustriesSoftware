@@ -480,7 +480,7 @@ const initialFormData: FormData = {
 // ── Reusable UI helpers ──────────────────────────────────────
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+    <label className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2.5">
       {children}
       {required && <span className="text-red-400 text-sm">*</span>}
     </label>
@@ -495,9 +495,9 @@ function InputField({ icon: Icon, ...props }: React.InputHTMLAttributes<HTMLInpu
       )}
       <input
         {...props}
-        className={`w-full ${Icon ? 'pl-12' : 'pl-4'} pr-4 py-3.5 sm:py-4 bg-white border border-slate-200 rounded-xl text-base text-slate-800 placeholder-slate-400
-          focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:shadow-sm
-          hover:border-slate-300 transition-all duration-200 ${props.className || ''}`}
+        className={`w-full ${Icon ? 'pl-12' : 'pl-4'} pr-4 py-3.5 sm:py-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30
+          focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-violet-500/20 focus:border-blue-500 dark:focus:border-violet-400 focus:shadow-sm
+          hover:border-slate-300 dark:hover:border-white/20 transition-all duration-200 ${props.className || ''}`}
       />
     </div>
   );
@@ -507,9 +507,9 @@ function TextArea({ ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement
   return (
     <textarea
       {...props}
-      className={`w-full px-4 py-3.5 sm:py-4 bg-white border border-slate-200 rounded-xl text-base text-slate-800 placeholder-slate-400
-        focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:shadow-sm
-        hover:border-slate-300 transition-all duration-200 resize-none ${props.className || ''}`}
+      className={`w-full px-4 py-3.5 sm:py-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30
+        focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-violet-500/20 focus:border-blue-500 dark:focus:border-violet-400 focus:shadow-sm
+        hover:border-slate-300 dark:hover:border-white/20 transition-all duration-200 resize-none ${props.className || ''}`}
     />
   );
 }
@@ -521,15 +521,15 @@ function Toggle({ checked, onChange, label, icon: Icon }: { checked: boolean; on
       onClick={() => onChange(!checked)}
       className={`flex items-center gap-4 w-full text-left p-4 rounded-xl border transition-all duration-200 ${
         checked
-          ? 'bg-blue-50 border-blue-200 shadow-sm'
-          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+          ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-400/30 shadow-sm'
+          : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50 dark:hover:bg-white/8'
       }`}
     >
-      <div className={`relative w-12 h-7 rounded-full transition-all duration-200 flex-shrink-0 ${checked ? 'bg-blue-600 shadow-inner' : 'bg-slate-300'}`}>
+      <div className={`relative w-12 h-7 rounded-full transition-all duration-200 flex-shrink-0 ${checked ? 'bg-blue-600 shadow-inner' : 'bg-slate-300 dark:bg-white/20'}`}>
         <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-200 ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
       </div>
       {Icon && <Icon size={18} className={`flex-shrink-0 ${checked ? 'text-blue-600' : 'text-slate-400'}`} />}
-      <span className={`text-base font-medium ${checked ? 'text-blue-700' : 'text-slate-600'}`}>{label}</span>
+      <span className={`text-base font-medium ${checked ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-white/60'}`}>{label}</span>
     </button>
   );
 }
@@ -553,7 +553,7 @@ function ConditionCheck({ checked, onChange, label, icon: Icon, showFt, ftValue,
 
   return (
     <div className={`flex items-center gap-4 p-4 sm:p-5 rounded-xl border-2 transition-all duration-200 ${
-      checked ? `${c.bg} ${c.border} shadow-sm` : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+      checked ? `${c.bg} ${c.border} shadow-sm` : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/8'
     }`}>
       <button
         type="button"
@@ -565,7 +565,7 @@ function ConditionCheck({ checked, onChange, label, icon: Icon, showFt, ftValue,
         {checked && <Check size={18} className="text-white" />}
       </button>
       {Icon && <Icon size={20} className={`flex-shrink-0 ${checked ? c.icon : 'text-slate-400'}`} />}
-      <span className={`text-base sm:text-lg flex-1 ${checked ? `${c.text} font-semibold` : 'text-slate-600'}`}>{label}</span>
+      <span className={`text-base sm:text-lg flex-1 ${checked ? `${c.text} font-semibold` : 'text-slate-600 dark:text-white/60'}`}>{label}</span>
       {showFt && checked && (
         <div className="flex items-center gap-2">
           <input
@@ -584,7 +584,7 @@ function ConditionCheck({ checked, onChange, label, icon: Icon, showFt, ftValue,
 
 function SectionCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-slate-50/80 border border-slate-200/60 rounded-2xl p-5 sm:p-6 space-y-4 ${className}`}>
+    <div className={`bg-slate-50/80 dark:bg-white/3 border border-slate-200/60 dark:border-white/10 rounded-2xl p-5 sm:p-6 space-y-4 ${className}`}>
       {children}
     </div>
   );
@@ -619,76 +619,76 @@ function CreateFacilityModal({ onClose, onSaved }: { onClose: () => void; onSave
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between p-5 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-purple-600" />
+        <div className="bg-white dark:bg-[#12082a] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-transparent dark:border-white/10">
+          <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-white/10">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-purple-600 dark:text-violet-400" />
               Add Facility
             </h2>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <X className="w-5 h-5 text-gray-400" />
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
+              <X className="w-5 h-5 text-gray-400 dark:text-white/40" />
             </button>
           </div>
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-400/30 rounded-xl p-3 text-sm text-red-700 dark:text-red-300">{error}</div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Facility Name *</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">Facility Name *</label>
               <input type="text" value={facilityForm.name} onChange={e => setFacilityForm({ ...facilityForm, name: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="e.g., Intel D1X Fab" />
+                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" placeholder="e.g., Intel D1X Fab" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">Address</label>
               <input type="text" value={facilityForm.address} onChange={e => setFacilityForm({ ...facilityForm, address: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" placeholder="Street address" />
+                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" placeholder="Street address" />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">City</label>
                 <input type="text" value={facilityForm.city} onChange={e => setFacilityForm({ ...facilityForm, city: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" />
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">State</label>
                 <input type="text" value={facilityForm.state} onChange={e => setFacilityForm({ ...facilityForm, state: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={2} placeholder="OR" />
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" maxLength={2} placeholder="OR" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">ZIP</label>
                 <input type="text" value={facilityForm.zip} onChange={e => setFacilityForm({ ...facilityForm, zip: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" maxLength={10} />
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" maxLength={10} />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Special Requirements</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">Special Requirements</label>
               <textarea value={facilityForm.special_requirements} onChange={e => setFacilityForm({ ...facilityForm, special_requirements: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2}
+                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" rows={2}
                 placeholder="PPE requirements, site rules, etc." />
             </div>
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
                 <button type="button" onClick={() => setFacilityForm({ ...facilityForm, orientation_required: !facilityForm.orientation_required })}
-                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.orientation_required ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.orientation_required ? 'bg-purple-600' : 'bg-gray-300 dark:bg-white/20'}`}>
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${facilityForm.orientation_required ? 'translate-x-4' : ''}`} />
                 </button>
-                <span className="text-sm text-gray-700">Orientation Required</span>
+                <span className="text-sm text-gray-700 dark:text-white/70">Orientation Required</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <button type="button" onClick={() => setFacilityForm({ ...facilityForm, badging_required: !facilityForm.badging_required })}
-                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.badging_required ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.badging_required ? 'bg-purple-600' : 'bg-gray-300 dark:bg-white/20'}`}>
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${facilityForm.badging_required ? 'translate-x-4' : ''}`} />
                 </button>
-                <span className="text-sm text-gray-700">Badging Required</span>
+                <span className="text-sm text-gray-700 dark:text-white/70">Badging Required</span>
               </label>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">Notes</label>
               <textarea value={facilityForm.notes} onChange={e => setFacilityForm({ ...facilityForm, notes: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400" rows={2} />
+                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
@@ -1621,13 +1621,13 @@ export default function ScheduleFormPage() {
   // ── Loading ────────────────────────────────────────────────
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-[#0b0618] dark:via-[#0e0720] dark:to-[#0b0618] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-14 h-14 relative">
-            <div className="absolute inset-0 rounded-full border-4 border-blue-100"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-blue-100 dark:border-white/10"></div>
             <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"></div>
           </div>
-          <p className="text-sm text-slate-500 font-medium">Loading Schedule Form...</p>
+          <p className="text-sm text-slate-500 dark:text-white/40 font-medium">Loading Schedule Form...</p>
         </div>
       </div>
     );
@@ -1636,16 +1636,16 @@ export default function ScheduleFormPage() {
   // ── Success screen ─────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-200/60 p-10 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-[#0b0618] dark:via-[#0e0720] dark:to-[#0b0618] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white dark:bg-white/5 rounded-3xl shadow-xl border border-slate-200/60 dark:border-white/10 p-10 text-center">
           <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-200">
             <CheckCircle size={40} className="text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Job Created!</h2>
-          <p className="text-sm text-slate-500 mb-1">Job Number</p>
-          <p className="text-xl font-bold text-blue-600 mb-1">{createdJobNumber}</p>
-          <p className="text-sm text-slate-500 mb-8">
-            Customer: <span className="font-semibold text-slate-700">{form.contractor_name}</span>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Job Created!</h2>
+          <p className="text-sm text-slate-500 dark:text-white/40 mb-1">Job Number</p>
+          <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-1">{createdJobNumber}</p>
+          <p className="text-sm text-slate-500 dark:text-white/40 mb-8">
+            Customer: <span className="font-semibold text-slate-700 dark:text-white/80">{form.contractor_name}</span>
           </p>
           <div className="flex gap-3">
             <Link
@@ -1656,7 +1656,7 @@ export default function ScheduleFormPage() {
             </Link>
             <button
               onClick={() => { setForm({ ...initialFormData }); setSubmitted(false); setCurrentStep(1); }}
-              className="flex-1 px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-all"
+              className="flex-1 px-5 py-3 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-slate-700 dark:text-white/80 rounded-xl text-sm font-semibold transition-all"
             >
               Create Another
             </button>
@@ -1681,25 +1681,25 @@ export default function ScheduleFormPage() {
         return (
           <div className="space-y-6">
             {/* Submitted By (compact) */}
-            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50/80 border border-slate-200 rounded-xl">
+            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white">
                 {(user?.name || '').split(' ').map(n => n[0]).join('')}
               </div>
-              <span className="text-sm text-slate-600">Submitted by <span className="font-semibold text-slate-800">{user?.name}</span> on {new Date().toLocaleDateString()}</span>
+              <span className="text-sm text-slate-600 dark:text-white/60">Submitted by <span className="font-semibold text-slate-800 dark:text-white">{user?.name}</span> on {new Date().toLocaleDateString()}</span>
             </div>
 
             {/* Selected customer badge */}
             {form.customer_id && form.contractor_name && (
-              <div className="flex items-center gap-3 px-5 py-4 bg-emerald-50 border-2 border-emerald-200 rounded-xl">
-                <CheckCircle size={22} className="text-emerald-600 flex-shrink-0" />
+              <div className="flex items-center gap-3 px-5 py-4 bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-200 dark:border-emerald-400/30 rounded-xl">
+                <CheckCircle size={22} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-base font-bold text-emerald-800">{form.contractor_name}</p>
-                  <p className="text-xs text-emerald-600">Customer selected — click Next Step to continue</p>
+                  <p className="text-base font-bold text-emerald-800 dark:text-emerald-300">{form.contractor_name}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">Customer selected — click Next Step to continue</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => updateForm({ contractor_name: '', customer_id: '', save_as_customer: false })}
-                  className="px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                  className="px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                 >
                   Change
                 </button>
@@ -1782,27 +1782,27 @@ export default function ScheduleFormPage() {
                         selectCrmCustomer(customerSnapshot);
                         setCustomerSearch('');
                       }}
-                      className="w-full flex items-center gap-4 px-5 py-4 bg-white border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm transition-all text-left group"
+                      className="w-full flex items-center gap-4 px-5 py-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-blue-300 dark:hover:border-blue-500/40 hover:bg-blue-50/50 dark:hover:bg-blue-500/10 hover:shadow-sm transition-all text-left group"
                     >
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 group-hover:from-blue-100 group-hover:to-blue-200 flex items-center justify-center text-sm font-bold text-slate-500 group-hover:text-blue-600 transition-colors">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-white/10 dark:to-white/5 group-hover:from-blue-100 group-hover:to-blue-200 dark:group-hover:from-blue-500/20 dark:group-hover:to-blue-500/10 flex items-center justify-center text-sm font-bold text-slate-500 dark:text-white/50 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
                         {c.company_name.substring(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-base font-semibold text-slate-800 truncate">{c.company_name}</p>
-                        <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
+                        <p className="text-base font-semibold text-slate-800 dark:text-white truncate">{c.company_name}</p>
+                        <div className="flex items-center gap-3 text-xs text-slate-400 dark:text-white/40 mt-0.5">
                           {c.primary_contact_name && <span>{c.primary_contact_name}</span>}
                           {c.address && <span className="truncate">{c.address}</span>}
                         </div>
                       </div>
-                      <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                      <ChevronRight size={16} className="text-slate-300 dark:text-white/20 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
                     </button>
                     );
                   })}
                 </div>
 
                 {/* Or type freely */}
-                <div className="border-t border-slate-200 pt-4">
-                  <p className="text-xs text-slate-400 mb-2 font-medium">Or type a customer name directly:</p>
+                <div className="border-t border-slate-200 dark:border-white/10 pt-4">
+                  <p className="text-xs text-slate-400 dark:text-white/30 mb-2 font-medium">Or type a customer name directly:</p>
                   <CustomerAutocomplete
                     value={form.contractor_name}
                     onChange={(value) => {
@@ -1836,10 +1836,10 @@ export default function ScheduleFormPage() {
           <div className="space-y-6">
             {/* Customer auto-populated from Step 1 */}
             {form.contractor_name && (
-              <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
-                <UserIcon size={16} className="text-blue-600" />
-                <span className="text-sm font-semibold text-blue-800">Customer: {form.contractor_name}</span>
-                {form.customer_id && <CheckCircle size={14} className="text-emerald-500 ml-auto" />}
+              <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-400/30 rounded-xl">
+                <UserIcon size={16} className="text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">Customer: {form.contractor_name}</span>
+                {form.customer_id && <CheckCircle size={14} className="text-emerald-500 dark:text-emerald-400 ml-auto" />}
               </div>
             )}
 
@@ -2045,13 +2045,13 @@ export default function ScheduleFormPage() {
                   const currentMode = form.scope_input_modes[code] || 'linear';
                   const activeFields = (isFlexible && currentMode === 'areas' && config.altFields) ? config.altFields : config.fields;
                   return (
-                    <div key={code} className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+                    <div key={code} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-sm">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black bg-gradient-to-br ${st?.gradient || 'from-gray-500 to-gray-600'} text-white shadow-md`}>
                             {code.substring(0, 2)}
                           </div>
-                          <h4 className="text-base font-bold text-slate-800">{config.label}</h4>
+                          <h4 className="text-base font-bold text-slate-800 dark:text-white">{config.label}</h4>
                         </div>
                         {/* Scope type badge */}
                         <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r ${st?.gradient || 'from-gray-500 to-gray-600'} text-white shadow-sm`}>
@@ -2126,7 +2126,7 @@ export default function ScheduleFormPage() {
                                           updated[idx] = { ...updated[idx], qty: e.target.value };
                                           updateHoles(updated);
                                         }}
-                                        className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                       />
                                       <div className="relative">
                                         <input
@@ -2215,9 +2215,9 @@ export default function ScheduleFormPage() {
                                 <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100' : ''}`}>
                                   {idx === 0 && (
                                     <div className="grid grid-cols-3 gap-3 mb-1.5">
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Linear Feet</label>
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cut Depth</label>
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest"># of Cuts</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Linear Feet</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Cut Depth</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest"># of Cuts</label>
                                     </div>
                                   )}
                                   <div className="flex items-center gap-2">
@@ -2232,9 +2232,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], linear_feet: e.target.value };
                                             updateCuts(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">ft</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">ft</span>
                                       </div>
                                       <div className="relative">
                                         <input
@@ -2247,9 +2247,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], depth: e.target.value };
                                             updateCuts(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">in.</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">in.</span>
                                       </div>
                                       <input
                                         type="number"
@@ -2260,7 +2260,7 @@ export default function ScheduleFormPage() {
                                           updated[idx] = { ...updated[idx], num_cuts: e.target.value };
                                           updateCuts(updated);
                                         }}
-                                        className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                       />
                                     </div>
                                     {cuts.length > 1 && (
@@ -2286,10 +2286,10 @@ export default function ScheduleFormPage() {
                               </button>
 
                               {(totalLF > 0 || totalCuts > 0) && (
-                                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
-                                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total:</span>
-                                  {totalLF > 0 && <span className="text-sm font-bold text-slate-800">{totalLF.toLocaleString()} linear ft</span>}
-                                  {totalCuts > 0 && <span className="text-xs text-slate-400">{totalCuts} cut{totalCuts !== 1 ? 's' : ''}</span>}
+                                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                                  <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-wider">Total:</span>
+                                  {totalLF > 0 && <span className="text-sm font-bold text-slate-800 dark:text-white">{totalLF.toLocaleString()} linear ft</span>}
+                                  {totalCuts > 0 && <span className="text-xs text-slate-400 dark:text-white/30">{totalCuts} cut{totalCuts !== 1 ? 's' : ''}</span>}
                                 </div>
                               )}
                             </div>
@@ -2321,10 +2321,10 @@ export default function ScheduleFormPage() {
                                 <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100' : ''}`}>
                                   {idx === 0 && (
                                     <div className="grid grid-cols-4 gap-3 mb-1.5">
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Length</label>
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Width</label>
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Thickness</label>
-                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Qty</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Length</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Width</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Thickness</label>
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Qty</label>
                                     </div>
                                   )}
                                   <div className="flex items-center gap-2">
@@ -2339,9 +2339,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], length: e.target.value };
                                             updateAreas(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">ft</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
                                       </div>
                                       <div className="relative">
                                         <input
@@ -2353,9 +2353,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], width: e.target.value };
                                             updateAreas(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">ft</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
                                       </div>
                                       <div className="relative">
                                         <input
@@ -2368,9 +2368,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], thickness: e.target.value };
                                             updateAreas(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">in.</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">in.</span>
                                       </div>
                                       <input
                                         type="number"
@@ -2381,7 +2381,7 @@ export default function ScheduleFormPage() {
                                           updated[idx] = { ...updated[idx], qty: e.target.value };
                                           updateAreas(updated);
                                         }}
-                                        className="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                       />
                                     </div>
                                     {areas.length > 1 && (
@@ -2397,7 +2397,7 @@ export default function ScheduleFormPage() {
                                   {/* Per-row area calculation */}
                                   {area.length && area.width && (
                                     <div className="mt-1 ml-1">
-                                      <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">
+                                      <span className="text-xs font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 rounded-lg">
                                         {((parseFloat(area.length) || 0) * (parseFloat(area.width) || 0)).toFixed(0)} sq ft{parseInt(area.qty) > 1 ? ` x ${area.qty} = ${((parseFloat(area.length) || 0) * (parseFloat(area.width) || 0) * (parseInt(area.qty) || 1)).toFixed(0)} sq ft` : ''}
                                       </span>
                                     </div>
@@ -2415,10 +2415,10 @@ export default function ScheduleFormPage() {
                               </button>
 
                               {totalSqFt > 0 && (
-                                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
-                                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total:</span>
-                                  <span className="text-sm font-bold text-slate-800">{totalSqFt.toLocaleString()} sq ft</span>
-                                  {totalAreaCount > 0 && <span className="text-xs text-slate-400">({totalAreaCount} area{totalAreaCount !== 1 ? 's' : ''})</span>}
+                                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                                  <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-wider">Total:</span>
+                                  <span className="text-sm font-bold text-slate-800 dark:text-white">{totalSqFt.toLocaleString()} sq ft</span>
+                                  {totalAreaCount > 0 && <span className="text-xs text-slate-400 dark:text-white/30">({totalAreaCount} area{totalAreaCount !== 1 ? 's' : ''})</span>}
                                 </div>
                               )}
                             </div>
@@ -2429,14 +2429,14 @@ export default function ScheduleFormPage() {
                         <div className={activeFields.some(f => f.fullWidth) ? 'space-y-3' : 'grid grid-cols-2 sm:grid-cols-3 gap-4'}>
                           {activeFields.map(field => (
                             <div key={field.key} className={field.fullWidth ? 'col-span-full' : ''}>
-                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">{field.label}</label>
+                              <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-1.5 block">{field.label}</label>
                               {field.type === 'textarea' ? (
                                 <textarea
                                   rows={3}
                                   placeholder={field.placeholder}
                                   value={form.scope_details[code]?.[field.key] || ''}
                                   onChange={e => updateScopeDetail(code, field.key, e.target.value)}
-                                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-base font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all resize-none"
+                                  className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all resize-none"
                                 />
                               ) : (
                                 <div className="relative">
@@ -2445,7 +2445,7 @@ export default function ScheduleFormPage() {
                                     placeholder={field.placeholder}
                                     value={form.scope_details[code]?.[field.key] || ''}
                                     onChange={e => updateScopeDetail(code, field.key, e.target.value)}
-                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-lg font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                    className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                   />
                                   {field.suffix && (
                                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">{field.suffix}</span>
@@ -2461,15 +2461,15 @@ export default function ScheduleFormPage() {
                 })}
 
                 {/* ── Removal Section ────────────── */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+                <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br from-red-500 to-red-700 text-white shadow-md">
                         <Truck className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="text-base font-bold text-slate-800">Material Removal</h4>
-                        <p className="text-xs text-slate-400">Are we removing material from the site?</p>
+                        <h4 className="text-base font-bold text-slate-800 dark:text-white">Material Removal</h4>
+                        <p className="text-xs text-slate-400 dark:text-white/40">Are we removing material from the site?</p>
                       </div>
                     </div>
                     <button
@@ -2488,7 +2488,7 @@ export default function ScheduleFormPage() {
                     <div className="mt-4 space-y-4">
                       {/* Removal Method */}
                       <div>
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Removal Method</label>
+                        <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2 block">Removal Method</label>
                         <div className="grid grid-cols-2 gap-3">
                           {[
                             { value: 'dumpster_on_site', label: 'Dumpster on Site' },
@@ -2501,7 +2501,7 @@ export default function ScheduleFormPage() {
                               className={`px-4 py-3.5 rounded-xl text-sm font-bold transition-all ${
                                 form.removal_method === opt.value
                                   ? 'bg-red-500 text-white border-2 border-red-400 shadow-lg'
-                                  : 'bg-slate-50 text-slate-600 border-2 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                                  : 'bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-white/70 border-2 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20'
                               }`}
                             >
                               {opt.label}
@@ -2512,8 +2512,8 @@ export default function ScheduleFormPage() {
 
                       {/* Removal Equipment Type */}
                       <div>
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Equipment for Removal</label>
-                        <p className="text-xs text-slate-400 mb-2">Select all that apply</p>
+                        <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2 block">Equipment for Removal</label>
+                        <p className="text-xs text-slate-400 dark:text-white/30 mb-2">Select all that apply</p>
                         <div className="flex flex-wrap gap-2">
                           {[
                             { value: 'forklift', label: 'Forklift' },
@@ -2537,7 +2537,7 @@ export default function ScheduleFormPage() {
                                 className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                                   isSelected
                                     ? 'bg-orange-500 text-white border-2 border-orange-400 shadow-md'
-                                    : 'bg-white text-slate-600 border-2 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                    : 'bg-white dark:bg-white/5 text-slate-600 dark:text-white/70 border-2 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20'
                                 }`}
                               >
                                 {equip.label}
@@ -2577,8 +2577,8 @@ export default function ScheduleFormPage() {
                 onChange={e => updateForm({ description: e.target.value })}
               />
               {voiceInput.isListening && voiceInput.interimTranscript && (
-                <div className="mt-2 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl text-sm text-orange-700 italic">
-                  <span className="font-semibold text-orange-600">Hearing: </span>
+                <div className="mt-2 px-4 py-3 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-400/30 rounded-xl text-sm text-orange-700 dark:text-orange-300 italic">
+                  <span className="font-semibold text-orange-600 dark:text-orange-400">Hearing: </span>
                   {voiceInput.interimTranscript}
                 </div>
               )}
@@ -2659,18 +2659,18 @@ export default function ScheduleFormPage() {
                 const showItems = config.subOption ? (subVal ? visibleItems : []) : visibleItems;
 
                 return (
-                  <div key={code} className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+                  <div key={code} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black bg-gradient-to-br ${st?.gradient || 'from-gray-500 to-gray-600'} text-white shadow-md`}>
                         {code.substring(0, 2)}
                       </div>
-                      <h4 className="text-base font-bold text-slate-800">{st?.label || code} Equipment</h4>
+                      <h4 className="text-base font-bold text-slate-800 dark:text-white">{st?.label || code} Equipment</h4>
                     </div>
 
                     {/* Sub-option selector (e.g., Pentruder vs PBG) */}
                     {config.subOption && (
                       <div className="mb-4">
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">{config.subOption.label}</label>
+                        <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2 block">{config.subOption.label}</label>
                         <div className="flex gap-2">
                           {config.subOption.choices.map(choice => (
                             <button
@@ -2680,7 +2680,7 @@ export default function ScheduleFormPage() {
                               className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                                 subVal === choice.value
                                   ? 'bg-blue-600 text-white border-2 border-blue-500 shadow-lg'
-                                  : 'bg-slate-50 text-slate-600 border-2 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                                  : 'bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-white/70 border-2 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20'
                               }`}
                             >
                               {choice.label}
@@ -2708,7 +2708,7 @@ export default function ScheduleFormPage() {
                               className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                                 isActive
                                   ? 'bg-blue-600 text-white border-2 border-blue-500 shadow-md'
-                                  : 'bg-white text-slate-600 border-2 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                  : 'bg-white dark:bg-white/5 text-slate-600 dark:text-white/70 border-2 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20'
                               }`}
                             >
                               {item.label}
@@ -2719,7 +2719,7 @@ export default function ScheduleFormPage() {
                         if (item.type === 'qty') {
                           return (
                             <div key={item.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all ${
-                              isActive ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white'
+                              isActive ? 'border-blue-400 bg-blue-50 dark:bg-blue-500/10' : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5'
                             }`}>
                               <button
                                 type="button"
@@ -2727,7 +2727,7 @@ export default function ScheduleFormPage() {
                                   if (isActive) { setEquipVal(code, item.id, ''); }
                                   else { setEquipVal(code, item.id, '1'); }
                                 }}
-                                className={`text-sm font-semibold transition-colors ${isActive ? 'text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`text-sm font-semibold transition-colors ${isActive ? 'text-blue-700 dark:text-blue-300' : 'text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white/80'}`}
                               >
                                 {item.label}
                               </button>
@@ -2751,9 +2751,9 @@ export default function ScheduleFormPage() {
                         if (item.type === 'option' && item.options) {
                           return (
                             <div key={item.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all ${
-                              isActive ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white'
+                              isActive ? 'border-blue-400 bg-blue-50 dark:bg-blue-500/10' : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5'
                             }`}>
-                              <span className={`text-sm font-semibold ${isActive ? 'text-blue-700' : 'text-slate-500'}`}>{item.label}</span>
+                              <span className={`text-sm font-semibold ${isActive ? 'text-blue-700 dark:text-blue-300' : 'text-slate-500 dark:text-white/50'}`}>{item.label}</span>
                               <div className="flex gap-1">
                                 {item.options.map(opt => (
                                   <button
@@ -2763,7 +2763,7 @@ export default function ScheduleFormPage() {
                                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                                       val === opt
                                         ? 'bg-blue-600 text-white shadow-sm'
-                                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                        : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-white/50 hover:bg-slate-200 dark:hover:bg-white/15'
                                     }`}
                                   >
                                     {opt}
@@ -2789,7 +2789,7 @@ export default function ScheduleFormPage() {
                           {/* Core Bit recommendations from scope */}
                           {coreBitItems.length > 0 && (
                             <div>
-                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Recommended Core Bits</label>
+                              <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2 block">Recommended Core Bits</label>
                               <div className="flex flex-wrap gap-2">
                                 {coreBitItems.map(renderItem)}
                               </div>
@@ -2802,15 +2802,15 @@ export default function ScheduleFormPage() {
                 );
               })
             ) : (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center">
-                <p className="text-sm text-slate-500">Select service types in Step 3 to see recommended equipment</p>
+              <div className="bg-slate-50 dark:bg-white/3 border border-slate-200 dark:border-white/10 rounded-2xl p-6 text-center">
+                <p className="text-sm text-slate-500 dark:text-white/40">Select service types in Step 3 to see recommended equipment</p>
               </div>
             )}
 
             {/* ── Custom & Rental Equipment ─── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5">
-                <h3 className="text-sm font-bold text-slate-800 mb-3">Add Custom Equipment</h3>
+              <div className="bg-slate-50 dark:bg-white/3 border border-slate-200 dark:border-white/10 rounded-2xl p-4 sm:p-5">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-3">Add Custom Equipment</h3>
                 <div className="flex gap-2">
                   <InputField
                     icon={Wrench}
@@ -2831,8 +2831,8 @@ export default function ScheduleFormPage() {
                 {form.equipment_needed.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {form.equipment_needed.map(eq => (
-                      <div key={eq} className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-1.5 rounded-xl text-sm shadow-sm">
-                        <span className="text-slate-700 font-semibold text-xs">{eq}</span>
+                      <div key={eq} className="flex items-center gap-1 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-2 py-1.5 rounded-xl text-sm shadow-sm">
+                        <span className="text-slate-700 dark:text-white/80 font-semibold text-xs">{eq}</span>
                         <button
                           type="button"
                           onClick={() => updateForm({
@@ -2861,8 +2861,8 @@ export default function ScheduleFormPage() {
                 )}
               </div>
 
-              <div className="bg-rose-50/50 border border-rose-200 rounded-2xl p-4 sm:p-5">
-                <h3 className="text-sm font-bold text-slate-800 mb-3">Add Rental Equipment</h3>
+              <div className="bg-rose-50/50 dark:bg-rose-500/5 border border-rose-200 dark:border-rose-400/20 rounded-2xl p-4 sm:p-5">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-3">Add Rental Equipment</h3>
                 <div className="flex gap-2">
                   <InputField
                     icon={Truck}
@@ -2883,8 +2883,8 @@ export default function ScheduleFormPage() {
                 {form.equipment_rentals.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {form.equipment_rentals.map((rental, idx) => (
-                      <div key={idx} className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-rose-200 rounded-xl text-sm font-semibold shadow-sm">
-                        <span className="text-rose-700">{rental.name}</span>
+                      <div key={idx} className="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-white/5 border border-rose-200 dark:border-rose-400/20 rounded-xl text-sm font-semibold shadow-sm">
+                        <span className="text-rose-700 dark:text-rose-300">{rental.name}</span>
                         <button
                           type="button"
                           onClick={() => {
@@ -2924,14 +2924,14 @@ export default function ScheduleFormPage() {
             </div>
 
             {/* ── PPE Required ── */}
-            <div className="bg-white rounded-2xl ring-1 ring-slate-200 shadow-sm p-5">
+            <div className="bg-white dark:bg-white/5 rounded-2xl ring-1 ring-slate-200 dark:ring-white/10 shadow-sm p-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-md">
                   ⚠️
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">PPE Required</h3>
-                  <p className="text-[11px] text-slate-500">Select personal protective equipment required for this job</p>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">PPE Required</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-white/40">Select personal protective equipment required for this job</p>
                 </div>
               </div>
 
@@ -2952,7 +2952,7 @@ export default function ScheduleFormPage() {
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
                         active
                           ? 'bg-orange-500 border-orange-500 text-white shadow-md'
-                          : 'bg-white border-slate-200 text-slate-600 hover:border-orange-300 hover:text-orange-600'
+                          : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/60 hover:border-orange-300 dark:hover:border-orange-400/40 hover:text-orange-600 dark:hover:text-orange-400'
                       }`}
                     >
                       <span>{item.icon}</span>
@@ -2963,10 +2963,10 @@ export default function ScheduleFormPage() {
               </div>
 
               {/* Gloves — cut level selector */}
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                <p className="text-xs font-bold text-slate-700 mb-2">Gloves — Cut Level</p>
+              <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-white/10">
+                <p className="text-xs font-bold text-slate-700 dark:text-white/70 mb-2">Gloves — Cut Level</p>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-slate-500">Required level:</span>
+                  <span className="text-xs text-slate-500 dark:text-white/40">Required level:</span>
                   {GLOVE_CUT_LEVELS.map(level => {
                     const key = `gloves_cut_${level}`;
                     const active = form.ppe_required.includes(key);
@@ -2983,7 +2983,7 @@ export default function ScheduleFormPage() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${
                           active
                             ? 'bg-orange-500 border-orange-500 text-white'
-                            : 'bg-white border-slate-200 text-slate-600 hover:border-orange-300 hover:text-orange-600'
+                            : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/60 hover:border-orange-300 dark:hover:border-orange-400/40 hover:text-orange-600 dark:hover:text-orange-400'
                         }`}
                       >
                         Level {level}
@@ -3010,7 +3010,7 @@ export default function ScheduleFormPage() {
                     const gloveMatch = key.match(/^gloves_cut_(\d)$/);
                     const label = item ? `${item.icon} ${item.label}` : gloveMatch ? `🧤 Gloves Cut ${gloveMatch[1]}` : key;
                     return (
-                      <span key={key} className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 border border-orange-200 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
+                      <span key={key} className="inline-flex items-center gap-1 bg-orange-100 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-400/30 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
                         {label}
                       </span>
                     );
@@ -3030,14 +3030,14 @@ export default function ScheduleFormPage() {
             <button
               type="button"
               onClick={openSchedulePreview}
-              className="w-full flex items-center justify-center gap-3 px-5 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl text-blue-700 font-bold hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 hover:shadow-md transition-all active:scale-[0.99]"
+              className="w-full flex items-center justify-center gap-3 px-5 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-500/10 dark:to-indigo-500/10 border-2 border-blue-200 dark:border-blue-400/30 rounded-2xl text-blue-700 dark:text-blue-300 font-bold hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-500/15 dark:hover:to-indigo-500/15 hover:border-blue-300 dark:hover:border-blue-400/50 hover:shadow-md transition-all active:scale-[0.99]"
             >
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-sm">
                 <Eye size={18} className="text-white" />
               </div>
               <div className="text-left">
                 <span className="text-base">View Current Schedule</span>
-                <p className="text-xs font-medium text-blue-500">Check operator availability before picking a date</p>
+                <p className="text-xs font-medium text-blue-500 dark:text-blue-400">Check operator availability before picking a date</p>
               </div>
               <ChevronRight size={20} className="text-blue-400 ml-auto" />
             </button>
@@ -3317,7 +3317,7 @@ export default function ScheduleFormPage() {
                         facility_requirements: fac?.special_requirements || '',
                       });
                     }}
-                    className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-base text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full px-4 py-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:[color-scheme:dark]"
                   >
                     <option value="">— None —</option>
                     {facilities.map(f => (
@@ -3328,12 +3328,12 @@ export default function ScheduleFormPage() {
               )}
 
               {form.facility_id && (
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-                  <p className="text-sm font-bold text-emerald-800">
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-400/30 rounded-xl">
+                  <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
                     {form.facility_name}
                   </p>
                   {form.facility_requirements && (
-                    <p className="text-xs text-emerald-700 mt-1">{form.facility_requirements}</p>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">{form.facility_requirements}</p>
                   )}
                 </div>
               )}
@@ -3343,7 +3343,7 @@ export default function ScheduleFormPage() {
                 <button
                   type="button"
                   onClick={() => setShowCreateFacility(true)}
-                  className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl border border-dashed border-blue-300 transition-all w-full justify-center"
+                  className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl border border-dashed border-blue-300 dark:border-blue-400/30 transition-all w-full justify-center"
                 >
                   <Plus size={16} />
                   Create New Facility Compliance Document
@@ -3386,8 +3386,8 @@ export default function ScheduleFormPage() {
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
                           isSelected
-                            ? 'border-purple-400 bg-purple-50 text-purple-800 ring-2 ring-offset-1 ring-purple-300'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                            ? 'border-purple-400 bg-purple-50 dark:bg-violet-500/15 text-purple-800 dark:text-violet-200 ring-2 ring-offset-1 ring-purple-300 dark:ring-violet-400/30'
+                            : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-600 dark:text-white/60 hover:border-slate-300 dark:hover:border-white/20'
                         }`}
                       >
                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
@@ -3482,7 +3482,7 @@ export default function ScheduleFormPage() {
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
                   <Droplets size={14} className="text-white" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Utilities & Resources</h3>
+                <h3 className="text-sm font-bold text-slate-700 dark:text-white/70 uppercase tracking-wider">Utilities & Resources</h3>
               </div>
               <div className="space-y-2.5">
                 <ConditionCheck
@@ -3513,7 +3513,7 @@ export default function ScheduleFormPage() {
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
                   <UserIcon size={14} className="text-white" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Staffing & Equipment</h3>
+                <h3 className="text-sm font-bold text-slate-700 dark:text-white/70 uppercase tracking-wider">Staffing & Equipment</h3>
               </div>
               <div className="space-y-2.5">
                 <ConditionCheck
@@ -3538,14 +3538,14 @@ export default function ScheduleFormPage() {
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                   <Wind size={14} className="text-white" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Work Environment</h3>
+                <h3 className="text-sm font-bold text-slate-700 dark:text-white/70 uppercase tracking-wider">Work Environment</h3>
               </div>
               <div className="space-y-2.5">
                 {/* Inside / Outside toggle */}
-                <div className="flex items-center gap-4 p-4 sm:p-5 rounded-xl border-2 border-slate-200 bg-white">
-                  <Building2 size={20} className="text-slate-500 flex-shrink-0" />
-                  <span className="text-base sm:text-lg text-slate-700 font-semibold flex-1">Inside / Outside:</span>
-                  <div className="flex gap-1.5 bg-slate-100 rounded-xl p-1.5">
+                <div className="flex items-center gap-4 p-4 sm:p-5 rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-white/5">
+                  <Building2 size={20} className="text-slate-500 dark:text-white/40 flex-shrink-0" />
+                  <span className="text-base sm:text-lg text-slate-700 dark:text-white/80 font-semibold flex-1">Inside / Outside:</span>
+                  <div className="flex gap-1.5 bg-slate-100 dark:bg-white/10 rounded-xl p-1.5">
                     {(['inside', 'outside'] as const).map(opt => (
                       <button
                         key={opt}
@@ -3556,7 +3556,7 @@ export default function ScheduleFormPage() {
                             ? opt === 'inside'
                               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
                               : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-white'
+                            : 'text-slate-500 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/70 hover:bg-white dark:hover:bg-white/15'
                         }`}
                       >
                         {opt}
@@ -3590,21 +3590,21 @@ export default function ScheduleFormPage() {
                       onClick={() => updateForm({ high_work_access: form.high_work_access === 'lift_provided' ? '' : 'lift_provided' })}
                       className={`flex items-center gap-3 w-full p-4 rounded-xl border-2 transition-all duration-200 ${
                         form.high_work_access === 'lift_provided'
-                          ? 'bg-emerald-50 border-emerald-300 shadow-sm'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                          ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-400/30 shadow-sm'
+                          : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/8'
                       }`}
                     >
                       <div className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ${
-                        form.high_work_access === 'lift_provided' ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300 bg-white'
+                        form.high_work_access === 'lift_provided' ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300 dark:border-white/20 bg-white dark:bg-transparent'
                       }`}>
                         {form.high_work_access === 'lift_provided' && <Check size={16} className="text-white" />}
                       </div>
-                      <Truck size={18} className={form.high_work_access === 'lift_provided' ? 'text-emerald-600' : 'text-slate-400'} />
-                      <span className={`text-base font-semibold ${form.high_work_access === 'lift_provided' ? 'text-emerald-800' : 'text-slate-600'}`}>
+                      <Truck size={18} className={form.high_work_access === 'lift_provided' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-white/30'} />
+                      <span className={`text-base font-semibold ${form.high_work_access === 'lift_provided' ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-600 dark:text-white/60'}`}>
                         Lift Provided (by customer)
                       </span>
                       {form.high_work_access === 'lift_provided' && (
-                        <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-100 px-2.5 py-1 rounded-full">No rental needed</span>
+                        <span className="ml-auto text-xs font-bold text-emerald-600 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-500/15 px-2.5 py-1 rounded-full">No rental needed</span>
                       )}
                     </button>
 
@@ -3615,21 +3615,21 @@ export default function ScheduleFormPage() {
                         onClick={() => updateForm({ high_work_access: form.high_work_access === 'we_provide' ? '' : 'we_provide' })}
                         className={`flex items-center gap-3 w-full p-4 rounded-xl border-2 transition-all duration-200 ${
                           form.high_work_access === 'we_provide'
-                            ? 'bg-blue-50 border-blue-300 shadow-sm'
-                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                            ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-300 dark:border-blue-400/30 shadow-sm'
+                            : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/8'
                         }`}
                       >
                         <div className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ${
-                          form.high_work_access === 'we_provide' ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'
+                          form.high_work_access === 'we_provide' ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-white/20 bg-white dark:bg-transparent'
                         }`}>
                           {form.high_work_access === 'we_provide' && <Check size={16} className="text-white" />}
                         </div>
-                        <HardHat size={18} className={form.high_work_access === 'we_provide' ? 'text-blue-600' : 'text-slate-400'} />
-                        <span className={`text-base font-semibold ${form.high_work_access === 'we_provide' ? 'text-blue-800' : 'text-slate-600'}`}>
+                        <HardHat size={18} className={form.high_work_access === 'we_provide' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-white/30'} />
+                        <span className={`text-base font-semibold ${form.high_work_access === 'we_provide' ? 'text-blue-800 dark:text-blue-300' : 'text-slate-600 dark:text-white/60'}`}>
                           We Are Providing (Patriot)
                         </span>
                         {form.high_work_access === 'we_provide' && (
-                          <span className="ml-auto text-xs font-bold text-blue-600 bg-blue-100 px-2.5 py-1 rounded-full">Rental required</span>
+                          <span className="ml-auto text-xs font-bold text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/15 px-2.5 py-1 rounded-full">Rental required</span>
                         )}
                       </button>
                     )}
@@ -3641,17 +3641,17 @@ export default function ScheduleFormPage() {
                         onClick={() => updateForm({ high_work_access: form.high_work_access === 'ladder' ? '' : 'ladder' })}
                         className={`flex items-center gap-3 w-full p-4 rounded-xl border-2 transition-all duration-200 ${
                           form.high_work_access === 'ladder'
-                            ? 'bg-amber-50 border-amber-300 shadow-sm'
-                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                            ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-400/30 shadow-sm'
+                            : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/8'
                         }`}
                       >
                         <div className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ${
-                          form.high_work_access === 'ladder' ? 'bg-amber-600 border-amber-600' : 'border-slate-300 bg-white'
+                          form.high_work_access === 'ladder' ? 'bg-amber-600 border-amber-600' : 'border-slate-300 dark:border-white/20 bg-white dark:bg-transparent'
                         }`}>
                           {form.high_work_access === 'ladder' && <Check size={16} className="text-white" />}
                         </div>
-                        <Star size={18} className={form.high_work_access === 'ladder' ? 'text-amber-600' : 'text-slate-400'} />
-                        <span className={`text-base font-semibold ${form.high_work_access === 'ladder' ? 'text-amber-800' : 'text-slate-600'}`}>
+                        <Star size={18} className={form.high_work_access === 'ladder' ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-white/30'} />
+                        <span className={`text-base font-semibold ${form.high_work_access === 'ladder' ? 'text-amber-800 dark:text-amber-300' : 'text-slate-600 dark:text-white/60'}`}>
                           Using Ladder
                         </span>
                       </button>
@@ -3667,7 +3667,7 @@ export default function ScheduleFormPage() {
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
                   <Scissors size={14} className="text-white" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Job Specifications</h3>
+                <h3 className="text-sm font-bold text-slate-700 dark:text-white/70 uppercase tracking-wider">Job Specifications</h3>
               </div>
               <div className="space-y-2.5">
                 <ConditionCheck
@@ -3696,20 +3696,20 @@ export default function ScheduleFormPage() {
   // MAIN RENDER
   // ══════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-[#0b0618] dark:via-[#0e0720] dark:to-[#0b0618]">
       {/* ── Header ─────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+      <header className="sticky top-0 z-10 bg-white/80 dark:bg-[#0b0618]/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10 shadow-sm">
         <div className="max-w-[960px] mx-auto px-4 sm:px-8 h-16 sm:h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/dashboard/admin"
-              className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1.5 text-slate-500 dark:text-white/60 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all text-sm font-medium"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Dashboard</span>
             </Link>
-            <div className="h-6 w-px bg-slate-200" />
-            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+            <div className="h-6 w-px bg-slate-200 dark:bg-white/10" />
+            <h1 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
               <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${currentStepData.color} flex items-center justify-center shadow-sm transition-all duration-300`}>
                 <ClipboardList size={16} className="text-white" />
               </div>
@@ -3718,17 +3718,17 @@ export default function ScheduleFormPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link href="/dashboard/admin/schedule-form-history"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all text-xs font-semibold">
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-slate-500 dark:text-white/60 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all text-xs font-semibold">
               <FileText size={14} />
               Previous Forms
             </Link>
             <button onClick={handleSaveAndExit}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg transition-all text-xs font-bold">
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-400/30 text-emerald-700 dark:text-emerald-300 rounded-lg transition-all text-xs font-bold">
               {draftSaved ? <CheckCircle size={14} /> : <ArrowLeft size={14} />}
               {draftSaved ? 'Saved!' : 'Save & Exit'}
             </button>
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
-              <span className="text-xs font-bold text-slate-500">STEP</span>
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-white/10 rounded-lg">
+              <span className="text-xs font-bold text-slate-500 dark:text-white/40">STEP</span>
               <span className={`text-sm font-bold bg-gradient-to-r ${currentStepData.color} bg-clip-text text-transparent`}>
                 {currentStep}/8
               </span>
@@ -3758,8 +3758,8 @@ export default function ScheduleFormPage() {
                     isActive
                       ? `bg-gradient-to-r ${step.color} text-white shadow-lg`
                       : isCompleted
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-pointer hover:bg-emerald-100 hover:shadow-sm'
-                        : 'bg-white text-slate-400 border border-slate-200'
+                        ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-500/25 hover:shadow-sm'
+                        : 'bg-white dark:bg-white/5 text-slate-400 dark:text-white/30 border border-slate-200 dark:border-white/10'
                   }`}
                 >
                   {isCompleted ? (
@@ -3776,7 +3776,7 @@ export default function ScheduleFormPage() {
         </div>
 
         {/* ── Step Content Card ─────────────────────────── */}
-        <div ref={formRef} className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-lg overflow-hidden">
+        <div ref={formRef} className="bg-white dark:bg-[#12082a] rounded-2xl sm:rounded-3xl border border-slate-200/60 dark:border-white/10 shadow-lg overflow-hidden">
           {/* Step header */}
           <div className={`px-6 sm:px-8 py-6 sm:py-7 bg-gradient-to-r ${currentStepData.color} relative overflow-hidden`}>
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djZoLTZ2LTZNMTY2IDh2NmgtNnYtNk0xNiAzNHY2aC02di02TTE2IDIwdjZoLTZ2LTZNMzYgMjB2NmgtNnYtNk0zNiA4djZoLTZ2LTZNNTYgMzR2NmgtNnYtNk01NiAyMHY2aC02di02TTU2IDh2NmgtNnYtNk0xNiA0OHY2aC02di02TTM2IDQ4djZoLTZ2LTZNNTYgNDh2NmgtNnYtNiIvPjwvZz48L2c+PC9zdmc+')] opacity-30"></div>
@@ -3805,8 +3805,8 @@ export default function ScheduleFormPage() {
           <div className="p-6 sm:p-8 lg:p-10">
             {/* Error message */}
             {error && (
-              <div className="mb-6 flex items-center gap-3 px-5 py-4 bg-red-50 border border-red-200 rounded-xl text-sm sm:text-base text-red-700 animate-in fade-in slide-in-from-top-1 duration-200">
-                <AlertTriangle size={20} className="text-red-500 flex-shrink-0" />
+              <div className="mb-6 flex items-center gap-3 px-5 py-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-400/30 rounded-xl text-sm sm:text-base text-red-700 dark:text-red-300 animate-in fade-in slide-in-from-top-1 duration-200">
+                <AlertTriangle size={20} className="text-red-500 dark:text-red-400 flex-shrink-0" />
                 <span className="font-medium">{error}</span>
               </div>
             )}
@@ -3815,14 +3815,14 @@ export default function ScheduleFormPage() {
           </div>
 
           {/* ── Navigation ─────────────────────────────── */}
-          <div className="px-6 sm:px-8 lg:px-10 py-5 sm:py-6 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+          <div className="px-6 sm:px-8 lg:px-10 py-5 sm:py-6 border-t border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-white/3 flex items-center justify-between">
             <button
               onClick={goPrev}
               disabled={currentStep === 1}
               className={`flex items-center gap-2 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 ${
                 currentStep === 1
-                  ? 'text-slate-300 cursor-not-allowed'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:shadow-md hover:border-slate-300'
+                  ? 'text-slate-300 dark:text-white/20 cursor-not-allowed'
+                  : 'bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/10 hover:shadow-md hover:border-slate-300 dark:hover:border-white/20'
               }`}
             >
               <ArrowLeft size={18} />
@@ -3860,13 +3860,13 @@ export default function ScheduleFormPage() {
         </div>
 
         {/* ── Progress bar ─────────────────────────────── */}
-        <div className="mt-6 h-2 bg-slate-200/80 rounded-full overflow-hidden shadow-inner">
+        <div className="mt-6 h-2 bg-slate-200/80 dark:bg-white/10 rounded-full overflow-hidden shadow-inner">
           <div
             className={`h-full bg-gradient-to-r ${currentStepData.color} rounded-full transition-all duration-500 ease-out`}
             style={{ width: `${(currentStep / 8) * 100}%` }}
           />
         </div>
-        <p className="text-center text-xs text-slate-400 mt-2 font-medium">{Math.round((currentStep / 8) * 100)}% complete</p>
+        <p className="text-center text-xs text-slate-400 dark:text-white/30 mt-2 font-medium">{Math.round((currentStep / 8) * 100)}% complete</p>
       </div>
 
       {/* ══════════════════════════════════════════════════════════ */}
@@ -3875,32 +3875,32 @@ export default function ScheduleFormPage() {
       {showDraftPicker && savedDrafts.length > 0 && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleStartNew} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-in zoom-in-95 duration-200 overflow-hidden">
+          <div className="relative bg-white dark:bg-[#12082a] rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-in zoom-in-95 duration-200 overflow-hidden border border-transparent dark:border-white/10">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <FileText size={20} /> Continue a Draft?
               </h2>
               <p className="text-blue-200 text-sm mt-0.5">You have saved schedule forms in progress</p>
             </div>
-            <div className="max-h-[40vh] overflow-y-auto divide-y divide-gray-100">
+            <div className="max-h-[40vh] overflow-y-auto divide-y divide-gray-100 dark:divide-white/5">
               {savedDrafts.map(draft => (
-                <div key={draft.id} className="flex items-center gap-3 px-6 py-3 hover:bg-blue-50 transition-colors">
+                <div key={draft.id} className="flex items-center gap-3 px-6 py-3 hover:bg-blue-50 dark:hover:bg-white/5 transition-colors">
                   <button onClick={() => handleLoadDraft(draft.id)} className="flex-1 text-left">
-                    <p className="text-sm font-semibold text-gray-900">{draft.customer}</p>
-                    <p className="text-xs text-gray-500">Step {draft.step}/8 · Saved {new Date(draft.date).toLocaleDateString()} {new Date(draft.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{draft.customer}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/40">Step {draft.step}/8 · Saved {new Date(draft.date).toLocaleDateString()} {new Date(draft.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                   </button>
                   <button onClick={() => handleLoadDraft(draft.id)}
-                    className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs font-bold transition-colors">
+                    className="px-3 py-1.5 bg-blue-100 dark:bg-blue-500/20 hover:bg-blue-200 dark:hover:bg-blue-500/30 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-bold transition-colors">
                     Resume
                   </button>
                   <button onClick={() => handleDeleteDraft(draft.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    className="p-1.5 text-gray-400 dark:text-white/30 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
                     <Trash2 size={14} />
                   </button>
                 </div>
               ))}
             </div>
-            <div className="border-t border-gray-200 px-6 py-3 flex justify-end">
+            <div className="border-t border-gray-200 dark:border-white/10 px-6 py-3 flex justify-end">
               <button onClick={handleStartNew}
                 className="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md">
                 <Plus size={14} className="inline mr-1.5" /> Start New Form
@@ -3934,7 +3934,7 @@ export default function ScheduleFormPage() {
           />
 
           {/* Modal */}
-          <div className="relative mt-8 sm:mt-16 mx-4 w-full max-w-4xl max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="relative mt-8 sm:mt-16 mx-4 w-full max-w-4xl max-h-[85vh] bg-white dark:bg-[#12082a] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
             {/* Modal Header */}
             <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -3955,7 +3955,7 @@ export default function ScheduleFormPage() {
             </div>
 
             {/* Date Navigation */}
-            <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+            <div className="px-6 py-3 bg-slate-50 dark:bg-white/3 border-b border-slate-200 dark:border-white/10 flex items-center justify-between flex-shrink-0">
               <button
                 onClick={() => {
                   const d = new Date(schedulePreviewDate);
@@ -3964,12 +3964,12 @@ export default function ScheduleFormPage() {
                   setSchedulePreviewDate(newDate);
                   fetchSchedulePreview(newDate);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg border border-slate-200 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10 rounded-lg border border-slate-200 dark:border-white/10 transition-all"
               >
                 <ArrowLeft size={14} />
                 Prev Week
               </button>
-              <div className="text-sm font-bold text-slate-700">
+              <div className="text-sm font-bold text-slate-700 dark:text-white">
                 {schedulePreviewDate && (() => {
                   const start = new Date(schedulePreviewDate + 'T00:00:00');
                   const end = new Date(start);
@@ -3985,7 +3985,7 @@ export default function ScheduleFormPage() {
                   setSchedulePreviewDate(newDate);
                   fetchSchedulePreview(newDate);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg border border-slate-200 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10 rounded-lg border border-slate-200 dark:border-white/10 transition-all"
               >
                 Next Week
                 <ArrowRight size={14} />
@@ -4009,20 +4009,20 @@ export default function ScheduleFormPage() {
                 <>
                   {/* ── Required skill banner ────────────────── */}
                   {schedulePreviewWeek.required_service_codes?.length > 0 && (
-                    <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl">
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-400/30 rounded-xl">
                       <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0">
                         <HardHat size={16} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-bold uppercase text-indigo-500 tracking-wider">Required Skill</p>
-                        <p className="text-sm font-bold text-indigo-900 truncate">
+                        <p className="text-[11px] font-bold uppercase text-indigo-500 dark:text-indigo-400 tracking-wider">Required Skill</p>
+                        <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200 truncate">
                           {(schedulePreviewWeek.required_service_labels || []).join(' · ')}
                           {schedulePreviewWeek.required_difficulty ? ` · Difficulty ${schedulePreviewWeek.required_difficulty}` : ''}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] font-bold uppercase text-indigo-500">Qualified Crew</p>
-                        <p className="text-sm font-bold text-indigo-900">
+                        <p className="text-[10px] font-bold uppercase text-indigo-500 dark:text-indigo-400">Qualified Crew</p>
+                        <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200">
                           {schedulePreviewWeek.operators?.filter((o: any) => o.is_qualified).length || 0} of {schedulePreviewWeek.total_operators}
                         </p>
                       </div>
@@ -4031,7 +4031,7 @@ export default function ScheduleFormPage() {
 
                   {/* ── Week Grid ─────────────────────────────── */}
                   <div>
-                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
                       <Calendar size={15} className="text-blue-600" />
                       Week View — Click a day to inspect
                     </h4>
@@ -4045,13 +4045,13 @@ export default function ScheduleFormPage() {
                         const noQualifiedFree = hasRequiredSkill && d.qualified_free_count === 0;
                         const tightCapacity = d.free_count <= 1 && d.free_count >= 0;
 
-                        let tone = 'border-slate-200 bg-white';
-                        if (isSelected) tone = 'border-blue-500 bg-blue-50 ring-2 ring-blue-300';
-                        else if (noQualifiedFree) tone = 'border-red-300 bg-red-50/70';
-                        else if (hasRequiredSkill && d.qualified_free_count === 1) tone = 'border-amber-300 bg-amber-50/70';
-                        else if (tightCapacity) tone = 'border-amber-300 bg-amber-50/60';
-                        else if (isWeekend) tone = 'border-slate-200 bg-slate-50/60';
-                        else if (isToday && !isSelected) tone = 'border-blue-300 bg-blue-50/40';
+                        let tone = 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5';
+                        if (isSelected) tone = 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-500/15 ring-2 ring-blue-300 dark:ring-blue-400/30';
+                        else if (noQualifiedFree) tone = 'border-red-300 dark:border-red-400/30 bg-red-50/70 dark:bg-red-500/10';
+                        else if (hasRequiredSkill && d.qualified_free_count === 1) tone = 'border-amber-300 dark:border-amber-400/30 bg-amber-50/70 dark:bg-amber-500/10';
+                        else if (tightCapacity) tone = 'border-amber-300 dark:border-amber-400/30 bg-amber-50/60 dark:bg-amber-500/8';
+                        else if (isWeekend) tone = 'border-slate-200 dark:border-white/8 bg-slate-50/60 dark:bg-white/3';
+                        else if (isToday && !isSelected) tone = 'border-blue-300 dark:border-blue-400/30 bg-blue-50/40 dark:bg-blue-500/8';
 
                         return (
                           <button
@@ -4061,20 +4061,20 @@ export default function ScheduleFormPage() {
                             className={`text-left rounded-xl border p-2 min-h-[140px] transition-all hover:shadow-md ${tone}`}
                           >
                             <div className="text-center mb-1.5">
-                              <p className={`text-[10px] font-bold uppercase ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>
+                              <p className={`text-[10px] font-bold uppercase ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-white/30'}`}>
                                 {dayDate.toLocaleDateString('en-US', { weekday: 'short' })}
                               </p>
-                              <p className={`text-lg font-bold ${isSelected ? 'text-blue-700' : isToday ? 'text-blue-700' : 'text-slate-800'}`}>
+                              <p className={`text-lg font-bold ${isSelected ? 'text-blue-700 dark:text-blue-300' : isToday ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-white'}`}>
                                 {dayDate.getDate()}
                               </p>
                             </div>
 
                             {/* Capacity */}
                             <div className="mb-1">
-                              <p className="text-[10px] font-bold text-slate-500 text-center">
-                                {d.free_count} <span className="text-slate-400 font-semibold">of</span> {d.total_operators}
+                              <p className="text-[10px] font-bold text-slate-500 dark:text-white/40 text-center">
+                                {d.free_count} <span className="text-slate-400 dark:text-white/25 font-semibold">of</span> {d.total_operators}
                               </p>
-                              <p className="text-[9px] text-slate-400 text-center uppercase tracking-wide">free</p>
+                              <p className="text-[9px] text-slate-400 dark:text-white/25 text-center uppercase tracking-wide">free</p>
                             </div>
 
                             {/* Skill chip */}
@@ -4134,17 +4134,17 @@ export default function ScheduleFormPage() {
 
                     return (
                       <div className={`rounded-2xl border-2 p-4 space-y-4 ${
-                        noQualifiedFree ? 'border-red-300 bg-red-50/30' : 'border-blue-200 bg-blue-50/20'
+                        noQualifiedFree ? 'border-red-300 dark:border-red-400/30 bg-red-50/30 dark:bg-red-500/5' : 'border-blue-200 dark:border-blue-400/20 bg-blue-50/20 dark:bg-blue-500/5'
                       }`}>
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Selected Day</p>
-                            <h5 className="text-base font-bold text-slate-800">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-white/40">Selected Day</p>
+                            <h5 className="text-base font-bold text-slate-800 dark:text-white">
                               {dDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                             </h5>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700">
+                            <span className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-white/70">
                               {d.booked_count} booked · {d.free_count} free
                             </span>
                             {hasRequiredSkill && (
@@ -4161,9 +4161,9 @@ export default function ScheduleFormPage() {
 
                         {/* Warning banner */}
                         {noQualifiedFree && (
-                          <div className="flex items-start gap-2 px-3 py-2.5 bg-red-100 border border-red-300 rounded-lg">
-                            <AlertTriangle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-xs text-red-800 font-semibold leading-snug">
+                          <div className="flex items-start gap-2 px-3 py-2.5 bg-red-100 dark:bg-red-500/15 border border-red-300 dark:border-red-400/30 rounded-lg">
+                            <AlertTriangle size={16} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-red-800 dark:text-red-300 font-semibold leading-snug">
                               No {schedulePreviewWeek.required_skill_label || 'qualified operator'} is free this day.
                               You can still schedule, but dispatch will need to reassign work or pull from another day.
                             </p>
@@ -4172,27 +4172,27 @@ export default function ScheduleFormPage() {
 
                         {/* Jobs on this day */}
                         <div>
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-white/40 mb-2">
                             Jobs Scheduled ({d.jobs.length})
                           </p>
                           {d.jobs.length === 0 ? (
-                            <p className="text-xs text-slate-400 italic">No jobs on the board for this day.</p>
+                            <p className="text-xs text-slate-400 dark:text-white/30 italic">No jobs on the board for this day.</p>
                           ) : (
                             <div className="space-y-1.5">
                               {d.jobs.map((j: any) => (
-                                <div key={j.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-white border border-slate-200 rounded-lg">
+                                <div key={j.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg">
                                   <div className="min-w-0 flex-1">
-                                    <p className="text-xs font-bold text-slate-800 truncate">
-                                      {j.job_number && <span className="text-slate-500 font-mono mr-2">{j.job_number}</span>}
+                                    <p className="text-xs font-bold text-slate-800 dark:text-white truncate">
+                                      {j.job_number && <span className="text-slate-500 dark:text-white/40 font-mono mr-2">{j.job_number}</span>}
                                       {j.customer_name || 'Unnamed customer'}
                                     </p>
-                                    <p className="text-[10px] text-slate-500 truncate">
+                                    <p className="text-[10px] text-slate-500 dark:text-white/40 truncate">
                                       {j.job_type || '—'}
                                       {j.difficulty ? ` · Diff ${j.difficulty}` : ''}
                                       {j.arrival_time ? ` · ${j.arrival_time}` : ''}
                                     </p>
                                   </div>
-                                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/40 bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded">
                                     {j.operator_ids?.length || 0} op{(j.operator_ids?.length || 0) === 1 ? '' : 's'}
                                   </span>
                                 </div>
@@ -4203,7 +4203,7 @@ export default function ScheduleFormPage() {
 
                         {/* Operator occupancy mini-grid */}
                         <div>
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-white/40 mb-2">
                             Operator Occupancy — {d.booked_count} of {d.total_operators} booked
                           </p>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
@@ -4215,10 +4215,10 @@ export default function ScheduleFormPage() {
                                   key={op.id}
                                   className={`flex items-center gap-2 px-2 py-1.5 rounded-md border text-[11px] ${
                                     isOff
-                                      ? 'bg-slate-100 border-slate-300 text-slate-500'
+                                      ? 'bg-slate-100 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-500 dark:text-white/40'
                                       : isFree
-                                        ? (op.is_qualified ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-600')
-                                        : 'bg-red-50 border-red-200 text-red-700'
+                                        ? (op.is_qualified ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-400/20 text-emerald-800 dark:text-emerald-300' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/60')
+                                        : 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-400/20 text-red-700 dark:text-red-300'
                                   }`}
                                   title={
                                     isOff ? 'Time off'
@@ -4242,7 +4242,7 @@ export default function ScheduleFormPage() {
 
                         {/* Skill roster */}
                         <div>
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-white/40 mb-2">
                             Skill Roster — Free Today
                           </p>
                           <div className="flex flex-wrap gap-1.5">
@@ -4254,12 +4254,12 @@ export default function ScheduleFormPage() {
                                   key={r.family}
                                   className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
                                     r.isPriority && r.freeCount === 0
-                                      ? 'bg-red-100 border-red-300 text-red-700'
+                                      ? 'bg-red-100 dark:bg-red-500/15 border-red-300 dark:border-red-400/30 text-red-700 dark:text-red-300'
                                       : r.isPriority
-                                        ? 'bg-indigo-100 border-indigo-300 text-indigo-800'
+                                        ? 'bg-indigo-100 dark:bg-indigo-500/15 border-indigo-300 dark:border-indigo-400/30 text-indigo-800 dark:text-indigo-300'
                                         : r.freeCount === 0
-                                          ? 'bg-slate-100 border-slate-200 text-slate-500'
-                                          : 'bg-white border-slate-200 text-slate-700'
+                                          ? 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/30'
+                                          : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/70'
                                   }`}
                                 >
                                   {r.isPriority && <span className="mr-1">★</span>}
@@ -4269,7 +4269,7 @@ export default function ScheduleFormPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-white/10">
                           <button
                             type="button"
                             onClick={() => { updateForm({ start_date: d.date }); setShowSchedulePreview(false); }}
@@ -4290,26 +4290,26 @@ export default function ScheduleFormPage() {
 
                   {/* ── Summary Stats ──────────────────────────── */}
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
-                      <p className="text-2xl font-bold text-blue-700">
+                    <div className="bg-blue-50 dark:bg-blue-500/10 rounded-xl p-3 text-center border border-blue-200 dark:border-blue-400/20">
+                      <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                         {(schedulePreviewWeek.days || []).reduce((sum: number, d: any) => sum + d.jobs.length, 0)}
                       </p>
-                      <p className="text-[10px] font-semibold text-blue-500 uppercase">Job-Days This Week</p>
+                      <p className="text-[10px] font-semibold text-blue-500 dark:text-blue-400 uppercase">Job-Days This Week</p>
                     </div>
-                    <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-200">
-                      <p className="text-2xl font-bold text-emerald-700">
+                    <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-xl p-3 text-center border border-emerald-200 dark:border-emerald-400/20">
+                      <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
                         {(schedulePreviewWeek.days || []).filter((d: any) => {
                           const needsSkill = (schedulePreviewWeek.required_service_codes || []).length > 0;
                           return needsSkill ? d.qualified_free_count > 0 : d.free_count > 0;
                         }).length}
                       </p>
-                      <p className="text-[10px] font-semibold text-emerald-500 uppercase">
+                      <p className="text-[10px] font-semibold text-emerald-500 dark:text-emerald-400 uppercase">
                         {(schedulePreviewWeek.required_service_codes || []).length > 0 ? 'Days With Qualified Crew' : 'Days With Free Crew'}
                       </p>
                     </div>
-                    <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
-                      <p className="text-2xl font-bold text-slate-700">{schedulePreviewWeek.total_operators}</p>
-                      <p className="text-[10px] font-semibold text-slate-500 uppercase">Total Crew</p>
+                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 text-center border border-slate-200 dark:border-white/10">
+                      <p className="text-2xl font-bold text-slate-700 dark:text-white">{schedulePreviewWeek.total_operators}</p>
+                      <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase">Total Crew</p>
                     </div>
                   </div>
                 </>
@@ -4317,8 +4317,8 @@ export default function ScheduleFormPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
-              <p className="text-xs text-slate-400 hidden sm:block">Click a day to inspect capacity & skill coverage</p>
+            <div className="px-6 py-4 bg-slate-50 dark:bg-white/3 border-t border-slate-200 dark:border-white/10 flex items-center justify-between flex-shrink-0 gap-3">
+              <p className="text-xs text-slate-400 dark:text-white/30 hidden sm:block">Click a day to inspect capacity & skill coverage</p>
               {(() => {
                 const selected = schedulePreviewSelectedDay
                   ? (schedulePreviewWeek?.days || []).find((x: any) => x.date === schedulePreviewSelectedDay)
@@ -4342,7 +4342,7 @@ export default function ScheduleFormPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setSchedulePreviewSelectedDay(null)}
-                        className="px-4 py-2.5 bg-white text-slate-700 font-bold text-sm rounded-xl border border-slate-300 hover:bg-slate-50 transition-all"
+                        className="px-4 py-2.5 bg-white dark:bg-white/5 text-slate-700 dark:text-white/80 font-bold text-sm rounded-xl border border-slate-300 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 transition-all"
                       >
                         Choose Different Day
                       </button>

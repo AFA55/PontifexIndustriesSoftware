@@ -58,11 +58,11 @@ export default function CustomerCard({ customer, onClick }: CustomerCardProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full bg-white hover:bg-gray-50 border border-gray-200 hover:border-purple-300 rounded-xl p-5 transition-all text-left group relative shadow-sm"
+      className="w-full bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/8 border border-gray-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-violet-500/40 rounded-xl p-5 transition-all text-left group relative shadow-sm"
     >
       {/* Inactive indicator */}
       {customer.is_active === false && (
-        <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-red-100 rounded text-[9px] font-bold text-red-600">
+        <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-red-100 dark:bg-red-500/15 rounded text-[9px] font-bold text-red-600 dark:text-red-300">
           Inactive
         </div>
       )}
@@ -72,18 +72,18 @@ export default function CustomerCard({ customer, onClick }: CustomerCardProps) {
           <span className="text-white font-bold text-sm">{initials}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-gray-900 text-sm truncate group-hover:text-purple-700 transition-colors flex items-center gap-1">
+          <h3 className="font-bold text-gray-900 dark:text-white text-sm truncate group-hover:text-purple-700 dark:group-hover:text-violet-300 transition-colors flex items-center gap-1">
             {customer.name}
-            <ArrowUpRight className="w-3 h-3 text-gray-400 group-hover:text-purple-500 transition-colors" />
+            <ArrowUpRight className="w-3 h-3 text-gray-400 dark:text-white/30 group-hover:text-purple-500 dark:group-hover:text-violet-400 transition-colors" />
           </h3>
           {customer.primary_contact_name && (
-            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+            <p className="text-xs text-gray-500 dark:text-white/60 flex items-center gap-1 mt-1">
               <User className="w-3 h-3" />
               {customer.primary_contact_name}
             </p>
           )}
           {customer.primary_contact_phone && (
-            <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+            <p className="text-xs text-gray-400 dark:text-white/40 flex items-center gap-1 mt-0.5">
               <Phone className="w-3 h-3" />
               {customer.primary_contact_phone}
             </p>
@@ -93,22 +93,22 @@ export default function CustomerCard({ customer, onClick }: CustomerCardProps) {
 
       <div className="flex items-center gap-2 mt-4 flex-wrap">
         {customer.customer_type && (
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TYPE_COLORS[customer.customer_type] || 'bg-gray-100 text-gray-600'}`}>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TYPE_COLORS[customer.customer_type] || 'bg-gray-100 text-gray-600'} dark:bg-white/10 dark:text-white/70`}>
             {TYPE_LABELS[customer.customer_type] || customer.customer_type}
           </span>
         )}
         {termsLabel && (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
             <CreditCard className="w-3 h-3" />
             {termsLabel}
           </span>
         )}
-        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 flex items-center gap-1">
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-violet-500/15 text-purple-700 dark:text-violet-300 flex items-center gap-1">
           <Briefcase className="w-3 h-3" />
           {customer.job_count} job{customer.job_count !== 1 ? 's' : ''}
         </span>
         {customer.total_revenue > 0 && (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 flex items-center gap-1">
             <DollarSign className="w-3 h-3" />
             ${customer.total_revenue.toLocaleString()}
           </span>
