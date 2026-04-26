@@ -233,6 +233,12 @@ export default function WorkPerformed() {
     }
   }, [params.id]);
 
+  // Back navigation — clears resume key so job ticket doesn't loop back here
+  const goBack = () => {
+    localStorage.removeItem(`job_last_page_${params.id}`);
+    router.push(`/dashboard/my-jobs/${params.id}`);
+  };
+
   // Fetch job type and day number for smart recommendations + correct work item tracking
   useEffect(() => {
     const fetchJobInfo = async () => {
@@ -1417,16 +1423,16 @@ export default function WorkPerformed() {
       <div className="bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
-            <Link
-              href={`/dashboard/my-jobs/${params.id}/jobsite`}
+            <button
+              onClick={goBack}
               className="p-2 bg-gray-100 dark:bg-white/10 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
             >
               <svg className="w-5 h-5 text-gray-600 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-            </Link>
+            </button>
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => { localStorage.removeItem(`job_last_page_${params.id}`); router.push('/dashboard'); }}
               className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
               title="Dashboard"
             >
@@ -2071,7 +2077,7 @@ export default function WorkPerformed() {
           <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-6 z-50">
             <div className="container mx-auto max-w-lg flex gap-3">
               <button
-                onClick={() => router.push(`/dashboard/my-jobs/${params.id}`)}
+                onClick={goBack}
                 className="flex-shrink-0 px-5 py-3.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold text-sm border border-gray-200 dark:border-white/10"
               >
                 Cancel
