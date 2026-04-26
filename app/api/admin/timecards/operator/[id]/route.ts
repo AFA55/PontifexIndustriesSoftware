@@ -55,11 +55,12 @@ export async function GET(
     // 1. Fetch operator profile
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, email, role, phone, avatar_url')
+      .select('id, full_name, email, role, phone, profile_picture_url')
       .eq('id', operatorId)
       .single();
 
     if (profileError || !profile) {
+      console.error('Profile fetch error for operatorId', operatorId, profileError);
       return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
     }
 
@@ -224,7 +225,7 @@ export async function GET(
           email: profile.email,
           role: profile.role,
           phone: profile.phone,
-          avatar_url: profile.avatar_url,
+          avatar_url: (profile as any).profile_picture_url || null,
         },
         weekStart: startDateStr,
         weekEnd: endDateStr,

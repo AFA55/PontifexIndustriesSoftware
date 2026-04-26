@@ -2040,28 +2040,44 @@ export default function WorkPerformed() {
 
       {/* Work Item Detail Modal */}
       {showQuantityModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
-            <div className="p-4 sm:p-6">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4 flex items-center gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 dark:border-white/10">
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/10 p-4 sm:p-6 rounded-t-2xl">
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${
+                  isCoreDrilling(currentItem)
+                    ? 'bg-gradient-to-br from-blue-500 to-cyan-500'
+                    : isSawing(currentItem)
+                    ? 'bg-gradient-to-br from-orange-500 to-red-500'
+                    : 'bg-gradient-to-br from-purple-600 to-indigo-600'
+                }`}>
                   <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                 </div>
-                {currentItem}
+                <div>
+                  <span className="block">{currentItem}</span>
+                  <span className={`block h-0.5 w-16 mt-1 rounded-full ${
+                    isCoreDrilling(currentItem) ? 'bg-gradient-to-r from-blue-500 to-cyan-500' :
+                    isSawing(currentItem) ? 'bg-gradient-to-r from-orange-500 to-red-500' :
+                    'bg-gradient-to-r from-purple-500 to-indigo-500'
+                  }`} />
+                </div>
               </h3>
+            </div>
+            <div className="p-4 sm:p-6">
 
               <div className="space-y-6">
                 {/* Core Drilling - Total Holes Summary */}
                 {isCoreDrilling(currentItem) && (
-                  <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-200">
+                  <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-2xl p-4 shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-semibold text-gray-800">Total Holes</h4>
-                        <p className="text-sm text-gray-600">All sizes combined</p>
+                        <h4 className="font-bold text-white text-sm uppercase tracking-wide opacity-90">Total Holes</h4>
+                        <p className="text-blue-100 text-xs mt-0.5">All sizes combined</p>
                       </div>
-                      <div className="text-3xl font-bold text-orange-600">
+                      <div className="text-4xl font-black text-white">
                         {getTotalHoles()}
                       </div>
                     </div>
@@ -2070,14 +2086,14 @@ export default function WorkPerformed() {
 
                 {/* Sawing - Total Linear Feet Summary */}
                 {isSawing(currentItem) && (
-                  <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl p-4 shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-semibold text-gray-800">Total Linear Feet</h4>
-                        <p className="text-sm text-gray-600">All cuts combined</p>
+                        <h4 className="font-bold text-white text-sm uppercase tracking-wide opacity-90">Total Linear Feet</h4>
+                        <p className="text-blue-100 text-xs mt-0.5">All cuts combined</p>
                       </div>
-                      <div className="text-3xl font-bold text-blue-600">
-                        {getTotalLinearFeet()}&apos;&apos;
+                      <div className="text-4xl font-black text-white">
+                        {getTotalLinearFeet()}&apos;
                       </div>
                     </div>
                   </div>
@@ -2086,8 +2102,8 @@ export default function WorkPerformed() {
                 {/* Core Drilling Specific Fields */}
                 {isCoreDrilling(currentItem) && (
                   <div className="space-y-4">
-                    <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-l-4 border-blue-500 pl-3">
+                      <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
@@ -2095,9 +2111,9 @@ export default function WorkPerformed() {
                     </h4>
 
                     {/* Add New Hole Entry */}
-                    <div className="bg-white rounded-2xl p-4 sm:p-6 border border-gray-200 shadow-sm">
-                      <h5 className="font-bold text-gray-900 mb-4 flex items-center gap-2 text-base sm:text-lg">
-                        <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-white dark:bg-white/[0.04] rounded-2xl p-4 sm:p-6 border border-gray-100 dark:border-white/10 shadow-sm">
+                      <h5 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2 text-base border-l-4 border-purple-500 pl-3">
+                        <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                         Add Hole Entry
@@ -2106,8 +2122,8 @@ export default function WorkPerformed() {
                       <div className="grid grid-cols-3 gap-2 sm:gap-4">
                         {/* Bit Size - Text Input */}
                         <div>
-                          <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                             Bit Size
@@ -2116,16 +2132,16 @@ export default function WorkPerformed() {
                             type="text"
                             value={currentHole.bitSize}
                             onChange={(e) => setCurrentHole(prev => ({ ...prev, bitSize: e.target.value }))}
-                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 bg-white border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md hover:border-orange-400 placeholder:text-gray-400 placeholder:font-normal"
+                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none transition-all duration-200 placeholder:text-gray-400 dark:placeholder:text-white/30"
                             placeholder='e.g., 1", 2-1/2", 6"'
                           />
-                          <p className="text-xs text-gray-500 mt-1">Common: 1/2", 1", 2", 4", 6", 8", 12"</p>
+                          <p className="text-xs text-gray-500 dark:text-white/40 mt-1">Common: 1/2", 1", 2", 4", 6", 8", 12"</p>
                         </div>
 
                         {/* Depth - Modern Input */}
                         <div>
-                          <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                             </svg>
                             Depth (in)
@@ -2136,15 +2152,15 @@ export default function WorkPerformed() {
                             min="0"
                             value={currentHole.depthInches || ''}
                             onChange={(e) => setCurrentHole(prev => ({ ...prev, depthInches: parseFloat(e.target.value) || 0 }))}
-                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 bg-white border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md hover:border-blue-400 placeholder:text-gray-400 placeholder:font-normal"
+                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-white/30"
                             placeholder="0.00"
                           />
                         </div>
 
                         {/* Quantity - Modern Input */}
                         <div>
-                          <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                             </svg>
                             Quantity
@@ -2154,48 +2170,55 @@ export default function WorkPerformed() {
                             min="1"
                             value={currentHole.quantity}
                             onChange={(e) => setCurrentHole(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 bg-white border-2 border-gray-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md hover:border-green-400 placeholder:text-gray-400 placeholder:font-normal"
+                            className="w-full px-4 py-3 text-base font-semibold text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-white/30"
                             placeholder="1"
                           />
                         </div>
                       </div>
 
                       {/* Plastic Setup for this hole */}
-                      <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-100">
-                        <label className="flex items-start gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={currentHole.plasticSetup}
-                            onChange={(e) => setCurrentHole(prev => ({ ...prev, plasticSetup: e.target.checked }))}
-                            className="w-5 h-5 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-0.5"
-                          />
-                          <div>
-                            <span className="text-sm font-semibold text-gray-900">Plastic Setup Required</span>
-                            <p className="text-xs text-gray-600 mt-0.5">Need plastic for dust control?</p>
-                          </div>
-                        </label>
+                      <div className={`mt-4 rounded-xl border-2 px-4 py-3 flex items-center justify-between cursor-pointer transition-all ${
+                        currentHole.plasticSetup
+                          ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20'
+                          : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
+                      }`}
+                        onClick={() => setCurrentHole(prev => ({ ...prev, plasticSetup: !prev.plasticSetup }))}>
+                        <div>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white">Plastic Setup Required</span>
+                          <p className="text-xs text-gray-500 dark:text-white/50 mt-0.5">Need plastic for dust control?</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={currentHole.plasticSetup}
+                          onChange={(e) => setCurrentHole(prev => ({ ...prev, plasticSetup: e.target.checked }))}
+                          className="w-5 h-5 text-purple-600 bg-white dark:bg-white/10 border-2 border-gray-300 dark:border-white/20 rounded focus:ring-2 focus:ring-purple-500"
+                          onClick={(e) => e.stopPropagation()}
+                        />
                       </div>
 
                       {/* Cut Through Steel for this hole */}
-                      <div className="mt-3 bg-red-50 rounded-xl p-4 border border-red-100">
-                        <label className="flex items-start gap-3 cursor-pointer mb-2">
-                          <input
-                            type="checkbox"
-                            checked={currentHole.cutSteel}
-                            onChange={(e) => setCurrentHole(prev => ({ ...prev, cutSteel: e.target.checked }))}
-                            className="w-5 h-5 text-red-600 bg-white border-2 border-gray-300 rounded focus:ring-2 focus:ring-red-500 mt-0.5"
-                          />
-                          <div>
-                            <span className="text-sm font-semibold text-gray-900">Cut Through Steel</span>
-                            <p className="text-xs text-gray-600 mt-0.5">Cut through steel/rebar?</p>
-                          </div>
-                        </label>
-
+                      <div className={`mt-3 rounded-xl border-2 px-4 py-3 flex items-center justify-between cursor-pointer transition-all ${
+                        currentHole.cutSteel
+                          ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
+                          : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
+                      }`}
+                        onClick={() => setCurrentHole(prev => ({ ...prev, cutSteel: !prev.cutSteel }))}>
+                        <div>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white">Cut Through Steel</span>
+                          <p className="text-xs text-gray-500 dark:text-white/50 mt-0.5">Cut through steel/rebar?</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={currentHole.cutSteel}
+                          onChange={(e) => setCurrentHole(prev => ({ ...prev, cutSteel: e.target.checked }))}
+                          className="w-5 h-5 text-red-600 bg-white dark:bg-white/10 border-2 border-gray-300 dark:border-white/20 rounded focus:ring-2 focus:ring-red-500"
+                          onClick={(e) => e.stopPropagation()}
+                        />
                       </div>
 
                       <button
                         onClick={addHole}
-                        className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center gap-2 font-bold shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
+                        className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -2206,34 +2229,34 @@ export default function WorkPerformed() {
 
                     {/* Added Holes List */}
                     {coreDrillingData.holes.length > 0 && (
-                      <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
-                        <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="bg-white dark:bg-white/[0.04] rounded-2xl border border-gray-200 dark:border-white/10 p-4">
+                        <h5 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2 border-l-4 border-purple-500 pl-3 text-base">
+                          <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           Added Holes ({coreDrillingData.holes.length} entries)
                         </h5>
                         <div className="space-y-2">
                           {coreDrillingData.holes.map((hole, index) => (
-                            <div key={index} className="bg-gray-50 rounded-lg p-3">
+                            <div key={index} className="bg-gray-50 dark:bg-white/[0.04] rounded-xl border border-gray-200 dark:border-white/10 p-3">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-4 text-sm">
                                   <div>
-                                    <span className="font-medium text-gray-700">{hole.bitSize}</span>
-                                    <span className="text-gray-500"> bit</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white">{hole.bitSize}</span>
+                                    <span className="text-gray-500 dark:text-white/40"> bit</span>
                                   </div>
                                   <div>
-                                    <span className="font-medium text-gray-700">{hole.depthInches}&quot;</span>
-                                    <span className="text-gray-500"> deep</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white">{hole.depthInches}&quot;</span>
+                                    <span className="text-gray-500 dark:text-white/40"> deep</span>
                                   </div>
                                   <div>
-                                    <span className="font-medium text-gray-700">{hole.quantity}</span>
-                                    <span className="text-gray-500"> {hole.quantity === 1 ? 'hole' : 'holes'}</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white">{hole.quantity}</span>
+                                    <span className="text-gray-500 dark:text-white/40"> {hole.quantity === 1 ? 'hole' : 'holes'}</span>
                                   </div>
                                 </div>
                                 <button
                                   onClick={() => removeHole(index)}
-                                  className="p-1 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                                  className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg p-1.5 transition-all"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -2243,10 +2266,10 @@ export default function WorkPerformed() {
                               {(hole.plasticSetup || hole.cutSteel) && (
                                 <div className="flex gap-2 text-xs">
                                   {hole.plasticSetup && (
-                                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">Plastic Setup</span>
+                                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full font-medium">Plastic Setup</span>
                                   )}
                                   {hole.cutSteel && (
-                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full">
+                                    <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full font-medium">
                                       Steel Cut{hole.steelEncountered ? `: ${hole.steelEncountered}` : ''}
                                     </span>
                                   )}
@@ -2261,12 +2284,12 @@ export default function WorkPerformed() {
 
                     {/* Core Drilling Notes */}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Notes</label>
+                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Additional Notes</label>
                       <textarea
                         value={coreDrillingData.notes}
                         onChange={(e) => setCoreDrillingData(prev => ({ ...prev, notes: e.target.value }))}
                         placeholder="Any additional details about the core drilling work..."
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none transition-colors text-gray-900 placeholder:text-gray-500"
+                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder:text-white/30"
                         rows={3}
                       />
                     </div>
@@ -2276,17 +2299,17 @@ export default function WorkPerformed() {
                 {/* Sawing Specific Fields */}
                 {isSawing(currentItem) && (
                   <div className="space-y-4">
-                    <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-l-4 border-orange-500 pl-3">
+                      <svg className="w-5 h-5 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
                       </svg>
                       Sawing Details
                     </h4>
 
                     {/* Add New Cut Entry */}
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border-2 border-blue-200">
-                      <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-white dark:bg-white/[0.04] rounded-2xl p-4 border border-gray-100 dark:border-white/10 shadow-sm">
+                      <h5 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2 border-l-4 border-purple-500 pl-3 text-base">
+                        <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                         Add Cut Entry
@@ -2333,7 +2356,7 @@ export default function WorkPerformed() {
                               <button
                                 type="button"
                                 onClick={() => setShowChainsawModal(true)}
-                                className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                                className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                               >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -2343,31 +2366,31 @@ export default function WorkPerformed() {
 
                               {/* Total Linear Feet & Cut Depth */}
                               <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-white rounded-xl p-4 border-2 border-purple-300">
-                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Total Linear Feet</label>
+                                <div className="bg-white dark:bg-white/[0.05] rounded-xl p-4 border-2 border-gray-200 dark:border-white/10">
+                                  <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1.5 uppercase tracking-wide">Total Linear Feet</label>
                                   <input
                                     type="number"
                                     step="0.1"
                                     min="0"
                                     value={currentCut.linearFeet || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
-                                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-purple-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                    className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-bold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="Total linear feet"
                                   />
-                                  <p className="text-xs text-gray-500 mt-1.5">Use Quick Entry button above or type directly</p>
+                                  <p className="text-xs text-gray-500 dark:text-white/40 mt-1.5">Use Quick Entry or type directly</p>
                                 </div>
-                                <div className="bg-white rounded-xl p-4 border-2 border-purple-300">
-                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Cut Depth (in)</label>
+                                <div className="bg-white dark:bg-white/[0.05] rounded-xl p-4 border-2 border-gray-200 dark:border-white/10">
+                                  <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1.5 uppercase tracking-wide">Cut Depth (in)</label>
                                   <input
                                     type="number"
                                     step="0.25"
                                     min="0"
                                     value={currentCut.cutDepth || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
-                                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-purple-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                    className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-bold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="Depth"
                                   />
-                                  <p className="text-xs text-gray-500 mt-1.5">Auto-filled from Quick Entry or type directly</p>
+                                  <p className="text-xs text-gray-500 dark:text-white/40 mt-1.5">Auto-filled from Quick Entry or type directly</p>
                                 </div>
                               </div>
                             </div>
@@ -2378,7 +2401,7 @@ export default function WorkPerformed() {
                               <button
                                 type="button"
                                 onClick={() => setShowQuickEntryModal(true)}
-                                className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                                className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                               >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -2388,31 +2411,31 @@ export default function WorkPerformed() {
 
                               {/* Total Linear Feet & Cut Depth */}
                               <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-white rounded-xl p-4 border-2 border-blue-300">
-                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Total Linear Feet</label>
+                                <div className="bg-white dark:bg-white/[0.05] rounded-xl p-4 border-2 border-gray-200 dark:border-white/10">
+                                  <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1.5 uppercase tracking-wide">Total Linear Feet</label>
                                   <input
                                     type="number"
                                     step="0.1"
                                     min="0"
                                     value={currentCut.linearFeet || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
-                                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-blue-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                    className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-bold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="Total linear feet"
                                   />
-                                  <p className="text-xs text-gray-500 mt-1.5">Use Quick Entry button above or type directly</p>
+                                  <p className="text-xs text-gray-500 dark:text-white/40 mt-1.5">Use Quick Entry or type directly</p>
                                 </div>
-                                <div className="bg-white rounded-xl p-4 border-2 border-blue-300">
-                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Cut Depth (in)</label>
+                                <div className="bg-white dark:bg-white/[0.05] rounded-xl p-4 border-2 border-gray-200 dark:border-white/10">
+                                  <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1.5 uppercase tracking-wide">Cut Depth (in)</label>
                                   <input
                                     type="number"
                                     step="0.25"
                                     min="0"
                                     value={currentCut.cutDepth || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
-                                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-blue-50 text-gray-900 font-bold placeholder:text-gray-400"
+                                    className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-bold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="Depth"
                                   />
-                                  <p className="text-xs text-gray-500 mt-1.5">Auto-filled from Quick Entry or type directly</p>
+                                  <p className="text-xs text-gray-500 dark:text-white/40 mt-1.5">Auto-filled from Quick Entry or type directly</p>
                                 </div>
                               </div>
                             </div>
@@ -2421,28 +2444,28 @@ export default function WorkPerformed() {
                             <div className="grid grid-cols-2 gap-4 mb-4">
                               {/* Linear Feet */}
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Linear Feet Cut</label>
+                                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-1">Linear Feet Cut</label>
                                 <input
                                   type="number"
                                   step="0.1"
                                   min="0"
                                   value={currentCut.linearFeet || ''}
                                   onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
-                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
+                                  className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-semibold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Linear feet"
                                 />
                               </div>
 
                               {/* Cut Depth */}
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cut Depth (in)</label>
+                                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-1">Cut Depth (in)</label>
                                 <input
                                   type="number"
                                   step="0.25"
                                   min="0"
                                   value={currentCut.cutDepth || ''}
                                   onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
-                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
+                                  className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-semibold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Depth"
                                 />
                               </div>
@@ -2450,39 +2473,45 @@ export default function WorkPerformed() {
                           )}
 
                           {/* Chainsaw Question */}
-                          <div className="mb-4 bg-purple-50 rounded-lg p-3 border-2 border-purple-200">
-                            <label className="flex items-center gap-2 cursor-pointer mb-2">
+                          <div className={`mb-4 rounded-xl border-2 px-4 py-3 cursor-pointer transition-all ${
+                            currentCut.chainsawed
+                              ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20'
+                              : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
+                          }`}
+                            onClick={() => setCurrentCut(prev => ({ ...prev, chainsawed: !prev.chainsawed }))}>
+                            <label className="flex items-center justify-between cursor-pointer mb-0">
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white">Did you chainsaw?</span>
                               <input
                                 type="checkbox"
                                 checked={currentCut.chainsawed}
                                 onChange={(e) => setCurrentCut(prev => ({ ...prev, chainsawed: e.target.checked }))}
                                 className="w-4 h-4 text-purple-600 rounded"
+                                onClick={(e) => e.stopPropagation()}
                               />
-                              <span className="text-sm font-semibold text-gray-700">Did you chainsaw?</span>
                             </label>
 
                             {currentCut.chainsawed && (
-                              <div className="grid grid-cols-2 gap-2 mt-2">
+                              <div className="grid grid-cols-2 gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                                 <div>
-                                  <label className="block text-xs text-gray-600 mb-1">Number of Areas</label>
+                                  <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Number of Areas</label>
                                   <input
                                     type="number"
                                     min="1"
                                     value={currentCut.chainsawAreas || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, chainsawAreas: parseInt(e.target.value) || 0 }))}
-                                    className="w-full px-3 py-2 text-sm border-2 border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none bg-white text-gray-900 placeholder:text-gray-500"
+                                    className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="e.g., 5"
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-xs text-gray-600 mb-1">Avg Width (inches)</label>
+                                  <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Avg Width (inches)</label>
                                   <input
                                     type="number"
                                     step="0.5"
                                     min="0"
                                     value={currentCut.chainsawWidthInches || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, chainsawWidthInches: parseFloat(e.target.value) || 0 }))}
-                                    className="w-full px-3 py-2 text-sm border-2 border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none bg-white text-gray-900 placeholder:text-gray-500"
+                                    className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="e.g., 3.5"
                                   />
                                 </div>
@@ -2491,30 +2520,35 @@ export default function WorkPerformed() {
                           </div>
 
                           {/* Cut Through Steel and Overcut - Linear Mode */}
-                          <div className="mb-4 bg-white rounded-lg p-3 border-2 border-gray-200">
-                            <div className="grid grid-cols-2 gap-3">
-                              <label className="flex items-center gap-2 cursor-pointer bg-gray-50 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                          <div className="mb-4 space-y-2">
+                            <div className={`rounded-xl border-2 px-4 py-3 flex items-center justify-between cursor-pointer transition-all ${
+                              currentCut.cutSteel ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
+                            }`}
+                              onClick={() => setCurrentCut(prev => ({ ...prev, cutSteel: !prev.cutSteel }))}>
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white">Cut Through Steel</span>
+                              <input
+                                type="checkbox"
+                                checked={currentCut.cutSteel}
+                                onChange={(e) => setCurrentCut(prev => ({ ...prev, cutSteel: e.target.checked }))}
+                                className="w-4 h-4 text-red-600 rounded"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            {(isHandSaw(currentItem) || isChainsaw(currentItem)) && (
+                              <div className={`rounded-xl border-2 px-4 py-3 flex items-center justify-between cursor-pointer transition-all ${
+                                currentCut.overcut ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
+                              }`}
+                                onClick={() => setCurrentCut(prev => ({ ...prev, overcut: !prev.overcut }))}>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">Overcut</span>
                                 <input
                                   type="checkbox"
-                                  checked={currentCut.cutSteel}
-                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, cutSteel: e.target.checked }))}
-                                  className="w-4 h-4 text-blue-600 rounded"
+                                  checked={currentCut.overcut}
+                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, overcut: e.target.checked }))}
+                                  className="w-4 h-4 text-amber-600 rounded"
+                                  onClick={(e) => e.stopPropagation()}
                                 />
-                                <span className="text-sm font-medium text-gray-700">Cut Through Steel</span>
-                              </label>
-                              {(isHandSaw(currentItem) || isChainsaw(currentItem)) && (
-                                <label className="flex items-center gap-2 cursor-pointer bg-gray-50 p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                                  <input
-                                    type="checkbox"
-                                    checked={currentCut.overcut}
-                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, overcut: e.target.checked }))}
-                                    className="w-4 h-4 text-blue-600 rounded"
-                                  />
-                                  <span className="text-sm font-medium text-gray-700">Overcut</span>
-                                </label>
-                              )}
-                            </div>
-
+                              </div>
+                            )}
                           </div>
                         </>
                       )}
@@ -2523,130 +2557,142 @@ export default function WorkPerformed() {
                       {cutInputMode === 'area' && (
                         <div className="mb-4">
                           {/* Area Input Form */}
-                          <div className="bg-white rounded-lg p-4 mb-3 border-2 border-blue-200 shadow-sm">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <div className="bg-white dark:bg-white/[0.04] rounded-xl p-4 mb-3 border border-gray-200 dark:border-white/10 shadow-sm">
+                            <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3">
                               Add Cut Area (e.g., 5&apos; × 7&apos;)
                             </label>
                             <div className="grid grid-cols-4 gap-2">
                               <div>
-                                <label className="block text-xs text-gray-600 mb-1">Length (ft)</label>
+                                <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Length (ft)</label>
                                 <input
                                   type="number"
                                   step="0.1"
                                   min="0"
                                   value={currentArea.length}
                                   onChange={(e) => setCurrentArea(prev => ({ ...prev, length: parseFloat(e.target.value) || 0 }))}
-                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
+                                  className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Length"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs text-gray-600 mb-1">Width (ft)</label>
+                                <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Width (ft)</label>
                                 <input
                                   type="number"
                                   step="0.1"
                                   min="0"
                                   value={currentArea.width}
                                   onChange={(e) => setCurrentArea(prev => ({ ...prev, width: parseFloat(e.target.value) || 0 }))}
-                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
+                                  className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Width"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs text-gray-600 mb-1">Depth (in)</label>
+                                <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Depth (in)</label>
                                 <input
                                   type="number"
                                   step="0.25"
                                   min="0"
                                   value={currentArea.depth}
                                   onChange={(e) => setCurrentArea(prev => ({ ...prev, depth: parseFloat(e.target.value) || 0 }))}
-                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
+                                  className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Depth"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs text-gray-600 mb-1">Qty</label>
+                                <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Qty</label>
                                 <input
                                   type="number"
                                   min="1"
                                   value={currentArea.quantity}
                                   onChange={(e) => setCurrentArea(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
+                                  className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="1"
                                 />
                               </div>
                             </div>
 
                             {/* Cut Steel and Overcut options for this area */}
-                            <div className="grid grid-cols-2 gap-3 mt-3">
-                              <label className="flex items-center gap-2 cursor-pointer bg-gray-50 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                            <div className="grid grid-cols-2 gap-2 mt-3">
+                              <div className={`rounded-xl border-2 px-3 py-2.5 flex items-center justify-between cursor-pointer transition-all ${
+                                currentArea.cutSteel ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
+                              }`}
+                                onClick={() => setCurrentArea(prev => ({ ...prev, cutSteel: !prev.cutSteel }))}>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">Cut Steel</span>
                                 <input
                                   type="checkbox"
                                   checked={currentArea.cutSteel}
                                   onChange={(e) => setCurrentArea(prev => ({ ...prev, cutSteel: e.target.checked }))}
-                                  className="w-4 h-4 text-blue-600 rounded"
+                                  className="w-4 h-4 text-red-600 rounded"
+                                  onClick={(e) => e.stopPropagation()}
                                 />
-                                <span className="text-sm font-medium text-gray-700">Cut Through Steel</span>
-                              </label>
-                              <label className="flex items-center gap-2 cursor-pointer bg-gray-50 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                              </div>
+                              <div className={`rounded-xl border-2 px-3 py-2.5 flex items-center justify-between cursor-pointer transition-all ${
+                                currentArea.overcut ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
+                              }`}
+                                onClick={() => setCurrentArea(prev => ({ ...prev, overcut: !prev.overcut }))}>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">Overcut</span>
                                 <input
                                   type="checkbox"
                                   checked={currentArea.overcut}
                                   onChange={(e) => setCurrentArea(prev => ({ ...prev, overcut: e.target.checked }))}
-                                  className="w-4 h-4 text-blue-600 rounded"
+                                  className="w-4 h-4 text-amber-600 rounded"
+                                  onClick={(e) => e.stopPropagation()}
                                 />
-                                <span className="text-sm font-medium text-gray-700">Overcut</span>
-                              </label>
+                              </div>
                             </div>
 
                             {/* Steel Info field - appears when Cut Through Steel is checked */}
                             {currentArea.cutSteel && (
                               <div className="mt-3">
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">Steel Type/Description</label>
+                                <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Steel Type/Description</label>
                                 <textarea
                                   value={currentArea.steelEncountered || ''}
                                   onChange={(e) => setCurrentArea(prev => ({ ...prev, steelEncountered: e.target.value }))}
                                   placeholder="e.g., #4 rebar, angle iron, etc..."
-                                  className="w-full px-3 py-2 text-sm border-2 border-red-300 rounded-lg focus:border-red-500 focus:outline-none bg-white text-gray-900 placeholder:text-gray-500"
+                                  className="w-full px-3 py-2 text-sm border-2 border-red-300 dark:border-red-500/30 rounded-xl focus:border-red-500 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   rows={2}
                                 />
                               </div>
                             )}
 
                             {/* Chainsaw Question */}
-                            <div className="mt-3 bg-purple-50 rounded-lg p-3 border-2 border-purple-200">
-                              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                            <div className={`mt-3 rounded-xl border-2 px-4 py-3 cursor-pointer transition-all ${
+                              currentArea.chainsawed ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
+                            }`}
+                              onClick={() => setCurrentArea(prev => ({ ...prev, chainsawed: !prev.chainsawed }))}>
+                              <label className="flex items-center justify-between cursor-pointer mb-0">
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">Did you chainsaw?</span>
                                 <input
                                   type="checkbox"
                                   checked={currentArea.chainsawed}
                                   onChange={(e) => setCurrentArea(prev => ({ ...prev, chainsawed: e.target.checked }))}
                                   className="w-4 h-4 text-purple-600 rounded"
+                                  onClick={(e) => e.stopPropagation()}
                                 />
-                                <span className="text-sm font-semibold text-gray-700">Did you chainsaw?</span>
                               </label>
 
                               {currentArea.chainsawed && (
-                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                <div className="grid grid-cols-2 gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                                   <div>
-                                    <label className="block text-xs text-gray-600 mb-1">Number of Areas</label>
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Number of Areas</label>
                                     <input
                                       type="number"
                                       min="1"
                                       value={currentArea.chainsawAreas || ''}
                                       onChange={(e) => setCurrentArea(prev => ({ ...prev, chainsawAreas: parseInt(e.target.value) || 0 }))}
-                                      className="w-full px-3 py-2 text-sm border-2 border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none bg-white text-gray-900 placeholder:text-gray-500"
+                                      className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                       placeholder="e.g., 5"
                                     />
                                   </div>
                                   <div>
-                                    <label className="block text-xs text-gray-600 mb-1">Avg Width (inches)</label>
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Avg Width (inches)</label>
                                     <input
                                       type="number"
                                       step="0.5"
                                       min="0"
                                       value={currentArea.chainsawWidthInches || ''}
                                       onChange={(e) => setCurrentArea(prev => ({ ...prev, chainsawWidthInches: parseFloat(e.target.value) || 0 }))}
-                                      className="w-full px-3 py-2 text-sm border-2 border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none bg-white text-gray-900 placeholder:text-gray-500"
+                                      className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                       placeholder="e.g., 6"
                                     />
                                   </div>
@@ -2657,7 +2703,7 @@ export default function WorkPerformed() {
                             <button
                               type="button"
                               onClick={addArea}
-                              className="mt-3 w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                              className="mt-3 w-full px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg text-sm"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -2668,19 +2714,19 @@ export default function WorkPerformed() {
 
                           {/* Added Areas List */}
                           {tempAreas.length > 0 && (
-                            <div className="bg-white rounded-lg p-3">
-                              <h6 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="bg-white dark:bg-white/[0.04] rounded-xl p-3 border border-gray-200 dark:border-white/10">
+                              <h6 className="text-sm font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                                <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Added Areas ({tempAreas.length})
                               </h6>
                               <div className="space-y-2 mb-3">
                                 {tempAreas.map((area, index) => (
-                                  <div key={index} className="bg-gray-50 rounded-lg p-2 text-sm">
+                                  <div key={index} className="bg-gray-50 dark:bg-white/[0.04] rounded-xl border border-gray-200 dark:border-white/10 p-2 text-sm">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-medium text-blue-600">
+                                        <span className="font-semibold text-purple-600 dark:text-purple-400">
                                           {area.length}&apos; × {area.width}&apos; × {area.depth}&quot;
                                         </span>
                                         {area.quantity > 1 && (
@@ -2710,7 +2756,7 @@ export default function WorkPerformed() {
                                       <button
                                         type="button"
                                         onClick={() => removeArea(index)}
-                                        className="p-1 text-red-500 hover:bg-red-100 rounded transition-colors flex-shrink-0"
+                                        className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg p-1.5 transition-all flex-shrink-0"
                                       >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2730,10 +2776,10 @@ export default function WorkPerformed() {
                                   </div>
                                 ))}
                               </div>
-                              <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
+                              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-xl p-3 border border-purple-200 dark:border-purple-500/20">
                                 <div className="flex items-center justify-between text-sm">
-                                  <span className="font-medium text-gray-700">Total Linear Feet:</span>
-                                  <span className="text-xl font-bold text-blue-600">
+                                  <span className="font-bold text-gray-700 dark:text-white/80">Total Linear Feet:</span>
+                                  <span className="text-xl font-black text-purple-600 dark:text-purple-400">
                                     {calculateTotalFromAreas(tempAreas).toFixed(1)}&apos;
                                   </span>
                                 </div>
@@ -2745,8 +2791,8 @@ export default function WorkPerformed() {
 
                       {/* Blade Selection */}
                       <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {isChainsaw(currentItem) ? 'Chain Size Used' : 'Blades Used'} (select all that apply)
+                        <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3 border-l-4 border-purple-500 pl-3">
+                          {isChainsaw(currentItem) ? 'Chain Size Used' : 'Blades Used'} — select all that apply
                         </label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                           {getBladesForSawType(currentItem).map((blade) => (
@@ -2754,10 +2800,10 @@ export default function WorkPerformed() {
                               key={blade}
                               type="button"
                               onClick={() => toggleBladeSelection(blade)}
-                              className={`px-3 py-2 text-xs rounded-lg border transition-all ${
+                              className={`px-3 py-2.5 text-sm rounded-xl border-2 font-semibold transition-all ${
                                 selectedBlades.includes(blade)
-                                  ? 'bg-blue-500 text-white border-blue-600'
-                                  : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                                  ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                  : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-700 dark:text-white/70 hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20'
                               }`}
                             >
                               {blade}
@@ -2767,21 +2813,21 @@ export default function WorkPerformed() {
 
                         {/* Custom Blade Input - Only show for non-hand saws and non-chainsaws */}
                         {!isHandSaw(currentItem) && !isChainsaw(currentItem) && (
-                          <div className="bg-gray-50 rounded-lg p-3">
-                            <label className="block text-xs font-medium text-gray-600 mb-2">Custom Blade Size</label>
+                          <div className="bg-gray-50 dark:bg-white/[0.04] rounded-xl p-3 border border-gray-200 dark:border-white/10">
+                            <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-2">Custom Blade Size</label>
                             <div className="flex gap-2">
                               <input
                                 type="text"
                                 value={customBladeSize}
                                 onChange={(e) => setCustomBladeSize(e.target.value)}
                                 placeholder='e.g., 30" Diamond, 36" Wire'
-                                className="flex-1 px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none text-gray-900 placeholder:text-gray-500"
+                                className="flex-1 px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder:text-white/30"
                               />
                               <button
                                 type="button"
                                 onClick={addCustomBlade}
                                 disabled={!customBladeSize.trim()}
-                                className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                                className="px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold transition-all"
                               >
                                 Add
                               </button>
@@ -2792,17 +2838,17 @@ export default function WorkPerformed() {
                         {/* Show selected blades */}
                         {selectedBlades.length > 0 && (
                           <div className="mt-3">
-                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                            <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-2">
                               {isChainsaw(currentItem) ? 'Selected Chains:' : 'Selected Blades:'}
                             </label>
                             <div className="flex flex-wrap gap-1">
                               {selectedBlades.map((blade, index) => (
-                                <span key={index} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1">
+                                <span key={index} className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-xs flex items-center gap-1 font-medium">
                                   {blade}
                                   <button
                                     type="button"
                                     onClick={() => toggleBladeSelection(blade)}
-                                    className="hover:bg-blue-200 rounded-full p-0.5"
+                                    className="hover:bg-purple-200 dark:hover:bg-purple-800 rounded-full p-0.5 transition-colors"
                                   >
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2817,7 +2863,7 @@ export default function WorkPerformed() {
 
                       <button
                         onClick={addCut}
-                        className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 font-medium"
+                        className="w-full px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -2828,50 +2874,50 @@ export default function WorkPerformed() {
 
                     {/* Added Cuts List */}
                     {sawingData.cuts.length > 0 && (
-                      <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
-                        <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="bg-white dark:bg-white/[0.04] rounded-2xl border border-gray-200 dark:border-white/10 p-4">
+                        <h5 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2 border-l-4 border-purple-500 pl-3 text-base">
+                          <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           Added Cuts ({sawingData.cuts.length} entries)
                         </h5>
                         <div className="space-y-3">
                           {sawingData.cuts.map((cut, index) => (
-                            <div key={index} className="bg-gray-50 rounded-lg p-3 border">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-4 text-sm">
+                            <div key={index} className="bg-gray-50 dark:bg-white/[0.04] rounded-xl border border-gray-200 dark:border-white/10 p-3">
+                              <div className="flex items-start justify-between mb-2 gap-2">
+                                <div className="flex flex-wrap items-center gap-2 text-sm flex-1">
                                   <div>
-                                    <span className="font-medium text-blue-600">{cut.linearFeet.toFixed(1)}&apos;</span>
-                                    <span className="text-gray-500"> linear feet</span>
+                                    <span className="font-bold text-purple-600 dark:text-purple-400">{cut.linearFeet.toFixed(1)}&apos;</span>
+                                    <span className="text-gray-500 dark:text-white/40"> linear feet</span>
                                   </div>
                                   <div>
-                                    <span className="font-medium text-gray-700">{cut.cutDepth}&quot;</span>
-                                    <span className="text-gray-500"> deep</span>
+                                    <span className="font-semibold text-gray-700 dark:text-white/80">{cut.cutDepth}&quot;</span>
+                                    <span className="text-gray-500 dark:text-white/40"> deep</span>
                                   </div>
                                   {cut.inputMode === 'area' && (
-                                    <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                                    <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
                                       Area Mode
                                     </span>
                                   )}
                                   {cut.cutSteel && (
-                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">
+                                    <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-xs font-medium">
                                       Steel Cut
                                     </span>
                                   )}
                                   {cut.overcut && (
-                                    <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">
+                                    <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full text-xs font-medium">
                                       Overcut
                                     </span>
                                   )}
                                   {cut.chainsawed && (
-                                    <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                                    <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-medium">
                                       Chainsawed
                                     </span>
                                   )}
                                 </div>
                                 <button
                                   onClick={() => removeCut(index)}
-                                  className="p-1 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                                  className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg p-1.5 transition-all flex-shrink-0"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -2879,19 +2925,19 @@ export default function WorkPerformed() {
                                 </button>
                               </div>
                               {cut.chainsawed && cut.chainsawAreas && cut.chainsawWidthInches && (
-                                <div className="mb-2 bg-purple-50 rounded-lg p-2 border border-purple-200">
-                                  <div className="text-xs text-purple-700">
-                                    <span className="font-medium">Chainsaw:</span> {cut.chainsawAreas} areas × {cut.chainsawWidthInches}&quot; width
+                                <div className="mb-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-2 border border-indigo-200 dark:border-indigo-500/20">
+                                  <div className="text-xs text-indigo-700 dark:text-indigo-300">
+                                    <span className="font-bold">Chainsaw:</span> {cut.chainsawAreas} areas × {cut.chainsawWidthInches}&quot; width
                                   </div>
                                 </div>
                               )}
                               {/* Show areas if entered using area mode */}
                               {cut.inputMode === 'area' && cut.areas && cut.areas.length > 0 && (
-                                <div className="mb-2 bg-white rounded-lg p-2 border border-purple-200">
-                                  <div className="text-xs text-gray-600 mb-1">Cut Areas:</div>
+                                <div className="mb-2 bg-white dark:bg-white/[0.04] rounded-lg p-2 border border-purple-200 dark:border-purple-500/20">
+                                  <div className="text-xs text-gray-600 dark:text-white/50 mb-1">Cut Areas:</div>
                                   <div className="flex flex-wrap gap-1">
                                     {cut.areas.map((area, areaIndex) => (
-                                      <span key={areaIndex} className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">
+                                      <span key={areaIndex} className="px-2 py-1 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
                                         {area.length}&apos; × {area.width}&apos; ({area.depth}&quot; deep)
                                       </span>
                                     ))}
@@ -2899,19 +2945,19 @@ export default function WorkPerformed() {
                                 </div>
                               )}
                               <div className="flex flex-wrap gap-1 text-xs">
-                                <span className="text-gray-500">
+                                <span className="text-gray-500 dark:text-white/40">
                                   {isChainsaw(currentItem) ? 'Chains:' : 'Blades:'}
                                 </span>
                                 {cut.bladesUsed.map((blade, bladeIndex) => (
-                                  <span key={bladeIndex} className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                  <span key={bladeIndex} className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full font-medium">
                                     {blade}
                                   </span>
                                 ))}
                               </div>
                               {cut.cutSteel && cut.steelEncountered && (
                                 <div className="mt-2 text-xs">
-                                  <span className="text-gray-500">Steel type:</span>
-                                  <span className="ml-1 text-red-600 font-medium">{cut.steelEncountered}</span>
+                                  <span className="text-gray-500 dark:text-white/40">Steel type:</span>
+                                  <span className="ml-1 text-red-600 dark:text-red-400 font-medium">{cut.steelEncountered}</span>
                                 </div>
                               )}
                             </div>
@@ -2922,12 +2968,12 @@ export default function WorkPerformed() {
 
                     {/* Sawing Notes */}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Notes</label>
+                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Additional Notes</label>
                       <textarea
                         value={sawingData.notes}
                         onChange={(e) => setSawingData(prev => ({ ...prev, notes: e.target.value }))}
                         placeholder="Any additional details about the sawing work..."
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-900 placeholder:text-gray-500"
+                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder:text-white/30"
                         rows={3}
                       />
                     </div>
@@ -2998,14 +3044,14 @@ export default function WorkPerformed() {
                 {/* General Notes for non-specialized items */}
                 {!isCoreDrilling(currentItem) && !isSawing(currentItem) && (
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
                       {(isBreakAndRemove(currentItem) || isJackHammering(currentItem) || isChipping(currentItem) || isBrokk(currentItem)) ? 'Quantity/Notes (Auto-filled by Quick Entry)' : 'Notes'}
                     </label>
                     <textarea
                       value={currentNotes}
                       onChange={(e) => setCurrentNotes(e.target.value)}
                       placeholder="Add any notes about this work item..."
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none transition-colors text-gray-900 placeholder:text-gray-500"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50 dark:focus:ring-purple-500/20 focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder:text-white/30"
                       rows={3}
                     />
                   </div>
@@ -3015,13 +3061,13 @@ export default function WorkPerformed() {
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={() => setShowQuantityModal(false)}
-                  className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-semibold"
+                  className="flex-shrink-0 px-6 py-3 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold border border-gray-200 dark:border-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddItem}
-                  className="flex-1 px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors font-semibold flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-md hover:shadow-lg transition-all font-bold flex items-center justify-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -3036,32 +3082,32 @@ export default function WorkPerformed() {
 
       {/* Add More Dialog */}
       {showAddMoreDialog && (
-        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[60] sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-md w-full shadow-2xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[60] sm:p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl max-w-md w-full shadow-2xl border border-gray-100 dark:border-white/10">
             <div className="p-4 sm:p-6">
               <div className="flex items-center justify-center mb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
               </div>
 
-              <h3 className="text-xl font-bold text-gray-800 mb-2 text-center">Work Item Added!</h3>
-              <p className="text-gray-600 text-center mb-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 text-center">Work Item Added!</h3>
+              <p className="text-gray-500 dark:text-white/50 text-center mb-6">
                 Would you like to add another work item or continue to the next step?
               </p>
 
               <div className="flex gap-3">
                 <button
                   onClick={handleAddMore}
-                  className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors font-semibold"
+                  className="flex-1 px-6 py-3 bg-white dark:bg-white/10 border-2 border-gray-200 dark:border-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-50 dark:hover:bg-white/20 transition-all font-bold"
                 >
                   Add Another
                 </button>
                 <button
                   onClick={handleContinue}
-                  className="flex-1 px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors font-semibold"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-md hover:shadow-lg transition-all font-bold"
                 >
                   Continue
                 </button>

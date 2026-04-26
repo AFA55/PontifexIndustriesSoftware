@@ -70,6 +70,7 @@ export default function Dashboard() {
   const [currentTimecard, setCurrentTimecard] = useState<Timecard | null>(null);
   const [currentHours, setCurrentHours] = useState(0);
   const [clockLoading, setClockLoading] = useState(false);
+  const [clockStatusLoading, setClockStatusLoading] = useState(true); // true until status is confirmed on mount
   const [clockMessage, setClockMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [currentStatus, setCurrentStatus] = useState<OperatorStatus>('clocked_out');
   const [statusLoading, setStatusLoading] = useState(false);
@@ -200,6 +201,7 @@ export default function Dashboard() {
         console.warn('⚠️ No active session found - session may have expired. Redirecting to login...');
         localStorage.removeItem('supabase-user');
         localStorage.removeItem('patriot-user');
+        setClockStatusLoading(false);
         window.location.href = '/login';
         return;
       }
@@ -224,6 +226,10 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error checking clock status:', error);
+      // On error, default to not clocked in so the user can try to clock in
+      setIsClockedIn(false);
+    } finally {
+      setClockStatusLoading(false);
     }
   };
 
@@ -415,6 +421,21 @@ export default function Dashboard() {
       const result = await response.json();
 
       if (!response.ok) {
+        // If the API says we're already clocked in, update UI to show Clock Out
+        if (response.status === 400 && result.activeTimecard) {
+          setIsClockedIn(true);
+          setCurrentTimecard({
+            id: result.activeTimecard.id,
+            clockInTime: result.activeTimecard.clockInTime,
+            currentHours: (new Date().getTime() - new Date(result.activeTimecard.clockInTime).getTime()) / (1000 * 60 * 60),
+          });
+          setCurrentHours((new Date().getTime() - new Date(result.activeTimecard.clockInTime).getTime()) / (1000 * 60 * 60));
+          setCurrentStatus('clocked_in');
+          setShowNfcClockInModal(false);
+          setClockMessage({ type: 'error', text: result.details || result.error || 'You are already clocked in.' });
+          setClockLoading(false);
+          throw new Error(result.error || 'Already clocked in');
+        }
         const errorDetail = result.details ? `\n${result.details}` : '';
         const errorText = (result.error || 'Failed to clock in') + errorDetail;
         setClockMessage({ type: 'error', text: errorText });
@@ -929,14 +950,21 @@ export default function Dashboard() {
 
                 <button
                   onClick={isClockedIn ? handleClockOut : handleClockIn}
-                  disabled={clockLoading}
+                  disabled={clockLoading || clockStatusLoading}
                   className={`group flex items-center justify-center space-x-3 w-full sm:w-auto ${
-                    isClockedIn
-                      ? 'bg-gradient-to-r from-rose-600 via-red-600 to-pink-600 hover:from-rose-700 hover:via-red-700 hover:to-pink-700'
-                      : 'bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700'
+                    clockStatusLoading
+                      ? 'bg-gradient-to-r from-gray-400 to-gray-500'
+                      : isClockedIn
+                        ? 'bg-gradient-to-r from-rose-600 via-red-600 to-pink-600 hover:from-rose-700 hover:via-red-700 hover:to-pink-700'
+                        : 'bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700'
                   } text-white font-bold py-5 px-10 rounded-2xl transition-all duration-300 hover:scale-105 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
                 >
-                  {clockLoading ? (
+                  {clockStatusLoading ? (
+                    <>
+                      <div className="animate-spin w-6 h-6 border-3 border-white border-t-transparent rounded-full"></div>
+                      <span className="text-lg">Checking Status...</span>
+                    </>
+                  ) : clockLoading ? (
                     <>
                       <div className="animate-spin w-6 h-6 border-3 border-white border-t-transparent rounded-full"></div>
                       <span className="text-lg">Verifying Location...</span>
@@ -1054,17 +1082,19 @@ export default function Dashboard() {
             <div className="flex gap-3 overflow-x-auto pb-2">
               <button
                 onClick={isClockedIn ? handleClockOut : handleClockIn}
-                disabled={clockLoading}
+                disabled={clockLoading || clockStatusLoading}
                 className={`flex items-center gap-2 px-5 py-3 ${
-                  isClockedIn
-                    ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white'
-                    : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white'
+                  clockStatusLoading
+                    ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
+                    : isClockedIn
+                      ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white'
+                      : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white'
                 } rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {isClockedIn ? 'Clock Out' : 'Clock In'}
+                {clockStatusLoading ? 'Checking...' : isClockedIn ? 'Clock Out' : 'Clock In'}
               </button>
               <Link
                 href="/dashboard/timecard"

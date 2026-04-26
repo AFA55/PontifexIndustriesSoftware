@@ -273,7 +273,10 @@ function OperatorTimecardDetailPageInner() {
     notes: '',
     pay_type_override: '' as string, // '' = Auto/null
     is_night_shift: false,
+    pay_category: 'regular' as string,
+    is_shop_time: false,
   });
+  const [editSaving, setEditSaving] = useState(false);
 
   // Notes
   const [weekNotes, setWeekNotes] = useState('');
@@ -476,36 +479,61 @@ function OperatorTimecardDetailPageInner() {
       notes: entry.admin_notes || entry.notes || '',
       pay_type_override: entry.pay_type_override || '',
       is_night_shift: entry.is_night_shift,
+      pay_category: (entry as any).pay_category || 'regular',
+      is_shop_time: (entry as any).is_shop_time || entry.is_shop_hours || false,
     });
     setShowEditModal(true);
   };
 
   const handleUpdateEntry = async () => {
     if (!selectedEntry) return;
+    setEditSaving(true);
     try {
       const token = await getSessionToken();
       if (!token) return;
-      const payload: Record<string, unknown> = {
-        clock_in_time: editFormData.clock_in_time,
-        clock_out_time: editFormData.clock_out_time,
-        notes: editFormData.notes,
-        is_night_shift: editFormData.is_night_shift,
-        pay_type_override: editFormData.pay_type_override || null, // '' → null (auto)
+
+      // Attempt the new per-entry endpoint first (handles both tables)
+      const newPayload: Record<string, unknown> = {
+        clock_in: editFormData.clock_in_time || undefined,
+        clock_out: editFormData.clock_out_time || undefined,
+        admin_notes: editFormData.notes,
+        pay_category: editFormData.pay_category,
+        is_shop_time: editFormData.is_shop_time,
       };
-      const response = await fetch(`/api/admin/timecards/${selectedEntry.id}/update`, {
-        method: 'PUT',
+      const newRes = await fetch(`/api/admin/timecards/entries/${selectedEntry.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(newPayload),
       });
-      if (response.ok) {
-        setShowEditModal(false);
-        fetchData();
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.error}`);
+
+      if (!newRes.ok) {
+        // Fall back to legacy update endpoint
+        const legacyPayload: Record<string, unknown> = {
+          clock_in_time: editFormData.clock_in_time,
+          clock_out_time: editFormData.clock_out_time,
+          notes: editFormData.notes,
+          is_night_shift: editFormData.is_night_shift,
+          is_shop_hours: editFormData.is_shop_time,
+          pay_type_override: editFormData.pay_type_override || null,
+        };
+        const legacyRes = await fetch(`/api/admin/timecards/${selectedEntry.id}/update`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(legacyPayload),
+        });
+        if (!legacyRes.ok) {
+          const errBody = await legacyRes.json().catch(() => ({}));
+          alert(`Error: ${errBody.error || 'Failed to update'}`);
+          return;
+        }
       }
+
+      setShowEditModal(false);
+      fetchData();
     } catch (error) {
       console.error('Error updating entry:', error);
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -1309,8 +1337,22 @@ function OperatorTimecardDetailPageInner() {
 
                               {/* Badges */}
                               <div className="flex items-center gap-1 flex-wrap justify-end">
-                                {/* Pay type badge */}
-                                {getPayTypeBadge(entry, weekBefore)}
+                                {/* Pay category badge (new system) */}
+                                {(entry as any).pay_category && (entry as any).pay_category !== 'regular' ? (
+                                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                                    (entry as any).pay_category === 'night_shift' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                                    (entry as any).pay_category === 'shop' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                    (entry as any).pay_category === 'overtime' ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                                    'bg-slate-100 text-slate-700 border-slate-200'
+                                  }`}>
+                                    {(entry as any).pay_category === 'night_shift' ? 'Night Shift' :
+                                     (entry as any).pay_category === 'shop' ? 'Shop Time' :
+                                     (entry as any).pay_category === 'overtime' ? 'Overtime' : 'Regular'}
+                                  </span>
+                                ) : (
+                                  /* Legacy pay type badge */
+                                  getPayTypeBadge(entry, weekBefore)
+                                )}
 
                                 {/* Entry type */}
                                 {entry.entry_type && entry.entry_type !== 'regular' && (
@@ -1318,7 +1360,7 @@ function OperatorTimecardDetailPageInner() {
                                     {entry.entry_type.replace(/_/g, ' ')}
                                   </span>
                                 )}
-                                {entry.is_shop_hours && (
+                                {(entry.is_shop_hours || (entry as any).is_shop_time) && (
                                   <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400">Shop</span>
                                 )}
                                 {entry.hour_type === 'mandatory_overtime' && (
@@ -1643,13 +1685,66 @@ function OperatorTimecardDetailPageInner() {
                 )}
               </div>
 
+              {/* Pay Category (new system) */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Pay Category</label>
+                <select
+                  value={editFormData.pay_category}
+                  onChange={(e) => {
+                    const cat = e.target.value;
+                    setEditFormData({
+                      ...editFormData,
+                      pay_category: cat,
+                      // Auto-sync is_shop_time when shop is selected
+                      is_shop_time: cat === 'shop' ? true : editFormData.is_shop_time,
+                    });
+                  }}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 text-sm text-gray-900 transition-all"
+                >
+                  <option value="regular">Regular — standard rate</option>
+                  <option value="night_shift">Night Shift — premium rate (field only)</option>
+                  <option value="shop">Shop Time — regular rate regardless of hour</option>
+                  <option value="overtime">Overtime — 1.5× rate</option>
+                </select>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Auto-calculated based on clock-in time and weekly hours. Override here to lock the category.
+                </p>
+              </div>
+
+              {/* Shop Time toggle */}
+              <div className="flex items-center justify-between px-3 py-2.5 bg-amber-50 rounded-lg border border-amber-100">
+                <div className="flex items-center gap-2">
+                  <Coffee size={14} className="text-amber-500" />
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">Shop Time</p>
+                    <p className="text-[10px] text-gray-500">No night shift premium — always regular rate</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editFormData.is_shop_time}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditFormData({
+                        ...editFormData,
+                        is_shop_time: checked,
+                        pay_category: checked ? 'shop' : (editFormData.pay_category === 'shop' ? 'regular' : editFormData.pay_category),
+                      });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
               {/* Night Shift toggle — only when not overriding pay type */}
-              {!editFormData.pay_type_override && (
+              {!editFormData.pay_type_override && editFormData.pay_category !== 'shop' && (
                 <div className="flex items-center justify-between px-3 py-2.5 bg-purple-50 rounded-lg border border-purple-100">
                   <div className="flex items-center gap-2">
                     <Moon size={14} className="text-purple-500" />
                     <div>
-                      <p className="text-xs font-semibold text-gray-700">Mark as Night Shift</p>
+                      <p className="text-xs font-semibold text-gray-700">Mark as Night Shift (legacy)</p>
                       <p className="text-[10px] text-gray-500">Applies {nightShiftMultiplier}× premium (up to 40hr weekly threshold)</p>
                     </div>
                   </div>
@@ -1714,9 +1809,11 @@ function OperatorTimecardDetailPageInner() {
                 </button>
                 <button
                   onClick={handleUpdateEntry}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-semibold text-sm transition-all shadow-lg shadow-purple-500/20"
+                  disabled={editSaving}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-60 text-white rounded-lg font-semibold text-sm transition-all shadow-lg shadow-purple-500/20"
                 >
-                  Save Changes
+                  {editSaving ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {editSaving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
             </div>

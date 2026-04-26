@@ -524,6 +524,41 @@ export default function SettingsPage() {
           </div>
 
           {/* ══════════════════════════════════════════════
+              PAY CATEGORY CONFIG
+             ══════════════════════════════════════════════ */}
+          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-4 text-white">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Pay Category Rules
+              </h2>
+              <p className="text-emerald-100 text-sm mt-1">Configure overtime thresholds, night shift premiums, and shop time rules</p>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="text-center p-3 bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-400/30 rounded-xl">
+                  <div className="text-xs font-bold text-rose-600 dark:text-rose-300 uppercase">Overtime</div>
+                  <p className="text-[10px] text-rose-500 dark:text-rose-300/70 mt-1">After weekly threshold (default 40 hrs)</p>
+                </div>
+                <div className="text-center p-3 bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-400/30 rounded-xl">
+                  <div className="text-xs font-bold text-indigo-600 dark:text-indigo-300 uppercase">Night Shift</div>
+                  <p className="text-[10px] text-indigo-500 dark:text-indigo-300/70 mt-1">Field work from 3 PM (configurable)</p>
+                </div>
+                <div className="text-center p-3 bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-400/30 rounded-xl">
+                  <div className="text-xs font-bold text-amber-600 dark:text-amber-300 uppercase">Shop Time</div>
+                  <p className="text-[10px] text-amber-500 dark:text-amber-300/70 mt-1">Always regular rate</p>
+                </div>
+              </div>
+              <Link
+                href="/dashboard/admin/settings/pay-config"
+                className="block w-full text-center px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-sm"
+              >
+                Configure Pay Rules →
+              </Link>
+            </div>
+          </div>
+
+          {/* ══════════════════════════════════════════════
               DATA BACKUPS
              ══════════════════════════════════════════════ */}
           <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
