@@ -274,9 +274,9 @@ function TimecardPage() {
 
   const getEntryBadges = (entry: TimecardEntry) => {
     const badges: { label: string; color: string; icon: React.ReactNode }[] = [];
-    if (entry.is_shop_hours) badges.push({ label: 'Shop', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: <Factory size={10} /> });
-    if (entry.is_night_shift) badges.push({ label: 'Night', color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: <Moon size={10} /> });
-    if (entry.hour_type === 'mandatory_overtime') badges.push({ label: 'Weekend OT', color: 'bg-red-50 text-red-700 border-red-200', icon: <AlertTriangle size={10} /> });
+    if (entry.is_shop_hours) badges.push({ label: 'Shop', color: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700/50', icon: <Factory size={10} /> });
+    if (entry.is_night_shift) badges.push({ label: 'Night', color: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-700/50', icon: <Moon size={10} /> });
+    if (entry.hour_type === 'mandatory_overtime') badges.push({ label: 'Weekend OT', color: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-700/50', icon: <AlertTriangle size={10} /> });
     return badges;
   };
 
@@ -376,10 +376,10 @@ function TimecardPage() {
           ) : activeTimecard ? (
             /* CLOCKED IN STATE */
             <div className="text-center space-y-4">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full border border-emerald-200 dark:border-emerald-700/50">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-sm font-semibold">Clocked In</span>
-                <span className="text-xs text-emerald-600">
+                <span className="text-xs text-emerald-600 dark:text-emerald-400">
                   since {new Date(activeTimecard.clockInTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                 </span>
               </div>
@@ -442,12 +442,12 @@ function TimecardPage() {
 
               {/* Bypass NFC Banner */}
               {bypassNfc && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left max-w-sm mx-auto">
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl p-4 text-left max-w-sm mx-auto">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-bold text-amber-800">Remote Clock-In</p>
-                      <p className="text-xs text-amber-600 mt-1">
+                      <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Remote Clock-In</p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                         NFC requirement has been bypassed by your admin. GPS location will still be captured. Clock in using the button below.
                       </p>
                     </div>
@@ -590,8 +590,8 @@ function TimecardPage() {
           <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-gray-200/60 dark:border-white/10 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-gray-400 dark:text-white/40 uppercase tracking-wider">Days</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                <Calendar size={15} className="text-emerald-600" />
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                <Calendar size={15} className="text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{weekData?.daysWorked || 0}</p>
@@ -601,8 +601,8 @@ function TimecardPage() {
           <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-gray-200/60 dark:border-white/10 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-gray-400 dark:text-white/40 uppercase tracking-wider">Approved</span>
-              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                <CheckCircle size={15} className="text-blue-600" />
+              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                <CheckCircle size={15} className="text-blue-600 dark:text-blue-400" />
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -620,11 +620,11 @@ function TimecardPage() {
         {/* ── Hour Category Breakdown ────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
           {[
-            { label: 'Regular', value: (weekData?.regularHours || 0).toFixed(1), icon: <CheckCircle size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-            { label: 'Weekly OT', value: (weekData?.weeklyOvertimeHours || 0).toFixed(1), icon: <TrendingUp size={14} />, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
-            { label: 'Mandatory OT', value: (weekData?.mandatoryOvertimeHours || 0).toFixed(1), icon: <Briefcase size={14} />, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
-            { label: 'Night Shift', value: (weekData?.nightShiftHours || 0).toFixed(1), icon: <Moon size={14} />, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
-            { label: 'Shop Hours', value: (weekData?.shopHours || 0).toFixed(1), icon: <Factory size={14} />, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+            { label: 'Regular', value: (weekData?.regularHours || 0).toFixed(1), icon: <CheckCircle size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-100 dark:border-emerald-700/40' },
+            { label: 'Weekly OT', value: (weekData?.weeklyOvertimeHours || 0).toFixed(1), icon: <TrendingUp size={14} />, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-100 dark:border-orange-700/40' },
+            { label: 'Mandatory OT', value: (weekData?.mandatoryOvertimeHours || 0).toFixed(1), icon: <Briefcase size={14} />, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-100 dark:border-red-700/40' },
+            { label: 'Night Shift', value: (weekData?.nightShiftHours || 0).toFixed(1), icon: <Moon size={14} />, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20', border: 'border-indigo-100 dark:border-indigo-700/40' },
+            { label: 'Shop Hours', value: (weekData?.shopHours || 0).toFixed(1), icon: <Factory size={14} />, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-100 dark:border-amber-700/40' },
           ].map(({ label, value, icon, color, bg, border }) => (
             <div key={label} className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg border ${border} ${bg}`}>
               <div className={color}>{icon}</div>
@@ -638,18 +638,18 @@ function TimecardPage() {
 
         {/* ── OT Alerts ──────────────────────────────────── */}
         {weekData && weekData.weeklyOvertimeHours > 0 && (
-          <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg">
-            <AlertTriangle size={16} className="text-orange-600 flex-shrink-0" />
-            <p className="text-sm text-orange-700">
+          <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700/50 rounded-lg">
+            <AlertTriangle size={16} className="text-orange-600 dark:text-orange-400 flex-shrink-0" />
+            <p className="text-sm text-orange-700 dark:text-orange-300">
               <strong>{weekData.weeklyOvertimeHours.toFixed(1)} weekly overtime hours</strong> -- Mon-Fri hours exceeded 40.
             </p>
           </div>
         )}
 
         {weekData && weekData.mandatoryOvertimeHours > 0 && (
-          <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-lg">
-            <Briefcase size={16} className="text-red-600 flex-shrink-0" />
-            <p className="text-sm text-red-700">
+          <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 rounded-lg">
+            <Briefcase size={16} className="text-red-600 dark:text-red-400 flex-shrink-0" />
+            <p className="text-sm text-red-700 dark:text-red-300">
               <strong>{weekData.mandatoryOvertimeHours.toFixed(1)} hours</strong> of weekend/mandatory overtime recorded.
             </p>
           </div>
@@ -667,7 +667,7 @@ function TimecardPage() {
           {loading ? (
             <div className="p-16 text-center">
               <div className="w-10 h-10 mx-auto mb-3 relative">
-                <div className="absolute inset-0 rounded-full border-[3px] border-gray-100"></div>
+                <div className="absolute inset-0 rounded-full border-[3px] border-gray-100 dark:border-white/10"></div>
                 <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-blue-600 animate-spin"></div>
               </div>
               <p className="text-gray-400 dark:text-white/40 text-sm">Loading entries...</p>
@@ -714,7 +714,7 @@ function TimecardPage() {
                           {entry.clock_out_time ? (
                             <span className="text-xs font-medium text-gray-700 dark:text-white/80 tabular-nums">{formatTime(entry.clock_out_time)}</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50">
                               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                               <span className="hidden sm:inline">Active</span>
                             </span>
@@ -740,12 +740,12 @@ function TimecardPage() {
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           {entry.is_approved ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50">
                               <CheckCircle size={10} />
                               <span className="hidden sm:inline">Approved</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50">
                               <Clock size={10} />
                               <span className="hidden sm:inline">Pending</span>
                             </span>
