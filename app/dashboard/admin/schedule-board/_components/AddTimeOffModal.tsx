@@ -73,7 +73,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
 
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-slate-600 to-slate-700 p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
@@ -100,11 +100,11 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
 
             {/* Operator dropdown */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">Operator</label>
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">Operator</label>
               <select
                 value={operatorId}
                 onChange={(e) => setOperatorId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
               >
                 <option value="">Select Operator...</option>
                 {operators.map(op => (
@@ -115,18 +115,18 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
 
             {/* Date picker */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">Date</label>
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">Date</label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
               />
             </div>
 
             {/* Type radio buttons */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Type</label>
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-2">Type</label>
               <div className="grid grid-cols-2 gap-2">
                 {TIME_OFF_TYPES.map((t) => (
                   <button
@@ -135,7 +135,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
                     className={`px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
                       type === t.value
                         ? `${t.color} ring-2 ring-offset-1 ring-slate-400`
-                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                        : 'bg-gray-50 dark:bg-white/[0.03] text-gray-500 dark:text-white/40 border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/[0.08]'
                     }`}
                   >
                     {t.label}
@@ -146,15 +146,15 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
 
             {/* Notes */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">
-                Notes <span className="font-normal text-gray-400">(optional)</span>
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">
+                Notes <span className="font-normal text-gray-400 dark:text-white/30">(optional)</span>
               </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Any additional details..."
                 rows={2}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all resize-none"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder-white/30 transition-all resize-none"
               />
             </div>
 
@@ -162,7 +162,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
             <div className="flex items-center gap-3 pt-1">
               <button
                 onClick={onClose}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-all"
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-xl font-bold text-sm transition-all"
               >
                 Cancel
               </button>

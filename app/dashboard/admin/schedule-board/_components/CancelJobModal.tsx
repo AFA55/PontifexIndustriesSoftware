@@ -54,17 +54,17 @@ export default function CancelJobModal({ job, onClose, onReschedule, onDelete }:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Remove from Schedule</h2>
-            <p className="text-sm text-gray-500 mt-0.5 truncate max-w-xs">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Remove from Schedule</h2>
+            <p className="text-sm text-gray-500 dark:text-white/50 mt-0.5 truncate max-w-xs">
               {job.customer_name} — {job.job_number}
             </p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 dark:text-white/30 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -117,7 +117,7 @@ export default function CancelJobModal({ job, onClose, onReschedule, onDelete }:
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-white/70 mb-1.5">
                 New Scheduled Date <span className="text-red-500">*</span>
               </label>
               <input
@@ -125,20 +125,20 @@ export default function CancelJobModal({ job, onClose, onReschedule, onDelete }:
                 value={newDate}
                 min={minDate}
                 onChange={(e) => { setNewDate(e.target.value); setError(null); }}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-gray-900 text-base"
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] text-base"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Reason for Postponement <span className="text-gray-400 font-normal">(optional)</span>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-white/70 mb-1.5">
+                Reason for Postponement <span className="text-gray-400 dark:text-white/30 font-normal">(optional)</span>
               </label>
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="e.g. Customer requested delay, weather, permit not ready..."
                 rows={3}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-gray-900 text-sm resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] text-sm resize-none placeholder:text-gray-400 dark:placeholder-white/30"
               />
             </div>
 
@@ -149,7 +149,7 @@ export default function CancelJobModal({ job, onClose, onReschedule, onDelete }:
             <div className="flex gap-3 pt-1">
               <button
                 onClick={onClose}
-                className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-colors"
+                className="flex-1 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 text-gray-600 dark:text-white/60 font-semibold hover:bg-gray-50 dark:hover:bg-white/[0.08] transition-colors"
               >
                 Cancel
               </button>
@@ -182,11 +182,11 @@ export default function CancelJobModal({ job, onClose, onReschedule, onDelete }:
               </p>
             </div>
 
-            <div className="bg-gray-50 rounded-xl p-4 space-y-1 text-sm text-gray-600">
-              <p><span className="font-medium text-gray-700">Customer:</span> {job.customer_name}</p>
-              <p><span className="font-medium text-gray-700">Job #:</span> {job.job_number}</p>
-              <p><span className="font-medium text-gray-700">Type:</span> {job.job_type}</p>
-              <p><span className="font-medium text-gray-700">Scheduled:</span> {job.scheduled_date}</p>
+            <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 space-y-1 text-sm text-gray-600 dark:text-white/60">
+              <p><span className="font-medium text-gray-700 dark:text-white/70">Customer:</span> {job.customer_name}</p>
+              <p><span className="font-medium text-gray-700 dark:text-white/70">Job #:</span> {job.job_number}</p>
+              <p><span className="font-medium text-gray-700 dark:text-white/70">Type:</span> {job.job_type}</p>
+              <p><span className="font-medium text-gray-700 dark:text-white/70">Scheduled:</span> {job.scheduled_date}</p>
             </div>
 
             {error && (
@@ -196,7 +196,7 @@ export default function CancelJobModal({ job, onClose, onReschedule, onDelete }:
             <div className="flex gap-3 pt-1">
               <button
                 onClick={onClose}
-                className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-colors"
+                className="flex-1 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 text-gray-600 dark:text-white/60 font-semibold hover:bg-gray-50 dark:hover:bg-white/[0.08] transition-colors"
               >
                 Keep Job
               </button>

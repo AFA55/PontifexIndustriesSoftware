@@ -1918,11 +1918,11 @@ export default function ScheduleBoardPage() {
       {/* ═══ WILL CALL FOLDER ══════════════════════════════════════════════ */}
       {showWillCall && (
         <div className="container mx-auto px-4 md:px-6 pb-4">
-          <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-2xl border-2 border-amber-200 p-5">
+          <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/10 rounded-2xl border-2 border-amber-200 dark:border-amber-500/30 p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <FolderOpen className="w-5 h-5 text-amber-600" />
-                <h3 className="font-bold text-gray-900">Will Call Folder</h3>
+                <h3 className="font-bold text-gray-900 dark:text-white">Will Call Folder</h3>
                 <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-bold">{willCallJobs.length} jobs</span>
               </div>
               <p className="text-xs text-amber-600">Jobs waiting for an open slot — schedule when availability opens up</p>

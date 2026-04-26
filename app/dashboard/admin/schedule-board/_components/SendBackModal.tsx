@@ -27,7 +27,7 @@ export default function SendBackModal({ job, onConfirm, onClose }: SendBackModal
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
 
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-gray-600 to-gray-700 p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
@@ -46,14 +46,14 @@ export default function SendBackModal({ job, onConfirm, onClose }: SendBackModal
 
           <div className="p-5 space-y-4">
             {/* Job summary */}
-            <div className="bg-orange-50 rounded-xl p-3 border border-orange-200">
-              <h3 className="font-bold text-gray-900 text-sm">{job.customer_name}</h3>
-              <span className="text-xs text-gray-500">{job.job_type} • Submitted by {job.submitted_by}</span>
+            <div className="bg-orange-50 dark:bg-white/[0.05] rounded-xl p-3 border border-orange-200 dark:border-white/10">
+              <h3 className="font-bold text-gray-900 dark:text-white text-sm">{job.customer_name}</h3>
+              <span className="text-xs text-gray-500 dark:text-white/50">{job.job_type} • Submitted by {job.submitted_by}</span>
             </div>
 
             {/* Quick reasons */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Quick Select Reason</label>
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-2">Quick Select Reason</label>
               <div className="flex flex-wrap gap-1.5">
                 {QUICK_REASONS.map((r) => (
                   <button
@@ -62,7 +62,7 @@ export default function SendBackModal({ job, onConfirm, onClose }: SendBackModal
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       reason === r
                         ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-gray-100 dark:bg-white/[0.05] text-gray-600 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/[0.08]'
                     }`}
                   >
                     {r}
@@ -73,7 +73,7 @@ export default function SendBackModal({ job, onConfirm, onClose }: SendBackModal
 
             {/* Custom reason */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">
                 <AlertTriangle className="w-4 h-4 inline mr-1" />
                 Reason for Sending Back
               </label>
@@ -82,7 +82,7 @@ export default function SendBackModal({ job, onConfirm, onClose }: SendBackModal
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Tell the salesman what needs to be fixed..."
                 rows={3}
-                className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-gray-500 focus:ring-2 focus:ring-gray-200 text-sm transition-all resize-none"
+                className="w-full px-4 py-2.5 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-gray-500 focus:ring-2 focus:ring-gray-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder-white/30 transition-all resize-none"
               />
             </div>
 
@@ -90,7 +90,7 @@ export default function SendBackModal({ job, onConfirm, onClose }: SendBackModal
             <div className="flex items-center gap-3 pt-1">
               <button
                 onClick={onClose}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-all"
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-xl font-bold text-sm transition-all"
               >
                 Cancel
               </button>

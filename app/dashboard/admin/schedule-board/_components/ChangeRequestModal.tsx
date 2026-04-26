@@ -66,13 +66,13 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+      <div className="bg-white dark:bg-[#1a0f35] rounded-2xl border border-gray-200 dark:border-white/10 shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-white/10">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Request Schedule Change</h2>
-            <p className="text-gray-500 text-sm mt-0.5">{job.job_number} — {job.customer_name}</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Request Schedule Change</h2>
+            <p className="text-gray-500 dark:text-white/50 text-sm mt-0.5">{job.job_number} — {job.customer_name}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -80,7 +80,7 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
         <div className="p-6 space-y-4">
           {/* Type selector */}
           <div>
-            <label className="text-sm text-gray-700 mb-2 block">What needs to change?</label>
+            <label className="text-sm text-gray-700 dark:text-white/70 mb-2 block">What needs to change?</label>
             <div className="space-y-2">
               {REQUEST_TYPES.map(type => (
                 <button
@@ -89,13 +89,13 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
                   className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
                     requestType === type.key
                       ? 'border-purple-500 bg-purple-500/10'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
+                      : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] hover:border-gray-300 dark:hover:border-white/20 dark:hover:bg-white/[0.08]'
                   }`}
                 >
-                  <type.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${requestType === type.key ? 'text-purple-500' : 'text-gray-400'}`} />
+                  <type.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${requestType === type.key ? 'text-purple-500' : 'text-gray-400 dark:text-white/30'}`} />
                   <div>
-                    <div className={`text-sm font-medium ${requestType === type.key ? 'text-gray-900' : 'text-gray-700'}`}>{type.label}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{type.desc}</div>
+                    <div className={`text-sm font-medium ${requestType === type.key ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-white/70'}`}>{type.label}</div>
+                    <div className="text-xs text-gray-500 dark:text-white/40 mt-0.5">{type.desc}</div>
                   </div>
                 </button>
               ))}
@@ -105,7 +105,7 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
           {/* Date picker for date-related requests */}
           {['date_extension', 'date_change'].includes(requestType) && (
             <div>
-              <label className="text-sm text-gray-700 mb-1 block">
+              <label className="text-sm text-gray-700 dark:text-white/70 mb-1 block">
                 {requestType === 'date_extension' ? 'New End Date' : 'Requested New Date'}
               </label>
               <input
@@ -113,14 +113,14 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
                 value={requestedValue}
                 onChange={e => setRequestedValue(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:border-purple-500 focus:ring-purple-500"
+                className="w-full bg-white dark:bg-white/[0.05] border border-gray-300 dark:border-white/10 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 focus:ring-purple-500"
               />
             </div>
           )}
 
           {/* Reason */}
           <div>
-            <label className="text-sm text-gray-700 mb-1 block">Reason / Notes *</label>
+            <label className="text-sm text-gray-700 dark:text-white/70 mb-1 block">Reason / Notes *</label>
             <textarea
               value={reason}
               onChange={e => setReason(e.target.value)}
@@ -132,7 +132,7 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
                   ? 'e.g. Customer cancelled due to...'
                   : 'Explain why this change is needed...'
               }
-              className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-purple-500 resize-none"
+              className="w-full bg-white dark:bg-white/[0.05] border border-gray-300 dark:border-white/10 rounded-lg px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:outline-none focus:border-purple-500 focus:ring-purple-500 resize-none"
             />
           </div>
 
@@ -145,10 +145,10 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
           {error && <p className="text-red-400 text-sm">{error}</p>}
         </div>
 
-        <div className="flex gap-3 p-6 border-t border-gray-200">
+        <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-white/10">
           <button
             onClick={onClose}
-            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-3 font-semibold transition-colors"
+            className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-xl py-3 font-semibold transition-colors"
           >
             Cancel
           </button>

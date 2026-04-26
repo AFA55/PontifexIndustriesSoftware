@@ -60,7 +60,7 @@ export default function AssignOperatorModal({
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
 
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-600 to-pink-500 p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
@@ -79,13 +79,13 @@ export default function AssignOperatorModal({
 
           <div className="p-5 space-y-4">
             {/* Job summary */}
-            <div className="bg-orange-50 rounded-xl p-3 border border-orange-200">
-              <h3 className="font-bold text-gray-900 text-sm">{job.customer_name}</h3>
+            <div className="bg-orange-50 dark:bg-white/[0.05] rounded-xl p-3 border border-orange-200 dark:border-white/10">
+              <h3 className="font-bold text-gray-900 dark:text-white text-sm">{job.customer_name}</h3>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mt-1">
                 {job.job_type?.split(',')[0]?.trim()}
               </span>
               {job.location && (
-                <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                <p className="text-xs text-gray-500 dark:text-white/50 flex items-center gap-1 mt-1">
                   <MapPin className="w-3 h-3" /> {job.location}
                 </p>
               )}
@@ -112,14 +112,14 @@ export default function AssignOperatorModal({
 
             {/* Operator dropdown */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">
                 <Users className="w-4 h-4 inline mr-1.5" />
                 Operator
               </label>
               <select
                 value={selectedOperator}
                 onChange={(e) => setSelectedOperator(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
               >
                 <option value="">Select Operator...</option>
                 {allOperators.map(name => (
@@ -140,14 +140,14 @@ export default function AssignOperatorModal({
 
             {/* Helper dropdown */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">
                 <Users className="w-4 h-4 inline mr-1.5" />
-                Helper <span className="font-normal text-gray-400">(optional)</span>
+                Helper <span className="font-normal text-gray-400 dark:text-white/30">(optional)</span>
               </label>
               <select
                 value={selectedHelper}
                 onChange={(e) => setSelectedHelper(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
               >
                 <option value="">No Helper</option>
                 {allHelpers.map(name => (
@@ -170,7 +170,7 @@ export default function AssignOperatorModal({
             <div className="flex items-center gap-3 pt-1">
               <button
                 onClick={onClose}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-all"
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-xl font-bold text-sm transition-all"
               >
                 Cancel
               </button>

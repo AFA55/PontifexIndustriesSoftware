@@ -115,7 +115,7 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
 
       {/* Modal */}
       <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-700 to-purple-500 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -131,41 +131,41 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
           </div>
 
           {/* Select All / Counter */}
-          <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-6 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
             <button
               onClick={toggleSelectAll}
-              className="flex items-center gap-2 text-sm font-medium text-purple-700 hover:text-purple-900 transition-colors"
+              className="flex items-center gap-2 text-sm font-medium text-purple-700 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-300 transition-colors"
             >
               <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                 allSelected
                   ? 'bg-purple-600 border-purple-600'
-                  : 'border-gray-300 bg-white'
+                  : 'border-gray-300 dark:border-white/20 bg-white dark:bg-white/[0.05]'
               }`}>
                 {allSelected && <Check className="w-3 h-3 text-white" />}
               </div>
               {allSelected ? 'Deselect All' : 'Select All'}
             </button>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 dark:text-white/50">
               {selectedCount} of {jobs.length} selected
             </span>
           </div>
 
           {/* Job List */}
-          <div className="flex-1 overflow-y-auto px-6 py-2 divide-y divide-gray-50">
+          <div className="flex-1 overflow-y-auto px-6 py-2 divide-y divide-gray-50 dark:divide-white/[0.05]">
             {jobs.map((job) => {
               const isSelected = selectedIds.has(job.id);
               return (
                 <label
                   key={job.id}
                   className={`flex items-center gap-3 py-3 cursor-pointer rounded-lg px-2 -mx-2 transition-colors ${
-                    isSelected ? 'bg-purple-50/60' : 'hover:bg-gray-50'
+                    isSelected ? 'bg-purple-50/60 dark:bg-purple-500/10' : 'hover:bg-gray-50 dark:hover:bg-white/[0.05]'
                   }`}
                 >
                   {/* Checkbox */}
                   <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
                     isSelected
                       ? 'bg-purple-600 border-purple-600'
-                      : 'border-gray-300 bg-white'
+                      : 'border-gray-300 dark:border-white/20 bg-white dark:bg-white/[0.05]'
                   }`}>
                     {isSelected && <Check className="w-3 h-3 text-white" />}
                   </div>
@@ -182,8 +182,8 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
                   {/* Job Details */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{job.job_number}</span>
-                      <span className="text-xs text-gray-500">{job.customer_name}</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{job.job_number}</span>
+                      <span className="text-xs text-gray-500 dark:text-white/50">{job.customer_name}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-purple-600 font-medium">{job.job_type}</span>
@@ -206,7 +206,7 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
             })}
 
             {jobs.length === 0 && (
-              <div className="py-8 text-center text-sm text-gray-400">
+              <div className="py-8 text-center text-sm text-gray-400 dark:text-white/30">
                 No jobs available for printing.
               </div>
             )}
@@ -222,11 +222,11 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
           )}
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+          <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex items-center justify-end gap-3">
             <button
               onClick={onClose}
               disabled={printing}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-white/60 hover:text-gray-800 dark:hover:text-white transition-colors disabled:opacity-50"
             >
               Cancel
             </button>

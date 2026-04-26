@@ -300,7 +300,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
 
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="relative bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
@@ -319,10 +319,10 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
           <div className="p-5 space-y-4">
             {/* ── Job Summary ── */}
-            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-bold text-gray-900 text-lg">{job.customer_name}</h3>
+                  <h3 className="font-bold text-gray-900 dark:text-white text-lg">{job.customer_name}</h3>
                   <div className="flex flex-wrap gap-1.5 mt-1">
                     {job.job_type?.split(',').map((t, i) => (
                       <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
@@ -345,49 +345,49 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
               </div>
 
               {job.location && (
-                <p className="text-xs text-gray-500 flex items-center gap-1 mt-2">
+                <p className="text-xs text-gray-500 dark:text-white/50 flex items-center gap-1 mt-2">
                   <MapPin className="w-3.5 h-3.5" /> {job.location}
                 </p>
               )}
 
               {job.description && (
-                <p className="text-xs text-gray-500 mt-2 italic line-clamp-3">&ldquo;{job.description}&rdquo;</p>
+                <p className="text-xs text-gray-500 dark:text-white/50 mt-2 italic line-clamp-3">&ldquo;{job.description}&rdquo;</p>
               )}
             </div>
 
             {/* ── Jobsite Info ── */}
             {(job.address || job.contact_phone || job.po_number || job.project_name) && (
-              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2.5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Jobsite Info</div>
+              <div className="bg-slate-50 dark:bg-white/[0.05] rounded-xl border border-slate-200 dark:border-white/10 p-4 space-y-2.5">
+                <div className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase tracking-widest">Jobsite Info</div>
 
                 {job.project_name && (
                   <div className="flex items-start gap-2.5">
-                    <ClipboardList className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <ClipboardList className="w-4 h-4 text-slate-400 dark:text-white/30 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">Project</div>
-                      <div className="text-sm font-semibold text-slate-800">{job.project_name}</div>
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase">Project</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-white">{job.project_name}</div>
                     </div>
                   </div>
                 )}
 
                 {job.address && (
                   <div className="flex items-start gap-2.5">
-                    <MapPin className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <MapPin className="w-4 h-4 text-slate-400 dark:text-white/30 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">Site Address</div>
-                      <div className="text-sm font-semibold text-slate-800">{job.address}</div>
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase">Site Address</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-white">{job.address}</div>
                     </div>
                   </div>
                 )}
 
                 {job.site_contact && (
                   <div className="flex items-start gap-2.5">
-                    <User className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <User className="w-4 h-4 text-slate-400 dark:text-white/30 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">Site Contact</div>
-                      <div className="text-sm font-semibold text-slate-800">
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase">Site Contact</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-white">
                         {job.site_contact}
-                        {job.contact_phone && <span className="text-slate-500 font-normal ml-1.5">· {job.contact_phone}</span>}
+                        {job.contact_phone && <span className="text-slate-500 dark:text-white/50 font-normal ml-1.5">· {job.contact_phone}</span>}
                       </div>
                     </div>
                   </div>
@@ -395,20 +395,20 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
                 {!job.site_contact && job.contact_phone && (
                   <div className="flex items-start gap-2.5">
-                    <User className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <User className="w-4 h-4 text-slate-400 dark:text-white/30 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">Site Contact Phone</div>
-                      <div className="text-sm font-semibold text-slate-800">{job.contact_phone}</div>
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase">Site Contact Phone</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-white">{job.contact_phone}</div>
                     </div>
                   </div>
                 )}
 
                 {job.po_number && (
                   <div className="flex items-start gap-2.5">
-                    <Hash className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <Hash className="w-4 h-4 text-slate-400 dark:text-white/30 mt-0.5 shrink-0" />
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">PO Number</div>
-                      <div className="text-sm font-semibold text-slate-800">{job.po_number}</div>
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase">PO Number</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-white">{job.po_number}</div>
                     </div>
                   </div>
                 )}
@@ -485,10 +485,10 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
             {/* ── Difficulty Rating ── */}
             {job.difficulty_rating && (
-              <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-white/[0.05] rounded-xl border border-gray-200 dark:border-white/10">
                 <Gauge className="w-5 h-5 text-gray-500" />
                 <div className="flex-1">
-                  <div className="text-[10px] font-bold text-gray-400 uppercase">Job Difficulty</div>
+                  <div className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase">Job Difficulty</div>
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex gap-0.5">
                       {Array.from({ length: 10 }, (_, i) => (
@@ -497,7 +497,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                           className={`w-5 h-2.5 rounded-sm ${
                             i < job.difficulty_rating!
                               ? i < 3 ? 'bg-green-400' : i < 5 ? 'bg-blue-400' : i < 7 ? 'bg-yellow-400' : i < 9 ? 'bg-orange-400' : 'bg-red-500'
-                              : 'bg-gray-200'
+                              : 'bg-gray-200 dark:bg-white/10'
                           }`}
                         />
                       ))}
@@ -533,7 +533,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                       <div className="text-[10px] font-bold text-indigo-500 uppercase mb-1.5">All Equipment</div>
                       <div className="flex flex-wrap gap-1.5">
                         {allEquipmentItems.map((item, idx) => (
-                          <span key={idx} className="px-2.5 py-1 bg-white rounded-lg text-xs text-indigo-700 font-semibold border border-indigo-200 flex items-center gap-1">
+                          <span key={idx} className="px-2.5 py-1 bg-white dark:bg-white/10 rounded-lg text-xs text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-500/30 flex items-center gap-1">
                             <Wrench className="w-3 h-3" />
                             {item.label}
                             {item.qty && <span className="text-indigo-500 font-bold ml-0.5">×{item.qty}</span>}
@@ -564,7 +564,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
             {/* ── Jobsite Conditions ── */}
             {conditions && activeConditions.length > 0 && (
-              <div className={`rounded-xl border overflow-hidden ${warningConditions.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+              <div className={`rounded-xl border overflow-hidden ${warningConditions.length > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-500/30' : 'bg-gray-50 dark:bg-white/[0.05] border-gray-200 dark:border-white/10'}`}>
                 <button
                   onClick={() => toggleSection('conditions')}
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/5 transition-colors"
@@ -574,7 +574,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                     <span className={`text-sm font-bold ${warningConditions.length > 0 ? 'text-amber-900' : 'text-gray-900'}`}>
                       Jobsite Conditions
                     </span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${warningConditions.length > 0 ? 'bg-amber-200 text-amber-700' : 'bg-gray-200 text-gray-700'}`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${warningConditions.length > 0 ? 'bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-300' : 'bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-white/60'}`}>
                       {activeConditions.length} active
                     </span>
                     {warningConditions.length > 0 && (
@@ -601,7 +601,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
                             cond.warning
                               ? 'bg-red-50 text-red-700 border border-red-200'
-                              : 'bg-white text-gray-700 border border-gray-200'
+                              : 'bg-white dark:bg-white/[0.05] text-gray-700 dark:text-white/70 border border-gray-200 dark:border-white/10'
                           }`}
                         >
                           {cond.icon}
@@ -671,26 +671,26 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
             {/* ── Additional Notes ── */}
             {job.additional_info && (
-              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 flex items-start gap-2">
-                <FileText className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+              <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-3 border border-gray-200 dark:border-white/10 flex items-start gap-2">
+                <FileText className="w-4 h-4 text-gray-400 dark:text-white/30 mt-0.5 flex-shrink-0" />
                 <div>
-                  <div className="text-[10px] font-bold text-gray-400 uppercase mb-0.5">Additional Notes</div>
-                  <p className="text-xs text-gray-700">{job.additional_info}</p>
+                  <div className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase mb-0.5">Additional Notes</div>
+                  <p className="text-xs text-gray-700 dark:text-white/70">{job.additional_info}</p>
                 </div>
               </div>
             )}
 
             {/* ── Dates Display ── */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
-                <div className="text-[10px] font-bold text-blue-500 uppercase mb-1">Start Date</div>
-                <div className="text-sm font-bold text-gray-900">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 border border-blue-200 dark:border-blue-500/30">
+                <div className="text-[10px] font-bold text-blue-500 dark:text-blue-400 uppercase mb-1">Start Date</div>
+                <div className="text-sm font-bold text-gray-900 dark:text-white">
                   {job.scheduled_date ? formatDate(job.scheduled_date) : 'Not set'}
                 </div>
               </div>
-              <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
-                <div className="text-[10px] font-bold text-blue-500 uppercase mb-1">End Date</div>
-                <div className="text-sm font-bold text-gray-900">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 border border-blue-200 dark:border-blue-500/30">
+                <div className="text-[10px] font-bold text-blue-500 dark:text-blue-400 uppercase mb-1">End Date</div>
+                <div className="text-sm font-bold text-gray-900 dark:text-white">
                   {job.end_date ? formatDate(job.end_date) : 'Same day'}
                 </div>
                 {isMultiDay && (
@@ -710,7 +710,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
             {/* ── Schedule Date Picker ── */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-2">
                 <Calendar className="w-4 h-4 inline mr-1.5" />
                 {job.is_will_call ? 'Tentative Start Date' : 'Confirm Start Date'}
               </label>
@@ -729,7 +729,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
             {/* ── Capacity Status ── */}
             {capacityLoading && (
-              <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
+              <div className="flex items-center gap-2 text-gray-500 dark:text-white/50 text-sm py-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Checking schedule capacity...
               </div>
@@ -839,16 +839,16 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
             {/* ── Week Schedule Quick-View ── */}
             {scheduledDate && (
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+              <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] overflow-hidden">
                 <button
-                  className="w-full px-4 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 flex items-center justify-between"
+                  className="w-full px-4 py-3 bg-gradient-to-r from-slate-50 to-white dark:from-white/[0.05] dark:to-white/[0.03] border-b border-slate-200 dark:border-white/10 flex items-center justify-between"
                   onClick={() => toggleSection('weekSchedule')}
                 >
                   <div className="flex items-center gap-2">
                     <CalendarDays className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Week Schedule</span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-white/70 uppercase tracking-wider">Week Schedule</span>
                     {weekSnapshot && (
-                      <span className="text-[10px] text-slate-500">
+                      <span className="text-[10px] text-slate-500 dark:text-white/40">
                         {weekSnapshot.week_days[0]} – {weekSnapshot.week_days[6]}
                       </span>
                     )}
@@ -859,24 +859,24 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                 {expandedSections.weekSchedule && (
                   <div className="p-3">
                     {weekSnapshotLoading ? (
-                      <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-white/40 py-2">
                         <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading schedule...
                       </div>
                     ) : !weekSnapshot ? (
-                      <p className="text-xs text-slate-400">No schedule data available.</p>
+                      <p className="text-xs text-slate-400 dark:text-white/30">No schedule data available.</p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full text-[10px]">
                           <thead>
                             <tr>
-                              <th className="text-left text-slate-500 font-semibold pb-2 pr-2 min-w-[80px]">Operator</th>
+                              <th className="text-left text-slate-500 dark:text-white/50 font-semibold pb-2 pr-2 min-w-[80px]">Operator</th>
                               {weekSnapshot.week_days.map(day => {
                                 const isTarget = day === scheduledDate;
                                 const d = new Date(day + 'T12:00:00');
                                 const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
                                 const dateLabel = d.getDate();
                                 return (
-                                  <th key={day} className={`text-center pb-2 px-1 min-w-[36px] rounded-t-lg ${isTarget ? 'bg-blue-50 text-blue-700' : 'text-slate-500'}`}>
+                                  <th key={day} className={`text-center pb-2 px-1 min-w-[36px] rounded-t-lg ${isTarget ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-slate-500 dark:text-white/40'}`}>
                                     <div className="font-bold">{dayLabel}</div>
                                     <div className={`text-[9px] ${isTarget ? 'text-blue-500 font-bold' : 'text-slate-400'}`}>{dateLabel}</div>
                                   </th>
@@ -895,11 +895,11 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                                 'bg-rose-400';
 
                               return (
-                                <tr key={op.id} className="border-t border-slate-100">
+                                <tr key={op.id} className="border-t border-slate-100 dark:border-white/10">
                                   <td className="py-1.5 pr-2">
                                     <div className="flex items-center gap-1.5">
                                       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
-                                      <span className="text-slate-700 font-medium truncate max-w-[70px]" title={op.name}>
+                                      <span className="text-slate-700 dark:text-white/70 font-medium truncate max-w-[70px]" title={op.name}>
                                         {op.name.split(' ')[0]}
                                       </span>
                                     </div>
@@ -909,7 +909,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                                     const isTarget = day === scheduledDate;
                                     const isBusy = jobs.length > 0;
                                     return (
-                                      <td key={day} className={`py-1.5 px-1 text-center ${isTarget ? 'bg-blue-50' : ''}`}>
+                                      <td key={day} className={`py-1.5 px-1 text-center ${isTarget ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
                                         {isBusy ? (
                                           <div className="flex flex-col gap-0.5 items-center">
                                             {jobs.slice(0, 2).map(j => (
@@ -934,7 +934,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                             })}
                           </tbody>
                         </table>
-                        <p className="text-[9px] text-slate-400 mt-2">
+                        <p className="text-[9px] text-slate-400 dark:text-white/30 mt-2">
                           <span className="inline-block w-2 h-2 bg-emerald-400 rounded-full mr-1" />Good match &nbsp;
                           <span className="inline-block w-2 h-2 bg-amber-400 rounded-full mr-1" />Stretch &nbsp;
                           <span className="inline-block w-2 h-2 bg-rose-400 rounded-full mr-1" />Not qualified &nbsp;
@@ -949,11 +949,11 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
 
             {/* ── Operator Availability ── */}
             {scheduledDate && (
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 flex items-center justify-between">
+              <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] overflow-hidden">
+                <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-white dark:from-white/[0.05] dark:to-white/[0.03] border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <span className="text-xs font-bold text-slate-700 dark:text-white/70 uppercase tracking-wider">
                       Operator Availability
                     </span>
                   </div>
@@ -969,17 +969,17 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                 </div>
                 <div className="p-3">
                   {skillMatchLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-white/40">
                       <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking crew availability...
                     </div>
                   ) : !skillMatch ? (
-                    <p className="text-xs text-slate-400">Select a date to see qualified operators.</p>
+                    <p className="text-xs text-slate-400 dark:text-white/30">Select a date to see qualified operators.</p>
                   ) : (
                     <>
-                      <p className="text-[11px] text-slate-500 mb-2">
+                      <p className="text-[11px] text-slate-500 dark:text-white/40 mb-2">
                         Matched against {skillMatch.job_types.length > 0
-                          ? <span className="font-bold text-slate-700">{skillMatch.job_types.join(', ').toUpperCase()}</span>
-                          : 'this job'} · difficulty <span className="font-bold text-slate-700">{skillMatch.job_difficulty}/10</span>
+                          ? <span className="font-bold text-slate-700 dark:text-white/70">{skillMatch.job_types.join(', ').toUpperCase()}</span>
+                          : 'this job'} · difficulty <span className="font-bold text-slate-700 dark:text-white/70">{skillMatch.job_difficulty}/10</span>
                       </p>
                       <div className="space-y-1.5 max-h-48 overflow-y-auto">
                         {skillMatch.operators.map((op) => {
@@ -1019,7 +1019,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                           );
                         })}
                         {skillMatch.operators.length === 0 && (
-                          <p className="text-xs text-slate-400">No operators found.</p>
+                          <p className="text-xs text-slate-400 dark:text-white/30">No operators found.</p>
                         )}
                       </div>
                     </>
@@ -1039,7 +1039,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
             <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={onClose}
-                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-all"
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-xl font-bold text-sm transition-all"
               >
                 Cancel
               </button>
@@ -1072,7 +1072,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
           </div>
 
           {approving && (
-            <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] rounded-2xl flex items-center justify-center z-10">
+            <div className="absolute inset-0 bg-white/60 dark:bg-[#1a0f35]/80 backdrop-blur-[1px] rounded-2xl flex items-center justify-center z-10">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
                 <p className="text-sm font-semibold text-emerald-700">Approving job...</p>

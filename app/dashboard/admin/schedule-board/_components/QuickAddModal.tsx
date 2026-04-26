@@ -119,7 +119,7 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="bg-white dark:bg-[#1a0f35] rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 rounded-t-xl text-white">
             <div className="flex items-center justify-between">
@@ -139,27 +139,27 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
             {/* Customer + Salesman */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Customer Name *</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">Customer Name *</label>
                 <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-white/30" />
                   <input type="text" value={contractorName} onChange={(e) => setContractorName(e.target.value)}
                     placeholder="e.g. Turner Construction"
-                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white placeholder:text-gray-400" />
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder-white/30" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Salesman *</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">Salesman *</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-white/30" />
                   <select value={salesmanName} onChange={(e) => handleSalesmanChange(e.target.value)}
-                    className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white appearance-none">
+                    className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] appearance-none">
                     <option value="">Select salesman...</option>
                     {salesmanOptions.length > 0
                       ? salesmanOptions.map(s => <option key={s.id} value={s.full_name}>{s.full_name}</option>)
                       : salesmen.map(name => <option key={name} value={name}>{name}</option>)
                     }
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-white/30 pointer-events-none" />
                 </div>
               </div>
             </div>
@@ -167,20 +167,20 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
             {/* Start Date + End Date */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date *</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">Start Date *</label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-white/30" />
                   <input type="date" value={start_date} onChange={(e) => handleStartDateChange(e.target.value)}
-                    className="w-full pl-9 pr-2 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white" />
+                    className="w-full pl-9 pr-2 py-2 border border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05]" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">End Date *</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">End Date *</label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-white/30" />
                   <input type="date" value={end_date} onChange={(e) => handleEndDateChange(e.target.value)}
                     min={start_date || undefined}
-                    className={`w-full pl-9 pr-2 py-2 border rounded-lg focus:ring-1 text-sm text-gray-900 bg-white ${
+                    className={`w-full pl-9 pr-2 py-2 border rounded-lg focus:ring-1 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] dark:border-white/10 ${
                       dateError ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
                     }`} />
                 </div>
@@ -191,7 +191,7 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
             {/* Priority + Est Cost */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Priority</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">Priority</label>
                 <div className="flex gap-1.5">
                   {[
                     { value: 'low', label: 'Low', active: 'bg-gray-200 text-gray-700 ring-gray-400' },
@@ -201,22 +201,22 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
                   ].map(p => (
                     <button key={p.value} type="button" onClick={() => setPriority(p.value)}
                       className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                        priority === p.value ? `${p.active} border-current ring-1 ring-offset-1` : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
+                        priority === p.value ? `${p.active} border-current ring-1 ring-offset-1` : 'bg-gray-50 dark:bg-white/[0.03] text-gray-400 dark:text-white/40 border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/[0.08]'
                       }`}>{p.label}</button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Est. Quote $</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">Est. Quote $</label>
                 <input type="text" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value.replace(/[^0-9.]/g, ''))}
-                  placeholder="0.00" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white placeholder:text-gray-400" />
+                  placeholder="0.00" className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder-white/30" />
               </div>
             </div>
 
             {/* Job Types — multi-select chips */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
-                <Wrench className="w-3 h-3" /> Job Types * <span className="text-gray-400 font-normal">(select all that apply)</span>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1.5 flex items-center gap-1">
+                <Wrench className="w-3 h-3" /> Job Types * <span className="text-gray-400 dark:text-white/30 font-normal">(select all that apply)</span>
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {JOB_TYPES.map(jt => {
@@ -229,7 +229,7 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
                       className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
                         selected
                           ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                          : 'bg-gray-50 dark:bg-white/[0.03] text-gray-600 dark:text-white/60 border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/[0.08] hover:border-gray-300 dark:hover:border-white/20'
                       }`}
                     >
                       {selected && <span className="mr-1">✓</span>}{jt.label}
@@ -238,45 +238,45 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
                 })}
               </div>
               {jobTypes.length === 0 && (
-                <p className="text-xs text-gray-400 mt-1">No types selected yet</p>
+                <p className="text-xs text-gray-400 dark:text-white/30 mt-1">No types selected yet</p>
               )}
             </div>
 
             {/* Address */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Job Address</label>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">Job Address</label>
               <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-white/30" />
                 <input type="text" value={address} onChange={(e) => setAddress(e.target.value)}
                   placeholder="123 Main St, City, State"
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white placeholder:text-gray-400" />
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder-white/30" />
               </div>
             </div>
 
             {/* Contact */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Site Contact</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">Site Contact</label>
                 <input type="text" value={contactName} onChange={(e) => setContactName(e.target.value)}
-                  placeholder="Foreman name" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white placeholder:text-gray-400" />
+                  placeholder="Foreman name" className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder-white/30" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Phone</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">Contact Phone</label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-white/30" />
                   <input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}
                     placeholder="(555) 123-4567"
-                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white placeholder:text-gray-400" />
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder-white/30" />
                 </div>
               </div>
             </div>
 
             {/* Scope */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Scope of Work</label>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1">Scope of Work</label>
               <textarea value={scope} onChange={(e) => setScope(e.target.value)}
                 placeholder="Brief description — e.g. Core drill 8 holes, 6in diameter through 12in slab"
-                rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 bg-white placeholder:text-gray-400 resize-none" />
+                rows={2} className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder-white/30 resize-none" />
             </div>
 
             {/* Notification info */}
@@ -290,7 +290,7 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddM
             {/* Actions */}
             <div className="flex items-center gap-3 pt-1">
               <button onClick={onClose}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-all">
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-lg font-semibold text-sm transition-all">
                 Cancel
               </button>
               <button

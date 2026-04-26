@@ -383,7 +383,7 @@ export default function EditJobPanel({
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
 
       {/* Full-width modal */}
-      <div className="fixed inset-4 sm:inset-6 lg:inset-x-[10%] lg:inset-y-6 bg-white rounded-2xl shadow-2xl z-[80] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
+      <div className="fixed inset-4 sm:inset-6 lg:inset-x-[10%] lg:inset-y-6 bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl z-[80] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
         {/* Header */}
         <div className={`px-6 py-4 text-white flex-shrink-0 ${canEdit
           ? 'bg-gradient-to-r from-purple-600 to-pink-500'
@@ -431,14 +431,14 @@ export default function EditJobPanel({
 
         {/* Duplicate job banner */}
         {showDuplicate && (
-          <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center gap-3 flex-shrink-0">
+          <div className="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-500/30 flex items-center gap-3 flex-shrink-0">
             <Copy className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <span className="text-sm font-semibold text-blue-800">Copy to:</span>
+            <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">Copy to:</span>
             <input type="date" value={dupDate} onChange={e => setDupDate(e.target.value)}
-              className="px-3 py-1.5 border border-blue-300 rounded-lg text-sm text-gray-900 bg-white" />
+              className="px-3 py-1.5 border border-blue-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05]" />
             <input type="date" value={dupEndDate} onChange={e => setDupEndDate(e.target.value)}
               placeholder="End date (optional)"
-              className="px-3 py-1.5 border border-blue-300 rounded-lg text-sm text-gray-900 bg-white" />
+              className="px-3 py-1.5 border border-blue-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05]" />
             <button onClick={handleDuplicate} disabled={!dupDate || duplicating}
               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5">
               {duplicating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
@@ -451,11 +451,11 @@ export default function EditJobPanel({
         )}
 
         {/* Tab bar */}
-        <div className="px-6 border-b border-gray-200 flex gap-1 flex-shrink-0">
+        <div className="px-6 border-b border-gray-200 dark:border-white/10 flex gap-1 flex-shrink-0">
           {(['details', 'documents'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors capitalize ${
-                activeTab === tab ? 'border-purple-500 text-purple-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+                activeTab === tab ? 'border-purple-500 text-purple-700 dark:text-purple-400' : 'border-transparent text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/80'
               }`}>
               {tab === 'documents' ? `Documents (${documents.length})` : 'Job Details'}
             </button>
@@ -469,50 +469,50 @@ export default function EditJobPanel({
               {/* LEFT COLUMN — Job Info + Contact */}
               <div className="space-y-5">
                 {/* Job Information */}
-                <section className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-3">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm uppercase tracking-wide">
+                <section className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10 space-y-3">
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wide">
                     <Building2 className="w-4 h-4 text-purple-500" /> Job Information
                   </h3>
 
                   {/* Customer Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">CUSTOMER</label>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">CUSTOMER</label>
                     {canEdit ? (
                       <input type="text" value={editedCustomerName}
                         onChange={e => { setEditedCustomerName(e.target.value); markChanged(); }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
                     ) : (
-                      <p className="text-sm text-gray-900 font-medium">{editedCustomerName || customerName || '--'}</p>
+                      <p className="text-sm text-gray-900 dark:text-white font-medium">{editedCustomerName || customerName || '--'}</p>
                     )}
                   </div>
 
                   {/* Location / Project Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">PROJECT / LOCATION</label>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">PROJECT / LOCATION</label>
                     {canEdit ? (
                       <input type="text" value={editedLocation}
                         onChange={e => { setEditedLocation(e.target.value); markChanged(); }}
                         placeholder="e.g. Downtown Office Tower"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
                     ) : (
                       <div className="flex items-start gap-2 text-sm">
-                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                        <p className="font-medium text-gray-900">{editedLocation || location || '--'}</p>
+                        <MapPin className="w-4 h-4 text-gray-400 dark:text-white/30 mt-0.5 flex-shrink-0" />
+                        <p className="font-medium text-gray-900 dark:text-white">{editedLocation || location || '--'}</p>
                       </div>
                     )}
                   </div>
 
                   {/* Address */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">SITE ADDRESS</label>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">SITE ADDRESS</label>
                     {canEdit ? (
                       <input type="text" value={editedAddress}
                         onChange={e => { setEditedAddress(e.target.value); markChanged(); }}
                         placeholder="123 Main St, City, State"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
                     ) : (
                       (editedAddress || address) && (
-                        <p className="text-xs text-gray-500">{editedAddress || address}</p>
+                        <p className="text-xs text-gray-500 dark:text-white/50">{editedAddress || address}</p>
                       )
                     )}
                   </div>
@@ -520,49 +520,49 @@ export default function EditJobPanel({
                   {/* Scope of Work */}
                   {canEdit ? (
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">SCOPE OF WORK</label>
+                      <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">SCOPE OF WORK</label>
                       <textarea value={description} onChange={e => { setDescription(e.target.value); markChanged(); }}
-                        rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white resize-none focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        rows={3} className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] resize-none focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
                     </div>
                   ) : (
                     description && (
-                      <p className="text-sm text-gray-600 italic border-l-2 border-gray-300 pl-3">{description}</p>
+                      <p className="text-sm text-gray-600 dark:text-white/60 italic border-l-2 border-gray-300 dark:border-white/20 pl-3">{description}</p>
                     )
                   )}
 
                   {/* Jobsite Conditions */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">WORK CONDITIONS / JOBSITE NOTES</label>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">WORK CONDITIONS / JOBSITE NOTES</label>
                     {canEdit ? (
                       <textarea value={editedJobsiteConditions} onChange={e => { setEditedJobsiteConditions(e.target.value); markChanged(); }}
                         rows={2} placeholder="Any special jobsite conditions or access requirements..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white resize-none focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] resize-none focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
                     ) : (
                       editedJobsiteConditions
-                        ? <p className="text-sm text-gray-600 italic border-l-2 border-amber-300 pl-3">{editedJobsiteConditions}</p>
-                        : <p className="text-sm text-gray-400 italic">None specified</p>
+                        ? <p className="text-sm text-gray-600 dark:text-white/60 italic border-l-2 border-amber-300 pl-3">{editedJobsiteConditions}</p>
+                        : <p className="text-sm text-gray-400 dark:text-white/30 italic">None specified</p>
                     )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">PO #</label>
+                      <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">PO #</label>
                       {canEdit ? (
                         <input type="text" value={poNumber} onChange={e => { setPoNumber(e.target.value); markChanged(); }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
                       ) : (
-                        <p className="text-sm text-gray-900 font-medium">{poNumber || '--'}</p>
+                        <p className="text-sm text-gray-900 dark:text-white font-medium">{poNumber || '--'}</p>
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">ESTIMATED COST</label>
+                      <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">ESTIMATED COST</label>
                       {canEdit ? (
                         <input type="number" value={editedEstimatedCost} min={0} step={0.01}
                           onChange={e => { setEditedEstimatedCost(e.target.value); markChanged(); }}
                           placeholder="0.00"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
                       ) : (
-                        <p className="text-sm text-gray-900 font-medium">
+                        <p className="text-sm text-gray-900 dark:text-white font-medium">
                           {editedEstimatedCost ? `$${parseFloat(editedEstimatedCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '--'}
                         </p>
                       )}
@@ -571,13 +571,13 @@ export default function EditJobPanel({
 
                   {/* Salesman */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">QUOTED BY</label>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">QUOTED BY</label>
                     {canEdit ? (
                       <input type="text" value={editedSalesmanName}
                         onChange={e => { setEditedSalesmanName(e.target.value); markChanged(); }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
                     ) : (
-                      <p className="text-sm text-gray-900 font-medium">{editedSalesmanName || '--'}</p>
+                      <p className="text-sm text-gray-900 dark:text-white font-medium">{editedSalesmanName || '--'}</p>
                     )}
                   </div>
 
@@ -597,8 +597,8 @@ export default function EditJobPanel({
                 </section>
 
                 {/* Site Contact */}
-                <section className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-3">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm uppercase tracking-wide">
+                <section className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10 space-y-3">
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wide">
                     <Phone className="w-4 h-4 text-purple-500" /> Site Contact
                   </h3>
                   {canEdit ? (
@@ -607,40 +607,40 @@ export default function EditJobPanel({
                       <div className="relative">
                         <button
                           onClick={() => setShowContactDropdown(!showContactDropdown)}
-                          className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white hover:border-purple-400 transition-colors"
+                          className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-white/[0.05] hover:border-purple-400 transition-colors"
                         >
-                          <span className={selectedContact ? 'text-gray-900 font-medium' : 'text-gray-400'}>
+                          <span className={selectedContact ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-400 dark:text-white/30'}>
                             {selectedContact || 'Select site contact...'}
                           </span>
-                          <ChevronDown className="w-4 h-4 text-gray-400" />
+                          <ChevronDown className="w-4 h-4 text-gray-400 dark:text-white/30" />
                         </button>
 
                         {showContactDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-10 max-h-48 overflow-y-auto">
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1a0f35] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-10 max-h-48 overflow-y-auto">
                             {contactsLoading ? (
-                              <div className="p-3 text-center text-sm text-gray-500">
+                              <div className="p-3 text-center text-sm text-gray-500 dark:text-white/50">
                                 <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> Loading contacts...
                               </div>
                             ) : contacts.length > 0 ? (
                               contacts.map(c => (
                                 <button key={c.id} onClick={() => handleSelectContact(c)}
-                                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-purple-50 text-left transition-colors border-b border-gray-100 last:border-0">
-                                  <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-purple-50 dark:hover:bg-white/[0.08] text-left transition-colors border-b border-gray-100 dark:border-white/10 last:border-0">
+                                  <User className="w-4 h-4 text-gray-400 dark:text-white/30 flex-shrink-0" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
-                                    <p className="text-xs text-gray-500 truncate">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{c.name}</p>
+                                    <p className="text-xs text-gray-500 dark:text-white/50 truncate">
                                       {c.phone || 'No phone'} {c.role && `· ${c.role}`}
                                     </p>
                                   </div>
-                                  {c.is_primary && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] font-bold">PRIMARY</span>}
+                                  {c.is_primary && <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 rounded text-[10px] font-bold">PRIMARY</span>}
                                   {selectedContact === c.name && <Check className="w-4 h-4 text-purple-600 flex-shrink-0" />}
                                 </button>
                               ))
                             ) : (
-                              <p className="p-3 text-sm text-gray-400 text-center">No contacts found</p>
+                              <p className="p-3 text-sm text-gray-400 dark:text-white/30 text-center">No contacts found</p>
                             )}
                             <button onClick={() => { setShowAddContact(true); setShowContactDropdown(false); }}
-                              className="w-full flex items-center gap-2 px-3 py-2.5 text-purple-600 hover:bg-purple-50 text-sm font-semibold border-t border-gray-200">
+                              className="w-full flex items-center gap-2 px-3 py-2.5 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-white/[0.08] text-sm font-semibold border-t border-gray-200 dark:border-white/10">
                               <Plus className="w-4 h-4" /> Add New Contact
                             </button>
                           </div>
@@ -653,13 +653,13 @@ export default function EditJobPanel({
                           <input type="text" value={selectedContact}
                             onChange={e => { setSelectedContact(e.target.value); markChanged(); }}
                             placeholder="Contact name"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
                         </div>
                         <div className="flex-1">
                           <input type="tel" value={selectedContactPhone}
                             onChange={e => { setSelectedContactPhone(e.target.value); markChanged(); }}
                             placeholder="Phone number"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
                         </div>
                       </div>
 
@@ -689,15 +689,15 @@ export default function EditJobPanel({
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <p className="text-sm text-gray-900 font-medium">{selectedContact || (d?.customer_contact as string) || '--'}</p>
-                      <p className="text-xs text-gray-500">{selectedContactPhone || (d?.site_contact_phone as string) || '--'}</p>
+                      <p className="text-sm text-gray-900 dark:text-white font-medium">{selectedContact || (d?.customer_contact as string) || '--'}</p>
+                      <p className="text-xs text-gray-500 dark:text-white/50">{selectedContactPhone || (d?.site_contact_phone as string) || '--'}</p>
                     </div>
                   )}
                 </section>
 
                 {/* Equipment */}
-                <section className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-3">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm uppercase tracking-wide">
+                <section className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10 space-y-3">
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wide">
                     <Wrench className="w-4 h-4 text-purple-500" /> Equipment ({equipment.length})
                   </h3>
                   {canEdit ? (
@@ -712,13 +712,13 @@ export default function EditJobPanel({
                             </button>
                           </span>
                         ))}
-                        {equipment.length === 0 && <span className="text-sm text-gray-400 italic">No equipment added</span>}
+                        {equipment.length === 0 && <span className="text-sm text-gray-400 dark:text-white/30 italic">No equipment added</span>}
                       </div>
                       <div className="flex gap-2">
                         <input type="text" value={newEquipment} onChange={e => setNewEquipment(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEquipment(newEquipment); } }}
                           placeholder="Type equipment code..."
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500" />
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 dark:placeholder-white/30" />
                         <button onClick={() => addEquipment(newEquipment)} disabled={!newEquipment.trim()}
                           className="px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-bold disabled:opacity-50">
                           <Plus className="w-4 h-4" />
@@ -728,7 +728,7 @@ export default function EditJobPanel({
                         <div className="flex flex-wrap gap-1">
                           {suggestions.slice(0, 8).map(eq => (
                             <button key={eq} onClick={() => addEquipment(eq)}
-                              className="px-2 py-1 bg-gray-100 hover:bg-indigo-100 rounded-lg text-xs text-gray-600 hover:text-indigo-700 border border-gray-200 hover:border-indigo-300 transition-all font-medium">
+                              className="px-2 py-1 bg-gray-100 dark:bg-white/[0.05] hover:bg-indigo-100 dark:hover:bg-indigo-500/20 rounded-lg text-xs text-gray-600 dark:text-white/60 hover:text-indigo-700 dark:hover:text-indigo-300 border border-gray-200 dark:border-white/10 hover:border-indigo-300 transition-all font-medium">
                               + {eq}
                             </button>
                           ))}
@@ -740,7 +740,7 @@ export default function EditJobPanel({
                       {equipment.map(eq => (
                         <span key={eq} className="px-3 py-1 bg-indigo-50 rounded-lg text-sm text-indigo-700 font-medium border border-indigo-200">{getDisplayName(eq)}</span>
                       ))}
-                      {equipment.length === 0 && <span className="text-sm text-gray-400 italic">No equipment specified</span>}
+                      {equipment.length === 0 && <span className="text-sm text-gray-400 dark:text-white/30 italic">No equipment specified</span>}
                     </div>
                   )}
                 </section>
@@ -749,35 +749,35 @@ export default function EditJobPanel({
               {/* RIGHT COLUMN — Schedule + Assignment + Actions */}
               <div className="space-y-5">
                 {/* Schedule & Assignment */}
-                <section className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-4">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm uppercase tracking-wide">
+                <section className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10 space-y-4">
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wide">
                     <Calendar className="w-4 h-4 text-purple-500" /> Schedule & Assignment
                   </h3>
                   {canEdit ? (
                     <>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">START DATE</label>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">START DATE</label>
                           <input type="date" value={scheduledDate} onChange={e => { setScheduledDate(e.target.value); markChanged(); }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">END DATE</label>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">END DATE</label>
                           <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); markChanged(); }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">ARRIVAL TIME</label>
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">ARRIVAL TIME</label>
                         <input type="time" value={arrivalTime} onChange={e => { setArrivalTime(e.target.value); markChanged(); }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
                       </div>
 
                       {/* Operator */}
                       <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">OPERATOR</label>
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">OPERATOR</label>
                         <select value={selectedOperator} onChange={e => { setSelectedOperator(e.target.value); markChanged(); }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500">
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500">
                           <option value="">Unassigned</option>
                           {allOperators.map(name => {
                             const skill = operatorSkillMap?.[name];
@@ -790,8 +790,8 @@ export default function EditJobPanel({
                           })}
                         </select>
                         {selectedOperator && operatorSkillMap && operatorSkillMap[selectedOperator] !== undefined && (
-                          <div className="flex items-center gap-2 mt-1.5 px-2 py-1.5 bg-white rounded-lg border border-gray-200">
-                            <span className="text-xs text-gray-600">Skill:</span>
+                          <div className="flex items-center gap-2 mt-1.5 px-2 py-1.5 bg-white dark:bg-white/[0.05] rounded-lg border border-gray-200 dark:border-white/10">
+                            <span className="text-xs text-gray-600 dark:text-white/60">Skill:</span>
                             <SkillMatchIndicator operatorSkill={operatorSkillMap[selectedOperator] ?? null} jobDifficulty={job.difficulty_rating} />
                           </div>
                         )}
@@ -805,9 +805,9 @@ export default function EditJobPanel({
 
                       {/* Helper */}
                       <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">HELPER <span className="text-gray-400 font-normal">(optional)</span></label>
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">HELPER <span className="text-gray-400 dark:text-white/30 font-normal">(optional)</span></label>
                         <select value={selectedHelper} onChange={e => { setSelectedHelper(e.target.value); markChanged(); }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-500">
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500">
                           <option value="">No Helper</option>
                           {allHelpers.map(name => (
                             <option key={name} value={name}>
@@ -825,11 +825,11 @@ export default function EditJobPanel({
                     </>
                   ) : (
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-gray-500">Date:</span><span className="font-medium">{scheduledDate}</span></div>
-                      {endDate && <div className="flex justify-between"><span className="text-gray-500">End:</span><span className="font-medium">{endDate}</span></div>}
-                      {arrivalTime && <div className="flex justify-between"><span className="text-gray-500">Arrival:</span><span className="font-medium">{arrivalTime}</span></div>}
-                      <div className="flex justify-between"><span className="text-gray-500">Operator:</span><span className="font-medium">{currentOperatorName || 'Unassigned'}</span></div>
-                      {currentHelperName && <div className="flex justify-between"><span className="text-gray-500">Helper:</span><span className="font-medium">{currentHelperName}</span></div>}
+                      <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">Date:</span><span className="font-medium dark:text-white">{scheduledDate}</span></div>
+                      {endDate && <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">End:</span><span className="font-medium dark:text-white">{endDate}</span></div>}
+                      {arrivalTime && <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">Arrival:</span><span className="font-medium dark:text-white">{arrivalTime}</span></div>}
+                      <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">Operator:</span><span className="font-medium dark:text-white">{currentOperatorName || 'Unassigned'}</span></div>
+                      {currentHelperName && <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">Helper:</span><span className="font-medium dark:text-white">{currentHelperName}</span></div>}
                     </div>
                   )}
                 </section>
@@ -837,12 +837,12 @@ export default function EditJobPanel({
                 {/* Quick Actions */}
                 <section className="space-y-2">
                   <button onClick={onViewNotes}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 transition-colors">
+                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-white/[0.05] hover:bg-gray-100 dark:hover:bg-white/[0.08] rounded-xl border border-gray-200 dark:border-white/10 text-sm font-semibold text-gray-700 dark:text-white/70 transition-colors">
                     <span className="flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-green-600" /> View Notes
                       {job.notes_count > 0 && <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold">{job.notes_count}</span>}
                     </span>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                    <ChevronRight className="w-4 h-4 text-gray-400 dark:text-white/30" />
                   </button>
 
                   {canEdit && onMakeWillCall && !job.is_will_call && (
@@ -880,21 +880,21 @@ export default function EditJobPanel({
                 <div className="space-y-2">
                   {documents.map(doc => (
                     <a key={doc.id} href={doc.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition-colors">
+                      className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-white/[0.05] hover:bg-gray-100 dark:hover:bg-white/[0.08] rounded-xl border border-gray-200 dark:border-white/10 transition-colors">
                       <Paperclip className="w-4 h-4 text-purple-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
-                        <p className="text-xs text-gray-400">{doc.type} · {new Date(doc.uploaded_at).toLocaleDateString()}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{doc.name}</p>
+                        <p className="text-xs text-gray-400 dark:text-white/30">{doc.type} · {new Date(doc.uploaded_at).toLocaleDateString()}</p>
                       </div>
-                      <FileText className="w-4 h-4 text-gray-400" />
+                      <FileText className="w-4 h-4 text-gray-400 dark:text-white/30" />
                     </a>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <Paperclip className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500 font-medium">No documents attached</p>
-                  <p className="text-xs text-gray-400 mt-1">Upload plans, permits, photos, or other job documents</p>
+                  <Paperclip className="w-10 h-10 text-gray-300 dark:text-white/20 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-white/50 font-medium">No documents attached</p>
+                  <p className="text-xs text-gray-400 dark:text-white/30 mt-1">Upload plans, permits, photos, or other job documents</p>
                 </div>
               )}
             </div>
@@ -903,9 +903,9 @@ export default function EditJobPanel({
 
         {/* Footer */}
         {(canEdit || isChangeRequestRole) && (
-          <div className="border-t border-gray-200 px-6 py-4 flex items-center gap-3 bg-gray-50 flex-shrink-0">
+          <div className="border-t border-gray-200 dark:border-white/10 px-6 py-4 flex items-center gap-3 bg-gray-50 dark:bg-white/[0.03] flex-shrink-0">
             <button onClick={onClose}
-              className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-sm transition-all">
+              className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-xl font-bold text-sm transition-all">
               Cancel
             </button>
             {isChangeRequestRole && (
@@ -955,15 +955,15 @@ export default function EditJobPanel({
       {/* Change Request Confirmation Modal */}
       {showChangeRequestConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Submit Change Request?</h3>
-            <p className="text-sm text-gray-600 mb-4">
+          <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Submit Change Request?</h3>
+            <p className="text-sm text-gray-600 dark:text-white/60 mb-4">
               Your changes will be submitted to a supervisor for review. The job will not be modified until approved.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowChangeRequestConfirm(false)}
-                className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-colors">
+                className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-xl font-bold text-sm transition-colors">
                 Cancel
               </button>
               <button
