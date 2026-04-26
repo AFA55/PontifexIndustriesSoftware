@@ -499,7 +499,7 @@ export default function WorkPerformed() {
 
   const addHole = () => {
     if (!currentHole.bitSize || currentHole.depthInches <= 0) {
-      alert('Please specify both bit size and depth for the hole');
+      showNotification('Please specify both bit size and depth for the hole', 'warning');
       return;
     }
 
@@ -535,7 +535,7 @@ export default function WorkPerformed() {
     if (cutInputMode === 'area') {
       // For area mode, must have at least one area added
       if (tempAreas.length === 0) {
-        alert('Please add at least one cut area');
+        showNotification('Please add at least one cut area', 'warning');
         return;
       }
 
@@ -547,7 +547,7 @@ export default function WorkPerformed() {
 
       if (selectedBlades.length === 0) {
         const itemType = isChainsaw(currentItem) ? 'chain size' : 'blade type';
-        alert(`Please select at least one ${itemType} used`);
+        showNotification(`Please select at least one ${itemType} used`, 'warning');
         return;
       }
 
@@ -572,13 +572,13 @@ export default function WorkPerformed() {
     } else {
       // Linear mode validation
       if (currentCut.linearFeet <= 0 || currentCut.cutDepth <= 0) {
-        alert('Please specify both linear feet and cut depth');
+        showNotification('Please specify both linear feet and cut depth', 'warning');
         return;
       }
 
       if (selectedBlades.length === 0) {
         const itemType = isChainsaw(currentItem) ? 'chain size' : 'blade type';
-        alert(`Please select at least one ${itemType} used`);
+        showNotification(`Please select at least one ${itemType} used`, 'warning');
         return;
       }
 
@@ -640,7 +640,7 @@ export default function WorkPerformed() {
   // Add an area to the temporary areas list
   const addArea = () => {
     if (currentArea.length <= 0 || currentArea.width <= 0 || currentArea.depth <= 0) {
-      alert('Please specify length, width, and depth for the area');
+      showNotification('Please specify length, width, and depth for the area', 'warning');
       return;
     }
 
@@ -656,7 +656,7 @@ export default function WorkPerformed() {
   // Quick Entry Modal Functions
   const addQuickEntryCut = () => {
     if (quickEntryNumCuts <= 0 || quickEntryLengthFeet <= 0) {
-      alert('Please specify number of cuts and length');
+      showNotification('Please specify number of cuts and length', 'warning');
       return;
     }
 
@@ -686,7 +686,7 @@ export default function WorkPerformed() {
 
   const applyQuickEntry = () => {
     if (quickEntryCuts.length === 0) {
-      alert('Please add at least one cut entry');
+      showNotification('Please add at least one cut entry', 'warning');
       return;
     }
 
@@ -706,7 +706,7 @@ export default function WorkPerformed() {
   // Chain Saw Quick Entry Functions
   const addChainsawCut = () => {
     if (chainsawNumCuts <= 0 || chainsawLengthInches <= 0) {
-      alert('Please specify number of cuts and length in inches');
+      showNotification('Please specify number of cuts and length in inches', 'warning');
       return;
     }
 
@@ -738,7 +738,7 @@ export default function WorkPerformed() {
 
   const applyChainsawEntry = () => {
     if (chainsawCuts.length === 0) {
-      alert('Please add at least one cut entry');
+      showNotification('Please add at least one cut entry', 'warning');
       return;
     }
 
@@ -758,7 +758,7 @@ export default function WorkPerformed() {
   // Break & Remove Quick Entry Functions
   const addBreakRemoveArea = () => {
     if (breakRemoveLength <= 0 || breakRemoveWidth <= 0 || breakRemoveDepth <= 0) {
-      alert('Please specify length, width, and depth');
+      showNotification('Please specify length, width, and depth', 'warning');
       return;
     }
 
@@ -788,17 +788,17 @@ export default function WorkPerformed() {
 
   const applyBreakRemoveEntry = () => {
     if (breakRemoveAreas.length === 0) {
-      alert('Please add at least one area');
+      showNotification('Please add at least one area', 'warning');
       return;
     }
 
     if (!removalMethod) {
-      alert('Please select a removal method');
+      showNotification('Please select a removal method', 'warning');
       return;
     }
 
     if (removalMethod === 'rigged' && !removalEquipment) {
-      alert('Please specify equipment used for rigging');
+      showNotification('Please specify equipment used for rigging', 'warning');
       return;
     }
 
@@ -821,7 +821,7 @@ export default function WorkPerformed() {
   // Jack Hammering Quick Entry Functions
   const addJackhammerArea = () => {
     if (jackhammerLength <= 0 || jackhammerWidth <= 0) {
-      alert('Please specify length and width');
+      showNotification('Please specify length and width', 'warning');
       return;
     }
 
@@ -849,12 +849,12 @@ export default function WorkPerformed() {
 
   const applyJackhammerEntry = () => {
     if (jackhammerAreas.length === 0) {
-      alert('Please add at least one area');
+      showNotification('Please add at least one area', 'warning');
       return;
     }
 
     if (!jackhammerEquipment) {
-      alert('Please select equipment used');
+      showNotification('Please select equipment used', 'warning');
       return;
     }
 
@@ -877,7 +877,7 @@ export default function WorkPerformed() {
   // Brokk Quick Entry Functions
   const addBrokkArea = () => {
     if (brokkLength <= 0 || brokkWidth <= 0 || brokkThickness <= 0) {
-      alert('Please specify length, width, and thickness');
+      showNotification('Please specify length, width, and thickness', 'warning');
       return;
     }
 
@@ -907,7 +907,7 @@ export default function WorkPerformed() {
 
   const applyBrokkEntry = () => {
     if (brokkAreas.length === 0) {
-      alert('Please add at least one area');
+      showNotification('Please add at least one area', 'warning');
       return;
     }
 
@@ -996,13 +996,13 @@ export default function WorkPerformed() {
 
     if (isCoreDrilling(currentItem)) {
       if (coreDrillingData.holes.length === 0) {
-        alert('Please add at least one hole entry with size and depth');
+        showNotification('Please add at least one hole entry with size and depth', 'warning');
         return;
       }
       details = { ...coreDrillingData };
     } else if (isSawing(currentItem)) {
       if (sawingData.cuts.length === 0) {
-        alert('Please add at least one cut entry with linear feet and depth');
+        showNotification('Please add at least one cut entry with linear feet and depth', 'warning');
         return;
       }
       details = { ...sawingData };
@@ -1098,7 +1098,7 @@ export default function WorkPerformed() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('Session expired. Please log in again.');
+        showNotification('Session expired. Please log in again.', 'error');
         return;
       }
 
@@ -1121,13 +1121,13 @@ export default function WorkPerformed() {
         // Add to local state
         setEquipmentUsageEntries(prev => [...prev, result.data]);
         setShowEquipmentForm(false);
-        alert('Equipment usage saved successfully!');
+        showNotification('Equipment usage saved!', 'success');
       } else {
-        alert('Failed to save equipment usage: ' + result.error);
+        showNotification('Failed to save equipment usage: ' + result.error, 'error');
       }
     } catch (error) {
       console.error('Error saving equipment usage:', error);
-      alert('Failed to save equipment usage');
+      showNotification('Failed to save equipment usage', 'error');
     } finally {
       setSavingEquipment(false);
     }
@@ -1153,13 +1153,13 @@ export default function WorkPerformed() {
 
       if (result.success) {
         setEquipmentUsageEntries(prev => prev.filter(entry => entry.id !== entryId));
-        alert('Equipment usage entry removed');
+        showNotification('Equipment usage entry removed', 'success');
       } else {
-        alert('Failed to remove entry: ' + result.error);
+        showNotification('Failed to remove entry: ' + result.error, 'error');
       }
     } catch (error) {
       console.error('Error removing equipment entry:', error);
-      alert('Failed to remove entry');
+      showNotification('Failed to remove entry', 'error');
     }
   };
 
