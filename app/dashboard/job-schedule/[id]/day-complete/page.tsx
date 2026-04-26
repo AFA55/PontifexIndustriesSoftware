@@ -530,6 +530,29 @@ export default function DayCompletePage() {
     );
   }
 
+  // ─── Already submitted for approval — show confirmation screen ───────────
+  if (job?.status === 'pending_completion') {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border border-blue-100 dark:border-blue-900/30 p-8 max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Already Submitted</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+            This job has already been submitted for supervisor approval. You&apos;ll be notified once it&apos;s reviewed.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard/my-jobs')}
+            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl font-semibold"
+          >
+            Back to My Jobs
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ─── Remote link sent — success screen ────────────────────────────────────
   if (remoteSent) {
     return (

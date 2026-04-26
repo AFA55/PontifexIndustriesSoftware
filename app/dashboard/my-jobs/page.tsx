@@ -114,22 +114,26 @@ export default function MyJobsPage() {
 
       const today = toDateString(new Date());
 
-      // Fetch on_hold jobs assigned to this user (any date)
-      const [onHoldRes, inProgressRes] = await Promise.all([
+      // Fetch on_hold, in_progress, and pending_completion jobs assigned to this user (any date)
+      const [onHoldRes, inProgressRes, pendingCompletionRes] = await Promise.all([
         fetch(`/api/job-orders?status=on_hold&include_helper_jobs=true&includeCompleted=false`, {
           headers: { Authorization: `Bearer ${session.access_token}` }
         }),
         fetch(`/api/job-orders?status=in_progress&include_helper_jobs=true&includeCompleted=false`, {
           headers: { Authorization: `Bearer ${session.access_token}` }
         }),
+        fetch(`/api/job-orders?status=pending_completion&include_helper_jobs=true&includeCompleted=false`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        }),
       ]);
 
       const onHoldData = onHoldRes.ok ? (await onHoldRes.json()).data || [] : [];
       const inProgressData = inProgressRes.ok ? (await inProgressRes.json()).data || [] : [];
+      const pendingCompletionData = pendingCompletionRes.ok ? (await pendingCompletionRes.json()).data || [] : [];
 
       // Combine, filter to past dates only (don't double-show today's jobs)
       const uid = session.user.id;
-      const all = [...onHoldData, ...inProgressData].filter((j: any) => {
+      const all = [...onHoldData, ...inProgressData, ...pendingCompletionData].filter((j: any) => {
         const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid;
         const isPastDate = j.scheduled_date && j.scheduled_date < today;
         return isAssigned && isPastDate;
@@ -330,9 +334,13 @@ export default function MyJobsPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                      job.status === 'on_hold' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
+                      job.status === 'on_hold' ? 'bg-purple-100 text-purple-700' :
+                      job.status === 'pending_completion' ? 'bg-blue-100 text-blue-700' :
+                      'bg-orange-100 text-orange-700'
                     }`}>
-                      {job.status === 'on_hold' ? 'On Hold' : 'In Progress'}
+                      {job.status === 'on_hold' ? 'On Hold' :
+                       job.status === 'pending_completion' ? 'Awaiting Approval' :
+                       'In Progress'}
                     </span>
                     <a
                       href={`/dashboard/my-jobs/${job.id}`}

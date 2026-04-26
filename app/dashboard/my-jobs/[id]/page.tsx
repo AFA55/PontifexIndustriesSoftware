@@ -41,6 +41,7 @@ function getStatusStyle(status: string) {
     case 'assigned': return 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30';
     case 'in_route': return 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-500/30';
     case 'in_progress': return 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-500/30';
+    case 'pending_completion': return 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30';
     case 'on_hold': return 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/30';
     case 'completed': return 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-500/30';
     default: return 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/70 border-gray-200 dark:border-white/10';
@@ -114,7 +115,7 @@ export default function JobDetailPage() {
 
             // Resume last position: if operator already visited work-performed today, send them back
             const lastPage = localStorage.getItem(`job_last_page_${jobId}`);
-            if (lastPage === 'work-performed' && ['in_route', 'on_site', 'in_progress', 'working'].includes(found.status)) {
+            if (lastPage === 'work-performed' && ['in_route', 'on_site', 'in_progress', 'working', 'pending_completion'].includes(found.status)) {
               router.replace(`/dashboard/job-schedule/${jobId}/work-performed`);
               return;
             }
@@ -212,11 +213,13 @@ export default function JobDetailPage() {
       ? checkAllConfirmed(unifiedItems, checkedItems)
       : mandatoryComplete);
   const locationUnlocked = equipmentAllChecked &&
-    ['in_route', 'on_site', 'in_progress', 'completed'].includes(job?.status || '');
+    ['in_route', 'on_site', 'in_progress', 'pending_completion', 'completed'].includes(job?.status || '');
 
   const isCompleted = job?.status === 'completed';
   const isOnHold = job?.status === 'on_hold';
-  const isInProgress = job ? ['in_route', 'in_progress'].includes(job.status) : false;
+  // pending_completion = operator submitted for approval; treat same as in_progress so they can still navigate freely
+  const isPendingCompletion = job?.status === 'pending_completion';
+  const isInProgress = job ? ['in_route', 'in_progress', 'pending_completion'].includes(job.status) : false;
   const jobIsHelper = job?.isHelper || isHelper;
 
   // Split documents into admin-attached and operator-uploaded
@@ -259,7 +262,7 @@ export default function JobDetailPage() {
     if (!job) return;
     if (job.status === 'in_route') {
       router.push(`/dashboard/my-jobs/${job.id}/jobsite`);
-    } else if (job.status === 'in_progress') {
+    } else if (job.status === 'in_progress' || job.status === 'pending_completion') {
       router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
     }
   };
@@ -662,6 +665,19 @@ export default function JobDetailPage() {
                   <span className="text-sm text-amber-900 dark:text-amber-200">{co.scope_description}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pending Completion Banner — job submitted for approval, operator can still view details */}
+        {isPendingCompletion && (
+          <div className="bg-blue-50 dark:bg-blue-500/10 border-2 border-blue-300 dark:border-blue-500/40 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="w-6 h-6 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-base font-bold text-blue-800 dark:text-blue-300">Submitted for Approval</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">Your supervisor has been notified and will review shortly. You can still view your work log.</p>
+              </div>
             </div>
           </div>
         )}
@@ -1077,7 +1093,7 @@ export default function JobDetailPage() {
                 className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
               >
                 <PlayCircle className="w-6 h-6" />
-                {job.status === 'in_route' ? 'Continue to Jobsite' : 'Continue Work'}
+                {job.status === 'in_route' ? 'Continue to Jobsite' : isPendingCompletion ? 'View Work Log' : 'Continue Work'}
               </button>
             ) : (
               <button
