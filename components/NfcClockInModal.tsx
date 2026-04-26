@@ -267,7 +267,7 @@ export default function NfcClockInModal({
     }
   };
 
-  // ── Jobsite GPS (auto-acquire when entering camera flow) ──
+  // ── Jobsite GPS (auto-acquire when entering camera flow, or on retry) ──
   useEffect(() => {
     if (flow === 'jobsite_camera' && jobsiteGpsStatus === 'idle') {
       setJobsiteGpsStatus('acquiring');
@@ -276,7 +276,7 @@ export default function NfcClockInModal({
         .catch(() => setJobsiteGpsStatus('error'));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flow]);
+  }, [flow, jobsiteGpsStatus]);
 
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -286,13 +286,13 @@ export default function NfcClockInModal({
   };
 
   const confirmJobsiteClockIn = async () => {
-    if (!photoFile || jobsiteGpsStatus !== 'ok' || !jobsiteCoords) return;
+    // Allow clock-in even if GPS errored (no coords); photo is still required.
+    if (!photoFile) return;
     setFlow('processing');
     setGlobalError(null);
     try {
       const { supabase } = await import('@/lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
 
       // Upload photo
       const path = `remote-clockin/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
@@ -306,27 +306,15 @@ export default function NfcClockInModal({
         photoUrl = publicUrl;
       }
 
-      await fetch('/api/timecard/clock-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          clock_in_method: 'remote',
-          latitude: jobsiteCoords.latitude,
-          longitude: jobsiteCoords.longitude,
-          accuracy: jobsiteCoords.accuracy,
-          is_shop_hours: false,
-          remote_photo_url: photoUrl || 'photo-upload-failed',
-          requires_approval: true,
-        }),
-      });
-
-      // Also call the parent callback
+      // Delegate entirely to the parent callback — it owns the API call.
+      // Passing null coords when GPS was unavailable; the backend accepts null
+      // for remote/gps_remote methods and will flag for admin review.
       await onClockIn({
         method: 'remote',
         remote_photo_url: photoUrl || 'photo-upload-failed',
-        latitude: jobsiteCoords.latitude,
-        longitude: jobsiteCoords.longitude,
-        accuracy: jobsiteCoords.accuracy,
+        latitude: jobsiteCoords?.latitude ?? 0,
+        longitude: jobsiteCoords?.longitude ?? 0,
+        accuracy: jobsiteCoords?.accuracy,
       });
 
       setSuccessTime(formatTime(new Date()));
@@ -683,13 +671,24 @@ export default function NfcClockInModal({
                     {jobsiteGpsStatus === 'idle' && 'Waiting for GPS…'}
                     {jobsiteGpsStatus === 'acquiring' && 'Acquiring GPS…'}
                     {jobsiteGpsStatus === 'ok' && jobsiteCoords && `GPS ready — ±${Math.round(jobsiteCoords.accuracy)}m accuracy`}
-                    {jobsiteGpsStatus === 'error' && 'GPS unavailable — clock-in may be delayed'}
+                    {jobsiteGpsStatus === 'error' && 'GPS unavailable — location will be flagged for review'}
                   </span>
                   {jobsiteGpsStatus === 'acquiring' && (
                     <Loader2 className="w-3 h-3 animate-spin text-purple-500" />
                   )}
                   {jobsiteGpsStatus === 'ok' && (
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  )}
+                  {jobsiteGpsStatus === 'error' && (
+                    <button
+                      onClick={() => {
+                        setJobsiteGpsStatus('idle');
+                        setJobsiteCoords(null);
+                      }}
+                      className="text-[10px] text-purple-500 hover:text-purple-700 dark:text-purple-400 font-semibold underline flex-shrink-0"
+                    >
+                      Retry
+                    </button>
                   )}
                 </div>
 
@@ -701,7 +700,7 @@ export default function NfcClockInModal({
 
                 <button
                   onClick={confirmJobsiteClockIn}
-                  disabled={!photoFile || jobsiteGpsStatus !== 'ok'}
+                  disabled={!photoFile || jobsiteGpsStatus === 'acquiring' || jobsiteGpsStatus === 'idle'}
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:from-emerald-600 hover:to-teal-700 active:scale-[0.98] transition-all"
                 >
                   Clock In (Needs Approval)
