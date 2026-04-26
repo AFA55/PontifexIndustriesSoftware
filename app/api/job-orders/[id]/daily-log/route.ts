@@ -65,8 +65,10 @@ export async function POST(
       );
     }
 
-    // Verify user is assigned to this job
-    if (job.assigned_to !== user.id) {
+    // Verify user is assigned to this job (operator or helper)
+    const isOperator = job.assigned_to === user.id;
+    const isHelper = job.helper_assigned_to === user.id;
+    if (!isOperator && !isHelper) {
       return NextResponse.json(
         { error: 'You are not assigned to this job' },
         { status: 403 }
