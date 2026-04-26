@@ -9,7 +9,7 @@ import {
   ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
   ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer,
   Paperclip, Upload, Trash2, PauseCircle, X, Image, File, MapPin, Phone, Eye,
-  AlertTriangle, Shield, Lock
+  AlertTriangle, Shield, Lock, Home
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
@@ -57,6 +57,7 @@ export default function JobDetailPage() {
   const [userRole, setUserRole] = useState<string>('operator');
   const [userId, setUserId] = useState<string>('');
   const [startingRoute, setStartingRoute] = useState(false);
+  const [dayNumber, setDayNumber] = useState<number>(1);
 
   // Equipment checklist state
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
@@ -108,6 +109,15 @@ export default function JobDetailPage() {
               ...found,
               isHelper: found.helper_assigned_to === uid && found.assigned_to !== uid,
             });
+            const daysWorked = found?.total_days_worked || 0;
+            setDayNumber(daysWorked + 1);
+
+            // Resume last position: if operator already visited work-performed today, send them back
+            const lastPage = localStorage.getItem(`job_last_page_${jobId}`);
+            if (lastPage === 'work-performed' && ['in_route', 'on_site', 'in_progress', 'working'].includes(found.status)) {
+              router.replace(`/dashboard/job-schedule/${jobId}/work-performed`);
+              return;
+            }
           } else {
             router.push('/dashboard/my-jobs');
           }
@@ -189,13 +199,15 @@ export default function JobDetailPage() {
 
   const equipmentAlreadyConfirmed = job ? hasOperatorConfirmedEquipment() : false;
 
-  const canStartRoute = equipmentAlreadyConfirmed ||
+  const isMultiDayReturnVisit = dayNumber > 1;
+
+  const canStartRoute = equipmentAlreadyConfirmed || isMultiDayReturnVisit ||
     (hasEquipmentSelections
       ? checkAllConfirmed(unifiedItems, checkedItems)
       : mandatoryComplete);
 
   // Location & site contact unlock once equipment is confirmed AND job is in_route or further
-  const equipmentAllChecked = equipmentAlreadyConfirmed ||
+  const equipmentAllChecked = equipmentAlreadyConfirmed || isMultiDayReturnVisit ||
     (hasEquipmentSelections
       ? checkAllConfirmed(unifiedItems, checkedItems)
       : mandatoryComplete);
@@ -461,6 +473,13 @@ export default function JobDetailPage() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="p-2 rounded-xl hover:bg-white/10 transition-colors"
+              title="Dashboard"
+            >
+              <Home className="w-5 h-5 text-white" />
+            </button>
             <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
               <Briefcase className="w-5 h-5" />
             </div>
@@ -989,6 +1008,12 @@ export default function JobDetailPage() {
             </button>
             {equipmentOpen && (
               <div className="px-5 pb-5">
+                {isMultiDayReturnVisit && (
+                  <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 text-sm text-blue-700 font-medium">
+                    <CheckCircle2 className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                    Day {dayNumber} — Equipment already confirmed. Review as needed.
+                  </div>
+                )}
                 <UnifiedEquipmentPanel
                   equipmentSelections={job.equipment_selections}
                   equipmentNeeded={allEquipment}
@@ -996,7 +1021,7 @@ export default function JobDetailPage() {
                   specialEquipment={job.special_equipment}
                   checkedItems={checkedItems}
                   onToggle={toggleEquipment}
-                  disabled={isCompleted || equipmentAlreadyConfirmed}
+                  disabled={isCompleted || equipmentAlreadyConfirmed || isMultiDayReturnVisit}
                 />
               </div>
             )}

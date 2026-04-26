@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -10,7 +10,7 @@ import QuickAccessButtons from '@/components/QuickAccessButtons';
 import EquipmentUsageForm from '@/components/EquipmentUsageForm';
 import RecommendedItems from './_components/RecommendedItems';
 import PhotoUploader from '@/components/PhotoUploader';
-import { Camera, Mic } from 'lucide-react';
+import { Camera, Mic, Save, Zap, Home } from 'lucide-react';
 import VoiceMemoNotes from './_components/VoiceMemoNotes';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 
@@ -220,6 +220,19 @@ export default function WorkPerformed() {
   const [dayAlreadySubmitted, setDayAlreadySubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ─── Auto-save state ─────────────────────────────────────────────────────────
+  type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftLoadedRef = useRef(false);
+
+  // Mark this job as having visited work-performed (for resume-last-position logic)
+  useEffect(() => {
+    if (params.id) {
+      localStorage.setItem(`job_last_page_${params.id}`, 'work-performed');
+    }
+  }, [params.id]);
+
   // Fetch job type and day number for smart recommendations + correct work item tracking
   useEffect(() => {
     const fetchJobInfo = async () => {
@@ -267,6 +280,72 @@ export default function WorkPerformed() {
     };
     checkDaySubmitted();
   }, [params.id]);
+
+  // ─── Draft save/load helpers ──────────────────────────────────────────────────
+  const saveDraft = useCallback(async (draft: object | null) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`/api/job-orders/${params.id}/work-performed-draft`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ draft }),
+      });
+    } catch { /* non-critical */ }
+  }, [params.id]);
+
+  // Load draft on mount (runs once after job info loads)
+  useEffect(() => {
+    if (draftLoadedRef.current) return;
+    const loadDraft = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`/api/job-orders/${params.id}/work-performed-draft`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.draft) {
+          const d = json.draft;
+          if (d.selectedItems) setSelectedItems(d.selectedItems);
+          if (d.sawingData) setSawingData(d.sawingData);
+          if (d.coreDrillingData) setCoreDrillingData(d.coreDrillingData);
+          if (d.jobNotes !== undefined) setVoiceNotes(d.jobNotes);
+          showNotification('Draft restored', 'success');
+        }
+      } catch { /* non-critical */ }
+      draftLoadedRef.current = true;
+    };
+    loadDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]);
+
+  // Debounced auto-save: fires 2 s after any major state change
+  useEffect(() => {
+    if (!draftLoadedRef.current) return; // don't save before draft is loaded
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    setSaveStatus('saving');
+    autoSaveTimerRef.current = setTimeout(async () => {
+      const draft = {
+        selectedItems,
+        sawingData,
+        coreDrillingData,
+        jobNotes: voiceNotes,
+        photoUploads: [],
+      };
+      await saveDraft(draft);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }, 2000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItems, sawingData, coreDrillingData, voiceNotes]);
 
   const [standbyLogs, setStandbyLogs] = useState<any[]>([]);
   const [totalStandbyMinutes, setTotalStandbyMinutes] = useState(0);
@@ -1249,7 +1328,13 @@ export default function WorkPerformed() {
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
 
+      // Clear draft on successful submission
+      saveDraft(null).catch(() => {});
+
       showNotification('Work performed saved!', 'success');
+
+      // Clear resume-last-position marker on successful submission
+      localStorage.removeItem(`job_last_page_${params.id}`);
 
       // Navigate to day completion page (done for today vs fully complete)
       setTimeout(() => {
@@ -1266,6 +1351,7 @@ export default function WorkPerformed() {
         timestamp: new Date().toISOString()
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
+      localStorage.removeItem(`job_last_page_${params.id}`);
       router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
     } finally {
       setIsSubmitting(false);
@@ -1286,25 +1372,44 @@ export default function WorkPerformed() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </Link>
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+              title="Dashboard"
+            >
+              <Home className="w-5 h-5 text-gray-600 dark:text-white" />
+            </button>
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-lg font-bold text-gray-900 dark:text-white truncate">Work Performed</h1>
-              <p className="text-gray-500 dark:text-white/50 text-xs">Select completed work items</p>
+              <div className="flex items-center gap-2">
+                <p className="text-gray-500 dark:text-white/50 text-xs">Select completed work items</p>
+                {saveStatus === 'saving' && (
+                  <span className="text-xs text-gray-400 dark:text-white/30 flex items-center gap-1">
+                    <Save className="w-3 h-3 animate-pulse" />Saving...
+                  </span>
+                )}
+                {saveStatus === 'saved' && (
+                  <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <Save className="w-3 h-3" />Saved ✓
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <DarkModeIconToggle />
               {selectedItems.length > 0 && (
-                <span className="px-2 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl text-xs font-semibold border border-gray-200 dark:border-white/10">
+                <span className="px-2 py-1.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-xl text-xs font-semibold border border-purple-200 dark:border-purple-500/30">
                   {selectedItems.length}
                 </span>
               )}
               <button
                 onClick={() => setView(view === 'search' ? 'selected' : 'search')}
-                className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold text-xs border border-gray-200 dark:border-white/10 min-h-[36px]"
+                className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all font-semibold text-xs shadow-sm min-h-[36px]"
               >
                 <span className="hidden sm:inline">{view === 'search' ? 'View Selected' : 'Add More'}</span>
                 <span className="sm:hidden">{view === 'search' ? 'Selected' : 'Search'}</span>
@@ -1334,7 +1439,7 @@ export default function WorkPerformed() {
         {view === 'search' ? (
           <>
             {/* Autocomplete Search Bar */}
-            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-4 mb-4">
+            <div className="bg-white dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 mb-4">
               {/* Smart Recommendations based on job type */}
               <RecommendedItems
                 jobType={jobType}
@@ -1342,11 +1447,12 @@ export default function WorkPerformed() {
                 onAddItem={(itemName) => handleQuickAddItem(itemName)}
               />
 
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
+              <label className="block text-sm font-bold text-gray-700 dark:text-white mb-3 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-purple-500" />
                 Search and Add Work Items
               </label>
               <div className="relative">
-                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
@@ -1355,26 +1461,26 @@ export default function WorkPerformed() {
                   onChange={(e) => handleSearchChange(e.target.value)}
                   onFocus={() => setShowDropdown(true)}
                   placeholder="Type to search work items..."
-                  className="w-full pl-12 pr-4 py-4 text-lg rounded-xl border-2 border-gray-300 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 bg-white font-medium"
+                  className="w-full pl-12 pr-4 py-4 text-lg rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-400 dark:focus:border-purple-500 focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] font-medium placeholder:text-gray-400 dark:placeholder-white/30"
                 />
 
                 {/* Autocomplete Dropdown */}
                 {showDropdown && getFilteredItems().length > 0 && (
-                  <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-2xl border-2 border-gray-200 max-h-96 overflow-y-auto">
+                  <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-white/10 max-h-96 overflow-y-auto">
                     {getFilteredItems().slice(0, 20).map((item) => {
                       const isSelected = selectedItems.some(si => si.name === item);
                       return (
                         <button
                           key={item}
                           onClick={() => handleQuickAddItem(item)}
-                          className={`w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0 ${
-                            isSelected ? 'bg-green-50' : ''
+                          className={`w-full px-4 py-3 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors border-b border-gray-100 dark:border-white/5 last:border-b-0 ${
+                            isSelected ? 'bg-green-50 dark:bg-green-500/10' : ''
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-gray-900">{item}</span>
+                            <span className="font-medium text-gray-900 dark:text-white">{item}</span>
                             {isSelected && (
-                              <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full">
+                              <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-bold">
                                 Added
                               </span>
                             )}
@@ -1385,15 +1491,15 @@ export default function WorkPerformed() {
                   </div>
                 )}
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-gray-500 dark:text-white/40 mt-2">
                 Start typing to see suggestions. Click to add multiple items.
               </p>
             </div>
 
             {/* Selected Items Display */}
             {selectedItems.length > 0 && (
-              <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-4 mb-4">
-                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-500/20 rounded-2xl p-4 mb-4">
+                <h3 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                   <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
@@ -1403,14 +1509,14 @@ export default function WorkPerformed() {
                   {selectedItems.map((item, index) => (
                     <div
                       key={index}
-                      className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 shadow-lg"
+                      className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5 shadow-sm text-sm"
                     >
-                      <span>{item.name} (x{item.quantity})</span>
+                      <span>{item.name} <span className="opacity-80">×{item.quantity}</span></span>
                       <button
                         onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))}
-                        className="hover:bg-white/20 rounded-full p-1 transition-colors"
+                        className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
@@ -1420,11 +1526,15 @@ export default function WorkPerformed() {
               </div>
             )}
 
-            {/* Popular Items Quick Add (Optional) */}
-            <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-2xl shadow-lg p-6 mb-6">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="text-2xl">⭐</span>
-                Popular Items - Quick Add
+            {/* Popular Items Quick Add */}
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-2xl shadow-sm border border-purple-100 dark:border-purple-500/20 p-5 mb-6">
+              <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </div>
+                Popular Items — Quick Add
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {POPULAR_ITEMS.map((item) => {
@@ -1433,25 +1543,31 @@ export default function WorkPerformed() {
                   <button
                     key={item}
                     onClick={() => handleSelectItem(item)}
-                    className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+                    className={`p-4 rounded-xl border-2 transition-all duration-200 text-left group ${
                       isSelected
-                        ? 'bg-green-50 border-green-400 shadow-md'
-                        : 'bg-white border-gray-200 hover:border-blue-400 hover:bg-blue-50'
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-500/40 shadow-md'
+                        : 'bg-white dark:bg-white/[0.05] border-gray-200 dark:border-white/10 hover:border-purple-400 dark:hover:border-purple-500/50 hover:shadow-md hover:bg-purple-50 dark:hover:bg-purple-900/20'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-800">{item}</h3>
+                        <h3 className={`font-bold text-sm ${isSelected ? 'text-green-800 dark:text-green-300' : 'text-gray-800 dark:text-white group-hover:text-purple-700 dark:group-hover:text-purple-300'}`}>{item}</h3>
                         {isSelected && (
-                          <p className="text-sm text-green-600 mt-1">
+                          <p className="text-xs text-green-600 dark:text-green-400 mt-0.5 font-semibold">
                             Qty: {selectedItems.find(si => si.name === item)?.quantity}
                           </p>
                         )}
                       </div>
-                      {isSelected && (
-                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {isSelected ? (
+                        <div className="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      ) : (
+                        <div className="w-7 h-7 rounded-full border-2 border-gray-200 dark:border-white/20 group-hover:border-purple-400 dark:group-hover:border-purple-500 flex items-center justify-center flex-shrink-0 transition-colors">
+                          <svg className="w-3.5 h-3.5 text-gray-300 dark:text-white/30 group-hover:text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                           </svg>
                         </div>
                       )}
@@ -1464,8 +1580,15 @@ export default function WorkPerformed() {
           </>
         ) : (
           /* Selected Items View */
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Selected Work Items</h2>
+          <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <div className="w-7 h-7 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              Selected Work Items
+            </h2>
 
             {/* Standby Time Summary */}
             {standbyLogs.length > 0 && (
@@ -1548,35 +1671,37 @@ export default function WorkPerformed() {
             ) : (
               <div className="space-y-3">
                 {selectedItems.map((item) => (
-                  <div key={item.name} className="bg-gray-50 rounded-xl overflow-hidden">
+                  <div key={item.name} className="bg-gray-50 dark:bg-white/[0.04] rounded-xl overflow-hidden border border-gray-100 dark:border-white/10">
                     <div className="flex items-center justify-between p-4">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                        <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                           {isCoreDrilling(item.name) && (
-                            <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
                           )}
                           {isSawing(item.name) && (
-                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
                             </svg>
                           )}
                           {item.name}
                         </h3>
-                        <div className="flex items-center gap-4 mt-1">
-                          <span className="text-sm text-gray-600">Quantity: {item.quantity}</span>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs font-semibold text-gray-500 dark:text-white/50 bg-gray-200 dark:bg-white/10 px-2 py-0.5 rounded-full">
+                            Qty: {item.quantity}
+                          </span>
                           {item.notes && (
-                            <span className="text-sm text-gray-500">Note: {item.notes}</span>
+                            <span className="text-xs text-gray-500 dark:text-white/40 truncate max-w-[150px]">{item.notes}</span>
                           )}
                         </div>
                       </div>
                       <button
                         onClick={() => handleRemoveItem(item.name)}
-                        className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                        className="p-2 bg-red-50 dark:bg-red-500/10 text-red-500 rounded-xl hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors border border-red-100 dark:border-red-500/20"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
@@ -1842,13 +1967,13 @@ export default function WorkPerformed() {
         )}
 
         {/* Job Photos Section */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-4">
+        <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
           <div className="flex items-center gap-2 mb-3">
-            <Camera className="w-5 h-5 text-blue-600" />
-            <h3 className="text-sm font-bold text-gray-700">Job Photos</h3>
-            <span className="text-xs text-gray-400">(optional)</span>
+            <Camera className="w-5 h-5 text-purple-500" />
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Photos</h3>
+            <span className="text-xs text-gray-400 dark:text-white/40">(optional)</span>
           </div>
-          <p className="text-xs text-gray-500 mb-3">
+          <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
             Document your work — site conditions, before/after, and your team in action
           </p>
           <PhotoUploader
@@ -1872,13 +1997,13 @@ export default function WorkPerformed() {
         </div>
 
         {/* Voice Memo Notes */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-4">
+        <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
           <div className="flex items-center gap-2 mb-3">
-            <Mic className="w-5 h-5 text-blue-600" />
-            <h3 className="text-sm font-bold text-gray-700">Job Notes</h3>
-            <span className="text-xs text-gray-400">(voice or typed)</span>
+            <Mic className="w-5 h-5 text-purple-500" />
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Notes</h3>
+            <span className="text-xs text-gray-400 dark:text-white/40">(voice or typed)</span>
           </div>
-          <p className="text-xs text-gray-500 mb-3">
+          <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
             Describe work performed, conditions encountered, or anything noteworthy. Use the mic button to dictate notes hands-free.
           </p>
           <VoiceMemoNotes
@@ -1890,18 +2015,18 @@ export default function WorkPerformed() {
 
         {/* Submit Button */}
         {selectedItems.length > 0 && !dayAlreadySubmitted && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 p-4 pb-6 z-50">
+          <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-6 z-50">
             <div className="container mx-auto max-w-lg flex gap-3">
               <button
                 onClick={() => router.push(`/dashboard/my-jobs/${params.id}`)}
-                className="flex-shrink-0 px-5 py-3.5 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-semibold text-sm"
+                className="flex-shrink-0 px-5 py-3.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold text-sm border border-gray-200 dark:border-white/10"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
