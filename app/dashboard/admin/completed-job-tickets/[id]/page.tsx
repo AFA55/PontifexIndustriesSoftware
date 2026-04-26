@@ -26,6 +26,7 @@ interface CompletionSummary {
   liability_release_pdf_url: string | null; liability_release_signed_by: string | null;
   liability_release_signed_at: string | null; work_order_pdf_url: string | null;
   silica_plan_pdf_url: string | null; completion_signer_name: string | null;
+  completion_pdf_url: string | null; completion_signature_url: string | null;
   contact_not_on_site: boolean; customer_overall_rating: number | null;
   customer_cleanliness_rating: number | null; customer_communication_rating: number | null;
   customer_feedback_comments: string | null; feedback_submitted_at: string | null;
@@ -867,6 +868,18 @@ export default function CompletedJobSummaryPage() {
 
           {/* Core documents */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {summary.completion_pdf_url && (
+              <DocCard
+                title="Completion Sign-Off PDF"
+                subtitle={summary.completion_signer_name
+                  ? `Signed by: ${summary.completion_signer_name}`
+                  : 'Customer sign-off document'}
+                date={summary.completion_signed_at}
+                color="emerald"
+                onView={() => openPdfViewer(summary.completion_pdf_url!, 'Job Completion Sign-Off')}
+                downloadUrl={summary.completion_pdf_url}
+              />
+            )}
             {summary.liability_release_pdf_url && (
               <DocCard
                 title="Liability Release"
@@ -882,7 +895,7 @@ export default function CompletedJobSummaryPage() {
                 title="Work Order Agreement"
                 subtitle={summary.completion_signer_name ? `Signed by: ${summary.completion_signer_name}` : undefined}
                 date={summary.completion_signed_at}
-                color="emerald"
+                color="sky"
                 onView={() => openPdfViewer(summary.work_order_pdf_url!, 'Work Order Agreement')}
                 downloadUrl={summary.work_order_pdf_url}
               />
@@ -891,7 +904,7 @@ export default function CompletedJobSummaryPage() {
               <DocCard
                 title="Silica Exposure Plan"
                 subtitle="OSHA compliance document"
-                color="sky"
+                color="violet"
                 onView={() => openPdfViewer(summary.silica_plan_pdf_url!, 'Silica Exposure Control Plan')}
                 downloadUrl={summary.silica_plan_pdf_url}
               />
@@ -941,7 +954,8 @@ export default function CompletedJobSummaryPage() {
             </div>
           )}
 
-          {!summary.liability_release_pdf_url &&
+          {!summary.completion_pdf_url &&
+            !summary.liability_release_pdf_url &&
             !summary.work_order_pdf_url &&
             !summary.silica_plan_pdf_url &&
             documents.length === 0 &&
