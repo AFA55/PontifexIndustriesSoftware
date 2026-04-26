@@ -505,7 +505,7 @@ export default function DayCompletePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
       </div>
     );
   }
@@ -514,37 +514,14 @@ export default function DayCompletePage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center p-4">
         <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border border-red-100 dark:border-red-900/30 p-8 max-w-sm w-full text-center">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <AlertTriangle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Job Not Found</h2>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
             Could not load job details. Please go back and try again.
           </p>
           <button
             onClick={() => router.push('/dashboard/my-jobs')}
-            className="w-full bg-gray-700 hover:bg-gray-800 text-white py-3 rounded-xl font-semibold"
-          >
-            Back to My Jobs
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Already submitted for approval — show confirmation screen ───────────
-  if (job?.status === 'pending_completion') {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border border-blue-100 dark:border-blue-900/30 p-8 max-w-sm w-full text-center">
-          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Already Submitted</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-            This job has already been submitted for supervisor approval. You&apos;ll be notified once it&apos;s reviewed.
-          </p>
-          <button
-            onClick={() => router.push('/dashboard/my-jobs')}
-            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl font-semibold"
+            className="w-full bg-gray-700 dark:bg-white/10 hover:bg-gray-800 dark:hover:bg-white/20 text-white dark:text-gray-300 py-3 rounded-xl font-semibold transition-colors"
           >
             Back to My Jobs
           </button>
@@ -626,8 +603,8 @@ export default function DayCompletePage() {
       {/* Notification */}
       {notification && (
         <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${
-          notification.type === 'success' ? 'bg-emerald-500' :
-          notification.type === 'error' ? 'bg-red-500' : 'bg-amber-500'
+          notification.type === 'success' ? 'bg-emerald-500 dark:bg-emerald-600' :
+          notification.type === 'error' ? 'bg-red-500 dark:bg-red-600' : 'bg-amber-500 dark:bg-amber-600'
         }`}>
           {notification.message}
         </div>
@@ -647,7 +624,7 @@ export default function DayCompletePage() {
           </div>
           {job?.is_multi_day && (
             <div className="mt-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800/40">
-              <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+              <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
                 Multi-day job &bull; Day {(job?.total_days_worked || 0) + 1}
               </p>
             </div>
@@ -692,14 +669,14 @@ export default function DayCompletePage() {
                 disabled={submitting}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 text-left transition-all hover:scale-[1.01] active:scale-[0.99] hover:border-amber-300 dark:hover:border-amber-700 disabled:opacity-50"
               >
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-500/20">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-500/20 dark:bg-amber-500/10">
                   <Sun className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div className="flex-1">
                   <p className="font-bold text-gray-900 dark:text-white">Done for Today</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Job continues tomorrow. Progress saved.</p>
                 </div>
-                {submitting && <Loader2 className="w-5 h-5 animate-spin text-amber-500" />}
+                {submitting && <Loader2 className="w-5 h-5 animate-spin text-amber-500 dark:text-amber-400" />}
               </button>
             )}
 
@@ -709,7 +686,7 @@ export default function DayCompletePage() {
               disabled={submitting}
               className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-900/20 text-left transition-all hover:scale-[1.01] active:scale-[0.99] hover:border-emerald-300 dark:hover:border-emerald-700 disabled:opacity-50"
             >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20 dark:bg-emerald-500/10">
                 <Trophy className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div className="flex-1">
@@ -724,7 +701,7 @@ export default function DayCompletePage() {
               disabled={submitting}
               className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/20 text-left transition-all hover:scale-[1.01] active:scale-[0.99] hover:border-indigo-300 dark:hover:border-indigo-700 disabled:opacity-50"
             >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-indigo-500/20">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-indigo-500/20 dark:bg-indigo-500/10">
                 <Send className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div className="flex-1">
@@ -752,7 +729,7 @@ export default function DayCompletePage() {
 
             {/* ── Company Header Card ──────────────────────────────────────── */}
             <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
-              {/* Header stripe */}
+              {/* Header stripe — keep slate-800/900 in both modes */}
               <div className="bg-slate-800 dark:bg-slate-900 px-5 py-4">
                 <p className="text-white font-bold text-base tracking-wide">PATRIOT CONCRETE CUTTING</p>
                 <p className="text-slate-300 text-xs mt-0.5">Job Completion Sign-Off</p>
@@ -761,20 +738,20 @@ export default function DayCompletePage() {
               {/* Job meta grid */}
               <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-white/5">
                 <div className="bg-white dark:bg-[#0f0a1e] px-4 py-3">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Job #</p>
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5">Job #</p>
                   <p className="text-sm font-bold text-gray-900 dark:text-white">{job?.job_number || '—'}</p>
                 </div>
                 <div className="bg-white dark:bg-[#0f0a1e] px-4 py-3">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Date</p>
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5">Date</p>
                   <p className="text-sm font-bold text-gray-900 dark:text-white">
                     {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </p>
                 </div>
                 <div className="bg-white dark:bg-[#0f0a1e] px-4 py-3 col-span-2">
                   <div className="flex items-start gap-1.5">
-                    <User className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <User className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Customer</p>
+                      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5">Customer</p>
                       <p className="text-sm font-bold text-gray-900 dark:text-white">{job?.customer_name || '—'}</p>
                     </div>
                   </div>
@@ -782,9 +759,9 @@ export default function DayCompletePage() {
                 {(job?.address || job?.location) && (
                   <div className="bg-white dark:bg-[#0f0a1e] px-4 py-3 col-span-2">
                     <div className="flex items-start gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Location</p>
+                        <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5">Location</p>
                         <p className="text-sm text-gray-700 dark:text-gray-200">{job?.address || job?.location}</p>
                       </div>
                     </div>
@@ -826,7 +803,7 @@ export default function DayCompletePage() {
                       const desc = [item.description, item.notes].filter(Boolean).join(' — ');
                       return (
                         <li key={idx} className="flex items-start gap-2 text-sm">
-                          <span className="text-emerald-500 font-bold mt-0.5">•</span>
+                          <span className="text-emerald-500 dark:text-emerald-400 font-bold mt-0.5">•</span>
                           <span className="text-gray-700 dark:text-gray-300">
                             <span className="font-semibold text-gray-900 dark:text-white">{item.type || 'Work'}</span>
                             {qtyStr ? ` — ${qtyStr}` : ''}
@@ -875,14 +852,14 @@ export default function DayCompletePage() {
               {/* Signer Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                  Printed Name <span className="text-gray-400 font-normal">(optional)</span>
+                  Printed Name <span className="text-gray-400 dark:text-gray-500 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
                   value={signerName}
                   onChange={(e) => setSignerName(e.target.value)}
                   placeholder="Name of person signing"
-                  className="w-full px-4 py-3 border border-slate-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07]"
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07] placeholder:text-gray-400 dark:placeholder:text-white/30"
                 />
               </div>
 
@@ -891,12 +868,12 @@ export default function DayCompletePage() {
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-1">
                     <PenTool className="w-3.5 h-3.5" />
-                    Signature <span className="text-gray-400 font-normal ml-1">(draw below)</span>
+                    Signature <span className="text-gray-400 dark:text-gray-500 font-normal ml-1">(draw below)</span>
                   </label>
                   {signatureData && (
                     <button
                       onClick={clearSignature}
-                      className="text-xs text-red-500 hover:text-red-700 font-medium"
+                      className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium"
                     >
                       Clear
                     </button>
@@ -933,7 +910,7 @@ export default function DayCompletePage() {
 
               {/* PDF notice */}
               <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-800/40">
-                <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                <FileText className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                 <p className="text-xs text-blue-700 dark:text-blue-300">
                   A PDF of this sign-off will be generated and saved to the job record automatically.
                 </p>
@@ -961,7 +938,7 @@ export default function DayCompletePage() {
               <button
                 onClick={() => { setShowSignature(false); setShowCompletionModal(true); }}
                 disabled={submitting}
-                className="w-full text-gray-500 dark:text-gray-400 text-sm hover:text-gray-700 dark:hover:text-gray-200 py-2 disabled:opacity-40"
+                className="w-full text-gray-500 dark:text-gray-400 text-sm hover:text-gray-700 dark:hover:text-gray-200 py-2 disabled:opacity-40 transition-colors"
               >
                 Skip signature — submit for supervisor approval instead
               </button>
@@ -984,7 +961,7 @@ export default function DayCompletePage() {
       {/* ── Remote Signature Panel (modal) ─────────────────────────────────── */}
       {showRemotePanel && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
@@ -1009,13 +986,13 @@ export default function DayCompletePage() {
                 Contact&apos;s Phone Number
               </label>
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <input
                   type="tel"
                   value={remotePhone}
                   onChange={(e) => setRemotePhone(e.target.value)}
                   placeholder="(555) 867-5309"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07]"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07] placeholder:text-gray-400 dark:placeholder:text-white/30"
                 />
               </div>
             </div>
@@ -1048,7 +1025,7 @@ export default function DayCompletePage() {
       {/* ── Completion Confirmation Modal ───────────────────────────────────── */}
       {showCompletionModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Submit for Completion</h2>
             <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
               This will send the job to your supervisor for final approval.
@@ -1056,7 +1033,7 @@ export default function DayCompletePage() {
 
             <textarea
               placeholder="Any final notes for the supervisor? (optional)"
-              className="w-full border border-gray-300 dark:border-white/20 rounded-lg p-3 text-sm mb-4 h-24 focus:outline-none focus:border-emerald-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07] resize-none"
+              className="w-full border border-gray-300 dark:border-white/20 rounded-lg p-3 text-sm mb-4 h-24 focus:outline-none focus:border-emerald-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07] placeholder:text-gray-400 dark:placeholder:text-white/30 resize-none"
               value={completionNotes}
               onChange={(e) => setCompletionNotes(e.target.value)}
             />
