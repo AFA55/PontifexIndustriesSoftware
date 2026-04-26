@@ -194,7 +194,8 @@ export default function ScheduleBoardPage() {
   const [nextAvailableDate, setNextAvailableDate] = useState<{ date: string; jobCount: number; availableSlots: number } | null>(null);
 
   // ═══ TIME-OFF STATE ═══
-  const [timeOffMap, setTimeOffMap] = useState<Record<string, { type: string; notes: string | null }>>({});
+  const [timeOffMap, setTimeOffMap] = useState<Record<string, { id: string; type: string; notes: string | null }>>({});
+  const [rowNotesMap, setRowNotesMap] = useState<Record<string, string>>({}); // operatorId → note text
 
   // ═══ ROW ASSIGNMENTS — who's in which crew row (driven by capacityMaxSlots) ═══
   const [rowAssignments, setRowAssignments] = useState<{ operator: string | null; helper: string | null }[]>(
@@ -672,15 +673,33 @@ export default function ScheduleBoardPage() {
         const res = await apiFetch(`/api/admin/schedule-board/time-off?date=${selectedDate}`);
         if (res.ok) {
           const json = await res.json();
-          const map: Record<string, { type: string; notes: string | null }> = {};
+          const map: Record<string, { id: string; type: string; notes: string | null }> = {};
           for (const entry of json.data || []) {
-            map[entry.operator_id] = { type: entry.type, notes: entry.notes };
+            map[entry.operator_id] = { id: entry.id, type: entry.type, notes: entry.notes };
           }
           setTimeOffMap(map);
         }
       } catch { setTimeOffMap({}); }
     }
     fetchTimeOff();
+  }, [selectedDate]);
+
+  // ═══ FETCH ROW NOTES ═══
+  useEffect(() => {
+    async function fetchRowNotes() {
+      try {
+        const res = await apiFetch(`/api/admin/schedule-board/row-notes?date=${selectedDate}`);
+        if (res.ok) {
+          const json = await res.json();
+          const map: Record<string, string> = {};
+          for (const entry of json.data || []) {
+            map[entry.operator_id] = entry.note;
+          }
+          setRowNotesMap(map);
+        }
+      } catch { setRowNotesMap({}); }
+    }
+    fetchRowNotes();
   }, [selectedDate]);
 
   // ═══ FETCH CAPACITY SETTINGS ═══
@@ -1384,6 +1403,55 @@ export default function ScheduleBoardPage() {
     }
   };
 
+  // ── Time-off handlers ────────────────────────────────────────────────────
+  const handleAddTimeOff = async (rowIdx: number, type: string, notes: string) => {
+    const opName = rowAssignments[rowIdx]?.operator;
+    const opId = opName ? operatorIdMap[opName] : null;
+    if (!opId) return;
+    try {
+      const res = await apiFetch('/api/admin/schedule-board/time-off', {
+        method: 'POST',
+        body: JSON.stringify({ operator_id: opId, date: selectedDate, type, notes }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setTimeOffMap(prev => ({ ...prev, [opId]: { id: json.data.id, type, notes } }));
+        addToast('success', 'Time Off Recorded', `${opName} marked as ${type} on ${selectedDate}`);
+      } else {
+        const err = await res.json();
+        addToast('error', 'Failed', err.error || 'Could not record time off');
+      }
+    } catch { addToast('error', 'Error', 'Network error'); }
+  };
+
+  const handleRemoveTimeOff = async (rowIdx: number) => {
+    const opName = rowAssignments[rowIdx]?.operator;
+    const opId = opName ? operatorIdMap[opName] : null;
+    if (!opId) return;
+    const entry = timeOffMap[opId];
+    if (!entry?.id) return;
+    try {
+      const res = await apiFetch(`/api/admin/schedule-board/time-off?id=${entry.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setTimeOffMap(prev => { const n = { ...prev }; delete n[opId]; return n; });
+        addToast('info', 'Time Off Removed', `${opName} is back on schedule`);
+      }
+    } catch { addToast('error', 'Error', 'Network error'); }
+  };
+
+  const handleSaveRowNote = async (rowIdx: number, note: string) => {
+    const opName = rowAssignments[rowIdx]?.operator;
+    const opId = opName ? operatorIdMap[opName] : null;
+    if (!opId) return;
+    try {
+      await apiFetch('/api/admin/schedule-board/row-notes', {
+        method: 'POST',
+        body: JSON.stringify({ operator_id: opId, date: selectedDate, note }),
+      });
+      setRowNotesMap(prev => ({ ...prev, [opId]: note }));
+    } catch { /* silent fail */ }
+  };
+
   // ── Cancel job: reschedule or delete permanently ─────────────────────────
   const handleRescheduleJob = async (jobId: string, newDate: string, reason?: string) => {
     const notes = reason ? `Rescheduled: ${reason}` : undefined;
@@ -2004,6 +2072,12 @@ export default function ScheduleBoardPage() {
                 onChangeOperator={(name) => handleChangeRowOperator(idx, name)}
                 onChangeHelper={(name) => handleChangeRowHelper(idx, name)}
                 onDropJob={handleDropJob}
+                operatorId={rowAssignments[idx]?.operator ? (operatorIdMap[rowAssignments[idx].operator!] ?? null) : null}
+                timeOff={(() => { const opId = rowAssignments[idx]?.operator ? operatorIdMap[rowAssignments[idx].operator!] : null; return opId ? (timeOffMap[opId] ?? null) : null; })()}
+                rowNote={(() => { const opId = rowAssignments[idx]?.operator ? operatorIdMap[rowAssignments[idx].operator!] : null; return opId ? (rowNotesMap[opId] ?? '') : ''; })()}
+                onAddTimeOff={(type, notes) => handleAddTimeOff(idx, type, notes)}
+                onRemoveTimeOff={() => handleRemoveTimeOff(idx)}
+                onSaveRowNote={(note) => handleSaveRowNote(idx, note)}
               />
             ))}
           </>

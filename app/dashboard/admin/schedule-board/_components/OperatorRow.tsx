@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Users, Plus, Briefcase, ChevronDown, Check } from 'lucide-react';
+import { Users, Plus, Briefcase, ChevronDown, ChevronUp, Check, CalendarX, XCircle } from 'lucide-react';
 import JobCard from './JobCard';
 import type { JobCardData } from './JobCard';
 
@@ -32,7 +32,12 @@ interface OperatorRowProps {
   onChangeOperator?: (name: string | null) => void;
   onChangeHelper?: (name: string | null) => void;
   onDropJob?: (jobData: string, targetRowIndex: number) => void;
-  timeOff?: { type: string; notes: string | null };
+  operatorId?: string | null;
+  timeOff?: { id: string; type: string; notes: string | null } | null;
+  rowNote?: string;
+  onAddTimeOff?: (type: string, notes: string) => void;
+  onRemoveTimeOff?: () => void;
+  onSaveRowNote?: (note: string) => void;
 }
 
 const TIME_OFF_LABELS: Record<string, string> = {
@@ -41,6 +46,22 @@ const TIME_OFF_LABELS: Record<string, string> = {
   worked_last_night: 'Worked Last Night',
   sick: 'Sick',
   other: 'Other',
+};
+
+const TIME_OFF_OPTIONS = [
+  { value: 'pto', label: 'PTO', color: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-500/30' },
+  { value: 'unpaid', label: 'Unpaid', color: 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/70 hover:bg-gray-200 dark:hover:bg-white/20' },
+  { value: 'sick', label: 'Sick 🤒', color: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-500/30' },
+  { value: 'worked_last_night', label: 'Worked Last Night 🌙', color: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-500/30' },
+  { value: 'other', label: 'Other', color: 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/70 hover:bg-gray-200 dark:hover:bg-white/20' },
+];
+
+const TIME_OFF_BADGE_COLORS: Record<string, string> = {
+  pto: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30',
+  unpaid: 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/70 border-gray-200 dark:border-white/20',
+  sick: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/30',
+  worked_last_night: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/30',
+  other: 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/70 border-gray-200 dark:border-white/20',
 };
 
 // ── Inline dropdown for picking operator or helper ──────────────────────
@@ -145,10 +166,43 @@ export default function OperatorRow({
   onChangeOperator,
   onChangeHelper,
   onDropJob,
+  operatorId,
   timeOff,
+  rowNote,
+  onAddTimeOff,
+  onRemoveTimeOff,
+  onSaveRowNote,
 }: OperatorRowProps) {
   const hasJobs = jobs.length > 0;
   const [dragOver, setDragOver] = useState(false);
+
+  // Time-off panel state
+  const [showTimeOffPanel, setShowTimeOffPanel] = useState(false);
+  const [selectedTimeOffType, setSelectedTimeOffType] = useState('pto');
+  const [timeOffNotes, setTimeOffNotes] = useState('');
+  const timeOffPanelRef = useRef<HTMLDivElement>(null);
+
+  // Row notes state
+  const [showNotes, setShowNotes] = useState(false);
+  const [noteText, setNoteText] = useState(rowNote || '');
+
+  // Sync noteText when rowNote prop changes
+  useEffect(() => {
+    setNoteText(rowNote || '');
+  }, [rowNote]);
+
+  // Close time-off panel on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (timeOffPanelRef.current && !timeOffPanelRef.current.contains(e.target as Node)) {
+        setShowTimeOffPanel(false);
+      }
+    };
+    if (showTimeOffPanel) {
+      document.addEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
+    }
+  }, [showTimeOffPanel]);
 
   const handleDragOver = (e: React.DragEvent) => {
     if (!canEdit) return;
@@ -167,6 +221,13 @@ export default function OperatorRow({
     if (jobData && onDropJob) {
       onDropJob(jobData, rowIndex);
     }
+  };
+
+  const handleSaveTimeOff = () => {
+    onAddTimeOff?.(selectedTimeOffType, timeOffNotes);
+    setShowTimeOffPanel(false);
+    setTimeOffNotes('');
+    setSelectedTimeOffType('pto');
   };
 
   return (
@@ -225,10 +286,27 @@ export default function OperatorRow({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Time-off badge when active */}
+            {timeOff && operatorName && (
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${TIME_OFF_BADGE_COLORS[timeOff.type] || TIME_OFF_BADGE_COLORS.other}`}>
+                <span>{TIME_OFF_LABELS[timeOff.type] || timeOff.type} — {operatorName} is out</span>
+                {canEdit && (
+                  <button
+                    onClick={onRemoveTimeOff}
+                    className="ml-0.5 hover:opacity-70 transition-opacity"
+                    title="Remove time off"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
             <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${colorScheme.bg} ${colorScheme.text}`}>
               {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}
             </span>
-            {canEdit && isAvailable && (
+
+            {canEdit && isAvailable && !timeOff && (
               <button
                 onClick={onAssignJob}
                 className="p-1.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-500/15 text-green-600 dark:text-green-400 transition-colors"
@@ -237,10 +315,73 @@ export default function OperatorRow({
                 <Plus className="w-4 h-4" />
               </button>
             )}
+
+            {/* Time-off add button */}
+            {canEdit && operatorName && !timeOff && (
+              <div ref={timeOffPanelRef} className="relative">
+                <button
+                  onClick={() => setShowTimeOffPanel(!showTimeOffPanel)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/50 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
+                  title="Mark time off"
+                >
+                  <CalendarX className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Time Off</span>
+                </button>
+
+                {/* Time-off panel */}
+                {showTimeOffPanel && (
+                  <div className="absolute top-full right-0 mt-2 w-72 bg-white dark:bg-[#1a0f35] rounded-xl shadow-xl border border-gray-200 dark:border-white/10 z-50 p-4">
+                    <h4 className="font-bold text-sm text-gray-900 dark:text-white mb-3">Mark Time Off</h4>
+
+                    {/* Type selector */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {TIME_OFF_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setSelectedTimeOffType(opt.value)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all border-2 ${
+                            selectedTimeOffType === opt.value
+                              ? `${opt.color} border-current`
+                              : `${opt.color} border-transparent`
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Notes textarea */}
+                    <textarea
+                      value={timeOffNotes}
+                      onChange={(e) => setTimeOffNotes(e.target.value)}
+                      placeholder="Add a note (optional)..."
+                      rows={2}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 mb-3"
+                    />
+
+                    {/* Action buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setShowTimeOffPanel(false); setTimeOffNotes(''); setSelectedTimeOffType('pto'); }}
+                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveTimeOff}
+                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+                      >
+                        Save Time Off
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Time-off overlay */}
+        {/* Time-off overlay (body) */}
         {timeOff && (
           <div className="flex items-center gap-3 py-3 px-4 mb-3 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-white/70">
             <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
@@ -314,6 +455,39 @@ export default function OperatorRow({
                 </>
               )}
             </p>
+          </div>
+        )}
+
+        {/* Row Notes section (canEdit only) */}
+        {canEdit && (
+          <div className="mt-3">
+            <div className="border-t border-gray-100 dark:border-white/10 pt-2">
+              <button
+                onClick={() => setShowNotes(!showNotes)}
+                className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60 transition-colors font-medium"
+              >
+                {showNotes ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                Row Notes
+                {noteText && !showNotes && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 text-[10px] font-semibold">
+                    {noteText.slice(0, 30)}{noteText.length > 30 ? '…' : ''}
+                  </span>
+                )}
+              </button>
+              {showNotes && (
+                <div className="mt-2">
+                  <textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    onBlur={() => onSaveRowNote?.(noteText)}
+                    placeholder="Add shift notes (e.g. 'Alex leaving at 2pm')..."
+                    rows={2}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 transition-colors"
+                  />
+                  <p className="text-[10px] text-gray-400 dark:text-white/30 mt-1">Auto-saves on blur</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

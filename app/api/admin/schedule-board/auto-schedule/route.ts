@@ -276,7 +276,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No operators available' }, { status: 400 });
     }
 
-    // ─── Step 4: Fetch current operator workload for this date ─────
+    // ─── Step 4: Fetch time-off and current operator workload ─────
+
+    // Exclude operators who have time-off on this date
+    const { data: timeOffData } = await supabaseAdmin
+      .from('operator_time_off')
+      .select('operator_id')
+      .eq('date', date);
+
+    const timeOffOperatorIds = new Set((timeOffData || []).map((e: any) => e.operator_id));
+
+    // Filter out operators on time-off
+    const availableRawOperators = rawOperators.filter(op => !timeOffOperatorIds.has(op.id));
+
+    if (availableRawOperators.length === 0) {
+      return NextResponse.json({ error: 'No operators available (all on time-off)' }, { status: 400 });
+    }
 
     const { data: existingAssignments } = await supabaseAdmin
       .from('job_orders')
@@ -286,7 +301,7 @@ export async function POST(request: NextRequest) {
       .neq('status', 'cancelled');
 
     // Build operator objects with current load
-    const operators: Operator[] = rawOperators.map((op) => {
+    const operators: Operator[] = availableRawOperators.map((op) => {
       const assignedJobs = (existingAssignments || []).filter(j => j.assigned_to === op.id);
       return {
         id: op.id,
