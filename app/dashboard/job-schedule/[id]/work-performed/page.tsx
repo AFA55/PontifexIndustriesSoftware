@@ -303,21 +303,43 @@ export default function WorkPerformed() {
     const loadDraft = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-        const res = await fetch(`/api/job-orders/${params.id}/work-performed-draft`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        if (!res.ok) return;
-        const json = await res.json();
-        if (json.draft) {
-          const d = json.draft;
-          if (d.selectedItems) setSelectedItems(d.selectedItems);
-          if (d.sawingData) setSawingData(d.sawingData);
-          if (d.coreDrillingData) setCoreDrillingData(d.coreDrillingData);
-          if (d.jobNotes !== undefined) setVoiceNotes(d.jobNotes);
+        if (!session) {
+          draftLoadedRef.current = true;
+          return;
+        }
+
+        let draft: Record<string, any> | null = null;
+
+        // ── Try DB first ──────────────────────────────────────────────────────
+        try {
+          const res = await fetch(`/api/job-orders/${params.id}/work-performed-draft`, {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          if (res.ok) {
+            const json = await res.json();
+            // API shape: { success, data: { draft } }
+            draft = json.data?.draft ?? null;
+          }
+        } catch { /* network error — fall through to localStorage */ }
+
+        // ── Fallback: localStorage ────────────────────────────────────────────
+        if (!draft) {
+          try {
+            const stored = localStorage.getItem(`work-draft-${params.id}`);
+            if (stored) draft = JSON.parse(stored);
+          } catch { /* corrupt storage — ignore */ }
+        }
+
+        // ── Restore state ─────────────────────────────────────────────────────
+        if (draft) {
+          if (draft.selectedItems?.length > 0) setSelectedItems(draft.selectedItems);
+          if (draft.sawingData) setSawingData(draft.sawingData);
+          if (draft.coreDrillingData) setCoreDrillingData(draft.coreDrillingData);
+          if (draft.jobNotes !== undefined) setVoiceNotes(draft.jobNotes);
           showNotification('Draft restored', 'success');
         }
       } catch { /* non-critical */ }
+      // Always mark draft as loaded so auto-save can proceed
       draftLoadedRef.current = true;
     };
     loadDraft();
@@ -327,6 +349,9 @@ export default function WorkPerformed() {
   // Debounced auto-save: fires 2 s after any major state change
   useEffect(() => {
     if (!draftLoadedRef.current) return; // don't save before draft is loaded
+    // Don't overwrite a previously saved draft with a completely empty state
+    if (selectedItems.length === 0 && !voiceNotes) return;
+
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     setSaveStatus('saving');
     autoSaveTimerRef.current = setTimeout(async () => {
@@ -335,11 +360,37 @@ export default function WorkPerformed() {
         sawingData,
         coreDrillingData,
         jobNotes: voiceNotes,
-        photoUploads: [],
       };
-      await saveDraft(draft);
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 3000);
+
+      // ── Save to localStorage immediately (synchronous backup) ──────────────
+      try {
+        localStorage.setItem(`work-draft-${params.id}`, JSON.stringify(draft));
+      } catch { /* storage quota — ignore */ }
+
+      // ── Save to DB ────────────────────────────────────────────────────────
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setSaveStatus('error');
+          return;
+        }
+        const res = await fetch(`/api/job-orders/${params.id}/work-performed-draft`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ draft }),
+        });
+        if (res.ok) {
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 3000);
+        } else {
+          setSaveStatus('error');
+        }
+      } catch {
+        setSaveStatus('error');
+      }
     }, 2000);
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -1328,8 +1379,9 @@ export default function WorkPerformed() {
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
 
-      // Clear draft on successful submission
+      // Clear draft on successful submission (DB + localStorage)
       saveDraft(null).catch(() => {});
+      try { localStorage.removeItem(`work-draft-${params.id}`); } catch { /* ignore */ }
 
       showNotification('Work performed saved!', 'success');
 
@@ -1352,6 +1404,7 @@ export default function WorkPerformed() {
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
       localStorage.removeItem(`job_last_page_${params.id}`);
+      try { localStorage.removeItem(`work-draft-${params.id}`); } catch { /* ignore */ }
       router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
     } finally {
       setIsSubmitting(false);

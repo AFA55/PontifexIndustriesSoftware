@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
  * Draft state is stored in daily_job_logs.work_performed_draft (jsonb).
  * On final submission via /daily-log, the real work_performed column is
  * written and the draft columns are cleared.
+ *
+ * Schema note: daily_job_logs has UNIQUE(job_order_id, operator_id, log_date),
+ * allowing the primary operator and helper to each have their own row.
+ * The trigger set_daily_log_day_number auto-assigns day_number on INSERT.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -55,13 +59,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Get the most recent daily log for this operator on this job
+    // Get the most recent daily log for this operator on this job.
+    // Order by created_at DESC so we always get the most recent row regardless
+    // of day_number (draft-skeleton rows may share day_number=1 with real rows).
     const { data: log, error: logError } = await supabaseAdmin
       .from('daily_job_logs')
       .select('id, day_number, work_performed_draft, work_performed_draft_updated_at')
       .eq('job_order_id', jobId)
       .eq('operator_id', userId)
-      .order('day_number', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -73,6 +79,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
+    // Return gracefully with null draft when no log row exists yet
     return NextResponse.json({
       success: true,
       data: {
@@ -82,7 +89,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         day_number: log?.day_number ?? null,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Unexpected error in GET work-performed-draft:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -136,14 +143,24 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const now = new Date().toISOString();
 
-    // Find the existing log for today (by log_date)
-    const { data: existingLog } = await supabaseAdmin
+    // Look for an existing log row for this operator on this job today.
+    // The unique constraint is now (job_order_id, operator_id, log_date) so
+    // each operator gets their own row — no collision with helpers.
+    const { data: existingLog, error: lookupError } = await supabaseAdmin
       .from('daily_job_logs')
       .select('id')
       .eq('job_order_id', jobId)
       .eq('operator_id', userId)
       .eq('log_date', today)
       .maybeSingle();
+
+    if (lookupError) {
+      console.error('Error looking up existing log:', lookupError);
+      return NextResponse.json(
+        { error: 'Failed to save draft' },
+        { status: 500 }
+      );
+    }
 
     let savedLogId: string | null = null;
 
@@ -169,18 +186,20 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       }
       savedLogId = updated.id;
     } else {
-      // No log exists yet for today — insert a skeleton row with the draft
-      // day_completed_at has a NOT NULL constraint; use a far-future sentinel
-      // that the final /daily-log submission will overwrite.
+      // No log row exists yet for today — insert a skeleton row to hold the draft.
+      // - day_completed_at is nullable; omit it so the trigger/submission sets it.
+      // - day_number is auto-set by the set_daily_log_day_number INSERT trigger.
+      // - tenant_id is carried forward from the operator's profile for isolation.
       const { data: inserted, error: insertError } = await supabaseAdmin
         .from('daily_job_logs')
         .insert({
           job_order_id: jobId,
           operator_id: userId,
+          tenant_id: tenantId ?? null,
           log_date: today,
-          day_completed_at: '9999-12-31T23:59:59Z', // sentinel — replaced on submission
           work_performed_draft: draft,
           work_performed_draft_updated_at: now,
+          // work_performed, hours_worked default to [] and 0 via column defaults
         })
         .select('id')
         .single();
@@ -202,7 +221,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         updated_at: now,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Unexpected error in PUT work-performed-draft:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
