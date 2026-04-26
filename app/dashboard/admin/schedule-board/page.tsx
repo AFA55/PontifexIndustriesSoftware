@@ -7,7 +7,7 @@ import {
   Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
   UserCheck, UserX, FolderOpen, Timer, Loader2, Settings, Search, X,
-  Megaphone, CheckCircle2, Sparkles, Zap, Brain, RefreshCw
+  Megaphone, CheckCircle2, Sparkles, Zap, Brain, RefreshCw, KeyRound, Copy
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
@@ -229,6 +229,11 @@ export default function ScheduleBoardPage() {
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
   const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null } | null>(null);
+
+  // ═══ DAILY CODE STATE ═══
+  const [showDailyCode, setShowDailyCode] = useState(false);
+  const [dailyCode, setDailyCode] = useState<string | null>(null);
+  const [codeLoading, setCodeLoading] = useState(false);
 
   // ═══ AI AUTO-SCHEDULE STATE ═══
   const [autoScheduleLoading, setAutoScheduleLoading] = useState(false);
@@ -1642,6 +1647,30 @@ export default function ScheduleBoardPage() {
     setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, helper: newHelper } : r));
   };
 
+  // --- Daily Code ---
+  const fetchDailyCode = async () => {
+    setCodeLoading(true);
+    try {
+      const res = await apiFetch('/api/admin/daily-code');
+      if (res.ok) {
+        const json = await res.json();
+        setDailyCode(json.data?.pin_code || null);
+      }
+    } catch {} finally { setCodeLoading(false); }
+  };
+
+  const regenerateDailyCode = async () => {
+    setCodeLoading(true);
+    try {
+      const res = await apiFetch('/api/admin/daily-code', { method: 'POST' });
+      if (res.ok) {
+        const json = await res.json();
+        setDailyCode(json.data?.pin_code || null);
+        addToast('success', 'Code Updated', `New daily code: ${json.data?.pin_code}`);
+      }
+    } catch {} finally { setCodeLoading(false); }
+  };
+
   // --- Quick Add ---
   const handleQuickAdd = async (data: QuickAddData) => {
     try {
@@ -1785,6 +1814,12 @@ export default function ScheduleBoardPage() {
                     {dispatchInfo && dispatchInfo.total > 0 && (
                       <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex items-center justify-center">{dispatchInfo.total}</span>
                     )}
+                  </button>
+                  <button
+                    onClick={() => { setShowDailyCode(true); fetchDailyCode(); }}
+                    className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-400/30 rounded-xl text-indigo-700 dark:text-indigo-300 text-sm font-semibold transition-all flex items-center gap-2"
+                  >
+                    <KeyRound className="w-4 h-4" /> Daily Code
                   </button>
                 </>
               )}
@@ -2506,6 +2541,67 @@ export default function ScheduleBoardPage() {
           onSave={handleSaveCapacitySettings}
           onClose={() => setShowCapacitySettings(false)}
         />
+      )}
+
+      {/* ═══ DAILY CODE MODAL ═══════════════════════════════════════════ */}
+      {showDailyCode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDailyCode(false)}>
+          <div className="bg-white dark:bg-[#0e0720] rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-white">Today&apos;s Shop Code</h3>
+                  <p className="text-xs text-gray-500 dark:text-white/50">Share with your team each morning</p>
+                </div>
+              </div>
+              <button onClick={() => setShowDailyCode(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-gray-500 dark:text-white/50" />
+              </button>
+            </div>
+
+            {codeLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+              </div>
+            ) : dailyCode ? (
+              <>
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 rounded-2xl border-2 border-indigo-200 dark:border-indigo-500/30 p-6 text-center mb-4">
+                  <p className="text-4xl font-black tracking-[0.3em] text-indigo-700 dark:text-indigo-300 font-mono">{dailyCode}</p>
+                  <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-2">Valid today only • Resets at midnight</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(dailyCode); addToast('success', 'Copied', 'Code copied to clipboard'); }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 rounded-xl text-indigo-700 dark:text-indigo-300 text-sm font-semibold transition-all"
+                  >
+                    <Copy className="w-4 h-4" /> Copy
+                  </button>
+                  <button
+                    onClick={regenerateDailyCode}
+                    disabled={codeLoading}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-50 dark:bg-orange-500/15 hover:bg-orange-100 dark:hover:bg-orange-500/25 border border-orange-200 dark:border-orange-500/30 rounded-xl text-orange-700 dark:text-orange-300 text-sm font-semibold transition-all"
+                  >
+                    <RefreshCw className="w-4 h-4" /> Regenerate
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-white/30 text-center mt-3">⚠️ Regenerating invalidates the old code immediately</p>
+              </>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-gray-500 dark:text-white/50 mb-4 text-sm">No code set for today yet.</p>
+                <button
+                  onClick={regenerateDailyCode}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm transition-all flex items-center gap-2 mx-auto"
+                >
+                  <KeyRound className="w-4 h-4" /> Generate Today&apos;s Code
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ═══ TOASTS ═══════════════════════════════════════════════════ */}

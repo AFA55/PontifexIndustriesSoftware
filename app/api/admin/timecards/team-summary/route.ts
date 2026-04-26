@@ -51,6 +51,10 @@ interface DayInfo {
   hours: number;
   status: 'approved' | 'pending' | 'active' | 'mixed' | 'none';
   entryCount: number;
+  isLate: boolean;
+  lateMinutes: number;
+  firstTimecardId: string | null;
+  firstClockIn: string | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -95,7 +99,7 @@ export async function GET(request: NextRequest) {
     // 2. Fetch all timecards for this week
     let timecardsQuery = supabaseAdmin
       .from('timecards')
-      .select('id, user_id, date, clock_in_time, clock_out_time, total_hours, is_approved, is_shop_hours, is_night_shift, hour_type, break_minutes, notes')
+      .select('id, user_id, date, clock_in_time, clock_out_time, total_hours, is_approved, is_shop_hours, is_night_shift, hour_type, break_minutes, notes, is_late, late_minutes')
       .gte('date', mondayStr)
       .lte('date', sundayStr)
       .order('date', { ascending: true });
@@ -139,7 +143,7 @@ export async function GET(request: NextRequest) {
         // Build daily hours map
         const dailyHours: Record<string, DayInfo> = {};
         DAY_NAMES.forEach(day => {
-          dailyHours[day] = { hours: 0, status: 'none', entryCount: 0 };
+          dailyHours[day] = { hours: 0, status: 'none', entryCount: 0, isLate: false, lateMinutes: 0, firstTimecardId: null, firstClockIn: null };
         });
 
         let weeklyTotal = 0;
@@ -159,6 +163,16 @@ export async function GET(request: NextRequest) {
           dailyHours[dayName].entryCount += 1;
           weeklyTotal += hours;
           breakMinutesTotal += tc.break_minutes || 0;
+
+          // Track late arrival — use the first clock-in of the day
+          if (dailyHours[dayName].firstTimecardId === null) {
+            dailyHours[dayName].firstTimecardId = tc.id;
+            dailyHours[dayName].firstClockIn = tc.clock_in_time || null;
+          }
+          if ((tc as any).is_late) {
+            dailyHours[dayName].isLate = true;
+            dailyHours[dayName].lateMinutes = Math.max(dailyHours[dayName].lateMinutes, (tc as any).late_minutes || 0);
+          }
 
           if (!tc.clock_out_time) {
             isClockedIn = true;

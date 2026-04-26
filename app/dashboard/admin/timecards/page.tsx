@@ -10,7 +10,8 @@ import {
   User as UserIcon, FileText, Download,
   ChevronLeft, ChevronRight, AlertTriangle,
   Search, TrendingUp, Users, Loader2, Shield, Zap,
-  Bell, DollarSign, Coffee, Eye, ChevronDown, Moon, Settings, Save, X
+  Bell, DollarSign, Coffee, Eye, ChevronDown, Moon, Settings, Save, X,
+  Edit2, AlertCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -19,6 +20,10 @@ interface DayInfo {
   hours: number;
   status: 'approved' | 'pending' | 'active' | 'mixed' | 'none';
   entryCount: number;
+  isLate?: boolean;
+  lateMinutes?: number;
+  firstTimecardId?: string | null;
+  firstClockIn?: string | null;
 }
 
 interface TeamMember {
@@ -120,6 +125,13 @@ export default function AdminTimecardsPage() {
   const [showNightShiftSettings, setShowNightShiftSettings] = useState(false);
   const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
   const [savingNightShiftSettings, setSavingNightShiftSettings] = useState(false);
+
+  // Edit clock-in modal state
+  const [editClockInTarget, setEditClockInTarget] = useState<{ timecardId: string; currentClockIn: string; memberName: string } | null>(null);
+  const [editClockInTime, setEditClockInTime] = useState('');
+  const [editClockInNotes, setEditClockInNotes] = useState('');
+  const [savingClockIn, setSavingClockIn] = useState(false);
+
   const router = useRouter();
   const isRedirecting = useRef(false);
 
@@ -290,6 +302,30 @@ export default function AdminTimecardsPage() {
       fetchTeamSummary();
     } catch (error) {
       console.error('Error approving user timecards:', error);
+    }
+  };
+
+  // ── Edit clock-in time ─────────────────────────────────────
+  const handleSaveClockIn = async () => {
+    if (!editClockInTarget) return;
+    setSavingClockIn(true);
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+      const res = await fetch(`/api/admin/timecards/${editClockInTarget.timecardId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ clock_in_time: editClockInTime, admin_notes: editClockInNotes || undefined }),
+      });
+      if (res.ok) {
+        setEditClockInTarget(null);
+        setEditClockInNotes('');
+        fetchTeamSummary();
+      }
+    } catch (error) {
+      console.error('Error saving clock-in time:', error);
+    } finally {
+      setSavingClockIn(false);
     }
   };
 
@@ -800,13 +836,20 @@ export default function AdminTimecardsPage() {
                           const info = member.dailyHours[day];
                           return (
                             <td key={day} className="px-2 py-3 text-center">
-                              <div className={`inline-flex items-center justify-center w-12 h-8 rounded-md text-xs font-bold tabular-nums ${getDayCellClasses(info)}`}>
-                                {info.hours > 0 ? info.hours.toFixed(1) : info.status === 'active' ? (
-                                  <span className="flex items-center gap-0.5">
-                                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                              <div className="flex flex-col items-center gap-0.5">
+                                <div className={`inline-flex items-center justify-center w-12 h-8 rounded-md text-xs font-bold tabular-nums ${getDayCellClasses(info)}`}>
+                                  {info.hours > 0 ? info.hours.toFixed(1) : info.status === 'active' ? (
+                                    <span className="flex items-center gap-0.5">
+                                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-300">-</span>
+                                  )}
+                                </div>
+                                {info.isLate && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 rounded text-[9px] font-bold border border-red-200 dark:border-red-500/30">
+                                    ⏰ {info.lateMinutes}m late
                                   </span>
-                                ) : (
-                                  <span className="text-gray-300">-</span>
                                 )}
                               </div>
                             </td>
@@ -871,6 +914,29 @@ export default function AdminTimecardsPage() {
                               <Eye size={11} />
                               Detail
                             </button>
+                            {(() => {
+                              const lateDay = DAY_NAMES.find(d => member.dailyHours[d]?.firstTimecardId);
+                              const lateDayInfo = lateDay ? member.dailyHours[lateDay] : null;
+                              if (!lateDayInfo?.firstTimecardId) return null;
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const clockIn = lateDayInfo.firstClockIn || '';
+                                    // Convert to datetime-local format (YYYY-MM-DDTHH:mm)
+                                    const formatted = clockIn ? clockIn.slice(0, 16) : '';
+                                    setEditClockInTarget({ timecardId: lateDayInfo.firstTimecardId!, currentClockIn: clockIn, memberName: member.fullName });
+                                    setEditClockInTime(formatted);
+                                    setEditClockInNotes('');
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-md text-[11px] font-semibold border border-blue-200 dark:border-blue-400/30 transition-all"
+                                  title="Correct clock-in time"
+                                >
+                                  <Edit2 size={11} />
+                                  Edit
+                                </button>
+                              );
+                            })()}
                             {member.pendingCount > 0 && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleApproveUser(member.userId); }}
@@ -951,6 +1017,77 @@ export default function AdminTimecardsPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Edit Clock-In Modal ──────────────────────────── */}
+      {editClockInTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditClockInTarget(null)}>
+          <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                  <Edit2 size={16} className="text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm">Correct Clock-In Time</h3>
+                  <p className="text-[11px] text-gray-500 dark:text-white/40">{editClockInTarget.memberName}</p>
+                </div>
+              </div>
+              <button onClick={() => setEditClockInTarget(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors">
+                <X size={16} className="text-gray-400 dark:text-white/40" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/60 mb-1.5">
+                  Clock-In Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editClockInTime}
+                  onChange={(e) => setEditClockInTime(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:focus:border-blue-400 text-sm text-gray-900 dark:text-white transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-white/60 mb-1.5">
+                  Admin Notes <span className="font-normal text-gray-400">(optional)</span>
+                </label>
+                <textarea
+                  value={editClockInNotes}
+                  onChange={(e) => setEditClockInNotes(e.target.value)}
+                  placeholder="Reason for correction..."
+                  rows={2}
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:focus:border-blue-400 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 resize-none transition-all"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 px-3 py-2.5 bg-amber-50 dark:bg-amber-500/10 rounded-lg border border-amber-100 dark:border-amber-400/20">
+                <AlertCircle size={14} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                <p className="text-[10px] text-amber-700 dark:text-amber-300">This change will be logged. The operator will see the corrected time.</p>
+              </div>
+
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => setEditClockInTarget(null)}
+                  className="flex-1 px-4 py-2 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-700 dark:text-white/80 rounded-lg font-semibold text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveClockIn}
+                  disabled={savingClockIn || !editClockInTime}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg font-semibold text-sm transition-all disabled:opacity-50"
+                >
+                  {savingClockIn ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

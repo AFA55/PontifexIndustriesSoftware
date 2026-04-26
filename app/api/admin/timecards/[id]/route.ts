@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/admin/timecards/[id]
- * Get a specific timecard entry with all details including segments and GPS data.
+ * GET  /api/admin/timecards/[id] — fetch a specific timecard with full detail
+ * PATCH /api/admin/timecards/[id] — admin-correct clock-in/out times or add notes
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function GET(
   request: NextRequest,
@@ -100,6 +101,89 @@ export async function GET(
     });
   } catch (error: unknown) {
     console.error('Unexpected error in GET /api/admin/timecards/[id]:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/admin/timecards/[id]
+ * Admin-correct clock-in/out times, add notes, and recalculate total_hours.
+ * Clearing late flags when clock-in is corrected backward.
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
+    const { id: timecardId } = await params;
+    const tenantId = await getTenantId(auth.userId);
+
+    const body = await request.json();
+    const { clock_in_time, clock_out_time, admin_notes } = body;
+
+    const updates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (admin_notes !== undefined) updates.admin_notes = admin_notes;
+    if (clock_in_time) updates.clock_in_time = clock_in_time;
+    if (clock_out_time) updates.clock_out_time = clock_out_time;
+
+    // Fetch existing record so we can recalculate hours and check late status
+    const { data: existing, error: fetchError } = await supabaseAdmin
+      .from('timecards')
+      .select('clock_in_time, clock_out_time, break_minutes, is_late, scheduled_start_time')
+      .eq('id', timecardId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Timecard not found' }, { status: 404 });
+      }
+      return NextResponse.json({ error: 'Failed to fetch timecard' }, { status: 500 });
+    }
+
+    // Recalculate total_hours when either time changes
+    const inTime = clock_in_time
+      ? new Date(clock_in_time)
+      : new Date(existing.clock_in_time);
+    const outTimeRaw = clock_out_time
+      ? new Date(clock_out_time)
+      : existing.clock_out_time
+        ? new Date(existing.clock_out_time)
+        : null;
+
+    if (outTimeRaw) {
+      const rawHours = (outTimeRaw.getTime() - inTime.getTime()) / 3600000;
+      const breakHours = (existing.break_minutes || 0) / 60;
+      updates.total_hours = Math.max(0, rawHours - breakHours);
+    }
+
+    // Clear late flags if admin corrects clock-in time (assume the correction makes it on-time)
+    if (clock_in_time && existing.is_late) {
+      updates.is_late = false;
+      updates.late_minutes = 0;
+    }
+
+    const { data, error: updateError } = await supabaseAdmin
+      .from('timecards')
+      .update(updates)
+      .eq('id', timecardId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating timecard:', updateError);
+      return NextResponse.json({ error: 'Failed to update timecard' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (error: unknown) {
+    console.error('Unexpected error in PATCH /api/admin/timecards/[id]:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

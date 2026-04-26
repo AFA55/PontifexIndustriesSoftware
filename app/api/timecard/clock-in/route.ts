@@ -265,6 +265,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // -- Late detection --
+    // Look up the operator's job for today and check if they arrived late (≥15 min)
+    try {
+      const { data: todayJobs } = await supabaseAdmin
+        .from('job_orders')
+        .select('id, arrival_time, shop_arrival_time, customer_name')
+        .eq('assigned_to', user.id)
+        .eq('scheduled_date', todayDate)
+        .in('status', ['assigned', 'dispatched', 'in_route', 'on_site', 'in_progress', 'scheduled'])
+        .limit(1);
+
+      if (todayJobs && todayJobs.length > 0) {
+        const job = todayJobs[0];
+        // Use shop_arrival_time for shop clock-ins, arrival_time for jobsite clock-ins
+        const expectedTimeStr: string | null = is_shop_hours ? job.shop_arrival_time : job.arrival_time;
+
+        if (expectedTimeStr) {
+          const [hours, minutes] = expectedTimeStr.split(':').map(Number);
+          const expectedTime = new Date();
+          expectedTime.setHours(hours, minutes, 0, 0);
+
+          const lateMs = now.getTime() - expectedTime.getTime();
+          const lateMinutes = Math.floor(lateMs / 60000);
+
+          if (lateMinutes >= 15) {
+            // Mark the timecard as late
+            await supabaseAdmin
+              .from('timecards')
+              .update({
+                is_late: true,
+                late_minutes: lateMinutes,
+                scheduled_start_time: expectedTimeStr,
+                late_notified_at: now.toISOString(),
+              })
+              .eq('id', timecard.id);
+
+            // Notify all admins / ops managers in this tenant
+            const { data: adminProfiles } = await supabaseAdmin
+              .from('profiles')
+              .select('id')
+              .in('role', ['super_admin', 'operations_manager', 'admin'])
+              .eq('tenant_id', auth.tenantId || '');
+
+            const operatorName = profile?.full_name || user.email;
+            const actualTimeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+            const notifications = (adminProfiles || []).map((p: { id: string }) => ({
+              operator_id: p.id,
+              type: 'late_arrival',
+              message: `⚠️ ${operatorName} clocked in ${lateMinutes} min late (scheduled: ${expectedTimeStr}, actual: ${actualTimeStr}) — Job: ${job.customer_name}`,
+              tenant_id: auth.tenantId || null,
+              job_order_id: job.id,
+            }));
+
+            if (notifications.length > 0) {
+              Promise.resolve(
+                supabaseAdmin.from('schedule_notifications').insert(notifications)
+              ).catch(() => {});
+            }
+          }
+        }
+      }
+    } catch {
+      // Late detection is non-critical; never block a successful clock-in
+    }
+
     const flags = [];
     if (is_shop_hours) flags.push('Shop Hours');
     if (isNightShift) flags.push('Night Shift');
