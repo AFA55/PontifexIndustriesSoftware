@@ -1,0 +1,3 @@
+ALTER TABLE job_orders
+  ADD COLUMN IF NOT EXISTS in_route_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS arrived_at_jobsite_at TIMESTAMPTZ;
