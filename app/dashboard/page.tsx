@@ -964,50 +964,50 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
 
           {/* My Schedule - ACTIVE */}
-          <Link href="/dashboard/my-jobs" className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 p-1.5 shadow-2xl animate-fade-in-up hover:shadow-3xl transition-all duration-300 hover:scale-[1.02] text-left">
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7">
+          <Link href="/dashboard/my-jobs" className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-red-50 dark:from-white/[0.05] dark:to-red-900/10 p-1.5 shadow-2xl animate-fade-in-up hover:shadow-3xl transition-all duration-300 hover:scale-[1.02] text-left">
+            <div className="relative bg-white/95 dark:bg-white/[0.05] backdrop-blur-sm rounded-[22px] p-7">
               <div className="flex items-start justify-between mb-5">
-                <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-red-100 group-hover:ring-red-200 transition-all">
+                <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-red-100 dark:ring-red-500/20 group-hover:ring-red-200 transition-all">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
                 {activeJobsCount > 0 && (
-                  <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-bold border border-red-200">
+                  <span className="px-3 py-1 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 rounded-full text-sm font-bold border border-red-200 dark:border-red-500/30">
                     {activeJobsCount} Active
                   </span>
                 )}
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-red-700 transition-colors">My Schedule</h3>
-              <p className="text-gray-700 font-semibold">View today&apos;s dispatched job tickets</p>
-              <p className="text-sm text-gray-500 mt-1">Equipment checklists, routes, work logs</p>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-red-700 dark:group-hover:text-red-400 transition-colors">My Schedule</h3>
+              <p className="text-gray-700 dark:text-white/70 font-semibold">View today&apos;s dispatched job tickets</p>
+              <p className="text-sm text-gray-500 dark:text-white/40 mt-1">Equipment checklists, routes, work logs</p>
             </div>
           </Link>
 
           {/* View Timecard - Premium Indigo Card */}
           <Link
             href="/dashboard/timecard"
-            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-indigo-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.03] text-left animate-fade-in-up delay-200"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-indigo-50 dark:from-white/[0.05] dark:to-indigo-900/10 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.03] text-left animate-fade-in-up delay-200"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+            <div className="relative bg-white/95 dark:bg-white/[0.05] backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
               <div className="flex items-start justify-between mb-5">
-                <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-indigo-100 group-hover:ring-white/30">
+                <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-indigo-100 dark:ring-indigo-500/20 group-hover:ring-white/30">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <span className="px-4 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 group-hover:bg-white/20 text-indigo-700 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 shadow-md">
+                <span className="px-4 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-500/20 dark:to-purple-500/20 group-hover:bg-white/20 text-indigo-700 dark:text-indigo-300 group-hover:text-white text-xs font-bold rounded-full transition-all duration-300 shadow-md">
                   {weeklyHours.toFixed(1)} HRS
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2 transition-colors duration-300">
                 View Timecard
               </h3>
-              <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
+              <p className="text-gray-700 dark:text-white/70 group-hover:text-white/95 font-semibold transition-colors duration-300">
                 Check hours and attendance
               </p>
-              <div className="mt-5 flex items-center text-indigo-600 group-hover:text-white font-bold transition-colors duration-300">
+              <div className="mt-5 flex items-center text-indigo-600 dark:text-indigo-400 group-hover:text-white font-bold transition-colors duration-300">
                 <span>View Hours</span>
                 <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -1019,24 +1019,24 @@ export default function Dashboard() {
           {/* Request Time Off - Premium Purple Card */}
           <Link
             href="/dashboard/request-time-off"
-            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-purple-50 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 text-left animate-fade-in-up delay-300 hover:scale-[1.03]"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-purple-50 dark:from-white/[0.05] dark:to-purple-900/10 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 text-left animate-fade-in-up delay-300 hover:scale-[1.03]"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
-            <div className="relative bg-white/95 backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+            <div className="relative bg-white/95 dark:bg-white/[0.05] backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
               <div className="flex items-start justify-between mb-5">
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-purple-100 group-hover:ring-white/30">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-purple-100 dark:ring-purple-500/20 group-hover:ring-white/30">
                   <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-white mb-2 transition-colors duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2 transition-colors duration-300">
                 Request Time Off
               </h3>
-              <p className="text-gray-700 group-hover:text-white/95 font-semibold transition-colors duration-300">
+              <p className="text-gray-700 dark:text-white/70 group-hover:text-white/95 font-semibold transition-colors duration-300">
                 Submit vacation and PTO requests
               </p>
-              <div className="mt-5 flex items-center text-purple-600 group-hover:text-white font-bold transition-colors duration-300">
+              <div className="mt-5 flex items-center text-purple-600 dark:text-purple-400 group-hover:text-white font-bold transition-colors duration-300">
                 <span>Request Leave</span>
                 <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
