@@ -214,19 +214,19 @@ export default function StandbyPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-foreground">Loading...</p>
+          <div className="animate-spin w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-orange-50 dark:from-[#0b0618] dark:to-[#0e0720]">
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-orange-50 dark:bg-[#0b0618] dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720]">
       {/* Header */}
-      <div className="bg-white dark:bg-white/5 border-b-4 border-yellow-500 shadow-lg sticky top-0 z-10">
+      <div className="bg-white dark:bg-white/[0.05] border-b-4 border-yellow-500 dark:border-yellow-600/50 shadow-lg sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-2">
             <Link
@@ -255,23 +255,23 @@ export default function StandbyPage() {
       <div className="container mx-auto px-4 py-6 pb-24">
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-6 shadow-lg mb-6">
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800/40 rounded-2xl p-6 shadow-lg mb-6">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-red-200 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-red-200 dark:bg-red-900/40 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-700 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              <p className="text-red-800 font-bold text-lg">{error}</p>
+              <p className="text-red-800 dark:text-red-300 font-bold text-lg">{error}</p>
             </div>
           </div>
         )}
 
         {/* Step 1: Select Reason */}
         {step === 'reason' && (
-          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-5 sm:p-6">
+          <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-5 sm:p-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-2">Report Standby Time</h2>
-            <p className="text-gray-600 dark:text-white/60 mb-6">
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
               Please select the reason why work cannot proceed at this time.
             </p>
 
@@ -282,15 +282,15 @@ export default function StandbyPage() {
                   onClick={() => setSelectedReason(reason.value)}
                   className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
                     selectedReason === reason.value
-                      ? 'bg-yellow-50 border-yellow-500 shadow-md'
-                      : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/30'
+                      ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500 dark:border-yellow-500/70 shadow-md'
+                      : 'bg-gray-50 dark:bg-white/[0.05] border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/30'
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                       selectedReason === reason.value
                         ? 'border-yellow-500 bg-yellow-500'
-                        : 'border-gray-300 dark:border-white/20 bg-white dark:bg-transparent'
+                        : 'border-gray-300 dark:border-white/20 bg-white dark:bg-white/[0.07]'
                     }`}>
                       {selectedReason === reason.value && (
                         <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,7 +300,7 @@ export default function StandbyPage() {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-800 dark:text-white">{reason.label}</h3>
-                      <p className="text-sm text-gray-600 dark:text-white/60">{reason.description}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{reason.description}</p>
                     </div>
                   </div>
                 </button>
@@ -309,14 +309,14 @@ export default function StandbyPage() {
 
             {selectedReason === 'other' && (
               <div className="mt-4">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-white/80 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                   Please describe the reason:
                 </label>
                 <textarea
                   value={customReason}
                   onChange={(e) => setCustomReason(e.target.value)}
                   placeholder="Enter detailed description..."
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent dark:bg-white/5 dark:text-white"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-white/[0.07] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                   rows={4}
                 />
               </div>
@@ -333,27 +333,27 @@ export default function StandbyPage() {
 
         {/* Step 2: Policy Acknowledgment */}
         {step === 'policy' && (
-          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-5 sm:p-6">
+          <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-5 sm:p-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-2">Standby Time Policy</h2>
-            <p className="text-gray-600 dark:text-white/60 mb-6">
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
               The client representative must acknowledge the standby policy before the timer begins.
             </p>
 
             {/* Policy Summary */}
-            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 rounded-r-xl">
-              <h3 className="font-bold text-yellow-900 text-lg mb-2">Policy Summary</h3>
-              <p className="text-yellow-800 whitespace-pre-line">{STANDBY_POLICY_SUMMARY}</p>
-              <p className="text-yellow-900 font-bold mt-3">
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 p-4 mb-6 rounded-r-xl">
+              <h3 className="font-bold text-yellow-900 dark:text-yellow-300 text-lg mb-2">Policy Summary</h3>
+              <p className="text-yellow-800 dark:text-yellow-200 whitespace-pre-line">{STANDBY_POLICY_SUMMARY}</p>
+              <p className="text-yellow-900 dark:text-yellow-300 font-bold mt-3">
                 Billing Rate: ${STANDBY_HOURLY_RATE}/hour (minimum 1 hour)
               </p>
             </div>
 
             {/* Full Policy */}
-            <details className="mb-6 bg-gray-50 dark:bg-white/5 rounded-xl p-4">
-              <summary className="font-bold text-gray-800 dark:text-white cursor-pointer hover:text-yellow-600 transition-colors">
+            <details className="mb-6 bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10">
+              <summary className="font-bold text-gray-800 dark:text-white cursor-pointer hover:text-yellow-600 dark:hover:text-yellow-400 transition-colors">
                 View Full Policy Document
               </summary>
-              <div className="mt-4 text-sm text-gray-700 dark:text-white/80 whitespace-pre-line max-h-96 overflow-y-auto border-2 border-gray-200 dark:border-white/10 rounded-lg p-4 bg-white dark:bg-white/5">
+              <div className="mt-4 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line max-h-96 overflow-y-auto border-2 border-gray-200 dark:border-white/10 rounded-lg p-4 bg-white dark:bg-white/[0.05]">
                 {STANDBY_POLICY_FULL}
               </div>
             </details>
@@ -361,7 +361,7 @@ export default function StandbyPage() {
             {/* Client Acknowledgment Form */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-white/80 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                   Client Representative Name *
                 </label>
                 <input
@@ -369,12 +369,12 @@ export default function StandbyPage() {
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   placeholder="Enter full name"
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent dark:bg-white/5 dark:text-white"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-white/[0.07] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-white/80 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                   Client Representative Signature *
                 </label>
                 <input
@@ -382,17 +382,17 @@ export default function StandbyPage() {
                   value={clientSignature}
                   onChange={(e) => setClientSignature(e.target.value)}
                   placeholder="Type signature here"
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent font-signature text-xl dark:bg-white/5 dark:text-white"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent font-signature text-xl bg-white dark:bg-white/[0.07] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                   style={{ fontFamily: 'cursive' }}
                 />
-                <p className="text-xs text-gray-500 dark:text-white/40 mt-1">By typing your name, you agree to the terms above</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">By typing your name, you agree to the terms above</p>
               </div>
             </div>
 
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setStep('reason')}
-                className="flex-1 px-4 py-3 min-h-[44px] bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-800 dark:text-white rounded-xl font-bold text-base transition-all duration-200"
+                className="flex-1 px-4 py-3 min-h-[44px] bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-800 dark:text-gray-300 rounded-xl font-bold text-base transition-all duration-200"
                 disabled={submitting}
               >
                 Back
@@ -412,25 +412,25 @@ export default function StandbyPage() {
         {step === 'timer' && standbyStartTime && (
           <div className="space-y-6">
             {/* Timer Card */}
-            <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-8 text-center">
+            <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-8 text-center">
               <div className="inline-block p-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-full mb-4">
-                <svg className="w-16 h-16 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-16 h-16 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
 
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Standby Time Active</h2>
-              <p className="text-gray-600 dark:text-white/60 mb-6">Timer started at {standbyStartTime.toLocaleTimeString()}</p>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">Timer started at {standbyStartTime.toLocaleTimeString()}</p>
 
               {/* Large Timer Display */}
-              <div className="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-2xl p-5 sm:p-8 mb-6">
-                <div className="text-4xl sm:text-6xl font-bold text-yellow-900 font-mono">
+              <div className="bg-gradient-to-br from-yellow-100 to-orange-100 dark:bg-white/[0.05] dark:from-transparent dark:to-transparent rounded-2xl p-5 sm:p-8 mb-6 dark:border dark:border-yellow-500/20">
+                <div className="text-4xl sm:text-6xl font-bold text-yellow-900 dark:text-yellow-300 font-mono">
                   {formatDuration()}
                 </div>
-                <p className="text-gray-700 dark:text-white/80 font-semibold mt-4">
+                <p className="text-gray-700 dark:text-gray-300 font-semibold mt-4">
                   Current Charge: ${calculateCurrentCharge().toFixed(2)}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-white/60 mt-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   @ ${STANDBY_HOURLY_RATE}/hour (minimum 1 hour)
                 </p>
               </div>
@@ -445,23 +445,23 @@ export default function StandbyPage() {
             </div>
 
             {/* Info Card */}
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-6">
-              <h3 className="font-bold text-blue-900 mb-3">While on Standby:</h3>
-              <ul className="space-y-2 text-blue-800">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800/40 rounded-2xl p-6">
+              <h3 className="font-bold text-blue-900 dark:text-blue-300 mb-3">While on Standby:</h3>
+              <ul className="space-y-2 text-blue-800 dark:text-blue-200">
                 <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-1">•</span>
+                  <span className="text-blue-600 dark:text-blue-400 mt-1">•</span>
                   <span>Remain on-site and available to work</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-1">•</span>
+                  <span className="text-blue-600 dark:text-blue-400 mt-1">•</span>
                   <span>Document site conditions with photos if possible</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-1">•</span>
+                  <span className="text-blue-600 dark:text-blue-400 mt-1">•</span>
                   <span>Communicate with foreman about expected resolution time</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-1">•</span>
+                  <span className="text-blue-600 dark:text-blue-400 mt-1">•</span>
                   <span>Click "End Standby Time" as soon as work can resume</span>
                 </li>
               </ul>
