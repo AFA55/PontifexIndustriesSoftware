@@ -41,9 +41,24 @@ export async function GET(
     // Get job info
     const { data: job } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, customer_name, job_type, address, location, description, assigned_to, site_contact_phone, customer_contact')
+      .select('id, job_number, customer_name, job_type, address, location, description, assigned_to, site_contact_phone, customer_contact, in_route_at, arrived_at_jobsite_at, work_started_at, work_completed_at')
       .eq('id', sigRequest.job_order_id)
       .single();
+
+    // Fetch work items for this job
+    const { data: workItems } = await supabaseAdmin
+      .from('work_items')
+      .select('work_type, quantity, notes, core_quantity, core_size, linear_feet_cut')
+      .eq('job_order_id', sigRequest.job_order_id)
+      .order('created_at', { ascending: true });
+
+    // Fetch recent daily logs for this job
+    const { data: dailyLogs } = await supabaseAdmin
+      .from('daily_job_logs')
+      .select('log_date, hours_worked, work_performed')
+      .eq('job_order_id', sigRequest.job_order_id)
+      .order('log_date', { ascending: false })
+      .limit(10);
 
     // Update status to 'opened' if currently pending/sent
     if (['pending', 'sent'].includes(sigRequest.status)) {
@@ -62,6 +77,8 @@ export async function GET(
         contact_name: sigRequest.contact_name,
         status: sigRequest.status,
         form_template: sigRequest.form_templates || null,
+        work_items: workItems || [],
+        daily_logs: dailyLogs || [],
         job: job ? {
           job_number: job.job_number,
           customer_name: job.customer_name,
@@ -69,6 +86,10 @@ export async function GET(
           address: job.address || job.location,
           description: job.description,
           customer_contact: job.customer_contact,
+          in_route_at: job.in_route_at,
+          arrived_at_jobsite_at: job.arrived_at_jobsite_at,
+          work_started_at: job.work_started_at,
+          work_completed_at: job.work_completed_at,
         } : null,
       },
     });

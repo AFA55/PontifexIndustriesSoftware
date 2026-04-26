@@ -1849,7 +1849,7 @@ export default function WorkPerformed() {
             <span className="text-xs text-gray-400">(optional)</span>
           </div>
           <p className="text-xs text-gray-500 mb-3">
-            Take photos of work performed, site conditions, or anything noteworthy
+            Document your work — site conditions, before/after, and your team in action
           </p>
           <PhotoUploader
             bucket="job-photos"
@@ -1860,6 +1860,15 @@ export default function WorkPerformed() {
             label="Add Job Photos"
             lightMode={true}
           />
+          <div className="mt-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 flex items-start gap-2">
+            <span className="text-blue-500 text-lg flex-shrink-0">📸</span>
+            <div>
+              <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Showcase your work!</p>
+              <p className="text-xs text-blue-700 dark:text-blue-400">
+                Photos of you and your crew working are encouraged — they demonstrate professionalism and effort to the customer.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Voice Memo Notes */}

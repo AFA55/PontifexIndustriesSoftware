@@ -22,6 +22,15 @@ interface FormField {
   options?: string[];
 }
 
+interface WorkItem {
+  work_type: string;
+  quantity: number;
+  notes?: string;
+  core_quantity?: number;
+  core_size?: string;
+  linear_feet_cut?: number;
+}
+
 interface SignatureData {
   request_type: RequestType;
   contact_name: string;
@@ -33,6 +42,8 @@ interface SignatureData {
     fields: FormField[];
     requires_signature: boolean;
   } | null;
+  work_items?: WorkItem[];
+  daily_logs?: Array<{ log_date: string; hours_worked: number; work_performed?: string }>;
   job: {
     job_number: string;
     customer_name: string;
@@ -40,6 +51,10 @@ interface SignatureData {
     address: string;
     description: string;
     customer_contact: string;
+    in_route_at?: string;
+    arrived_at_jobsite_at?: string;
+    work_started_at?: string;
+    work_completed_at?: string;
   } | null;
 }
 
@@ -485,27 +500,48 @@ export default function PublicSignPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white">
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
         <div className="container mx-auto px-4 py-6 max-w-md">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-              <Shield className="w-5 h-5" />
+          {/* Company branding */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-11 h-11 rounded-xl bg-red-600 flex items-center justify-center shadow-lg">
+              <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold">Pontifex Industries</h1>
-              <p className="text-xs text-blue-300">Secure Document Signing</p>
+              <h1 className="text-lg font-bold tracking-tight">Patriot Concrete Cutting</h1>
+              <p className="text-xs text-slate-400">Licensed &bull; Insured &bull; Professional</p>
             </div>
           </div>
+
+          {/* Document title */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm font-semibold text-emerald-400 uppercase tracking-wide">
+                {isCompletion ? 'Work Completion Sign-Off' : isWaiver ? 'Utility Waiver' : 'Document Sign-Off'}
+              </span>
+            </div>
+          </div>
+
+          {/* Job card */}
           {data?.job && (
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 text-sm space-y-1">
-              <p className="font-semibold">{data.job.customer_name}</p>
-              <p className="text-blue-200 text-xs">{data.job.job_number} &bull; {data.job.job_type}</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 text-sm space-y-1.5 border border-white/10">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-white">{data.job.customer_name}</p>
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-mono text-slate-300">
+                  {data.job.job_number}
+                </span>
+              </div>
+              <p className="text-slate-400 text-xs capitalize">{data.job.job_type?.replace(/_/g, ' ')}</p>
               {data.job.address && (
-                <p className="text-blue-200 text-xs flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
+                <p className="text-slate-300 text-xs flex items-center gap-1">
+                  <MapPin className="w-3 h-3 flex-shrink-0" />
                   {data.job.address}
                 </p>
               )}
+              <p className="text-slate-400 text-xs">
+                {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
             </div>
           )}
         </div>
@@ -573,6 +609,64 @@ export default function PublicSignPage() {
               </div>
             </div>
           </>
+        )}
+
+        {/* ── WORK PERFORMED SUMMARY (completion only) ─── */}
+        {isCompletion && ((data?.work_items && data.work_items.length > 0) || (data?.daily_logs && data.daily_logs.length > 0) || data?.job?.arrived_at_jobsite_at || data?.job?.in_route_at) && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-green-600" />
+              Work Performed
+            </h2>
+
+            {/* Timeline timestamps */}
+            {(data?.job?.arrived_at_jobsite_at || data?.job?.in_route_at || data?.job?.work_completed_at) && (
+              <div className="flex flex-wrap gap-4 mb-4 p-3 bg-gray-50 rounded-xl">
+                {data.job?.in_route_at && (
+                  <div>
+                    <p className="text-xs text-gray-500">Crew Departed</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {new Date(data.job.in_route_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                )}
+                {data.job?.arrived_at_jobsite_at && (
+                  <div>
+                    <p className="text-xs text-gray-500">Arrived On Site</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {new Date(data.job.arrived_at_jobsite_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                )}
+                {data.job?.work_completed_at && (
+                  <div>
+                    <p className="text-xs text-gray-500">Work Completed</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {new Date(data.job.work_completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Work items list */}
+            {data?.work_items && data.work_items.length > 0 ? (
+              <div className="space-y-2">
+                {data.work_items.map((item: WorkItem, i: number) => (
+                  <div key={i} className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0">
+                    <span className="text-sm font-medium text-gray-800">{item.work_type}</span>
+                    <span className="text-sm text-gray-500 font-mono text-right ml-3 shrink-0">
+                      {item.quantity > 1 ? `×${item.quantity}` : ''}
+                      {item.core_quantity ? ` ${item.core_quantity} cores` : ''}
+                      {item.linear_feet_cut ? ` ${item.linear_feet_cut} LF` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">Work completed as discussed on site.</p>
+            )}
+          </div>
         )}
 
         {/* ── COMPLETION FORM ─── */}

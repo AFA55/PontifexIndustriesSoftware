@@ -9,7 +9,7 @@ import {
   ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
   ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer,
   Paperclip, Upload, Trash2, PauseCircle, X, Image, File, MapPin, Phone, Eye,
-  AlertTriangle, Shield
+  AlertTriangle, Shield, Lock
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
@@ -70,11 +70,9 @@ export default function JobDetailPage() {
 
   // Documents state
   const [documents, setDocuments] = useState<any[]>([]);
-  const [docsOpen, setDocsOpen] = useState(false); // collapsed by default
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docCategory, setDocCategory] = useState('other');
   const [docNotes, setDocNotes] = useState('');
-  const [showUploadForm, setShowUploadForm] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
 
   const isHelper = userRole === 'apprentice';
@@ -195,6 +193,15 @@ export default function JobDetailPage() {
     (hasEquipmentSelections
       ? checkAllConfirmed(unifiedItems, checkedItems)
       : mandatoryComplete);
+
+  // Location & site contact unlock once equipment is confirmed AND job is in_route or further
+  const equipmentAllChecked = equipmentAlreadyConfirmed ||
+    (hasEquipmentSelections
+      ? checkAllConfirmed(unifiedItems, checkedItems)
+      : mandatoryComplete);
+  const locationUnlocked = equipmentAllChecked &&
+    ['in_route', 'on_site', 'in_progress', 'completed'].includes(job?.status || '');
+
   const isCompleted = job?.status === 'completed';
   const isOnHold = job?.status === 'on_hold';
   const isInProgress = job ? ['in_route', 'in_progress'].includes(job.status) : false;
@@ -305,7 +312,6 @@ export default function JobDetailPage() {
 
       if (res.ok) {
         setDocNotes('');
-        setShowUploadForm(false);
         fetchDocuments();
       }
     } catch (err) {
@@ -661,31 +667,38 @@ export default function JobDetailPage() {
 
         {/* Job Location Card */}
         {(job.address || job.location) && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-6 h-6 text-red-600" />
+          locationUnlocked ? (
+            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-bold text-gray-800 mb-1">Location</h3>
+                  <p className="text-base text-gray-700 font-medium">{job.address || job.location}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-gray-800 mb-1">Location</h3>
-                <p className="text-base text-gray-700 font-medium">{job.address || job.location}</p>
-              </div>
+              {job.address && (
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors border border-blue-200"
+                >
+                  <MapPin className="w-4 h-4" /> Open in Maps
+                </a>
+              )}
             </div>
-            {job.address && (
-              <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors border border-blue-200"
-              >
-                <MapPin className="w-4 h-4" /> Open in Maps
-              </a>
-            )}
-          </div>
+          ) : (
+            <div className="bg-gray-100 dark:bg-white/5 rounded-xl p-4 flex items-center gap-3 text-gray-400">
+              <Lock className="w-5 h-5 flex-shrink-0" />
+              <p className="text-sm">Complete equipment checklist and start your route to view location & site contact</p>
+            </div>
+          )
         )}
 
-        {/* Site Contact Card — always show any available contact info */}
-        {(job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
+        {/* Site Contact Card — only show once location is unlocked */}
+        {locationUnlocked && (job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 overflow-hidden">
             <button
               onClick={() => setContactOpen(!contactOpen)}
@@ -1029,88 +1042,6 @@ export default function JobDetailPage() {
             </div>
           </div>
         )}
-
-        {/* Operator Documents - Collapsible upload section */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
-          <button
-            onClick={() => setDocsOpen(!docsOpen)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Upload className="w-5 h-5 text-indigo-600" />
-              <span className="text-base font-bold text-gray-800">My Uploads</span>
-              {operatorDocs.length > 0 && (
-                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-semibold">
-                  {operatorDocs.length}
-                </span>
-              )}
-            </div>
-            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${docsOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {docsOpen && (
-            <div className="px-5 pb-5 space-y-3">
-              {/* Operator docs list */}
-              {operatorDocs.length > 0 && (
-                <div className="space-y-3">
-                  {operatorDocs.map(doc => renderDocCard(doc, true))}
-                </div>
-              )}
-
-              {/* Upload toggle */}
-              {!showUploadForm ? (
-                <button
-                  onClick={() => setShowUploadForm(true)}
-                  className="w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
-                >
-                  <Upload className="w-4 h-4" /> Upload Document or Photo
-                </button>
-              ) : (
-                <div className="space-y-2 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                  <select
-                    value={docCategory}
-                    onChange={e => setDocCategory(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="site_photo">Site Photo</option>
-                    <option value="before_after">Before / After</option>
-                    <option value="permit">Permit</option>
-                    <option value="customer_doc">Customer Document</option>
-                    <option value="scope">Scope of Work</option>
-                    <option value="other">Other</option>
-                  </select>
-                  <input
-                    type="text"
-                    value={docNotes}
-                    onChange={e => setDocNotes(e.target.value)}
-                    placeholder="Notes (optional)"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                  <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-semibold cursor-pointer hover:bg-indigo-100 transition-all ${uploadingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                    {uploadingDoc ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
-                    ) : (
-                      <><Upload className="w-4 h-4" /> Tap to select file</>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      disabled={uploadingDoc}
-                    />
-                  </label>
-                  <button
-                    onClick={() => setShowUploadForm(false)}
-                    className="w-full text-sm text-gray-500 hover:text-gray-700 py-1"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
         {/* Action Buttons */}
         {!isCompleted && !isOnHold && !jobIsHelper && (
