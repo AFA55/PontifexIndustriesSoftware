@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
+import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 
 // Enhanced job data structure with real DSM-style information
 const jobDetails = {
@@ -352,9 +353,9 @@ export default function JobDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-blue-50 dark:bg-none dark:bg-[#0b0618]">
       {/* Header */}
-      <div className="bg-white border-b-4 border-red-500 shadow-lg sticky top-0 z-10">
+      <div className="bg-white dark:bg-white/[0.03] border-b-4 border-red-500 dark:border-red-700 shadow-lg sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-2">
             <Link
@@ -367,11 +368,12 @@ export default function JobDetail() {
               Back
             </Link>
 
-            <h1 className="text-base sm:text-xl font-bold text-gray-800 text-center flex-1 mx-2 truncate">
+            <h1 className="text-base sm:text-xl font-bold text-gray-800 dark:text-white text-center flex-1 mx-2 truncate">
               Job Order #{job.id}
             </h1>
 
             <div className="flex items-center gap-2 flex-shrink-0">
+              <DarkModeIconToggle />
               <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{user?.name?.charAt(0) || 'U'}</span>
               </div>

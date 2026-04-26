@@ -12,6 +12,7 @@ import RecommendedItems from './_components/RecommendedItems';
 import PhotoUploader from '@/components/PhotoUploader';
 import { Camera, Mic } from 'lucide-react';
 import VoiceMemoNotes from './_components/VoiceMemoNotes';
+import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 
 // Organized work item categories based on DSM screenshots
 const WORK_CATEGORIES = {
@@ -1272,16 +1273,16 @@ export default function WorkPerformed() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+      <div className="bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link
               href={`/dashboard/my-jobs/${params.id}/jobsite`}
-              className="p-2 bg-gray-100 rounded-xl border border-gray-200 hover:bg-gray-200 transition-all"
+              className="p-2 bg-gray-100 dark:bg-white/10 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
             >
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-600 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </Link>
@@ -1291,18 +1292,19 @@ export default function WorkPerformed() {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold text-gray-900 truncate">Work Performed</h1>
-              <p className="text-gray-500 text-xs">Select completed work items</p>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white truncate">Work Performed</h1>
+              <p className="text-gray-500 dark:text-white/50 text-xs">Select completed work items</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <DarkModeIconToggle />
               {selectedItems.length > 0 && (
-                <span className="px-2 py-1.5 bg-gray-100 text-gray-700 rounded-xl text-xs font-semibold border border-gray-200">
+                <span className="px-2 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl text-xs font-semibold border border-gray-200 dark:border-white/10">
                   {selectedItems.length}
                 </span>
               )}
               <button
                 onClick={() => setView(view === 'search' ? 'selected' : 'search')}
-                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold text-xs border border-gray-200 min-h-[36px]"
+                className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold text-xs border border-gray-200 dark:border-white/10 min-h-[36px]"
               >
                 <span className="hidden sm:inline">{view === 'search' ? 'View Selected' : 'Add More'}</span>
                 <span className="sm:hidden">{view === 'search' ? 'Selected' : 'Search'}</span>
