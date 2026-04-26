@@ -18,6 +18,12 @@ import {
   Send,
   Phone,
   X,
+  FileText,
+  Download,
+  User,
+  MapPin,
+  Wrench,
+  ClipboardList,
 } from 'lucide-react';
 import PhotoUploader from '@/components/PhotoUploader';
 import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
@@ -36,6 +42,12 @@ export default function DayCompletePage() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [completionPhotos, setCompletionPhotos] = useState<string[]>([]);
   const [esignConsented, setEsignConsented] = useState(false);
+  const [pdfSaved, setPdfSaved] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [workPerformedItems, setWorkPerformedItems] = useState<Array<{
+    type?: string; description?: string; quantity?: string | number;
+    unit?: string; depth?: string | number; notes?: string;
+  }>>([]);
 
   // ─── Smart last-day detection ────────────────────────────────────────────
   const [isLastScheduledDay, setIsLastScheduledDay] = useState<boolean | null>(null);
@@ -59,7 +71,15 @@ export default function DayCompletePage() {
   useEffect(() => {
     fetchJob();
     fetchScheduleInfo();
-  }, []);
+    // Load work performed from localStorage
+    const stored = localStorage.getItem(`work-performed-${jobId}`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setWorkPerformedItems(parsed.items || []);
+      } catch { /* ignore */ }
+    }
+  }, [jobId]);
 
   const fetchJob = async () => {
     try {
@@ -233,7 +253,34 @@ export default function DayCompletePage() {
       }
 
       const stored = localStorage.getItem(`work-performed-${jobId}`);
-      const workPerformed = stored ? JSON.parse(stored).items : [];
+      const workPerformed = stored ? JSON.parse(stored).items : workPerformedItems;
+
+      // ── Generate & upload completion PDF ──────────────────────────────────
+      let generatedPdfUrl: string | null = null;
+      try {
+        const pdfRes = await fetch(`/api/job-orders/${jobId}/generate-completion-pdf`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            signerName: signerName || null,
+            signatureDataUrl: signatureData || null,
+            workPerformed,
+          }),
+        });
+        if (pdfRes.ok) {
+          const pdfData = await pdfRes.json();
+          generatedPdfUrl = pdfData.pdf_url || null;
+          if (generatedPdfUrl) {
+            setPdfUrl(generatedPdfUrl);
+            setPdfSaved(true);
+          }
+        }
+      } catch (pdfErr) {
+        console.error('PDF generation error (non-fatal):', pdfErr);
+      }
 
       await fetch(`/api/job-orders/${jobId}/daily-log`, {
         method: 'POST',
@@ -267,9 +314,9 @@ export default function DayCompletePage() {
       });
 
       if (statusRes.ok) {
-        showNotif('Job completed! Great work!', 'success');
+        showNotif(generatedPdfUrl ? 'Job completed! PDF saved.' : 'Job completed! Great work!', 'success');
         localStorage.removeItem(`work-performed-${jobId}`);
-        setTimeout(() => router.push('/dashboard/my-jobs'), 1500);
+        setTimeout(() => router.push('/dashboard/my-jobs'), 2000);
       } else {
         const data = await statusRes.json();
         showNotif(data.error || 'Failed to complete job', 'error');
@@ -664,25 +711,148 @@ export default function DayCompletePage() {
             </button>
           </div>
         ) : (
-          /* ── On-site Signature Section ────────────────────────────────────── */
+          /* ── On-site Sign-Off Document ────────────────────────────────────── */
           <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-2">
+            {/* Back button + title */}
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowSignature(false)}
                 className="p-2 bg-gray-100 dark:bg-white/10 rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
               >
                 <ArrowLeft className="w-4 h-4 text-slate-600 dark:text-gray-300" />
               </button>
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-                Customer Signature
-              </h2>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Job Completion Sign-Off</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Review work summary with customer, then sign below</p>
+              </div>
             </div>
 
+            {/* ── Company Header Card ──────────────────────────────────────── */}
+            <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+              {/* Header stripe */}
+              <div className="bg-slate-800 dark:bg-slate-900 px-5 py-4">
+                <p className="text-white font-bold text-base tracking-wide">PATRIOT CONCRETE CUTTING</p>
+                <p className="text-slate-300 text-xs mt-0.5">Job Completion Sign-Off</p>
+              </div>
+
+              {/* Job meta grid */}
+              <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-white/5">
+                <div className="bg-white dark:bg-[#0f0a1e] px-4 py-3">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Job #</p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">{job?.job_number || '—'}</p>
+                </div>
+                <div className="bg-white dark:bg-[#0f0a1e] px-4 py-3">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Date</p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">
+                    {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-[#0f0a1e] px-4 py-3 col-span-2">
+                  <div className="flex items-start gap-1.5">
+                    <User className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Customer</p>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">{job?.customer_name || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+                {(job?.address || job?.location) && (
+                  <div className="bg-white dark:bg-[#0f0a1e] px-4 py-3 col-span-2">
+                    <div className="flex items-start gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Location</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-200">{job?.address || job?.location}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Work Ordered ─────────────────────────────────────────────── */}
+            {(job?.scope_of_work || job?.description) && (
+              <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
+                  <ClipboardList className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                  <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">Work Ordered</h3>
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {job?.scope_of_work || job?.description}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ── Work Performed ────────────────────────────────────────────── */}
+            <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
+                <Wrench className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">Work Performed</h3>
+              </div>
+              <div className="px-5 py-4">
+                {workPerformedItems.length > 0 ? (
+                  <ul className="space-y-2">
+                    {workPerformedItems.map((item, idx) => {
+                      const parts: string[] = [];
+                      if (item.quantity) parts.push(String(item.quantity));
+                      if (item.unit) parts.push(item.unit);
+                      if (item.depth) parts.push(`${item.depth}" depth`);
+                      const qtyStr = parts.join(' ');
+                      const desc = [item.description, item.notes].filter(Boolean).join(' — ');
+                      return (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <span className="text-emerald-500 font-bold mt-0.5">•</span>
+                          <span className="text-gray-700 dark:text-gray-300">
+                            <span className="font-semibold text-gray-900 dark:text-white">{item.type || 'Work'}</span>
+                            {qtyStr ? ` — ${qtyStr}` : ''}
+                            {desc ? `, ${desc}` : ''}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                    No individual work items recorded. Work was performed as described in the scope above.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* ── Disclaimer ───────────────────────────────────────────────── */}
+            <div className="bg-amber-50 dark:bg-amber-950/30 rounded-2xl border border-amber-200 dark:border-amber-800/50 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-3 border-b border-amber-200 dark:border-amber-800/50">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <h3 className="text-sm font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
+                  Acknowledgement &amp; Disclaimer
+                </h3>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                  Patriot Concrete Cutting assumes no responsibility for layout, water damage, embedments, or buried utilities. I agree that the work described above has been completed satisfactorily.
+                </p>
+                <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                  Patriot Concrete Cutting will not be liable for any reinforcement, utilities, or other obstructions that are damaged and are outside the capabilities of our equipment to detect. This includes but is not limited to: obstructions below the concrete on a slab on grade; low voltage or low current power lines not currently under load; any obstruction in newly poured concrete.
+                </p>
+                <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                  By signing below, the customer acknowledges that they have reviewed the scope of work and work performed above, and that the work has been completed to their satisfaction. Any claims or disputes must be reported within 48 hours of job completion. This signature authorizes Patriot Concrete Cutting to invoice for services rendered.
+                </p>
+              </div>
+            </div>
+
+            {/* ── Signature Form ────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                <PenTool className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">Customer Signature</h3>
+              </div>
+
               {/* Signer Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                  Customer Name (optional)
+                  Printed Name <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -698,18 +868,23 @@ export default function DayCompletePage() {
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-1">
                     <PenTool className="w-3.5 h-3.5" />
-                    Signature (optional)
+                    Signature <span className="text-gray-400 font-normal ml-1">(draw below)</span>
                   </label>
                   {signatureData && (
                     <button
                       onClick={clearSignature}
-                      className="text-xs text-red-500 hover:text-red-700"
+                      className="text-xs text-red-500 hover:text-red-700 font-medium"
                     >
                       Clear
                     </button>
                   )}
                 </div>
-                <div className="border-2 border-dashed border-slate-300 dark:border-white/20 rounded-xl overflow-hidden bg-gray-50 dark:bg-white/[0.03]">
+                <div className="border-2 border-dashed border-slate-300 dark:border-white/20 rounded-xl overflow-hidden bg-gray-50 dark:bg-white/[0.03] relative">
+                  {!signatureData && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <p className="text-xs text-gray-300 dark:text-gray-600 select-none">Sign here</p>
+                    </div>
+                  )}
                   <canvas
                     ref={canvasRef}
                     width={600}
@@ -725,9 +900,6 @@ export default function DayCompletePage() {
                     onTouchEnd={stopDrawing}
                   />
                 </div>
-                <p className="text-xs text-gray-400 mt-1 text-center">
-                  Draw signature above or skip
-                </p>
               </div>
 
               {/* E-Sign Consent */}
@@ -736,18 +908,31 @@ export default function DayCompletePage() {
                 consented={esignConsented}
               />
 
-              {/* Submit via approval workflow */}
+              {/* PDF notice */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-800/40">
+                <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  A PDF of this sign-off will be generated and saved to the job record automatically.
+                </p>
+              </div>
+
+              {/* Submit button */}
               <button
-                onClick={() => { setShowSignature(false); setShowCompletionModal(true); }}
+                onClick={handleJobComplete}
                 disabled={submitting}
                 className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl py-4 font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {submitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Saving PDF &amp; Completing…</span>
+                  </>
                 ) : (
-                  <CheckCircle2 className="w-5 h-5" />
+                  <>
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>Complete Job &amp; Save Sign-Off</span>
+                  </>
                 )}
-                {submitting ? 'Submitting...' : 'Submit for Approval'}
               </button>
 
               <button
@@ -755,7 +940,7 @@ export default function DayCompletePage() {
                 disabled={submitting}
                 className="w-full text-gray-500 dark:text-gray-400 text-sm hover:text-gray-700 dark:hover:text-gray-200 py-2 disabled:opacity-40"
               >
-                Skip signature and submit for approval
+                Skip signature — submit for supervisor approval instead
               </button>
             </div>
           </div>

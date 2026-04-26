@@ -38,12 +38,12 @@ function formatTime(time: string | null) {
 
 function getStatusStyle(status: string) {
   switch (status) {
-    case 'assigned': return 'bg-blue-100 text-blue-700 border-blue-200';
-    case 'in_route': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-    case 'in_progress': return 'bg-orange-100 text-orange-700 border-orange-200';
-    case 'on_hold': return 'bg-purple-100 text-purple-700 border-purple-200';
-    case 'completed': return 'bg-green-100 text-green-700 border-green-200';
-    default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    case 'assigned': return 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30';
+    case 'in_route': return 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-500/30';
+    case 'in_progress': return 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-500/30';
+    case 'on_hold': return 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/30';
+    case 'completed': return 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-500/30';
+    default: return 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/70 border-gray-200 dark:border-white/10';
   }
 }
 
@@ -338,10 +338,10 @@ export default function JobDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0b0618] dark:bg-none flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 text-lg font-medium">Loading job details...</p>
+          <p className="text-gray-600 dark:text-white/60 text-lg font-medium">Loading job details...</p>
         </div>
       </div>
     );
@@ -349,11 +349,11 @@ export default function JobDetailPage() {
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0b0618] dark:bg-none flex items-center justify-center">
         <div className="text-center">
-          <Inbox className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-600 text-lg font-medium">Job not found</p>
-          <Link href="/dashboard/my-jobs" className="mt-3 inline-block text-blue-600 hover:underline font-semibold">
+          <Inbox className="w-12 h-12 text-gray-400 dark:text-white/40 mx-auto mb-3" />
+          <p className="text-gray-600 dark:text-white/60 text-lg font-medium">Job not found</p>
+          <Link href="/dashboard/my-jobs" className="mt-3 inline-block text-blue-600 dark:text-blue-400 hover:underline font-semibold">
             Back to My Schedule
           </Link>
         </div>
@@ -404,42 +404,42 @@ export default function JobDetailPage() {
   const renderDocCard = (doc: any, canDelete: boolean = false) => {
     const isImage = doc.file_type?.startsWith('image/');
     return (
-      <div key={doc.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div key={doc.id} className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
         {/* Clickable preview area */}
         <a
           href={doc.file_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="block p-4 hover:bg-gray-50 transition-colors"
+          className="block p-4 hover:bg-gray-50 dark:hover:bg-white/[0.08] transition-colors"
         >
           <div className="flex items-start gap-4">
             <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              isImage ? 'bg-indigo-100' : 'bg-gray-100'
+              isImage ? 'bg-indigo-100 dark:bg-indigo-500/20' : 'bg-gray-100 dark:bg-white/10'
             }`}>
-              {isImage ? <Image className="w-7 h-7 text-indigo-500" /> : <File className="w-7 h-7 text-gray-400" />}
+              {isImage ? <Image className="w-7 h-7 text-indigo-500 dark:text-indigo-400" /> : <File className="w-7 h-7 text-gray-400 dark:text-white/40" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-base font-bold text-gray-900 truncate">{doc.file_name}</p>
+              <p className="text-base font-bold text-gray-900 dark:text-white truncate">{doc.file_name}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-xs font-semibold text-white bg-indigo-500 px-2 py-0.5 rounded-full">
                   {categoryLabels[doc.category] || doc.category}
                 </span>
                 {doc.uploaded_by_name && (
-                  <span className="text-xs text-gray-500">by {doc.uploaded_by_name}</span>
+                  <span className="text-xs text-gray-500 dark:text-white/40">by {doc.uploaded_by_name}</span>
                 )}
               </div>
               {doc.notes && (
-                <p className="text-sm text-gray-600 mt-1">{doc.notes}</p>
+                <p className="text-sm text-gray-600 dark:text-white/60 mt-1">{doc.notes}</p>
               )}
             </div>
-            <Eye className="w-5 h-5 text-blue-500 flex-shrink-0 mt-1" />
+            <Eye className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-1" />
           </div>
         </a>
         {canDelete && (
-          <div className="border-t border-gray-100 px-4 py-2">
+          <div className="border-t border-gray-100 dark:border-white/10 px-4 py-2">
             <button
               onClick={() => handleDeleteDocument(doc.id)}
-              className="text-xs text-red-500 hover:text-red-700 font-semibold flex items-center gap-1"
+              className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-semibold flex items-center gap-1"
             >
               <Trash2 className="w-3.5 h-3.5" /> Remove
             </button>
@@ -450,7 +450,7 @@ export default function JobDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0b0618] dark:bg-none">
       {/* Professional Header */}
       <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-10 shadow-2xl">
         <div className="container mx-auto px-4 py-4 max-w-lg">
@@ -507,14 +507,14 @@ export default function JobDetailPage() {
           <>
             {/* Location */}
             {(job.address || job.location) && (
-              <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+              <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-6 h-6 text-red-600" />
+                  <div className="w-12 h-12 bg-red-100 dark:bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-6 h-6 text-red-600 dark:text-red-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-bold text-gray-800 mb-1">Job Location</h3>
-                    <p className="text-base text-gray-700 font-medium">{job.address || job.location}</p>
+                    <h3 className="text-base font-bold text-gray-800 dark:text-white mb-1">Job Location</h3>
+                    <p className="text-base text-gray-700 dark:text-white/80 font-medium">{job.address || job.location}</p>
                   </div>
                 </div>
                 {job.address && (
@@ -532,17 +532,17 @@ export default function JobDetailPage() {
 
             {/* Site Contact */}
             {(job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
-              <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 p-5">
+              <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 dark:border-white/10 p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <Phone className="w-5 h-5 text-green-600" />
-                  <h3 className="text-base font-bold text-gray-800">Site Contact</h3>
+                  <Phone className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <h3 className="text-base font-bold text-gray-800 dark:text-white">Site Contact</h3>
                 </div>
                 <div className="space-y-3">
                   {(job.foreman_name || job.customer_contact) && (
-                    <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
+                    <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-100 dark:border-green-500/20">
                       <div>
-                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Contact</p>
-                        <p className="text-lg font-bold text-gray-900">{job.foreman_name || job.customer_contact}</p>
+                        <p className="text-xs text-gray-500 dark:text-white/40 font-semibold uppercase tracking-wider">Contact</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{job.foreman_name || job.customer_contact}</p>
                       </div>
                       {(job.foreman_phone || job.site_contact_phone) && (
                         <a href={`tel:${job.foreman_phone || job.site_contact_phone}`}
@@ -553,10 +553,10 @@ export default function JobDetailPage() {
                     </div>
                   )}
                   {!(job.foreman_name || job.customer_contact) && (job.site_contact_phone || job.foreman_phone) && (
-                    <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
+                    <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-100 dark:border-green-500/20">
                       <div>
-                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Site Phone</p>
-                        <p className="text-lg font-bold text-gray-900">{job.site_contact_phone || job.foreman_phone}</p>
+                        <p className="text-xs text-gray-500 dark:text-white/40 font-semibold uppercase tracking-wider">Site Phone</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{job.site_contact_phone || job.foreman_phone}</p>
                       </div>
                       <a href={`tel:${job.site_contact_phone || job.foreman_phone}`}
                         className="flex items-center gap-2 px-5 py-3 bg-green-500 text-white rounded-xl text-sm font-bold hover:bg-green-600 transition-colors shadow-md">
@@ -609,12 +609,12 @@ export default function JobDetailPage() {
             {job.readable_status}
           </span>
           {isMultiDay && (
-            <span className="text-sm px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full font-bold border border-purple-200">
+            <span className="text-sm px-3 py-1.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-full font-bold border border-purple-200 dark:border-purple-500/30">
               Multi-Day
             </span>
           )}
           {jobIsHelper && (
-            <span className="text-sm px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-full font-bold border border-emerald-200">
+            <span className="text-sm px-3 py-1.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-full font-bold border border-emerald-200 dark:border-emerald-500/30">
               Team Member
             </span>
           )}
@@ -628,19 +628,19 @@ export default function JobDetailPage() {
 
         {/* Scope Updated Banner — recent approved change orders */}
         {recentChangeOrders.length > 0 && (
-          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-sm">
+          <div className="bg-amber-50 dark:bg-amber-500/10 border-2 border-amber-300 dark:border-amber-500/40 rounded-2xl p-5 shadow-sm">
             <div className="flex items-start gap-3 mb-3">
-              <AlertTriangle className="w-6 h-6 text-amber-600 mt-0.5 flex-shrink-0" />
+              <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <p className="text-base font-bold text-amber-800">Scope has been updated on this job</p>
-                <p className="text-sm text-amber-700 mt-0.5">Review with your supervisor before proceeding</p>
+                <p className="text-base font-bold text-amber-800 dark:text-amber-300">Scope has been updated on this job</p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">Review with your supervisor before proceeding</p>
               </div>
             </div>
             <div className="space-y-2 pl-9">
               {recentChangeOrders.map(co => (
-                <div key={co.id} className="bg-amber-100/70 rounded-xl px-3 py-2 border border-amber-200">
-                  <span className="text-xs font-bold text-amber-700 mr-2">v{co.version}</span>
-                  <span className="text-sm text-amber-900">{co.scope_description}</span>
+                <div key={co.id} className="bg-amber-100/70 dark:bg-amber-500/20 rounded-xl px-3 py-2 border border-amber-200 dark:border-amber-500/30">
+                  <span className="text-xs font-bold text-amber-700 dark:text-amber-400 mr-2">v{co.version}</span>
+                  <span className="text-sm text-amber-900 dark:text-amber-200">{co.scope_description}</span>
                 </div>
               ))}
             </div>
@@ -649,16 +649,16 @@ export default function JobDetailPage() {
 
         {/* On-Hold Banner */}
         {isOnHold && (
-          <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-5 shadow-sm">
+          <div className="bg-purple-50 dark:bg-purple-500/10 border-2 border-purple-300 dark:border-purple-500/40 rounded-2xl p-5 shadow-sm">
             <div className="flex items-start gap-3">
-              <PauseCircle className="w-6 h-6 text-purple-600 mt-0.5 flex-shrink-0" />
+              <PauseCircle className="w-6 h-6 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <p className="text-base font-bold text-purple-800">Job On Hold</p>
+                <p className="text-base font-bold text-purple-800 dark:text-purple-300">Job On Hold</p>
                 {job.pause_reason && (
-                  <p className="text-sm text-purple-600 mt-1">{job.pause_reason}</p>
+                  <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">{job.pause_reason}</p>
                 )}
                 {job.return_date && (
-                  <p className="text-sm text-purple-500 mt-1">Expected return: {job.return_date}</p>
+                  <p className="text-sm text-purple-500 dark:text-purple-400 mt-1">Expected return: {job.return_date}</p>
                 )}
               </div>
             </div>
@@ -668,14 +668,14 @@ export default function JobDetailPage() {
         {/* Job Location Card */}
         {(job.address || job.location) && (
           locationUnlocked ? (
-            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+            <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-6 h-6 text-red-600" />
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-6 h-6 text-red-600 dark:text-red-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-bold text-gray-800 mb-1">Location</h3>
-                  <p className="text-base text-gray-700 font-medium">{job.address || job.location}</p>
+                  <h3 className="text-base font-bold text-gray-800 dark:text-white mb-1">Location</h3>
+                  <p className="text-base text-gray-700 dark:text-white/80 font-medium">{job.address || job.location}</p>
                 </div>
               </div>
               {job.address && (
@@ -683,14 +683,14 @@ export default function JobDetailPage() {
                   href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors border border-blue-200"
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-xl text-sm font-bold hover:bg-blue-100 dark:hover:bg-blue-500/30 transition-colors border border-blue-200 dark:border-blue-500/30"
                 >
                   <MapPin className="w-4 h-4" /> Open in Maps
                 </a>
               )}
             </div>
           ) : (
-            <div className="bg-gray-100 dark:bg-white/5 rounded-xl p-4 flex items-center gap-3 text-gray-400">
+            <div className="bg-gray-100 dark:bg-white/[0.05] rounded-xl p-4 flex items-center gap-3 text-gray-400 dark:text-white/40 border border-gray-200 dark:border-white/10">
               <Lock className="w-5 h-5 flex-shrink-0" />
               <p className="text-sm">Complete equipment checklist and start your route to view location & site contact</p>
             </div>
@@ -699,25 +699,25 @@ export default function JobDetailPage() {
 
         {/* Site Contact Card — only show once location is unlocked */}
         {locationUnlocked && (job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 overflow-hidden">
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 dark:border-white/10 overflow-hidden">
             <button
               onClick={() => setContactOpen(!contactOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Phone className="w-5 h-5 text-green-600" />
-                <span className="text-base font-bold text-gray-800">Site Contact</span>
+                <Phone className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <span className="text-base font-bold text-gray-800 dark:text-white">Site Contact</span>
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${contactOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${contactOpen ? 'rotate-180' : ''}`} />
             </button>
             {contactOpen && <div className="px-5 pb-5 space-y-3">
             <div className="space-y-3">
               {/* Primary contact name row */}
               {(job.foreman_name || job.customer_contact) && (
-                <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
+                <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-100 dark:border-green-500/20">
                   <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Contact</p>
-                    <p className="text-lg font-bold text-gray-900">{job.foreman_name || job.customer_contact}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/40 font-semibold uppercase tracking-wider">Contact</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">{job.foreman_name || job.customer_contact}</p>
                   </div>
                   {(job.foreman_phone || job.site_contact_phone) && (
                     <a
@@ -731,17 +731,17 @@ export default function JobDetailPage() {
               )}
               {/* Secondary contact if both foreman_name and customer_contact are set and different */}
               {job.foreman_name && job.customer_contact && job.customer_contact !== job.foreman_name && (
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Also</p>
-                  <p className="text-base font-bold text-gray-900">{job.customer_contact}</p>
+                <div className="p-4 bg-gray-50 dark:bg-white/[0.05] rounded-xl border border-gray-200 dark:border-white/10">
+                  <p className="text-xs text-gray-500 dark:text-white/40 font-semibold uppercase tracking-wider">Also</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-white">{job.customer_contact}</p>
                 </div>
               )}
               {/* Phone-only row when no name is set */}
               {!(job.foreman_name || job.customer_contact) && (job.site_contact_phone || job.foreman_phone) && (
-                <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
+                <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-100 dark:border-green-500/20">
                   <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Site Phone</p>
-                    <p className="text-lg font-bold text-gray-900">{job.site_contact_phone || job.foreman_phone}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/40 font-semibold uppercase tracking-wider">Site Phone</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">{job.site_contact_phone || job.foreman_phone}</p>
                   </div>
                   <a
                     href={`tel:${job.site_contact_phone || job.foreman_phone}`}
@@ -753,10 +753,10 @@ export default function JobDetailPage() {
               )}
               {/* Separate site phone row if name IS set and a different site phone also exists */}
               {(job.foreman_name || job.customer_contact) && job.site_contact_phone && job.site_contact_phone !== job.foreman_phone && (
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/[0.05] rounded-xl border border-gray-200 dark:border-white/10">
                   <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Site Phone</p>
-                    <p className="text-lg font-bold text-gray-900">{job.site_contact_phone}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/40 font-semibold uppercase tracking-wider">Site Phone</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">{job.site_contact_phone}</p>
                   </div>
                   <a
                     href={`tel:${job.site_contact_phone}`}
@@ -772,36 +772,36 @@ export default function JobDetailPage() {
         )}
 
         {/* Crew Info - collapsible */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+        <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 overflow-hidden">
           <button
             onClick={() => setCrewOpen(!crewOpen)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
           >
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-600" />
-              <span className="text-base font-bold text-gray-800">Crew</span>
+              <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <span className="text-base font-bold text-gray-800 dark:text-white">Crew</span>
             </div>
-            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${crewOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${crewOpen ? 'rotate-180' : ''}`} />
           </button>
           {crewOpen && <div className="px-5 pb-5">
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+            <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-xl border border-blue-100 dark:border-blue-500/20">
               <div className="w-11 h-11 bg-blue-500 text-white rounded-full flex items-center justify-center text-base font-bold flex-shrink-0">
                 {(job.operator_name || 'O')[0].toUpperCase()}
               </div>
               <div className="min-w-0">
-                <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider">Operator</p>
-                <p className="text-base font-bold text-gray-900 truncate">{job.operator_name || 'Unassigned'}</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider">Operator</p>
+                <p className="text-base font-bold text-gray-900 dark:text-white truncate">{job.operator_name || 'Unassigned'}</p>
               </div>
             </div>
             {job.helper_name && (
-              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+              <div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-100 dark:border-emerald-500/20">
                 <div className="w-11 h-11 bg-emerald-500 text-white rounded-full flex items-center justify-center text-base font-bold flex-shrink-0">
                   {job.helper_name[0].toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wider">Team Member</p>
-                  <p className="text-base font-bold text-gray-900 truncate">{job.helper_name}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold uppercase tracking-wider">Team Member</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-white truncate">{job.helper_name}</p>
                 </div>
               </div>
             )}
@@ -810,39 +810,39 @@ export default function JobDetailPage() {
         </div>
 
         {/* Work Details Panel - Bigger text */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+        <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 overflow-hidden">
           <button
             onClick={() => setWorkDetailsOpen(!workDetailsOpen)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
           >
             <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600" />
-              <span className="text-base font-bold text-gray-800">Work Details</span>
+              <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <span className="text-base font-bold text-gray-800 dark:text-white">Work Details</span>
             </div>
-            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${workDetailsOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${workDetailsOpen ? 'rotate-180' : ''}`} />
           </button>
           {workDetailsOpen && (
             <div className="px-5 pb-5 space-y-4">
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="px-4 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-base font-bold">
+                <span className="px-4 py-1.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-lg text-base font-bold">
                   {job.job_type}
                 </span>
                 {job.estimated_hours && (
-                  <span className="text-base text-gray-500">Est. {job.estimated_hours} hrs</span>
+                  <span className="text-base text-gray-500 dark:text-white/40">Est. {job.estimated_hours} hrs</span>
                 )}
                 {job.po_number && (
-                  <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">PO: {job.po_number}</span>
+                  <span className="text-sm text-gray-500 dark:text-white/40 bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg">PO: {job.po_number}</span>
                 )}
               </div>
-              <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">
+              <div className="p-4 bg-gray-50 dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 rounded-xl">
+                <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">
                   {job.description || 'No description provided'}
                 </p>
               </div>
               {/* Scope Details (quantities) */}
               {job.scope_details && Object.keys(job.scope_details).length > 0 && (
                 <div>
-                  <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Scope Quantities</p>
+                  <p className="text-sm font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider mb-2">Scope Quantities</p>
                   <ScopeDetailsDisplay scopeDetails={job.scope_details} />
                 </div>
               )}
@@ -855,9 +855,9 @@ export default function JobDetailPage() {
                 <PhotoViewer photos={job.site_compliance.attachment_urls} label="Compliance Documents" />
               )}
               {(job.salesman_name || job.created_by_name) && (
-                <div className="flex items-center gap-2 text-base text-gray-600">
+                <div className="flex items-center gap-2 text-base text-gray-600 dark:text-white/60">
                   <User className="w-4 h-4" />
-                  <span>Submitted by: <strong>{job.salesman_name || job.created_by_name}</strong></span>
+                  <span>Submitted by: <strong className="dark:text-white">{job.salesman_name || job.created_by_name}</strong></span>
                 </div>
               )}
             </div>
@@ -866,17 +866,17 @@ export default function JobDetailPage() {
 
         {/* Jobsite Conditions — collapsible */}
         {hasConditions && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-amber-200/60 overflow-hidden">
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-amber-200/60 dark:border-white/10 overflow-hidden">
             <button
               onClick={() => setConditionsOpen(!conditionsOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
             >
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
-                <span className="text-base font-bold text-gray-800">Jobsite Conditions</span>
-                <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold">{filledConditions.length}</span>
+                <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <span className="text-base font-bold text-gray-800 dark:text-white">Jobsite Conditions</span>
+                <span className="text-xs px-2 py-0.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded-full font-bold">{filledConditions.length}</span>
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${conditionsOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${conditionsOpen ? 'rotate-180' : ''}`} />
             </button>
             {conditionsOpen && (
               <div className="px-5 pb-5">
@@ -886,9 +886,9 @@ export default function JobDetailPage() {
                     const label = conditionLabels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                     const isWarning = key === 'cord_480' || key === 'high_work';
                     return (
-                      <div key={key} className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm ${isWarning ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-100'}`}>
-                        <span className={`font-semibold ${isWarning ? 'text-red-700' : 'text-gray-700'}`}>{label}</span>
-                        <span className={`font-bold ml-2 ${isWarning ? 'text-red-900' : 'text-gray-900'}`}>{displayValue}</span>
+                      <div key={key} className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm ${isWarning ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-100 dark:border-amber-500/20'}`}>
+                        <span className={`font-semibold ${isWarning ? 'text-red-700 dark:text-red-400' : 'text-gray-700 dark:text-white/70'}`}>{label}</span>
+                        <span className={`font-bold ml-2 ${isWarning ? 'text-red-900 dark:text-red-300' : 'text-gray-900 dark:text-white'}`}>{displayValue}</span>
                       </div>
                     );
                   })}
@@ -900,17 +900,17 @@ export default function JobDetailPage() {
 
         {/* Site Compliance — collapsible */}
         {hasCompliance && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-indigo-200/60 overflow-hidden">
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-indigo-200/60 dark:border-white/10 overflow-hidden">
             <button
               onClick={() => setComplianceOpen(!complianceOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-indigo-600" />
-                <span className="text-base font-bold text-gray-800">Site Compliance</span>
-                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-bold">Required</span>
+                <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-base font-bold text-gray-800 dark:text-white">Site Compliance</span>
+                <span className="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 rounded-full font-bold">Required</span>
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${complianceOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${complianceOpen ? 'rotate-180' : ''}`} />
             </button>
             {complianceOpen && (
               <div className="px-5 pb-5 space-y-2">
@@ -918,9 +918,9 @@ export default function JobDetailPage() {
                   const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                   const displayValue = typeof value === 'boolean' ? (value ? 'Required' : 'Not Required') : String(value);
                   return (
-                    <div key={key} className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                      <span className="text-sm font-semibold text-indigo-800">{label}</span>
-                      <span className="text-sm font-bold text-indigo-900 ml-2">{displayValue}</span>
+                    <div key={key} className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl border border-indigo-100 dark:border-indigo-500/20">
+                      <span className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">{label}</span>
+                      <span className="text-sm font-bold text-indigo-900 dark:text-white ml-2">{displayValue}</span>
                     </div>
                   );
                 })}
@@ -931,35 +931,35 @@ export default function JobDetailPage() {
 
         {/* Additional Notes & Directions — collapsible */}
         {hasAdditionalNotes && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-purple-200/60 overflow-hidden">
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-purple-200/60 dark:border-white/10 overflow-hidden">
             <button
               onClick={() => setNotesOpen(!notesOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
             >
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-purple-600" />
-                <span className="text-base font-bold text-gray-800">Additional Notes</span>
+                <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <span className="text-base font-bold text-gray-800 dark:text-white">Additional Notes</span>
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${notesOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${notesOpen ? 'rotate-180' : ''}`} />
             </button>
             {notesOpen && (
               <div className="px-5 pb-5 space-y-3">
                 {job.additional_info && (
-                  <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-                    <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Notes</p>
-                    <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.additional_info}</p>
+                  <div className="p-4 bg-purple-50 dark:bg-purple-500/10 rounded-xl border border-purple-100 dark:border-purple-500/20">
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold uppercase mb-1">Notes</p>
+                    <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.additional_info}</p>
                   </div>
                 )}
                 {job.directions && (
-                  <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                    <p className="text-xs text-blue-600 font-semibold uppercase mb-1">Directions</p>
-                    <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.directions}</p>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-500/10 rounded-xl border border-blue-100 dark:border-blue-500/20">
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold uppercase mb-1">Directions</p>
+                    <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.directions}</p>
                   </div>
                 )}
                 {job.special_equipment_notes && (
-                  <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-                    <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Special Equipment Notes</p>
-                    <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.special_equipment_notes}</p>
+                  <div className="p-4 bg-purple-50 dark:bg-purple-500/10 rounded-xl border border-purple-100 dark:border-purple-500/20">
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold uppercase mb-1">Special Equipment Notes</p>
+                    <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.special_equipment_notes}</p>
                   </div>
                 )}
               </div>
@@ -969,23 +969,23 @@ export default function JobDetailPage() {
 
         {/* Equipment Confirmation Panel */}
         {unifiedItems.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 overflow-hidden">
             <button
               onClick={() => setEquipmentOpen(!equipmentOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Wrench className="w-5 h-5 text-green-600" />
-                <span className="text-base font-bold text-gray-800">Equipment Confirmation</span>
+                <Wrench className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <span className="text-base font-bold text-gray-800 dark:text-white">Equipment Confirmation</span>
                 {!equipmentAlreadyConfirmed && !isCompleted && (
                   <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                    canStartRoute ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                    canStartRoute ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300'
                   }`}>
                     {canStartRoute ? 'Ready' : 'Confirm All'}
                   </span>
                 )}
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${equipmentOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${equipmentOpen ? 'rotate-180' : ''}`} />
             </button>
             {equipmentOpen && (
               <div className="px-5 pb-5">
@@ -1016,7 +1016,7 @@ export default function JobDetailPage() {
 
         {/* Completed job: show helper description as collapsible */}
         {jobIsHelper && isCompleted && (
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200 p-4">
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-green-200 dark:border-white/10 p-4">
             <HelperWorkLog
               jobId={job.id}
               jobNumber={job.job_number}
@@ -1029,10 +1029,10 @@ export default function JobDetailPage() {
 
         {/* Admin Documents & Photos - Prominent section */}
         {adminDocs.length > 0 && (
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl shadow-xl border-2 border-indigo-200 p-5">
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:bg-none dark:bg-white/[0.05] rounded-2xl shadow-xl border-2 border-indigo-200 dark:border-white/10 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Paperclip className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-base font-bold text-indigo-900">Job Documents & Photos</h3>
+              <Paperclip className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <h3 className="text-base font-bold text-indigo-900 dark:text-white">Job Documents & Photos</h3>
               <span className="text-xs px-2 py-0.5 bg-indigo-500 text-white rounded-full font-bold">
                 {adminDocs.length}
               </span>
@@ -1061,7 +1061,7 @@ export default function JobDetailPage() {
                 className={`w-full py-5 rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3 ${
                   canStartRoute
                     ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-white/40 cursor-not-allowed'
                 }`}
               >
                 {startingRoute ? (
@@ -1094,7 +1094,7 @@ export default function JobDetailPage() {
           <div className="pt-2">
             <button
               onClick={handleViewCompleted}
-              className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold text-base transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 bg-gray-100 dark:bg-white/[0.05] hover:bg-gray-200 dark:hover:bg-white/[0.10] text-gray-700 dark:text-white rounded-2xl font-semibold text-base transition-all flex items-center justify-center gap-2 border border-transparent dark:border-white/10"
             >
               <FileText className="w-5 h-5" /> View Work Performed
             </button>
