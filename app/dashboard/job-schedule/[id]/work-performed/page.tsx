@@ -2066,18 +2066,6 @@ export default function WorkPerformed() {
                           </div>
                         </label>
 
-                        {currentHole.cutSteel && (
-                          <div className="mt-3 ml-8">
-                            <label className="block text-xs font-bold text-gray-700 mb-1.5">Steel Type</label>
-                            <textarea
-                              value={currentHole.steelEncountered || ''}
-                              onChange={(e) => setCurrentHole(prev => ({ ...prev, steelEncountered: e.target.value }))}
-                              placeholder="e.g., #4 rebar, angle iron, etc..."
-                              className="w-full px-3 py-2.5 text-sm border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 placeholder:text-gray-400"
-                              rows={2}
-                            />
-                          </div>
-                        )}
                       </div>
 
                       <button
@@ -2236,7 +2224,7 @@ export default function WorkPerformed() {
                                     type="number"
                                     step="0.1"
                                     min="0"
-                                    value={currentCut.linearFeet}
+                                    value={currentCut.linearFeet || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
                                     className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-purple-50 text-gray-900 font-bold placeholder:text-gray-400"
                                     placeholder="Total linear feet"
@@ -2249,7 +2237,7 @@ export default function WorkPerformed() {
                                     type="number"
                                     step="0.25"
                                     min="0"
-                                    value={currentCut.cutDepth}
+                                    value={currentCut.cutDepth || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
                                     className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none bg-purple-50 text-gray-900 font-bold placeholder:text-gray-400"
                                     placeholder="Depth"
@@ -2281,7 +2269,7 @@ export default function WorkPerformed() {
                                     type="number"
                                     step="0.1"
                                     min="0"
-                                    value={currentCut.linearFeet}
+                                    value={currentCut.linearFeet || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
                                     className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-blue-50 text-gray-900 font-bold placeholder:text-gray-400"
                                     placeholder="Total linear feet"
@@ -2294,7 +2282,7 @@ export default function WorkPerformed() {
                                     type="number"
                                     step="0.25"
                                     min="0"
-                                    value={currentCut.cutDepth}
+                                    value={currentCut.cutDepth || ''}
                                     onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
                                     className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-blue-50 text-gray-900 font-bold placeholder:text-gray-400"
                                     placeholder="Depth"
@@ -2313,7 +2301,7 @@ export default function WorkPerformed() {
                                   type="number"
                                   step="0.1"
                                   min="0"
-                                  value={currentCut.linearFeet}
+                                  value={currentCut.linearFeet || ''}
                                   onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
                                   className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
                                   placeholder="Linear feet"
@@ -2327,7 +2315,7 @@ export default function WorkPerformed() {
                                   type="number"
                                   step="0.25"
                                   min="0"
-                                  value={currentCut.cutDepth}
+                                  value={currentCut.cutDepth || ''}
                                   onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
                                   className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white shadow-sm text-gray-900 placeholder:text-gray-500"
                                   placeholder="Depth"
@@ -2402,19 +2390,6 @@ export default function WorkPerformed() {
                               )}
                             </div>
 
-                            {/* Steel Info field - appears when Cut Through Steel is checked */}
-                            {currentCut.cutSteel && (
-                              <div className="mt-3">
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">Steel Type/Description</label>
-                                <textarea
-                                  value={currentCut.steelEncountered || ''}
-                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, steelEncountered: e.target.value }))}
-                                  placeholder="e.g., #4 rebar, angle iron, etc..."
-                                  className="w-full px-3 py-2 text-sm border-2 border-red-300 rounded-lg focus:border-red-500 focus:outline-none bg-white text-gray-900 placeholder:text-gray-500"
-                                  rows={2}
-                                />
-                              </div>
-                            )}
                           </div>
                         </>
                       )}
