@@ -65,14 +65,25 @@ export async function POST(
       );
     }
 
-    // Verify user is assigned to this job (operator or helper)
+    // Verify user is assigned to this job (primary operator or helper)
     const isOperator = job.assigned_to === user.id;
     const isHelper = job.helper_assigned_to === user.id;
     if (!isOperator && !isHelper) {
-      return NextResponse.json(
-        { error: 'You are not assigned to this job' },
-        { status: 403 }
-      );
+      // Fallback: allow if user has existing daily_job_logs for this job
+      // (handles edge cases where assignment changed after work started)
+      const { data: existingLog } = await supabaseAdmin
+        .from('daily_job_logs')
+        .select('id')
+        .eq('job_order_id', jobId)
+        .eq('operator_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      if (!existingLog) {
+        return NextResponse.json(
+          { error: 'You are not assigned to this job' },
+          { status: 403 }
+        );
+      }
     }
 
     const now = new Date().toISOString();
