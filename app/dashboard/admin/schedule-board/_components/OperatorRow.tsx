@@ -77,7 +77,7 @@ function PersonDropdown({
         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-semibold transition-all ${
           value
             ? `${colorScheme.bg} ${colorScheme.text} hover:opacity-80`
-            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+            : 'bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-white/50 hover:bg-gray-200 dark:hover:bg-white/15'
         }`}
       >
         {value || placeholder}
@@ -85,11 +85,11 @@ function PersonDropdown({
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-60 bg-white rounded-xl shadow-xl border border-gray-200 z-50 py-1 max-h-64 overflow-y-auto">
+        <div className="absolute top-full left-0 mt-1 w-60 bg-white dark:bg-[#1a0f35] rounded-xl shadow-xl border border-gray-200 dark:border-white/10 z-50 py-1 max-h-64 overflow-y-auto">
           {value && (
             <button
               onClick={() => { onSelect(null); setOpen(false); }}
-              className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 transition-colors"
+              className="w-full text-left px-3 py-2 text-xs text-gray-400 dark:text-white/40 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
             >
               Clear selection
             </button>
@@ -102,16 +102,18 @@ function PersonDropdown({
                 key={name}
                 onClick={() => { onSelect(name); setOpen(false); }}
                 className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between ${
-                  isCurrent ? 'bg-purple-50 text-purple-700' : 'hover:bg-gray-50 text-gray-700'
+                  isCurrent
+                    ? 'bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
+                    : 'hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-white/80'
                 }`}
               >
                 <div>
                   <span className="font-medium">{name}</span>
                   {busyJob && !isCurrent && (
-                    <p className="text-[10px] text-amber-600 font-medium">Assigned: {busyJob}</p>
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Assigned: {busyJob}</p>
                   )}
                 </div>
-                {isCurrent && <Check className="w-4 h-4 text-purple-600" />}
+                {isCurrent && <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
               </button>
             );
           })}
@@ -169,8 +171,10 @@ export default function OperatorRow({
 
   return (
     <div
-      className={`border-l-4 ${colorScheme.border} bg-white rounded-xl shadow-sm hover:shadow-md transition-all ${
-        dragOver ? 'ring-2 ring-purple-400 ring-offset-2 shadow-lg scale-[1.01] bg-purple-50/30' : ''
+      className={`border-l-4 ${colorScheme.border} bg-white dark:bg-white/[0.05] rounded-xl shadow-sm dark:shadow-none dark:ring-1 dark:ring-white/10 hover:shadow-md dark:hover:ring-white/20 transition-all ${
+        dragOver
+          ? 'ring-2 ring-purple-400 ring-offset-2 shadow-lg scale-[1.01] bg-purple-50/30 dark:bg-purple-500/10 dark:ring-purple-400/60'
+          : ''
       }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -180,7 +184,7 @@ export default function OperatorRow({
         {/* Row header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorScheme.bg}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorScheme.bg} dark:opacity-80`}>
               {hasJobs
                 ? <Briefcase className={`w-5 h-5 ${colorScheme.icon}`} />
                 : <Users className={`w-5 h-5 ${colorScheme.icon}`} />
@@ -197,23 +201,23 @@ export default function OperatorRow({
                     onSelect={(name) => onChangeOperator?.(name)}
                     colorScheme={colorScheme}
                   />
-                  <span className="text-gray-300 hidden sm:inline">+</span>
+                  <span className="text-gray-300 dark:text-white/20 hidden sm:inline">+</span>
                   <PersonDropdown
                     value={helperName}
                     options={allHelpers}
                     busyMap={busyHelpers}
                     placeholder="Select Helper"
                     onSelect={(name) => onChangeHelper?.(name)}
-                    colorScheme={{ bg: 'bg-gray-100', text: 'text-gray-600' }}
+                    colorScheme={{ bg: 'bg-gray-100 dark:bg-white/10', text: 'text-gray-600 dark:text-white/70' }}
                   />
                 </>
               ) : (
                 <div>
-                  <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">
                     {operatorName || 'Available'}
                   </h3>
                   {helperName && (
-                    <p className="text-xs text-gray-500">+ {helperName}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/50">+ {helperName}</p>
                   )}
                 </div>
               )}
@@ -227,7 +231,7 @@ export default function OperatorRow({
             {canEdit && isAvailable && (
               <button
                 onClick={onAssignJob}
-                className="p-1.5 rounded-lg hover:bg-green-100 text-green-600 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-500/15 text-green-600 dark:text-green-400 transition-colors"
                 title="Assign job to this operator"
               >
                 <Plus className="w-4 h-4" />
@@ -238,13 +242,13 @@ export default function OperatorRow({
 
         {/* Time-off overlay */}
         {timeOff && (
-          <div className="flex items-center gap-3 py-3 px-4 mb-3 rounded-lg bg-gray-100 border border-gray-200 text-gray-700">
-            <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+          <div className="flex items-center gap-3 py-3 px-4 mb-3 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-white/70">
+            <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
               <span className="text-sm">&#128564;</span>
             </div>
             <div>
               <span className="text-sm font-bold">{TIME_OFF_LABELS[timeOff.type] || timeOff.type}</span>
-              {timeOff.notes && <p className="text-xs text-gray-500 mt-0.5">{timeOff.notes}</p>}
+              {timeOff.notes && <p className="text-xs text-gray-500 dark:text-white/40 mt-0.5">{timeOff.notes}</p>}
             </div>
           </div>
         )}
@@ -285,9 +289,11 @@ export default function OperatorRow({
         )}
         {!timeOff && jobs.length === 0 && (
           <div className={`flex items-center justify-center py-3 rounded-lg border-2 border-dashed transition-all ${
-            dragOver ? 'bg-purple-50 border-purple-400' : 'bg-green-50/50 border-green-200'
+            dragOver
+              ? 'bg-purple-50 dark:bg-purple-500/10 border-purple-400 dark:border-purple-400/60'
+              : 'bg-green-50/50 dark:bg-green-500/5 border-green-200 dark:border-green-500/30'
           }`}>
-            <p className={`text-sm font-medium flex items-center gap-2 ${dragOver ? 'text-purple-600' : 'text-green-500'}`}>
+            <p className={`text-sm font-medium flex items-center gap-2 ${dragOver ? 'text-purple-600 dark:text-purple-300' : 'text-green-500 dark:text-green-400'}`}>
               {dragOver ? (
                 <>
                   <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
@@ -300,7 +306,7 @@ export default function OperatorRow({
                   {canEdit && (
                     <button
                       onClick={onAssignJob}
-                      className="ml-1 text-purple-600 hover:text-purple-800 font-semibold hover:underline"
+                      className="ml-1 text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-semibold hover:underline"
                     >
                       + Assign
                     </button>

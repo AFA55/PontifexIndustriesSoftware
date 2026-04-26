@@ -1615,7 +1615,7 @@ export default function ScheduleBoardPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-3" />
-          <p className="text-gray-600 dark:text-slate-400 font-medium">Loading schedule...</p>
+          <p className="text-gray-600 dark:text-white/60 font-medium">Loading schedule...</p>
         </div>
       </div>
     );
@@ -1624,19 +1624,19 @@ export default function ScheduleBoardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720]">
       {/* ═══ STICKY HEADER ════════════════════════════════════════════════ */}
-      <div className="backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-30 shadow-lg">
+      <div className="backdrop-blur-xl bg-white/90 dark:bg-[#0e0720]/95 border-b border-gray-200 dark:border-white/10 sticky top-0 z-30 shadow-lg">
         <div className="container mx-auto px-4 md:px-6 py-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <Link href="/dashboard/admin" className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all hover:scale-105">
-                <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-slate-300" />
+              <Link href="/dashboard/admin" className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-white/10 rounded-xl transition-all hover:scale-105">
+                <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-white/70" />
               </Link>
               <div>
                 <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-purple-600" />
                   {canEdit ? 'Operations Schedule Board' : 'Schedule Board'}
                 </h1>
-                <p className="text-gray-500 dark:text-slate-400 text-xs">
+                <p className="text-gray-500 dark:text-white/60 text-xs">
                   {canEdit ? 'Manage assignments, approvals & dispatch' : 'View scheduled jobs • Request changes'}
                 </p>
               </div>
@@ -1727,7 +1727,7 @@ export default function ScheduleBoardPage() {
 
       {/* ═══ DATE NAVIGATION + STATS ═════════════════════════════════════ */}
       <div className="container mx-auto px-4 md:px-6 py-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 p-4 md:p-5">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 p-4 md:p-5">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <ScheduleDatePicker value={selectedDate} onChange={setSelectedDate} />
 
@@ -1738,7 +1738,7 @@ export default function ScheduleBoardPage() {
                   className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
                     viewMode === 'day'
                       ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
-                      : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-600'
+                      : 'text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-200 dark:hover:bg-white/15'
                   }`}
                 >
                   <LayoutGrid className="w-4 h-4" /> Day
@@ -1748,7 +1748,7 @@ export default function ScheduleBoardPage() {
                   className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
                     viewMode === 'week'
                       ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
-                      : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-600'
+                      : 'text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-200 dark:hover:bg-white/15'
                   }`}
                 >
                   <CalendarDays className="w-4 h-4" /> Week
@@ -1801,7 +1801,7 @@ export default function ScheduleBoardPage() {
               {canEdit && (
                 <button
                   onClick={() => setShowCapacitySettings(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl text-gray-600 dark:text-slate-400 text-sm font-semibold transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 rounded-xl text-gray-600 dark:text-white/60 text-sm font-semibold transition-all"
                   title="Capacity Settings"
                 >
                   <Settings className="w-4 h-4" />
@@ -1895,7 +1895,7 @@ export default function ScheduleBoardPage() {
       {/* ═══ WEEKLY VIEW ═══════════════════════════════════════════════════ */}
       {viewMode === 'week' && boardViewMode !== 'crew-grid' && (
         <div className="container mx-auto px-4 md:px-6 pb-6">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 overflow-x-auto">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-x-auto">
             <div className="grid grid-cols-1 md:grid-cols-7 divide-x divide-gray-200 dark:divide-slate-700 min-w-0 md:min-w-[1000px]">
               {Object.entries(weekData).sort(([a], [b]) => a.localeCompare(b)).map(([date, jobs]) => {
                 const d = parseLocalDate(date);
@@ -1912,15 +1912,15 @@ export default function ScheduleBoardPage() {
                       className={`w-full px-3 py-2.5 text-center border-b-2 transition-all ${
                         isToday ? 'bg-purple-50 dark:bg-purple-500/15 border-purple-500' :
                         isSelected ? 'bg-blue-50 dark:bg-blue-500/15 border-blue-400' :
-                        'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'
+                        'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
                       }`}
                     >
-                      <p className={`text-xs font-bold uppercase ${isToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-slate-400'}`}>{dayName}</p>
+                      <p className={`text-xs font-bold uppercase ${isToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-white/60'}`}>{dayName}</p>
                       <p className={`text-lg font-bold ${isToday ? 'text-purple-700 dark:text-purple-300' : 'text-gray-900 dark:text-white'}`}>{monthName} {dayNum}</p>
                       <p className={`text-[10px] font-semibold ${
                         jobs.length === 0 ? 'text-green-500 dark:text-green-400' :
                         jobs.length >= capacityMaxSlots ? 'text-red-500 dark:text-red-400' :
-                        'text-gray-400 dark:text-slate-500'
+                        'text-gray-400 dark:text-white/50'
                       }`}>
                         {jobs.length} job{jobs.length !== 1 ? 's' : ''}
                       </p>
@@ -1928,7 +1928,7 @@ export default function ScheduleBoardPage() {
                     {/* Jobs list */}
                     <div className="p-2 space-y-1.5 max-h-[60vh] overflow-y-auto">
                       {jobs.length === 0 ? (
-                        <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-6 italic">No jobs</p>
+                        <p className="text-xs text-gray-400 dark:text-white/50 text-center py-6 italic">No jobs</p>
                       ) : (
                         jobs.map(job => (
                           <div
@@ -1939,7 +1939,7 @@ export default function ScheduleBoardPage() {
                               e.dataTransfer.effectAllowed = 'move';
                             }}
                             onClick={() => { setSelectedDate(date); setViewMode('day'); }}
-                            className="p-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-md transition-all cursor-pointer group"
+                            className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800 hover:shadow-md transition-all cursor-pointer group"
                           >
                             <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{job.customer_name}</p>
                             <p className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold truncate">{job.job_type?.split(',')[0]?.trim()}</p>
@@ -2039,7 +2039,7 @@ export default function ScheduleBoardPage() {
                 value={shopNotesText}
                 onChange={(e) => setShopNotesText(e.target.value)}
                 placeholder="Who's working in the shop today, notes for the crew, special instructions..."
-                className="w-full h-20 px-3 py-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-gray-400"
+                className="w-full h-20 px-3 py-2 border border-gray-200 dark:border-white/10 dark:bg-slate-700 dark:text-white dark:placeholder-white/40 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-gray-400"
               />
             </div>
           </div>
@@ -2186,7 +2186,7 @@ export default function ScheduleBoardPage() {
             </div>
 
             {/* Stats */}
-            <div className="px-6 py-4 grid grid-cols-3 gap-3 border-b border-gray-100 dark:border-slate-700">
+            <div className="px-6 py-4 grid grid-cols-3 gap-3 border-b border-gray-100 dark:border-white/10">
               <div className="text-center p-3 bg-green-50 dark:bg-green-500/10 rounded-xl">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">{autoScheduleResults.totalAssigned}</div>
                 <div className="text-xs font-semibold text-green-500 dark:text-green-500 uppercase">Assigned</div>
@@ -2209,13 +2209,13 @@ export default function ScheduleBoardPage() {
                     <Zap className="w-4 h-4 text-green-500" /> Assignments
                   </h3>
                   {autoScheduleResults.assignments.map((a, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700 rounded-xl border border-gray-100 dark:border-slate-600">
+                    <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700 rounded-xl border border-gray-100 dark:border-white/10">
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">{a.customerName}</div>
-                        <div className="text-xs text-gray-500 dark:text-slate-400">{a.jobNumber}</div>
+                        <div className="text-xs text-gray-500 dark:text-white/60">{a.jobNumber}</div>
                       </div>
                       <div className="flex items-center gap-2 ml-3">
-                        <span className="text-sm font-medium text-gray-700 dark:text-slate-300">→ {a.operatorName}</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-white/70">→ {a.operatorName}</span>
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                           a.matchQuality === 'good' ? 'bg-green-100 text-green-700' :
                           a.matchQuality === 'stretch' ? 'bg-yellow-100 text-yellow-700' :
@@ -2255,7 +2255,7 @@ export default function ScheduleBoardPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 flex justify-end">
+            <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex justify-end">
               <button
                 onClick={() => setAutoScheduleResults(null)}
                 className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md"
@@ -2370,16 +2370,16 @@ export default function ScheduleBoardPage() {
                     <div className="flex justify-center">
                       <div className="text-center p-4 bg-gray-50 dark:bg-slate-700 rounded-xl min-w-[120px]">
                         <div className="text-3xl font-bold text-gray-900 dark:text-white">{dispatchInfo.total}</div>
-                        <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-1">Assigned Jobs</div>
+                        <div className="text-xs text-gray-500 dark:text-white/60 font-medium mt-1">Assigned Jobs</div>
                       </div>
                     </div>
 
                     {dispatchInfo.total === 0 ? (
-                      <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl">
-                        <AlertCircle className="w-6 h-6 text-gray-400 dark:text-slate-500 flex-shrink-0" />
+                      <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-white/10 rounded-xl">
+                        <AlertCircle className="w-6 h-6 text-gray-400 dark:text-white/50 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-bold text-gray-700 dark:text-slate-300">No assigned jobs for this date</p>
-                          <p className="text-xs text-gray-500 dark:text-slate-400">Assign operators to jobs on the board first.</p>
+                          <p className="text-sm font-bold text-gray-700 dark:text-white/70">No assigned jobs for this date</p>
+                          <p className="text-xs text-gray-500 dark:text-white/60">Assign operators to jobs on the board first.</p>
                         </div>
                       </div>
                     ) : (
@@ -2402,7 +2402,7 @@ export default function ScheduleBoardPage() {
                   <button
                     onClick={() => setShowDispatchModal(false)}
                     disabled={dispatchLoading}
-                    className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-slate-600 rounded-xl text-gray-700 dark:text-slate-300 font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 transition-all disabled:opacity-50"
+                    className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl text-gray-700 dark:text-white/70 font-semibold hover:bg-gray-50 dark:hover:bg-white/10 transition-all disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -2479,10 +2479,10 @@ function CapacitySettingsModal({
 
           <div className="p-5 space-y-5">
             <div>
-              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">
                 Max Crew Slots
               </label>
-              <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Total number of crew rows on the schedule board</p>
+              <p className="text-xs text-gray-500 dark:text-white/60 mb-2">Total number of crew rows on the schedule board</p>
               <input
                 type="number"
                 min={1}
@@ -2493,28 +2493,28 @@ function CapacitySettingsModal({
                   setMaxSlots(v);
                   if (warningThreshold > v) setWarningThreshold(v);
                 }}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-lg font-bold text-gray-900 bg-white transition-all"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 dark:bg-slate-700 dark:text-white rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-lg font-bold text-gray-900 bg-white transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">
                 Warning Threshold
               </label>
-              <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Show capacity warning when this many slots are filled</p>
+              <p className="text-xs text-gray-500 dark:text-white/60 mb-2">Show capacity warning when this many slots are filled</p>
               <input
                 type="number"
                 min={1}
                 max={maxSlots}
                 value={warningThreshold}
                 onChange={(e) => setWarningThreshold(Math.min(parseInt(e.target.value) || 1, maxSlots))}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-lg font-bold text-gray-900 bg-white transition-all"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 dark:bg-slate-700 dark:text-white rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-lg font-bold text-gray-900 bg-white transition-all"
               />
             </div>
 
             {/* Preview */}
-            <div className="bg-gray-50 dark:bg-slate-700 rounded-xl p-3 border border-gray-200 dark:border-slate-600">
-              <p className="text-xs text-gray-600 dark:text-slate-400">
+            <div className="bg-gray-50 dark:bg-slate-700 rounded-xl p-3 border border-gray-200 dark:border-white/10">
+              <p className="text-xs text-gray-600 dark:text-white/60">
                 <strong>Preview:</strong> {maxSlots} total slots. Warning at {warningThreshold}+ jobs.
                 {warningThreshold < maxSlots && (
                   <span className="block mt-1 text-amber-600 dark:text-amber-400">
@@ -2530,7 +2530,7 @@ function CapacitySettingsModal({
             <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 rounded-xl font-bold text-sm transition-all"
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-white/15 text-gray-700 dark:text-white/70 rounded-xl font-bold text-sm transition-all"
               >
                 Cancel
               </button>
