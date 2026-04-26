@@ -10,6 +10,7 @@ import OnboardingTour from '@/components/OnboardingTour';
 import NfcClockInModal from '@/components/NfcClockInModal';
 import NotificationBell from '@/components/NotificationBell';
 import { useBranding } from '@/lib/branding-context';
+import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 
 // Dynamic Logo Component — uses branding if available
 function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: string; logoUrl?: string | null; companyName?: string }) {
@@ -571,7 +572,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
       {/* Onboarding Tour */}
       {showOnboarding && user && (
         <OnboardingTour
@@ -766,17 +767,17 @@ export default function Dashboard() {
       </div>
 
       {/* Modern Header with Professional Gradient */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+      <div className="bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             {/* Company Logo with Animation */}
             <div className="transform hover:scale-105 transition-transform duration-200">
-              <BrandedLogo className="h-10 text-gray-900" logoUrl={branding.logo_dark_url || branding.logo_url} companyName={branding.company_name} />
+              <BrandedLogo className="h-10 text-gray-900 dark:text-white" logoUrl={branding.logo_dark_url || branding.logo_url} companyName={branding.company_name} />
             </div>
 
             {/* Modern Profile Section */}
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
+              <div className="hidden sm:flex items-center gap-3 bg-gray-50 dark:bg-white/[0.05] px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10">
                 <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg overflow-hidden flex-shrink-0">
                   {operatorAvatarUrl ? (
                     <img src={operatorAvatarUrl} alt={user?.name || ''} className="w-full h-full object-cover" />
@@ -785,10 +786,13 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900">{user?.name || 'Demo Operator'}</p>
-                  <p className="text-xs text-gray-500 capitalize font-medium">{user?.role || 'Operator'}</p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">{user?.name || 'Demo Operator'}</p>
+                  <p className="text-xs text-gray-500 dark:text-white/50 capitalize font-medium">{user?.role || 'Operator'}</p>
                 </div>
               </div>
+
+              {/* Dark Mode Toggle */}
+              <DarkModeIconToggle />
 
               {/* Notification Bell */}
               <NotificationBell variant="dark" />
@@ -815,7 +819,7 @@ export default function Dashboard() {
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-gradient drop-shadow-sm">
               Welcome back, {user?.name?.split(' ')[0] || 'Demo'}!
             </h1>
-            <p className="text-gray-700 text-base sm:text-lg font-medium">
+            <p className="text-gray-700 dark:text-white/70 text-base sm:text-lg font-medium">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
           </div>
@@ -876,30 +880,30 @@ export default function Dashboard() {
             HERO CLOCK IN/OUT CARD — Primary Feature
             ═══════════════════════════════════════════════════════ */}
         <div className="max-w-5xl mx-auto mb-10 animate-fade-in">
-          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-white/50">
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-white/50 dark:border-white/10">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="flex items-center space-x-5">
                 <div className={`w-20 h-20 bg-gradient-to-br ${
                   isClockedIn
                     ? 'from-rose-500 via-red-500 to-pink-600'
                     : 'from-emerald-500 via-green-500 to-teal-600'
-                } rounded-3xl flex items-center justify-center shadow-2xl ring-4 ring-white`}>
+                } rounded-3xl flex items-center justify-center shadow-2xl ring-4 ring-white dark:ring-white/20`}>
                   <svg className="w-10 h-10 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
                     {isClockedIn ? 'Ready to Clock Out?' : 'Start Your Shift'}
                   </h3>
-                  <p className="text-gray-700 font-semibold text-base">
+                  <p className="text-gray-700 dark:text-white/70 font-semibold text-base">
                     {isClockedIn
                       ? `You've been working for ${currentHours.toFixed(1)} hours`
                       : 'Clock in when you arrive at the shop'
                     }
                   </p>
                   {isClockedIn && currentTimecard && (
-                    <p className="text-sm text-gray-600 mt-1.5 font-medium">
+                    <p className="text-sm text-gray-600 dark:text-white/50 mt-1.5 font-medium">
                       Clocked in at {new Date(currentTimecard.clockInTime).toLocaleTimeString()}
                     </p>
                   )}
@@ -1045,8 +1049,8 @@ export default function Dashboard() {
 
         {/* Quick Actions Bar */}
         <div className="mt-10 max-w-5xl mx-auto">
-          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border-2 border-white/50">
-            <p className="text-sm font-bold text-gray-600 mb-4 uppercase tracking-wide">QUICK ACTIONS</p>
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-xl rounded-3xl p-6 shadow-2xl border-2 border-white/50 dark:border-white/10">
+            <p className="text-sm font-bold text-gray-600 dark:text-white/50 mb-4 uppercase tracking-wide">QUICK ACTIONS</p>
             <div className="flex gap-3 overflow-x-auto pb-2">
               <button
                 onClick={isClockedIn ? handleClockOut : handleClockIn}

@@ -43,7 +43,7 @@ async function updateJobStatus(
     const { status, latitude, longitude, accuracy, departure_time, ...additionalFields } = body;
 
     // Validate status
-    const validStatuses = ['scheduled', 'assigned', 'in_route', 'in_progress', 'completed', 'cancelled'];
+    const validStatuses = ['scheduled', 'assigned', 'in_route', 'on_site', 'in_progress', 'completed', 'cancelled'];
     if (!status || !validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
@@ -103,6 +103,16 @@ async function updateJobStatus(
       if (departure_time) {
         updateData.departure_time = departure_time;
       }
+    }
+
+    // Set in_route_at on first transition to in_route
+    if (status === 'in_route' && !existingJob.in_route_at) {
+      updateData.in_route_at = now;
+    }
+
+    // Set arrived_at_jobsite_at on first transition to on_site
+    if (status === 'on_site' && !existingJob.arrived_at_jobsite_at) {
+      updateData.arrived_at_jobsite_at = now;
     }
 
     if (status === 'in_progress' && !existingJob.work_started_at) {

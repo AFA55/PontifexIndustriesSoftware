@@ -12,6 +12,7 @@ import RecommendedItems from './_components/RecommendedItems';
 import PhotoUploader from '@/components/PhotoUploader';
 import { Camera, Mic } from 'lucide-react';
 import VoiceMemoNotes from './_components/VoiceMemoNotes';
+import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 
 // Organized work item categories based on DSM screenshots
 const WORK_CATEGORIES = {
@@ -1274,14 +1275,14 @@ export default function WorkPerformed() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
       {/* Header */}
-      <div className="bg-white dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm">
+      <div className="bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link
               href={`/dashboard/my-jobs/${params.id}/jobsite`}
               className="p-2 bg-gray-100 dark:bg-white/10 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
             >
-              <svg className="w-5 h-5 text-gray-600 dark:text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-600 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </Link>
@@ -1292,17 +1293,18 @@ export default function WorkPerformed() {
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-lg font-bold text-gray-900 dark:text-white truncate">Work Performed</h1>
-              <p className="text-gray-500 dark:text-white/60 text-xs">Select completed work items</p>
+              <p className="text-gray-500 dark:text-white/50 text-xs">Select completed work items</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <DarkModeIconToggle />
               {selectedItems.length > 0 && (
-                <span className="px-2 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl text-xs font-semibold border border-gray-200 dark:border-white/10">
+                <span className="px-2 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl text-xs font-semibold border border-gray-200 dark:border-white/10">
                   {selectedItems.length}
                 </span>
               )}
               <button
                 onClick={() => setView(view === 'search' ? 'selected' : 'search')}
-                className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold text-xs border border-gray-200 dark:border-white/10 min-h-[36px]"
+                className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold text-xs border border-gray-200 dark:border-white/10 min-h-[36px]"
               >
                 <span className="hidden sm:inline">{view === 'search' ? 'View Selected' : 'Add More'}</span>
                 <span className="sm:hidden">{view === 'search' ? 'Selected' : 'Search'}</span>
@@ -1332,7 +1334,7 @@ export default function WorkPerformed() {
         {view === 'search' ? (
           <>
             {/* Autocomplete Search Bar */}
-            <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-4 mb-4">
+            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-4 mb-4">
               {/* Smart Recommendations based on job type */}
               <RecommendedItems
                 jobType={jobType}
@@ -1340,7 +1342,7 @@ export default function WorkPerformed() {
                 onAddItem={(itemName) => handleQuickAddItem(itemName)}
               />
 
-              <label className="block text-sm font-semibold text-gray-700 dark:text-white/80 mb-3">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Search and Add Work Items
               </label>
               <div className="relative">
@@ -1353,24 +1355,24 @@ export default function WorkPerformed() {
                   onChange={(e) => handleSearchChange(e.target.value)}
                   onFocus={() => setShowDropdown(true)}
                   placeholder="Type to search work items..."
-                  className="w-full pl-12 pr-4 py-4 text-lg rounded-xl border-2 border-gray-300 dark:border-white/10 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/5 font-medium"
+                  className="w-full pl-12 pr-4 py-4 text-lg rounded-xl border-2 border-gray-300 focus:border-blue-500 focus:outline-none transition-colors text-gray-900 bg-white font-medium"
                 />
 
                 {/* Autocomplete Dropdown */}
                 {showDropdown && getFilteredItems().length > 0 && (
-                  <div className="absolute z-50 w-full mt-2 bg-white dark:bg-[#1a1030] rounded-xl shadow-2xl border-2 border-gray-200 dark:border-white/10 max-h-96 overflow-y-auto">
+                  <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-2xl border-2 border-gray-200 max-h-96 overflow-y-auto">
                     {getFilteredItems().slice(0, 20).map((item) => {
                       const isSelected = selectedItems.some(si => si.name === item);
                       return (
                         <button
                           key={item}
                           onClick={() => handleQuickAddItem(item)}
-                          className={`w-full px-4 py-3 text-left hover:bg-blue-50 dark:hover:bg-white/10 transition-colors border-b border-gray-100 dark:border-white/5 last:border-b-0 ${
+                          className={`w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0 ${
                             isSelected ? 'bg-green-50' : ''
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-gray-900 dark:text-white">{item}</span>
+                            <span className="font-medium text-gray-900">{item}</span>
                             {isSelected && (
                               <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full">
                                 Added
@@ -1383,15 +1385,15 @@ export default function WorkPerformed() {
                   </div>
                 )}
               </div>
-              <p className="text-sm text-gray-500 dark:text-white/60 mt-2">
+              <p className="text-sm text-gray-500 mt-2">
                 Start typing to see suggestions. Click to add multiple items.
               </p>
             </div>
 
             {/* Selected Items Display */}
             {selectedItems.length > 0 && (
-              <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-4 mb-4">
-                <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+              <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-4 mb-4">
+                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
@@ -1420,7 +1422,7 @@ export default function WorkPerformed() {
 
             {/* Popular Items Quick Add (Optional) */}
             <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-2xl shadow-lg p-6 mb-6">
-              <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <span className="text-2xl">⭐</span>
                 Popular Items - Quick Add
               </h3>
@@ -1434,12 +1436,12 @@ export default function WorkPerformed() {
                     className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
                       isSelected
                         ? 'bg-green-50 border-green-400 shadow-md'
-                        : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-white/10'
+                        : 'bg-white border-gray-200 hover:border-blue-400 hover:bg-blue-50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-800 dark:text-white">{item}</h3>
+                        <h3 className="font-semibold text-gray-800">{item}</h3>
                         {isSelected && (
                           <p className="text-sm text-green-600 mt-1">
                             Qty: {selectedItems.find(si => si.name === item)?.quantity}
@@ -1462,8 +1464,8 @@ export default function WorkPerformed() {
           </>
         ) : (
           /* Selected Items View */
-          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl p-6">
-            <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Selected Work Items</h2>
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Selected Work Items</h2>
 
             {/* Standby Time Summary */}
             {standbyLogs.length > 0 && (
@@ -1535,7 +1537,7 @@ export default function WorkPerformed() {
 
             {selectedItems.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-500 dark:text-white/60">No items selected yet</p>
+                <p className="text-gray-500">No items selected yet</p>
                 <button
                   onClick={() => setView('search')}
                   className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
@@ -1546,10 +1548,10 @@ export default function WorkPerformed() {
             ) : (
               <div className="space-y-3">
                 {selectedItems.map((item) => (
-                  <div key={item.name} className="bg-gray-50 dark:bg-white/5 rounded-xl overflow-hidden">
+                  <div key={item.name} className="bg-gray-50 rounded-xl overflow-hidden">
                     <div className="flex items-center justify-between p-4">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                           {isCoreDrilling(item.name) && (
                             <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -1564,9 +1566,9 @@ export default function WorkPerformed() {
                           {item.name}
                         </h3>
                         <div className="flex items-center gap-4 mt-1">
-                          <span className="text-sm text-gray-600 dark:text-white/60">Quantity: {item.quantity}</span>
+                          <span className="text-sm text-gray-600">Quantity: {item.quantity}</span>
                           {item.notes && (
-                            <span className="text-sm text-gray-500 dark:text-white/40">Note: {item.notes}</span>
+                            <span className="text-sm text-gray-500">Note: {item.notes}</span>
                           )}
                         </div>
                       </div>
@@ -1734,7 +1736,7 @@ export default function WorkPerformed() {
               <div className="mt-8 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-xl p-6 border-2 border-indigo-200">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-3">
                       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
                         <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -1743,7 +1745,7 @@ export default function WorkPerformed() {
                       </div>
                       Equipment Usage Tracking
                     </h2>
-                    <p className="text-gray-600 dark:text-white/60 font-medium mt-1">Track equipment metrics for accurate job costing</p>
+                    <p className="text-gray-600 font-medium mt-1">Track equipment metrics for accurate job costing</p>
                   </div>
                   <button
                     onClick={() => setShowEquipmentForm(true)}
@@ -1759,31 +1761,31 @@ export default function WorkPerformed() {
 
                 {/* Equipment Usage Entries */}
                 {equipmentUsageEntries.length === 0 ? (
-                  <div className="bg-white dark:bg-white/5 rounded-xl p-8 text-center border-2 border-dashed border-indigo-300 dark:border-indigo-500/30">
+                  <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-indigo-300">
                     <svg className="w-16 h-16 mx-auto text-indigo-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <p className="text-gray-500 dark:text-white/60 font-semibold mb-2">No equipment usage tracked yet</p>
-                    <p className="text-gray-400 dark:text-white/40 text-sm">Click "Add Equipment Usage" to track linear feet, blade usage, and resource consumption</p>
+                    <p className="text-gray-500 font-semibold mb-2">No equipment usage tracked yet</p>
+                    <p className="text-gray-400 text-sm">Click "Add Equipment Usage" to track linear feet, blade usage, and resource consumption</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {equipmentUsageEntries.map((entry, index) => (
-                      <div key={entry.id || index} className="bg-white dark:bg-white/5 rounded-xl p-5 border-2 border-gray-200 dark:border-white/10 hover:border-indigo-300 transition-all shadow-md">
+                      <div key={entry.id || index} className="bg-white rounded-xl p-5 border-2 border-gray-200 hover:border-indigo-300 transition-all shadow-md">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
-                              <p className="text-xs font-bold text-gray-500 dark:text-white/60 uppercase mb-1">Equipment</p>
-                              <p className="text-sm font-bold text-gray-900 dark:text-white">{entry.equipment_type.replace(/_/g, ' ').toUpperCase()}</p>
-                              {entry.equipment_id && <p className="text-xs text-gray-500 dark:text-white/40">{entry.equipment_id}</p>}
+                              <p className="text-xs font-bold text-gray-500 uppercase mb-1">Equipment</p>
+                              <p className="text-sm font-bold text-gray-900">{entry.equipment_type.replace(/_/g, ' ').toUpperCase()}</p>
+                              {entry.equipment_id && <p className="text-xs text-gray-500">{entry.equipment_id}</p>}
                             </div>
                             <div>
-                              <p className="text-xs font-bold text-gray-500 dark:text-white/60 uppercase mb-1">Linear Feet</p>
+                              <p className="text-xs font-bold text-gray-500 uppercase mb-1">Linear Feet</p>
                               <p className="text-lg font-bold text-blue-600">{entry.linear_feet_cut} ft</p>
                             </div>
                             <div>
-                              <p className="text-xs font-bold text-gray-500 dark:text-white/60 uppercase mb-1">Difficulty</p>
+                              <p className="text-xs font-bold text-gray-500 uppercase mb-1">Difficulty</p>
                               <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
                                 entry.difficulty_level === 'easy' ? 'bg-green-100 text-green-700' :
                                 entry.difficulty_level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
@@ -1794,7 +1796,7 @@ export default function WorkPerformed() {
                               </span>
                             </div>
                             <div>
-                              <p className="text-xs font-bold text-gray-500 dark:text-white/60 uppercase mb-1">Blades Used</p>
+                              <p className="text-xs font-bold text-gray-500 uppercase mb-1">Blades Used</p>
                               <p className="text-sm font-bold text-purple-600">{entry.blades_used || 0}</p>
                             </div>
                           </div>
@@ -1809,25 +1811,25 @@ export default function WorkPerformed() {
                         </div>
 
                         {/* Resource Consumption Summary */}
-                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-white/10 grid grid-cols-3 gap-3 text-xs">
+                        <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-3 gap-3 text-xs">
                           <div>
-                            <span className="text-gray-500 dark:text-white/60">Hydraulic:</span>
-                            <span className="ml-1 font-semibold text-gray-700 dark:text-white/80">{entry.hydraulic_hose_used_ft} ft</span>
+                            <span className="text-gray-500">Hydraulic:</span>
+                            <span className="ml-1 font-semibold text-gray-700">{entry.hydraulic_hose_used_ft} ft</span>
                           </div>
                           <div>
-                            <span className="text-gray-500 dark:text-white/60">Water:</span>
-                            <span className="ml-1 font-semibold text-gray-700 dark:text-white/80">{entry.water_hose_used_ft} ft</span>
+                            <span className="text-gray-500">Water:</span>
+                            <span className="ml-1 font-semibold text-gray-700">{entry.water_hose_used_ft} ft</span>
                           </div>
                           <div>
-                            <span className="text-gray-500 dark:text-white/60">Power:</span>
-                            <span className="ml-1 font-semibold text-gray-700 dark:text-white/80">{entry.power_hours} hrs</span>
+                            <span className="text-gray-500">Power:</span>
+                            <span className="ml-1 font-semibold text-gray-700">{entry.power_hours} hrs</span>
                           </div>
                         </div>
 
                         {entry.notes && (
-                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-white/10">
-                            <p className="text-xs text-gray-500 dark:text-white/60 mb-1">Notes:</p>
-                            <p className="text-sm text-gray-700 dark:text-white/80">{entry.notes}</p>
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <p className="text-xs text-gray-500 mb-1">Notes:</p>
+                            <p className="text-sm text-gray-700">{entry.notes}</p>
                           </div>
                         )}
                       </div>
@@ -1840,14 +1842,14 @@ export default function WorkPerformed() {
         )}
 
         {/* Job Photos Section */}
-        <div className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm mb-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-4">
           <div className="flex items-center gap-2 mb-3">
             <Camera className="w-5 h-5 text-blue-600" />
-            <h3 className="text-sm font-bold text-gray-700 dark:text-white/80">Job Photos</h3>
-            <span className="text-xs text-gray-400 dark:text-white/40">(optional)</span>
+            <h3 className="text-sm font-bold text-gray-700">Job Photos</h3>
+            <span className="text-xs text-gray-400">(optional)</span>
           </div>
-          <p className="text-xs text-gray-500 dark:text-white/60 mb-3">
-            Take photos of work performed, site conditions, or anything noteworthy
+          <p className="text-xs text-gray-500 mb-3">
+            Document your work — site conditions, before/after, and your team in action
           </p>
           <PhotoUploader
             bucket="job-photos"
@@ -1858,16 +1860,25 @@ export default function WorkPerformed() {
             label="Add Job Photos"
             lightMode={true}
           />
+          <div className="mt-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 flex items-start gap-2">
+            <span className="text-blue-500 text-lg flex-shrink-0">📸</span>
+            <div>
+              <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Showcase your work!</p>
+              <p className="text-xs text-blue-700 dark:text-blue-400">
+                Photos of you and your crew working are encouraged — they demonstrate professionalism and effort to the customer.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Voice Memo Notes */}
-        <div className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm mb-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-4">
           <div className="flex items-center gap-2 mb-3">
             <Mic className="w-5 h-5 text-blue-600" />
-            <h3 className="text-sm font-bold text-gray-700 dark:text-white/80">Job Notes</h3>
-            <span className="text-xs text-gray-400 dark:text-white/40">(voice or typed)</span>
+            <h3 className="text-sm font-bold text-gray-700">Job Notes</h3>
+            <span className="text-xs text-gray-400">(voice or typed)</span>
           </div>
-          <p className="text-xs text-gray-500 dark:text-white/60 mb-3">
+          <p className="text-xs text-gray-500 mb-3">
             Describe work performed, conditions encountered, or anything noteworthy. Use the mic button to dictate notes hands-free.
           </p>
           <VoiceMemoNotes
@@ -1879,7 +1890,7 @@ export default function WorkPerformed() {
 
         {/* Submit Button */}
         {selectedItems.length > 0 && !dayAlreadySubmitted && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-white/10 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-6 z-50">
+          <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 p-4 pb-6 z-50">
             <div className="container mx-auto max-w-lg flex gap-3">
               <button
                 onClick={() => router.push(`/dashboard/my-jobs/${params.id}`)}

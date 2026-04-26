@@ -9,7 +9,7 @@ import {
   ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
   ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer,
   Paperclip, Upload, Trash2, PauseCircle, X, Image, File, MapPin, Phone, Eye,
-  AlertTriangle, Shield
+  AlertTriangle, Shield, Lock
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
@@ -70,11 +70,9 @@ export default function JobDetailPage() {
 
   // Documents state
   const [documents, setDocuments] = useState<any[]>([]);
-  const [docsOpen, setDocsOpen] = useState(false); // collapsed by default
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docCategory, setDocCategory] = useState('other');
   const [docNotes, setDocNotes] = useState('');
-  const [showUploadForm, setShowUploadForm] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
 
   const isHelper = userRole === 'apprentice';
@@ -195,6 +193,15 @@ export default function JobDetailPage() {
     (hasEquipmentSelections
       ? checkAllConfirmed(unifiedItems, checkedItems)
       : mandatoryComplete);
+
+  // Location & site contact unlock once equipment is confirmed AND job is in_route or further
+  const equipmentAllChecked = equipmentAlreadyConfirmed ||
+    (hasEquipmentSelections
+      ? checkAllConfirmed(unifiedItems, checkedItems)
+      : mandatoryComplete);
+  const locationUnlocked = equipmentAllChecked &&
+    ['in_route', 'on_site', 'in_progress', 'completed'].includes(job?.status || '');
+
   const isCompleted = job?.status === 'completed';
   const isOnHold = job?.status === 'on_hold';
   const isInProgress = job ? ['in_route', 'in_progress'].includes(job.status) : false;
@@ -305,7 +312,6 @@ export default function JobDetailPage() {
 
       if (res.ok) {
         setDocNotes('');
-        setShowUploadForm(false);
         fetchDocuments();
       }
     } catch (err) {
@@ -332,10 +338,10 @@ export default function JobDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-white/60 text-lg font-medium">Loading job details...</p>
+          <p className="text-gray-600 text-lg font-medium">Loading job details...</p>
         </div>
       </div>
     );
@@ -343,10 +349,10 @@ export default function JobDetailPage() {
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <Inbox className="w-12 h-12 text-gray-400 dark:text-white/40 mx-auto mb-3" />
-          <p className="text-gray-600 dark:text-white/60 text-lg font-medium">Job not found</p>
+          <Inbox className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-600 text-lg font-medium">Job not found</p>
           <Link href="/dashboard/my-jobs" className="mt-3 inline-block text-blue-600 hover:underline font-semibold">
             Back to My Schedule
           </Link>
@@ -398,13 +404,13 @@ export default function JobDetailPage() {
   const renderDocCard = (doc: any, canDelete: boolean = false) => {
     const isImage = doc.file_type?.startsWith('image/');
     return (
-      <div key={doc.id} className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+      <div key={doc.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         {/* Clickable preview area */}
         <a
           href={doc.file_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="block p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+          className="block p-4 hover:bg-gray-50 transition-colors"
         >
           <div className="flex items-start gap-4">
             <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -413,7 +419,7 @@ export default function JobDetailPage() {
               {isImage ? <Image className="w-7 h-7 text-indigo-500" /> : <File className="w-7 h-7 text-gray-400" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-base font-bold text-gray-900 dark:text-white truncate">{doc.file_name}</p>
+              <p className="text-base font-bold text-gray-900 truncate">{doc.file_name}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-xs font-semibold text-white bg-indigo-500 px-2 py-0.5 rounded-full">
                   {categoryLabels[doc.category] || doc.category}
@@ -423,14 +429,14 @@ export default function JobDetailPage() {
                 )}
               </div>
               {doc.notes && (
-                <p className="text-sm text-gray-600 dark:text-white/60 mt-1">{doc.notes}</p>
+                <p className="text-sm text-gray-600 mt-1">{doc.notes}</p>
               )}
             </div>
             <Eye className="w-5 h-5 text-blue-500 flex-shrink-0 mt-1" />
           </div>
         </a>
         {canDelete && (
-          <div className="border-t border-gray-100 dark:border-white/10 px-4 py-2">
+          <div className="border-t border-gray-100 px-4 py-2">
             <button
               onClick={() => handleDeleteDocument(doc.id)}
               className="text-xs text-red-500 hover:text-red-700 font-semibold flex items-center gap-1"
@@ -444,7 +450,7 @@ export default function JobDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-[#0b0618] dark:to-[#0e0720]">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Professional Header */}
       <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-10 shadow-2xl">
         <div className="container mx-auto px-4 py-4 max-w-lg">
@@ -501,14 +507,14 @@ export default function JobDetailPage() {
           <>
             {/* Location */}
             {(job.address || job.location) && (
-              <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
+              <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
                     <MapPin className="w-6 h-6 text-red-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-bold text-gray-800 dark:text-white mb-1">Job Location</h3>
-                    <p className="text-base text-gray-700 dark:text-white/80 font-medium">{job.address || job.location}</p>
+                    <h3 className="text-base font-bold text-gray-800 mb-1">Job Location</h3>
+                    <p className="text-base text-gray-700 font-medium">{job.address || job.location}</p>
                   </div>
                 </div>
                 {job.address && (
@@ -529,14 +535,14 @@ export default function JobDetailPage() {
               <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Phone className="w-5 h-5 text-green-600" />
-                  <h3 className="text-base font-bold text-gray-800 dark:text-white">Site Contact</h3>
+                  <h3 className="text-base font-bold text-gray-800">Site Contact</h3>
                 </div>
                 <div className="space-y-3">
                   {(job.foreman_name || job.customer_contact) && (
                     <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-white/60 font-semibold uppercase tracking-wider">Contact</p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-white">{job.foreman_name || job.customer_contact}</p>
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Contact</p>
+                        <p className="text-lg font-bold text-gray-900">{job.foreman_name || job.customer_contact}</p>
                       </div>
                       {(job.foreman_phone || job.site_contact_phone) && (
                         <a href={`tel:${job.foreman_phone || job.site_contact_phone}`}
@@ -549,8 +555,8 @@ export default function JobDetailPage() {
                   {!(job.foreman_name || job.customer_contact) && (job.site_contact_phone || job.foreman_phone) && (
                     <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-white/60 font-semibold uppercase tracking-wider">Site Phone</p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-white">{job.site_contact_phone || job.foreman_phone}</p>
+                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Site Phone</p>
+                        <p className="text-lg font-bold text-gray-900">{job.site_contact_phone || job.foreman_phone}</p>
                       </div>
                       <a href={`tel:${job.site_contact_phone || job.foreman_phone}`}
                         className="flex items-center gap-2 px-5 py-3 bg-green-500 text-white rounded-xl text-sm font-bold hover:bg-green-600 transition-colors shadow-md">
@@ -661,41 +667,48 @@ export default function JobDetailPage() {
 
         {/* Job Location Card */}
         {(job.address || job.location) && (
-          <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-6 h-6 text-red-600" />
+          locationUnlocked ? (
+            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-bold text-gray-800 mb-1">Location</h3>
+                  <p className="text-base text-gray-700 font-medium">{job.address || job.location}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-gray-800 dark:text-white mb-1">Location</h3>
-                <p className="text-base text-gray-700 dark:text-white/80 font-medium">{job.address || job.location}</p>
-              </div>
+              {job.address && (
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors border border-blue-200"
+                >
+                  <MapPin className="w-4 h-4" /> Open in Maps
+                </a>
+              )}
             </div>
-            {job.address && (
-              <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors border border-blue-200"
-              >
-                <MapPin className="w-4 h-4" /> Open in Maps
-              </a>
-            )}
-          </div>
+          ) : (
+            <div className="bg-gray-100 dark:bg-white/5 rounded-xl p-4 flex items-center gap-3 text-gray-400">
+              <Lock className="w-5 h-5 flex-shrink-0" />
+              <p className="text-sm">Complete equipment checklist and start your route to view location & site contact</p>
+            </div>
+          )
         )}
 
-        {/* Site Contact Card — always show any available contact info */}
-        {(job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
+        {/* Site Contact Card — only show once location is unlocked */}
+        {locationUnlocked && (job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-green-200/60 overflow-hidden">
             <button
               onClick={() => setContactOpen(!contactOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Phone className="w-5 h-5 text-green-600" />
-                <span className="text-base font-bold text-gray-800 dark:text-white">Site Contact</span>
+                <span className="text-base font-bold text-gray-800">Site Contact</span>
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${contactOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${contactOpen ? 'rotate-180' : ''}`} />
             </button>
             {contactOpen && <div className="px-5 pb-5 space-y-3">
             <div className="space-y-3">
@@ -703,8 +716,8 @@ export default function JobDetailPage() {
               {(job.foreman_name || job.customer_contact) && (
                 <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-white/60 font-semibold uppercase tracking-wider">Contact</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">{job.foreman_name || job.customer_contact}</p>
+                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Contact</p>
+                    <p className="text-lg font-bold text-gray-900">{job.foreman_name || job.customer_contact}</p>
                   </div>
                   {(job.foreman_phone || job.site_contact_phone) && (
                     <a
@@ -718,17 +731,17 @@ export default function JobDetailPage() {
               )}
               {/* Secondary contact if both foreman_name and customer_contact are set and different */}
               {job.foreman_name && job.customer_contact && job.customer_contact !== job.foreman_name && (
-                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
-                  <p className="text-xs text-gray-500 dark:text-white/60 font-semibold uppercase tracking-wider">Also</p>
-                  <p className="text-base font-bold text-gray-900 dark:text-white">{job.customer_contact}</p>
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Also</p>
+                  <p className="text-base font-bold text-gray-900">{job.customer_contact}</p>
                 </div>
               )}
               {/* Phone-only row when no name is set */}
               {!(job.foreman_name || job.customer_contact) && (job.site_contact_phone || job.foreman_phone) && (
                 <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-white/60 font-semibold uppercase tracking-wider">Site Phone</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">{job.site_contact_phone || job.foreman_phone}</p>
+                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Site Phone</p>
+                    <p className="text-lg font-bold text-gray-900">{job.site_contact_phone || job.foreman_phone}</p>
                   </div>
                   <a
                     href={`tel:${job.site_contact_phone || job.foreman_phone}`}
@@ -740,10 +753,10 @@ export default function JobDetailPage() {
               )}
               {/* Separate site phone row if name IS set and a different site phone also exists */}
               {(job.foreman_name || job.customer_contact) && job.site_contact_phone && job.site_contact_phone !== job.foreman_phone && (
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-white/60 font-semibold uppercase tracking-wider">Site Phone</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">{job.site_contact_phone}</p>
+                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Site Phone</p>
+                    <p className="text-lg font-bold text-gray-900">{job.site_contact_phone}</p>
                   </div>
                   <a
                     href={`tel:${job.site_contact_phone}`}
@@ -759,16 +772,16 @@ export default function JobDetailPage() {
         )}
 
         {/* Crew Info - collapsible */}
-        <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 overflow-hidden">
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
           <button
             onClick={() => setCrewOpen(!crewOpen)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
-              <span className="text-base font-bold text-gray-800 dark:text-white">Crew</span>
+              <span className="text-base font-bold text-gray-800">Crew</span>
             </div>
-            <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${crewOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${crewOpen ? 'rotate-180' : ''}`} />
           </button>
           {crewOpen && <div className="px-5 pb-5">
           <div className="grid grid-cols-2 gap-3">
@@ -778,7 +791,7 @@ export default function JobDetailPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider">Operator</p>
-                <p className="text-base font-bold text-gray-900 dark:text-white truncate">{job.operator_name || 'Unassigned'}</p>
+                <p className="text-base font-bold text-gray-900 truncate">{job.operator_name || 'Unassigned'}</p>
               </div>
             </div>
             {job.helper_name && (
@@ -788,7 +801,7 @@ export default function JobDetailPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wider">Team Member</p>
-                  <p className="text-base font-bold text-gray-900 dark:text-white truncate">{job.helper_name}</p>
+                  <p className="text-base font-bold text-gray-900 truncate">{job.helper_name}</p>
                 </div>
               </div>
             )}
@@ -797,16 +810,16 @@ export default function JobDetailPage() {
         </div>
 
         {/* Work Details Panel - Bigger text */}
-        <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 overflow-hidden">
+        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
           <button
             onClick={() => setWorkDetailsOpen(!workDetailsOpen)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-blue-600" />
-              <span className="text-base font-bold text-gray-800 dark:text-white">Work Details</span>
+              <span className="text-base font-bold text-gray-800">Work Details</span>
             </div>
-            <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${workDetailsOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${workDetailsOpen ? 'rotate-180' : ''}`} />
           </button>
           {workDetailsOpen && (
             <div className="px-5 pb-5 space-y-4">
@@ -821,15 +834,15 @@ export default function JobDetailPage() {
                   <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">PO: {job.po_number}</span>
                 )}
               </div>
-              <div className="p-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
-                <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">
                   {job.description || 'No description provided'}
                 </p>
               </div>
               {/* Scope Details (quantities) */}
               {job.scope_details && Object.keys(job.scope_details).length > 0 && (
                 <div>
-                  <p className="text-sm font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider mb-2">Scope Quantities</p>
+                  <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Scope Quantities</p>
                   <ScopeDetailsDisplay scopeDetails={job.scope_details} />
                 </div>
               )}
@@ -856,14 +869,14 @@ export default function JobDetailPage() {
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-amber-200/60 overflow-hidden">
             <button
               onClick={() => setConditionsOpen(!conditionsOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
-                <span className="text-base font-bold text-gray-800 dark:text-white">Jobsite Conditions</span>
+                <span className="text-base font-bold text-gray-800">Jobsite Conditions</span>
                 <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold">{filledConditions.length}</span>
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${conditionsOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${conditionsOpen ? 'rotate-180' : ''}`} />
             </button>
             {conditionsOpen && (
               <div className="px-5 pb-5">
@@ -890,14 +903,14 @@ export default function JobDetailPage() {
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-indigo-200/60 overflow-hidden">
             <button
               onClick={() => setComplianceOpen(!complianceOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Shield className="w-5 h-5 text-indigo-600" />
-                <span className="text-base font-bold text-gray-800 dark:text-white">Site Compliance</span>
+                <span className="text-base font-bold text-gray-800">Site Compliance</span>
                 <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-bold">Required</span>
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${complianceOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${complianceOpen ? 'rotate-180' : ''}`} />
             </button>
             {complianceOpen && (
               <div className="px-5 pb-5 space-y-2">
@@ -921,32 +934,32 @@ export default function JobDetailPage() {
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-purple-200/60 overflow-hidden">
             <button
               onClick={() => setNotesOpen(!notesOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-purple-600" />
-                <span className="text-base font-bold text-gray-800 dark:text-white">Additional Notes</span>
+                <span className="text-base font-bold text-gray-800">Additional Notes</span>
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${notesOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${notesOpen ? 'rotate-180' : ''}`} />
             </button>
             {notesOpen && (
               <div className="px-5 pb-5 space-y-3">
                 {job.additional_info && (
                   <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
                     <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Notes</p>
-                    <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.additional_info}</p>
+                    <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.additional_info}</p>
                   </div>
                 )}
                 {job.directions && (
                   <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
                     <p className="text-xs text-blue-600 font-semibold uppercase mb-1">Directions</p>
-                    <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.directions}</p>
+                    <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.directions}</p>
                   </div>
                 )}
                 {job.special_equipment_notes && (
                   <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
                     <p className="text-xs text-purple-600 font-semibold uppercase mb-1">Special Equipment Notes</p>
-                    <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.special_equipment_notes}</p>
+                    <p className="text-base text-gray-800 whitespace-pre-wrap leading-relaxed">{job.special_equipment_notes}</p>
                   </div>
                 )}
               </div>
@@ -956,14 +969,14 @@ export default function JobDetailPage() {
 
         {/* Equipment Confirmation Panel */}
         {unifiedItems.length > 0 && (
-          <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 overflow-hidden">
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden">
             <button
               onClick={() => setEquipmentOpen(!equipmentOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Wrench className="w-5 h-5 text-green-600" />
-                <span className="text-base font-bold text-gray-800 dark:text-white">Equipment Confirmation</span>
+                <span className="text-base font-bold text-gray-800">Equipment Confirmation</span>
                 {!equipmentAlreadyConfirmed && !isCompleted && (
                   <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                     canStartRoute ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
@@ -972,7 +985,7 @@ export default function JobDetailPage() {
                   </span>
                 )}
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${equipmentOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${equipmentOpen ? 'rotate-180' : ''}`} />
             </button>
             {equipmentOpen && (
               <div className="px-5 pb-5">
@@ -1030,88 +1043,6 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Operator Documents - Collapsible upload section */}
-        <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 overflow-hidden">
-          <button
-            onClick={() => setDocsOpen(!docsOpen)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Upload className="w-5 h-5 text-indigo-600" />
-              <span className="text-base font-bold text-gray-800 dark:text-white">My Uploads</span>
-              {operatorDocs.length > 0 && (
-                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-semibold">
-                  {operatorDocs.length}
-                </span>
-              )}
-            </div>
-            <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${docsOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {docsOpen && (
-            <div className="px-5 pb-5 space-y-3">
-              {/* Operator docs list */}
-              {operatorDocs.length > 0 && (
-                <div className="space-y-3">
-                  {operatorDocs.map(doc => renderDocCard(doc, true))}
-                </div>
-              )}
-
-              {/* Upload toggle */}
-              {!showUploadForm ? (
-                <button
-                  onClick={() => setShowUploadForm(true)}
-                  className="w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
-                >
-                  <Upload className="w-4 h-4" /> Upload Document or Photo
-                </button>
-              ) : (
-                <div className="space-y-2 p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
-                  <select
-                    value={docCategory}
-                    onChange={e => setDocCategory(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-300 dark:border-white/10 rounded-xl text-sm text-slate-700 dark:text-white dark:bg-white/5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="site_photo">Site Photo</option>
-                    <option value="before_after">Before / After</option>
-                    <option value="permit">Permit</option>
-                    <option value="customer_doc">Customer Document</option>
-                    <option value="scope">Scope of Work</option>
-                    <option value="other">Other</option>
-                  </select>
-                  <input
-                    type="text"
-                    value={docNotes}
-                    onChange={e => setDocNotes(e.target.value)}
-                    placeholder="Notes (optional)"
-                    className="w-full px-3 py-2.5 border border-slate-300 dark:border-white/10 rounded-xl text-sm text-slate-700 dark:text-white dark:bg-white/5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                  <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-semibold cursor-pointer hover:bg-indigo-100 transition-all ${uploadingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                    {uploadingDoc ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
-                    ) : (
-                      <><Upload className="w-4 h-4" /> Tap to select file</>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      disabled={uploadingDoc}
-                    />
-                  </label>
-                  <button
-                    onClick={() => setShowUploadForm(false)}
-                    className="w-full text-sm text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white py-1"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
         {/* Action Buttons */}
         {!isCompleted && !isOnHold && !jobIsHelper && (
           <div className="pt-2">
@@ -1130,7 +1061,7 @@ export default function JobDetailPage() {
                 className={`w-full py-5 rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3 ${
                   canStartRoute
                     ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                    : 'bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-white/40 cursor-not-allowed'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                 }`}
               >
                 {startingRoute ? (
@@ -1163,7 +1094,7 @@ export default function JobDetailPage() {
           <div className="pt-2">
             <button
               onClick={handleViewCompleted}
-              className="w-full py-4 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-700 dark:text-white/80 rounded-2xl font-semibold text-base transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold text-base transition-all flex items-center justify-center gap-2"
             >
               <FileText className="w-5 h-5" /> View Work Performed
             </button>

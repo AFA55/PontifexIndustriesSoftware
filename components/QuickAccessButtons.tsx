@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MapPin, Phone, Clock, AlertCircle } from 'lucide-react';
-import LoadingTransition from '@/components/LoadingTransition';
 
 interface QuickAccessButtonsProps {
   jobId: string;
@@ -24,6 +23,17 @@ interface StandbyLog {
   ended_at: string | null;
 }
 
+const STANDBY_REASONS = [
+  { value: 'no_access', label: 'No Access to Work Area' },
+  { value: 'incomplete_work', label: 'Prerequisite Work Incomplete' },
+  { value: 'missing_materials', label: 'Missing Materials' },
+  { value: 'unsafe_conditions', label: 'Unsafe Working Conditions' },
+  { value: 'utility_issues', label: 'Utility Issues' },
+  { value: 'scope_change', label: 'Scope Changes' },
+  { value: 'weather', label: 'Weather Conditions' },
+  { value: 'other', label: 'Other' },
+];
+
 export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAccessButtonsProps) {
   const [jobData, setJobData] = useState<JobData | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -32,9 +42,15 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
   const [isOnStandby, setIsOnStandby] = useState(false);
   const [currentStandbyLog, setCurrentStandbyLog] = useState<StandbyLog | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
   const [confirmedStartTime, setConfirmedStartTime] = useState('');
   const [confirmedEndTime, setConfirmedEndTime] = useState('');
+  const [standbyReason, setStandbyReason] = useState('');
+  const [toast, setToast] = useState<{msg: string, type: 'success'|'error'} | null>(null);
+
+  const showToast = (msg: string, type: 'success'|'error' = 'success') => {
+    setToast({msg, type});
+    setTimeout(() => setToast(null), 3500);
+  };
 
   useEffect(() => {
     fetchJobData();
@@ -119,13 +135,17 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
   };
 
   const startStandby = async () => {
+    if (!standbyReason) {
+      showToast('Please select a reason for standby', 'error');
+      return;
+    }
+
     if (!confirmedStartTime) {
-      alert('Please confirm the start time');
+      showToast('Please confirm the start time', 'error');
       return;
     }
 
     setLoading(true);
-    setLoadingMessage('Starting standby time...');
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -139,7 +159,7 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
         body: JSON.stringify({
           jobId: jobId,
           startedAt: confirmedStartTime,
-          reason: 'Waiting for work to proceed'
+          reason: standbyReason
         })
       });
 
@@ -149,16 +169,17 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
         setCurrentStandbyLog(result.data);
         setShowStandbyModal(false);
         setConfirmedStartTime('');
+        setStandbyReason('');
         if (onStandbyChange) {
           onStandbyChange(true);
         }
-        alert('Standby time started. Remember to stop standby before continuing work!');
+        showToast('Standby time started. Stop standby before continuing work.');
       } else {
-        alert('Error starting standby time');
+        showToast('Error starting standby time', 'error');
       }
     } catch (error) {
       console.error('Error starting standby:', error);
-      alert('Error starting standby time');
+      showToast('Error starting standby time', 'error');
     } finally {
       setLoading(false);
     }
@@ -166,12 +187,11 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
 
   const endStandby = async () => {
     if (!confirmedEndTime) {
-      alert('Please confirm the end time');
+      showToast('Please confirm the end time', 'error');
       return;
     }
 
     setLoading(true);
-    setLoadingMessage('Ending standby time...');
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -196,13 +216,13 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
         if (onStandbyChange) {
           onStandbyChange(false);
         }
-        alert('Standby time ended. You can now continue with your work.');
+        showToast('Standby time ended. You can now continue working.');
       } else {
-        alert('Error ending standby time');
+        showToast('Error ending standby time', 'error');
       }
     } catch (error) {
       console.error('Error ending standby:', error);
-      alert('Error ending standby time');
+      showToast('Error ending standby time', 'error');
     } finally {
       setLoading(false);
     }
@@ -224,17 +244,22 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
 
   return (
     <>
-      {/* Loading Transition */}
-      <LoadingTransition isLoading={loading} message={loadingMessage} />
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-xl font-semibold text-white text-sm flex items-center gap-2 pointer-events-none ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+          <span>{toast.type === 'success' ? '✓' : '✗'}</span>
+          {toast.msg}
+        </div>
+      )}
 
       {/* Standby Warning Banner */}
       {isOnStandby && (
-        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-2xl p-4 mb-6 animate-pulse">
+        <div className="bg-yellow-50 dark:bg-yellow-500/10 border-2 border-yellow-400 dark:border-yellow-500/30 rounded-2xl p-4 mb-6 animate-pulse">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
             <div className="flex-1">
-              <p className="font-bold text-yellow-900">⚠️ You are on standby time</p>
-              <p className="text-sm text-yellow-800">
+              <p className="font-bold text-yellow-900 dark:text-yellow-200">⚠️ You are on standby time</p>
+              <p className="text-sm text-yellow-800 dark:text-yellow-300">
                 Stop standby before proceeding with your work
               </p>
             </div>
@@ -291,32 +316,32 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
       {/* Location Modal */}
       {showLocationModal && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-8 shadow-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-[#1a0f35] rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-8 shadow-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
-              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-blue-100 dark:bg-blue-500/20 rounded-2xl flex items-center justify-center flex-shrink-0">
                 <MapPin className="w-5 h-5 sm:w-8 sm:h-8 text-blue-600" />
               </div>
               <div className="flex-1">
-                <h2 className="text-lg sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">Job Location</h2>
-                <p className="text-xs sm:text-sm text-gray-600">Get directions to the job site</p>
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-white mb-1 sm:mb-2">Job Location</h2>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-white/60">Get directions to the job site</p>
               </div>
             </div>
 
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 mb-6">
+            <div className="bg-blue-50 dark:bg-blue-500/10 border-2 border-blue-200 dark:border-blue-500/30 rounded-xl p-6 mb-6">
               <div className="mb-4">
-                <p className="text-sm text-blue-700 font-semibold mb-1">Location Name</p>
-                <p className="text-lg font-bold text-blue-900">{jobData.location}</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 font-semibold mb-1">Location Name</p>
+                <p className="text-lg font-bold text-blue-900 dark:text-blue-100">{jobData.location}</p>
               </div>
               <div>
-                <p className="text-sm text-blue-700 font-semibold mb-1">Address</p>
-                <p className="text-base font-semibold text-blue-900">{jobData.address}</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 font-semibold mb-1">Address</p>
+                <p className="text-base font-semibold text-blue-900 dark:text-blue-100">{jobData.address}</p>
               </div>
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setShowLocationModal(false)}
-                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all"
+                className="flex-1 px-6 py-3 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-800 dark:text-white rounded-xl font-semibold transition-all"
               >
                 Close
               </button>
@@ -339,28 +364,28 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
       {/* Contact Modal */}
       {showContactModal && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-8 shadow-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-[#1a0f35] rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-8 shadow-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
-              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-green-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-green-100 dark:bg-green-500/20 rounded-2xl flex items-center justify-center flex-shrink-0">
                 <Phone className="w-5 h-5 sm:w-8 sm:h-8 text-green-600" />
               </div>
               <div className="flex-1">
-                <h2 className="text-lg sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">Contact On Site</h2>
-                <p className="text-xs sm:text-sm text-gray-600">Call or text the customer</p>
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-white mb-1 sm:mb-2">Contact On Site</h2>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-white/60">Call or text the customer</p>
               </div>
             </div>
 
-            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+            <div className="bg-green-50 dark:bg-green-500/10 border-2 border-green-200 dark:border-green-500/30 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <div className="mb-4">
-                <p className="text-sm text-green-700 font-semibold mb-1">Contact On Site</p>
-                <p className="text-base sm:text-lg font-bold text-green-900">
+                <p className="text-sm text-green-700 dark:text-green-300 font-semibold mb-1">Contact On Site</p>
+                <p className="text-base sm:text-lg font-bold text-green-900 dark:text-green-100">
                   {jobData.foreman_name || jobData.customer_name}
                 </p>
               </div>
               {jobData.foreman_phone && (
                 <div>
-                  <p className="text-sm text-green-700 font-semibold mb-1">Phone Number</p>
-                  <p className="text-xl sm:text-2xl font-bold text-green-900">{jobData.foreman_phone}</p>
+                  <p className="text-sm text-green-700 dark:text-green-300 font-semibold mb-1">Phone Number</p>
+                  <p className="text-xl sm:text-2xl font-bold text-green-900 dark:text-green-100">{jobData.foreman_phone}</p>
                 </div>
               )}
             </div>
@@ -383,21 +408,21 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
                 </button>
                 <button
                   onClick={() => setShowContactModal(false)}
-                  className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all"
+                  className="w-full px-6 py-3 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-800 dark:text-white rounded-xl font-semibold transition-all"
                 >
                   Close
                 </button>
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
-                  <p className="text-yellow-800 text-sm font-medium text-center">
+                <div className="bg-yellow-50 dark:bg-yellow-500/10 border-2 border-yellow-300 dark:border-yellow-500/30 rounded-xl p-4">
+                  <p className="text-yellow-800 dark:text-yellow-300 text-sm font-medium text-center">
                     No contact phone number available for this job
                   </p>
                 </div>
                 <button
                   onClick={() => setShowContactModal(false)}
-                  className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all"
+                  className="w-full px-6 py-3 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-800 dark:text-white rounded-xl font-semibold transition-all"
                 >
                   Close
                 </button>
@@ -410,18 +435,18 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
       {/* Standby Time Modal */}
       {showStandbyModal && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-8 shadow-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-[#1a0f35] rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-8 shadow-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
               <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                isOnStandby ? 'bg-yellow-100' : 'bg-orange-100'
+                isOnStandby ? 'bg-yellow-100 dark:bg-yellow-500/20' : 'bg-orange-100 dark:bg-orange-500/20'
               }`}>
                 <Clock className={`w-5 h-5 sm:w-8 sm:h-8 ${isOnStandby ? 'text-yellow-600' : 'text-orange-600'}`} />
               </div>
               <div className="flex-1">
-                <h2 className="text-lg sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-white mb-1 sm:mb-2">
                   {isOnStandby ? 'Stop Standby Time' : 'Start Standby Time'}
                 </h2>
-                <p className="text-xs sm:text-sm text-gray-600">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-white/60">
                   {isOnStandby
                     ? 'Stop standby to continue working'
                     : 'Track time when contractor is not ready'}
@@ -431,18 +456,18 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
 
             {isOnStandby ? (
               <div className="space-y-4">
-                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 sm:p-6">
-                  <p className="text-sm text-yellow-700 font-semibold mb-1">Currently on standby</p>
-                  <p className="text-xs text-yellow-600 mb-4">
+                <div className="bg-yellow-50 dark:bg-yellow-500/10 border-2 border-yellow-300 dark:border-yellow-500/30 rounded-xl p-4 sm:p-6">
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 font-semibold mb-1">Currently on standby</p>
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mb-4">
                     Started: {currentStandbyLog && new Date(currentStandbyLog.started_at).toLocaleString()}
                   </p>
-                  <p className="text-sm text-yellow-800">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-300">
                     Confirm the end time below. Adjust if you forgot to stop standby at the actual time.
                   </p>
                 </div>
 
                 <div>
-                  <label htmlFor="confirmedEndTime" className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label htmlFor="confirmedEndTime" className="block text-sm font-semibold text-gray-700 dark:text-white/70 mb-2">
                     Confirm End Time *
                   </label>
                   <input
@@ -451,9 +476,9 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
                     name="confirmedEndTime"
                     value={confirmedEndTime}
                     onChange={(e) => setConfirmedEndTime(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-yellow-500 focus:outline-none text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 rounded-xl bg-white dark:bg-white/10 text-gray-900 dark:text-white focus:border-yellow-500 focus:outline-none"
                   />
-                  <p className="text-xs text-gray-600 mt-1">
+                  <p className="text-xs text-gray-600 dark:text-white/60 mt-1">
                     Adjust if you forgot to stop standby at the actual time
                   </p>
                 </div>
@@ -472,7 +497,7 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
                   </button>
                   <button
                     onClick={() => setShowStandbyModal(false)}
-                    className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all"
+                    className="w-full px-6 py-3 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-800 dark:text-white rounded-xl font-semibold transition-all"
                   >
                     Cancel
                   </button>
@@ -480,14 +505,30 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4 mb-4">
-                  <p className="text-sm text-orange-800 font-medium">
+                <div className="bg-orange-50 dark:bg-orange-500/10 border-2 border-orange-200 dark:border-orange-500/30 rounded-xl p-4 mb-4">
+                  <p className="text-sm text-orange-800 dark:text-orange-300 font-medium">
                     Use standby time when the contractor is not ready and you're waiting to begin work.
                   </p>
                 </div>
 
                 <div>
-                  <label htmlFor="confirmedStartTime" className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-white/70 mb-2">
+                    Reason for Standby *
+                  </label>
+                  <select
+                    value={standbyReason}
+                    onChange={(e) => setStandbyReason(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 rounded-xl bg-white dark:bg-white/10 text-gray-900 dark:text-white focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">Select a reason...</option>
+                    {STANDBY_REASONS.map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="confirmedStartTime" className="block text-sm font-semibold text-gray-700 dark:text-white/70 mb-2">
                     Confirm Start Time *
                   </label>
                   <input
@@ -496,15 +537,15 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
                     name="confirmedStartTime"
                     value={confirmedStartTime}
                     onChange={(e) => setConfirmedStartTime(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none text-gray-900"
+                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 rounded-xl bg-white dark:bg-white/10 text-gray-900 dark:text-white focus:border-orange-500 focus:outline-none"
                   />
-                  <p className="text-xs text-gray-600 mt-1">
+                  <p className="text-xs text-gray-600 dark:text-white/60 mt-1">
                     Adjust if you forgot to start standby at the actual time
                   </p>
                 </div>
 
-                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
-                  <p className="text-xs text-yellow-800 font-medium">
+                <div className="bg-yellow-50 dark:bg-yellow-500/10 border-2 border-yellow-300 dark:border-yellow-500/30 rounded-xl p-4">
+                  <p className="text-xs text-yellow-800 dark:text-yellow-300 font-medium">
                     ⚠️ Remember: You cannot proceed with workflow steps while on standby time. Stop standby before continuing work.
                   </p>
                 </div>
@@ -523,7 +564,7 @@ export default function QuickAccessButtons({ jobId, onStandbyChange }: QuickAcce
                   </button>
                   <button
                     onClick={() => setShowStandbyModal(false)}
-                    className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all"
+                    className="w-full px-6 py-3 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-800 dark:text-white rounded-xl font-semibold transition-all"
                   >
                     Cancel
                   </button>

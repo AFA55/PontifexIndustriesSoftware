@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
+import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 
 // Enhanced job data structure with real DSM-style information
 const jobDetails = {
@@ -352,9 +353,9 @@ export default function JobDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-blue-50 dark:from-[#0b0618] dark:to-[#0e0720]">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-blue-50 dark:bg-none dark:bg-[#0b0618]">
       {/* Header */}
-      <div className="bg-white dark:bg-white/5 border-b-4 border-red-500 shadow-lg sticky top-0 z-10">
+      <div className="bg-white dark:bg-white/[0.03] border-b-4 border-red-500 dark:border-red-700 shadow-lg sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-2">
             <Link
@@ -372,6 +373,7 @@ export default function JobDetail() {
             </h1>
 
             <div className="flex items-center gap-2 flex-shrink-0">
+              <DarkModeIconToggle />
               <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{user?.name?.charAt(0) || 'U'}</span>
               </div>
@@ -412,8 +414,8 @@ export default function JobDetail() {
         )}
 
         {/* Modern Status Section */}
-        <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-blue-100 dark:border-white/10 p-6">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Job Status</h2>
+        <div className="bg-white rounded-2xl shadow-xl border-2 border-blue-100 p-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Job Status</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 overflow-x-hidden">
             {[
               { key: 'scheduled', label: 'Scheduled', icon: '📅' },
@@ -444,7 +446,7 @@ export default function JobDetail() {
                     ? 'bg-gray-300 border-gray-400 text-gray-500 cursor-wait opacity-70'
                     : jobStatus === status.key
                     ? `${getStatusColor(status.key)} text-white shadow-lg scale-105`
-                    : 'bg-gray-100 dark:bg-white/10 border-gray-300 dark:border-white/10 text-gray-700 dark:text-white/80 hover:bg-gray-200 dark:hover:bg-white/20'
+                    : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
                 }`}
                 disabled={isDisabled || statusLoading}
               >
@@ -480,12 +482,12 @@ export default function JobDetail() {
         </div>
 
         {/* Job Details Card */}
-        <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-l-8 border-red-500 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-xl border-l-8 border-red-500 overflow-hidden">
           <div className="p-6">
             <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
               <div className="flex-1 min-w-0">
-                <h3 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-2 break-words">{job.title}</h3>
-                <div className="flex items-start gap-2 text-gray-600 dark:text-white/60">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2 break-words">{job.title}</h3>
+                <div className="flex items-start gap-2 text-gray-600">
                   <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -506,7 +508,7 @@ export default function JobDetail() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-semibold text-gray-700 dark:text-white/80 mb-2 flex items-center gap-2">
+                  <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2V6" />
                     </svg>
@@ -514,16 +516,16 @@ export default function JobDetail() {
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-white/60 font-semibold">Job Type:</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{job.jobType}</span>
+                      <span className="text-gray-700 font-semibold">Job Type:</span>
+                      <span className="font-bold text-gray-900">{job.jobType}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-white/60 font-semibold">Customer:</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{job.customer}</span>
+                      <span className="text-gray-700 font-semibold">Customer:</span>
+                      <span className="font-bold text-gray-900">{job.customer}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-white/60 font-semibold">Location:</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{job.location}</span>
+                      <span className="text-gray-700 font-semibold">Location:</span>
+                      <span className="font-bold text-gray-900">{job.location}</span>
                     </div>
                   </div>
                 </div>
@@ -531,7 +533,7 @@ export default function JobDetail() {
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-semibold text-gray-700 dark:text-white/80 mb-2 flex items-center gap-2">
+                  <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -539,16 +541,16 @@ export default function JobDetail() {
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-white/60 font-semibold">Arrival Time:</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{job.arrivalTime}</span>
+                      <span className="text-gray-700 font-semibold">Arrival Time:</span>
+                      <span className="font-bold text-gray-900">{job.arrivalTime}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-white/60 font-semibold">Est. Hours:</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{job.estimatedHours}</span>
+                      <span className="text-gray-700 font-semibold">Est. Hours:</span>
+                      <span className="font-bold text-gray-900">{job.estimatedHours}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-white/60 font-semibold">Technician:</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{job.technician}</span>
+                      <span className="text-gray-700 font-semibold">Technician:</span>
+                      <span className="font-bold text-gray-900">{job.technician}</span>
                     </div>
                   </div>
                 </div>
@@ -556,7 +558,7 @@ export default function JobDetail() {
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-semibold text-gray-700 dark:text-white/80 mb-2 flex items-center gap-2">
+                  <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
                     <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
@@ -564,14 +566,14 @@ export default function JobDetail() {
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-gray-700 dark:text-white/60 font-semibold">Foreman:</span>
+                      <span className="text-gray-700 font-semibold">Foreman:</span>
                       <p className="font-bold text-gray-900">{job.foreman}</p>
                       <a href={`tel:${job.foremaneOffice}`} className="text-blue-600 hover:underline font-semibold">
                         📞 {job.foremaneOffice}
                       </a>
                     </div>
                     <div>
-                      <span className="text-gray-700 dark:text-white/60 font-semibold">Salesman:</span>
+                      <span className="text-gray-700 font-semibold">Salesman:</span>
                       <p className="font-bold text-gray-900">{job.salesman}</p>
                     </div>
                   </div>
@@ -582,15 +584,15 @@ export default function JobDetail() {
         </div>
 
         {/* Job Description */}
-        <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-blue-100 dark:border-white/10 p-6">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+        <div className="bg-white rounded-2xl shadow-xl border-2 border-blue-100 p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             Job Description
           </h3>
-          <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-4">
-            <pre className="whitespace-pre-wrap text-gray-700 dark:text-white/80 font-medium leading-relaxed">
+          <div className="bg-gray-50 rounded-xl p-4">
+            <pre className="whitespace-pre-wrap text-gray-700 font-medium leading-relaxed">
               {job.description}
             </pre>
           </div>
@@ -599,8 +601,8 @@ export default function JobDetail() {
         {/* Equipment & Documents */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Required Equipment */}
-          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-green-100 dark:border-white/10 p-6">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-2xl shadow-xl border-2 border-green-100 p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -622,8 +624,8 @@ export default function JobDetail() {
           </div>
 
           {/* Required Documents */}
-          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-yellow-100 dark:border-white/10 p-6">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-2xl shadow-xl border-2 border-yellow-100 p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
@@ -705,17 +707,17 @@ export default function JobDetail() {
         </div>
 
         {/* Modern Action Buttons */}
-        <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border-2 border-red-100 dark:border-white/10 p-6">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Job Actions</h3>
+        <div className="bg-white rounded-2xl shadow-xl border-2 border-red-100 p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Job Actions</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button className="flex flex-col items-center gap-3 p-4 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-xl transition-all duration-200 border-2 border-gray-300 dark:border-white/10 hover:border-gray-400">
+            <button className="flex flex-col items-center gap-3 p-4 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-200 border-2 border-gray-300 hover:border-gray-400">
               <div className="w-12 h-12 bg-gray-600 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <span className="font-medium text-gray-800 dark:text-white/80 text-sm">Add Photos</span>
+              <span className="font-medium text-gray-800 text-sm">Add Photos</span>
             </button>
 
             <button className="flex flex-col items-center gap-3 p-4 bg-blue-100 hover:bg-blue-200 rounded-xl transition-all duration-200 border-2 border-blue-300 hover:border-blue-400">
@@ -772,9 +774,9 @@ export default function JobDetail() {
       {/* Equipment Checklist Confirmation Modal */}
       {showEquipmentCheckModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#1a1030] rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Equipment Checklist Confirmation</h2>
-            <p className="text-gray-700 dark:text-white/80 mb-6">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Equipment Checklist Confirmation</h2>
+            <p className="text-gray-700 mb-6">
               Before heading to the job site, please confirm that you have reviewed the equipment checklist and have all necessary equipment:
             </p>
             <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6">
@@ -788,7 +790,7 @@ export default function JobDetail() {
                 ))}
               </ul>
             </div>
-            <p className="text-gray-800 dark:text-white font-semibold mb-6">
+            <p className="text-gray-800 font-semibold mb-6">
               Have you verified that you have all the required equipment?
             </p>
             <div className="flex gap-3">
