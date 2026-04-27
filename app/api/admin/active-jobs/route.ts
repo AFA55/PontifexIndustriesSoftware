@@ -89,6 +89,18 @@ export async function GET(request: NextRequest) {
       changeRequestCounts[r.job_order_id] = (changeRequestCounts[r.job_order_id] || 0) + 1;
     });
 
+    // Fetch operator notes counts (exclude system change_log notes)
+    const { data: jobNotes } = await supabaseAdmin
+      .from('job_notes')
+      .select('job_order_id')
+      .in('job_order_id', jobIds)
+      .neq('note_type', 'change_log');
+
+    const notesCounts: Record<string, number> = {};
+    (jobNotes || []).forEach((n: any) => {
+      notesCounts[n.job_order_id] = (notesCounts[n.job_order_id] || 0) + 1;
+    });
+
     const result = jobs.map((j: any) => ({
       id: j.id,
       job_number: j.job_number,
@@ -103,6 +115,7 @@ export async function GET(request: NextRequest) {
       created_by_name: j.created_by ? (profileMap[j.created_by] ?? null) : null,
       pending_change_requests: changeRequestCounts[j.id] || 0,
       pending_completion_approval: completionPendingSet.has(j.id),
+      operator_notes_count: notesCounts[j.id] || 0,
     }));
 
     return NextResponse.json({ success: true, data: result });

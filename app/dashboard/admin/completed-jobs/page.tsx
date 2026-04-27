@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Trash2,
   Loader2,
+  StickyNote,
 } from 'lucide-react';
 
 interface CompletedJob {
@@ -85,6 +86,14 @@ export default function CompletedJobsArchivePage() {
   const [filterRating, setFilterRating] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [jobNotes, setJobNotes] = useState<Array<{
+    id: string;
+    author_name: string | null;
+    content: string;
+    note_type: string;
+    created_at: string;
+  }>>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
 
   const handleDeleteJob = async (jobId: string, jobNumber: string) => {
     const confirmed = window.confirm(
@@ -111,7 +120,10 @@ export default function CompletedJobsArchivePage() {
         return;
       }
       setJobs((prev) => prev.filter((j) => j.id !== jobId));
-      if (selectedJobDetails?.job.id === jobId) setSelectedJobDetails(null);
+      if (selectedJobDetails?.job.id === jobId) {
+        setSelectedJobDetails(null);
+        setJobNotes([]);
+      }
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete job');
     } finally {
@@ -161,8 +173,28 @@ export default function CompletedJobsArchivePage() {
     }
   };
 
+  const loadJobNotes = async (jobId: string, token: string) => {
+    setLoadingNotes(true);
+    try {
+      const res = await fetch(`/api/job-orders/${jobId}/notes`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setJobNotes(json.data || []);
+      } else {
+        setJobNotes([]);
+      }
+    } catch {
+      setJobNotes([]);
+    } finally {
+      setLoadingNotes(false);
+    }
+  };
+
   const loadJobDetails = async (job: CompletedJob) => {
     setLoadingDetails(true);
+    setJobNotes([]);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -272,6 +304,8 @@ export default function CompletedJobsArchivePage() {
         firstLogDate,
         lastLogDate,
       });
+      // Fire-and-forget notes fetch (non-blocking)
+      loadJobNotes(job.id, session.access_token);
     } catch (err) {
       console.error('Error loading job details:', err);
     } finally {
@@ -858,6 +892,61 @@ export default function CompletedJobsArchivePage() {
                               </p>
                             </div>
                           )}
+
+                        {/* Operator Notes */}
+                        <div className="mt-4 rounded-xl p-4 bg-sky-50 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:ring-sky-400/30">
+                          <h3 className="font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2 text-sm">
+                            <StickyNote className="w-4 h-4 text-sky-600 dark:text-sky-300" />
+                            Operator Notes
+                            {jobNotes.length > 0 && (
+                              <span className="ml-auto px-2 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-700 dark:bg-sky-500/25 dark:text-sky-200">
+                                {jobNotes.length}
+                              </span>
+                            )}
+                          </h3>
+                          {loadingNotes ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                            </div>
+                          ) : jobNotes.length === 0 ? (
+                            <p className="text-sm text-slate-500 dark:text-white/50 italic">No operator notes recorded for this job.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {jobNotes.map((note) => {
+                                const noteTypeColors: Record<string, string> = {
+                                  done_for_day: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+                                  completion: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+                                  amendment: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300',
+                                  manual: 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-white/70',
+                                };
+                                const colorClass = noteTypeColors[note.note_type] ?? noteTypeColors.manual;
+                                const initials = (note.author_name || 'O')
+                                  .split(' ')
+                                  .map((w: string) => w[0])
+                                  .join('')
+                                  .substring(0, 2)
+                                  .toUpperCase();
+                                return (
+                                  <div key={note.id} className="rounded-lg border p-2.5 text-sm border-sky-200 bg-white dark:border-sky-400/20 dark:bg-sky-500/5">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold text-white bg-gradient-to-br from-sky-500 to-blue-600">
+                                        {initials}
+                                      </span>
+                                      <span className="font-semibold text-slate-800 dark:text-white text-xs">{note.author_name || 'Operator'}</span>
+                                      <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${colorClass}`}>
+                                        {note.note_type.replace(/_/g, ' ')}
+                                      </span>
+                                    </div>
+                                    <p className="text-slate-600 dark:text-white/70 text-xs leading-relaxed whitespace-pre-line">{note.content}</p>
+                                    <p className="text-slate-400 dark:text-white/40 text-[10px] mt-1">
+                                      {new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
 
                         {selectedJobDetails.documents.length > 0 && (
                           <>
