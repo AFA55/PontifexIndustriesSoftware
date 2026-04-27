@@ -24,6 +24,7 @@ import {
   MapPin,
   Wrench,
   ClipboardList,
+  MessageSquarePlus,
 } from 'lucide-react';
 import PhotoUploader from '@/components/PhotoUploader';
 import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
@@ -57,6 +58,14 @@ export default function DayCompletePage() {
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionNotes, setCompletionNotes] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  // ─── Post-submission success screen state ─────────────────────────────────
+  type SuccessMode = null | 'done_for_day' | 'complete';
+  const [successMode, setSuccessMode] = useState<SuccessMode>(null);
+  const [showSupervisorNoteForm, setShowSupervisorNoteForm] = useState(false);
+  const [supervisorNote, setSupervisorNote] = useState('');
+  const [supervisorNoteSubmitting, setSupervisorNoteSubmitting] = useState(false);
+  const [supervisorNoteSent, setSupervisorNoteSent] = useState(false);
 
   // ─── Remote signature (Option 3) state ───────────────────────────────────
   const [showRemotePanel, setShowRemotePanel] = useState(false);
@@ -171,6 +180,35 @@ export default function DayCompletePage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
+  // Submit supervisor note after Done for Today / Complete Job
+  const handleSubmitSupervisorNote = async () => {
+    if (!supervisorNote.trim()) return;
+    setSupervisorNoteSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`/api/job-orders/${jobId}/notes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          content: supervisorNote.trim(),
+          noteType: successMode === 'complete' ? 'completion' : 'done_for_day',
+        }),
+      });
+      setSupervisorNoteSent(true);
+      setShowSupervisorNoteForm(false);
+      // Redirect after 2s
+      setTimeout(() => router.push('/dashboard/my-jobs'), 2000);
+    } catch {
+      /* non-critical */
+    } finally {
+      setSupervisorNoteSubmitting(false);
+    }
+  };
+
   // Calculate hours worked today
   const getHoursWorked = () => {
     if (!job) return 0;
@@ -221,9 +259,8 @@ export default function DayCompletePage() {
       });
 
       if (res.ok) {
-        showNotif('Day logged! Job will continue tomorrow.', 'success');
         localStorage.removeItem(`work-performed-${jobId}`);
-        setTimeout(() => router.push('/dashboard/my-jobs'), 1500);
+        setSuccessMode('done_for_day');
       } else {
         const data = await res.json();
         showNotif(data.error || 'Failed to save daily log', 'error');
@@ -322,9 +359,8 @@ export default function DayCompletePage() {
       });
 
       if (statusRes.ok) {
-        showNotif(generatedPdfUrl ? 'Job completed! PDF saved.' : 'Job completed! Great work!', 'success');
         localStorage.removeItem(`work-performed-${jobId}`);
-        setTimeout(() => router.push('/dashboard/my-jobs'), 2000);
+        setSuccessMode('complete');
       } else {
         const data = await statusRes.json();
         showNotif(data.error || 'Failed to complete job', 'error');
@@ -509,6 +545,102 @@ export default function DayCompletePage() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setSignatureData('');
   };
+
+  // ─── Post-submission success screen ──────────────────────────────────────
+  if (successMode) {
+    const isDoneForDay = successMode === 'done_for_day';
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border border-green-100 dark:border-green-900/30 p-8 max-w-sm w-full text-center">
+          {/* Icon */}
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 ${
+            isDoneForDay
+              ? 'bg-amber-100 dark:bg-amber-900/40'
+              : 'bg-emerald-100 dark:bg-emerald-900/40'
+          }`}>
+            {isDoneForDay
+              ? <Sun className="w-10 h-10 text-amber-500 dark:text-amber-400" />
+              : <Trophy className="w-10 h-10 text-emerald-500 dark:text-emerald-400" />
+            }
+          </div>
+
+          {/* Heading */}
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            {isDoneForDay ? 'Done for Today ✓' : 'Job Complete ✓'}
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+            {isDoneForDay
+              ? 'Day logged. Job continues tomorrow.'
+              : 'Great work! This job has been completed.'
+            }
+          </p>
+
+          {/* Note sent confirmation */}
+          {supervisorNoteSent && (
+            <div className="flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 rounded-xl px-4 py-3 mb-4">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+              <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Note sent to supervisor ✓</p>
+            </div>
+          )}
+
+          {/* Add note toggle */}
+          {!supervisorNoteSent && (
+            <div className="mb-4">
+              {!showSupervisorNoteForm ? (
+                <button
+                  onClick={() => setShowSupervisorNoteForm(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                >
+                  <MessageSquarePlus className="w-4 h-4 text-purple-500 dark:text-purple-400" />
+                  Add a note for your supervisor
+                </button>
+              ) : (
+                <div className="space-y-3 text-left">
+                  <textarea
+                    value={supervisorNote}
+                    onChange={(e) => setSupervisorNote(e.target.value)}
+                    placeholder="Leave a note for your supervisor..."
+                    rows={4}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.07] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSubmitSupervisorNote}
+                      disabled={supervisorNoteSubmitting || !supervisorNote.trim()}
+                      className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 transition-all"
+                    >
+                      {supervisorNoteSubmitting
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                        : <><Send className="w-4 h-4" /> Send Note</>
+                      }
+                    </button>
+                    <button
+                      onClick={() => setShowSupervisorNoteForm(false)}
+                      className="px-4 py-3 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Back to My Jobs */}
+          <button
+            onClick={() => router.push('/dashboard/my-jobs')}
+            className={`w-full py-3 rounded-xl font-semibold text-white transition-all ${
+              isDoneForDay
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                : 'bg-gradient-to-r from-emerald-500 to-green-600'
+            }`}
+          >
+            Back to My Jobs
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
