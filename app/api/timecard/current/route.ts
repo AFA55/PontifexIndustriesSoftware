@@ -14,11 +14,14 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
-    // Find active timecard (clocked in but not clocked out)
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Find active timecard for TODAY only (clocked in but not clocked out)
     const { data: activeTimecard, error: fetchError } = await supabaseAdmin
       .from('timecards')
       .select('*')
       .eq('user_id', auth.userId)
+      .eq('date', todayStr)
       .is('clock_out_time', null)
       .order('clock_in_time', { ascending: false })
       .limit(1)
@@ -40,6 +43,23 @@ export async function GET(request: NextRequest) {
     }
 
     if (!activeTimecard) {
+      // Auto-close any stale open timecards from previous days
+      const { data: staleTimecards } = await supabaseAdmin
+        .from('timecards')
+        .select('id, date, clock_in_time')
+        .eq('user_id', auth.userId)
+        .is('clock_out_time', null)
+        .lt('date', todayStr);
+
+      for (const stale of staleTimecards ?? []) {
+        // Close at end of that day (23:59:59)
+        const eod = `${stale.date}T23:59:59`;
+        await supabaseAdmin
+          .from('timecards')
+          .update({ clock_out_time: eod, notes: 'Auto-closed: no clock-out recorded' })
+          .eq('id', stale.id);
+      }
+
       return NextResponse.json(
         {
           success: true,

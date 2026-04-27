@@ -180,10 +180,32 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
+    // -- Hour categorization --
+    const now = new Date();
+    const todayDate = now.toISOString().split('T')[0];
+
+    // Auto-close any stale open timecards from previous days before checking today
+    const { data: staleTimecards } = await supabaseAdmin
+      .from('timecards')
+      .select('id, date, clock_in_time')
+      .eq('user_id', user.id)
+      .is('clock_out_time', null)
+      .lt('date', todayDate);
+
+    for (const stale of staleTimecards ?? []) {
+      const eod = `${stale.date}T23:59:59`;
+      await supabaseAdmin
+        .from('timecards')
+        .update({ clock_out_time: eod, notes: 'Auto-closed: no clock-out recorded' })
+        .eq('id', stale.id);
+    }
+
+    // Check for an active clock-in for TODAY only
     const { data: activeTimecard, error: checkError } = await supabaseAdmin
       .from('timecards')
       .select('*')
       .eq('user_id', user.id)
+      .eq('date', todayDate)
       .is('clock_out_time', null)
       .maybeSingle();
 
@@ -204,10 +226,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // -- Hour categorization --
-    const now = new Date();
-    const todayDate = now.toISOString().split('T')[0];
     const currentHour = now.getHours();
     const dayOfWeek = now.getDay();
 
