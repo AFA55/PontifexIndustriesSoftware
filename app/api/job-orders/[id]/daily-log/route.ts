@@ -196,12 +196,12 @@ export async function POST(
         console.error('Error updating job for next day:', updateError);
       }
 
-      // Cancel any pending completion requests so "Awaiting approval" doesn't linger
+      // Cancel any stale completion requests when continuing to next day
       await supabaseAdmin
         .from('job_completion_requests')
         .update({ status: 'cancelled' })
         .eq('job_order_id', jobId)
-        .eq('status', 'pending');
+        .in('status', ['pending', 'submitted']);
 
       // Reset workflow for next day — gracefully handle missing table
       const { error: workflowError } = await supabaseAdmin
