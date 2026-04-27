@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 24, 2026 | **Branch:** `feature/schedule-board-v2` | **Build Status:** PASSING ✅ (0 errors)
+**Date:** April 26, 2026 | **Branch:** `main` | **Build Status:** PASSING ✅ (0 errors)
 
 ---
 
@@ -28,6 +28,25 @@
 - Wire each operator's per-scope skill numbers into the Approve Job availability panel so the displayed match uses the scope-specific value (backend returns it once skill-match is updated to read `skill_levels` by scope).
 - Optionally render per-scope skill bars in the Team Profiles preview card for at-a-glance proficiency.
 - Continue Week 2 polish (end-to-end workflow test, mobile audit, loading/error pass, Patriot assets, prod deploy prep).
+
+---
+
+## APRIL 26, 2026 SESSION — Late Clock-In Tracking & Metrics
+
+### What shipped
+- **Late detection in clock-in API** (`app/api/timecard/clock-in/route.ts`) — already-existing DB columns (`is_late`, `late_minutes`, `scheduled_start_time`, `late_notified_at`) now fully wired: on each clock-in, looks up the operator's assigned job for today, compares clock-in time vs `arrival_time`/`shop_arrival_time`, and flags the timecard if ≥15 min late.
+- **Admin late notifications** — on late clock-in, fires a fire-and-forget insert into `schedule_notifications` for all admins/ops managers in the tenant. Fixed `recipient_id` column name (was incorrectly `operator_id` in earlier stubs).
+- **Operator detail API** (`app/api/admin/timecards/operator/[id]/route.ts`) — added 30-day punctuality stats block: `lateCountMonth`, `avgMinutesLate`, `lastLateDate`. Included in returned `stats.punctuality`.
+- **Team summary API** (`app/api/admin/timecards/team-summary/route.ts`) — added `lateArrivalsThisWeek` counter in totals, deduplicating by day per operator.
+- **Team payroll page** (`app/dashboard/admin/timecards/page.tsx`) — 7th summary card "Late Arrivals This Week" (color: gray/amber/red); new "Late" column in the operator table showing late-day count as color-coded badge (`Timer` icon, `Xd` format); tfoot total; legend entry.
+- **Operator detail page** (`app/dashboard/admin/timecards/operator/[id]/page.tsx`) — 7th metric tile "Punctuality" showing 30-day late count, avg minutes late, last late date; color-coded emerald/amber/red.
+- All changes committed `e28fa1a0`, pushed, and merged to `main`.
+
+### Pending / next
+- End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
+- Mobile responsive audit on all operator pages
+- Loading states & error handling audit
+- Patriot-specific visual assets and prod deploy prep
 
 ---
 
