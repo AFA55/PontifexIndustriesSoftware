@@ -11,7 +11,7 @@ import {
   AlertTriangle, CheckCircle2, Mail, Phone, Calendar,
   Loader2, ChevronRight, Activity, Clock, UserCheck, Pencil,
   Wrench, Save, CheckCircle, Award, Truck,
-  Plus, Trash2, IdCard,
+  Plus, Trash2, IdCard, ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
@@ -1145,9 +1145,358 @@ function CredentialsTab({
   );
 }
 
+// ─── Badges Tab ───────────────────────────────────────────────────────────────
+
+const BADGE_PRESETS = ['GE', 'BMW', 'M3', 'OSHA 10', 'OSHA 30', 'Other'];
+
+interface OperatorBadge {
+  id: string;
+  badge_type: string;
+  badge_number: string | null;
+  issued_date: string | null;
+  expiry_date: string | null;
+  notes: string | null;
+}
+
+function badgeStatus(expiryDate: string | null): { label: string; cls: string } {
+  if (!expiryDate) return { label: 'No Expiry', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const exp = new Date(expiryDate);
+  const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return { label: 'Expired', cls: 'bg-rose-100 text-rose-700 border-rose-200' };
+  if (diffDays <= 60) return { label: `Expires ${exp.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, cls: 'bg-amber-100 text-amber-700 border-amber-200' };
+  return { label: 'Valid', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+}
+
+function BadgesTab({
+  memberId,
+  getAuthHeaders,
+}: {
+  memberId: string;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+}) {
+  const [badges, setBadges] = useState<OperatorBadge[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form state
+  const [selectedPreset, setSelectedPreset] = useState('GE');
+  const [customType, setCustomType] = useState('');
+  const [badgeNumber, setBadgeNumber] = useState('');
+  const [issuedDate, setIssuedDate] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/admin/team-profiles/${memberId}/badges`, { headers });
+        const json = await res.json();
+        if (!cancelled) {
+          if (json.success) setBadges(json.data || []);
+          else setError(json.error || 'Failed to load badges');
+        }
+      } catch {
+        if (!cancelled) setError('Failed to load badges');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [memberId, getAuthHeaders]);
+
+  const resetForm = () => {
+    setSelectedPreset('GE');
+    setCustomType('');
+    setBadgeNumber('');
+    setIssuedDate('');
+    setExpiryDate('');
+    setNotes('');
+    setError(null);
+  };
+
+  const handleAdd = async () => {
+    const badgeType = selectedPreset === 'Other' ? customType.trim() : selectedPreset;
+    if (!badgeType) { setError('Badge type is required'); return; }
+    if (!expiryDate) { setError('Expiry date is required'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/team-profiles/${memberId}/badges`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          badge_type: badgeType,
+          badge_number: badgeNumber || null,
+          issued_date: issuedDate || null,
+          expiry_date: expiryDate,
+          notes: notes || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setError(json.error || 'Failed to add badge');
+      } else {
+        setBadges(prev => [...prev, json.data]);
+        setShowModal(false);
+        resetForm();
+      }
+    } catch {
+      setError('Failed to add badge');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (badgeId: string) => {
+    setDeleting(badgeId);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/team-profiles/${memberId}/badges`, {
+        method: 'DELETE',
+        headers,
+        body: JSON.stringify({ badgeId }),
+      });
+      const json = await res.json();
+      if (json.success) setBadges(prev => prev.filter(b => b.id !== badgeId));
+    } catch { /* silently ignore */ }
+    finally { setDeleting(null); }
+  };
+
+  const inputCls = 'text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors w-full';
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-violet-600" />
+          <span className="text-sm font-semibold text-gray-700">Facility &amp; Site Badges</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => { resetForm(); setShowModal(true); }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add Badge
+        </button>
+      </div>
+
+      {error && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Badge list */}
+      {badges.length === 0 ? (
+        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center">
+          <ShieldCheck className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500 font-medium">No badges on file.</p>
+          <p className="text-xs text-gray-400 mt-1">Click + Add Badge to get started.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5">Badge Type</th>
+                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5 hidden sm:table-cell">Badge #</th>
+                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5 hidden sm:table-cell">Issued</th>
+                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5">Expires</th>
+                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5 w-10" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {badges.map(badge => {
+                const status = badgeStatus(badge.expiry_date);
+                return (
+                  <tr key={badge.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-gray-900">{badge.badge_type}</td>
+                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">{badge.badge_number || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
+                      {badge.issued_date ? new Date(badge.issued_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {badge.expiry_date ? new Date(badge.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border ${status.cls}`}>
+                        {status.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(badge.id)}
+                        disabled={deleting === badge.id}
+                        className="text-gray-400 hover:text-rose-500 transition-colors disabled:opacity-40"
+                        title="Remove badge"
+                      >
+                        {deleting === badge.id
+                          ? <Loader2 className="w-4 h-4 animate-spin" />
+                          : <Trash2 className="w-4 h-4" />
+                        }
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Add Badge Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-violet-600" />
+                <h3 className="text-base font-semibold text-gray-900">Add Badge</h3>
+              </div>
+              <button type="button" onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              {error && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Badge type preset pills */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-2 block">Badge Type *</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {BADGE_PRESETS.map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setSelectedPreset(preset)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                        selectedPreset === preset
+                          ? 'bg-violet-600 text-white border-violet-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400 hover:text-violet-700'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                {selectedPreset === 'Other' && (
+                  <input
+                    type="text"
+                    placeholder="Enter badge type..."
+                    value={customType}
+                    onChange={e => setCustomType(e.target.value)}
+                    className={`${inputCls} mt-2`}
+                    autoFocus
+                  />
+                )}
+              </div>
+
+              {/* Badge number */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">Badge Number</label>
+                <input
+                  type="text"
+                  placeholder="e.g. GE-12345"
+                  value={badgeNumber}
+                  onChange={e => setBadgeNumber(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Issued Date</label>
+                  <input
+                    type="date"
+                    value={issuedDate}
+                    onChange={e => setIssuedDate(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Expiry Date *</label>
+                  <input
+                    type="date"
+                    value={expiryDate}
+                    onChange={e => setExpiryDate(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">Notes</label>
+                <input
+                  type="text"
+                  placeholder="Optional notes..."
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-6 pb-5">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                disabled={saving}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-2.5 text-sm font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAdd}
+                disabled={saving}
+                className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                {saving ? 'Saving...' : 'Save Badge'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 
-type DetailTab = 'info' | 'skills' | 'credentials' | 'permissions';
+type DetailTab = 'info' | 'skills' | 'credentials' | 'badges' | 'permissions';
 
 function MemberDetailPanel({
   member,
@@ -1171,6 +1520,7 @@ function MemberDetailPanel({
   const [tab, setTab] = useState<DetailTab>('info');
   const [flags, setFlags] = useState<Partial<UserFeatureFlags> | null>(null);
   const [loadingFlags, setLoadingFlags] = useState(false);
+  const showBadgesTab = member.role === 'operator' || member.role === 'apprentice';
 
   const handleSaveHireDate = async (isoDate: string) => {
     const headers = await getAuthHeaders();
@@ -1208,12 +1558,13 @@ function MemberDetailPanel({
   const showPermissionsTab = member.role !== 'super_admin';
   const showSkillsTab = member.role === 'operator' || member.role === 'apprentice';
   const showCredentialsTab = member.role === 'operator' || member.role === 'apprentice';
-  const showTabBar = showPermissionsTab || showSkillsTab || showCredentialsTab;
+  const showTabBar = showPermissionsTab || showSkillsTab || showCredentialsTab || showBadgesTab;
 
   const visibleTabs: DetailTab[] = [
     'info',
     ...(showSkillsTab ? (['skills'] as DetailTab[]) : []),
     ...(showCredentialsTab ? (['credentials'] as DetailTab[]) : []),
+    ...(showBadgesTab ? (['badges'] as DetailTab[]) : []),
     ...(showPermissionsTab ? (['permissions'] as DetailTab[]) : []),
   ];
 
@@ -1221,6 +1572,7 @@ function MemberDetailPanel({
     info: 'Profile Info',
     skills: 'Skills',
     credentials: 'Credentials',
+    badges: 'Badges',
     permissions: 'Feature Permissions',
   };
 
@@ -1328,6 +1680,10 @@ function MemberDetailPanel({
 
         {tab === 'credentials' && showCredentialsTab && (
           <CredentialsTab memberId={member.id} getAuthHeaders={getAuthHeaders} />
+        )}
+
+        {tab === 'badges' && showBadgesTab && (
+          <BadgesTab memberId={member.id} getAuthHeaders={getAuthHeaders} />
         )}
 
         {tab === 'permissions' && showPermissionsTab && (
