@@ -130,6 +130,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Weekend days worked — query timecards for all operators in one shot
+    const weekendMap: Record<string, number> = {};
+    const allOperatorIds = Object.keys(statsMap);
+    if (allOperatorIds.length > 0) {
+      const { data: tcEntries } = await supabaseAdmin
+        .from('timecards')
+        .select('user_id, date')
+        .in('user_id', allOperatorIds)
+        .not('clock_out_time', 'is', null);
+      for (const tc of tcEntries ?? []) {
+        const dow = new Date(tc.date + 'T12:00:00').getDay();
+        if (dow === 0 || dow === 6) {
+          weekendMap[tc.user_id] = (weekendMap[tc.user_id] ?? 0) + 1;
+        }
+      }
+    }
+
     // Resolve operator names
     const operatorIds = Object.keys(statsMap);
     const nameMap: Record<string, string> = {};
@@ -147,6 +164,7 @@ export async function GET(request: NextRequest) {
       ...s,
       operator_name: nameMap[s.operator_id] ?? 'Unknown',
       pto_days_remaining: Math.max(0, s.pto_days_allocated - s.pto_days_used),
+      weekend_days_worked: weekendMap[s.operator_id] ?? 0,
     }));
 
     // If operatorId was specified, return single object; otherwise return array

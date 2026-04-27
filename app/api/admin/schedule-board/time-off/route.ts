@@ -26,10 +26,12 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('operator_time_off')
-      .select('id, operator_id, date, type, notes, approved_by, created_at')
+      .select('id, operator_id, date, type, notes, status, approved_by, created_at')
       .order('date', { ascending: true });
 
-    query = query.eq('tenant_id', tenantId);
+    query = query.eq('tenant_id', tenantId)
+      // Only show approved entries on the schedule board — pending requests don't block slots yet
+      .or('status.eq.approved,status.is.null');
 
     if (date) {
       query = query.eq('date', date);

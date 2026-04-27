@@ -226,6 +226,10 @@ export async function GET(request: NextRequest) {
               ? 'has_pending'
               : 'all_approved';
 
+        const weekendDaysWorked = (['Sat', 'Sun'] as const).filter(
+          d => dailyHours[d].hours > 0
+        ).length;
+
         return {
           userId: profile.id,
           fullName: profile.full_name || profile.email,
@@ -242,6 +246,7 @@ export async function GET(request: NextRequest) {
           isClockedIn,
           hasNoEntries,
           status,
+          weekendDaysWorked,
         };
       })
       // Sort: active first, then by hours descending, no_entries last
