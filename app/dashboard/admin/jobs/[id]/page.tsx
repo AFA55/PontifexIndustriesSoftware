@@ -70,6 +70,10 @@ interface JobSummary {
   completion_approved_at: string | null;
   completion_rejected_at: string | null;
   completion_rejection_notes: string | null;
+  require_waiver_signature?: boolean;
+  utility_waiver_signed?: boolean | null;
+  utility_waiver_signer_name?: string | null;
+  utility_waiver_signed_at?: string | null;
 }
 
 interface ActivityEntry {
@@ -1303,6 +1307,22 @@ export default function AdminJobDetailPage({
                     <dd className="mt-0.5 text-slate-700 dark:text-white/80 flex items-center gap-1.5">
                       <Wrench className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
                       {job.permit_number || 'Required'}
+                    </dd>
+                  </div>
+                )}
+
+                {job.require_waiver_signature && (
+                  <div>
+                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Utility Waiver</dt>
+                    <dd className={`mt-0.5 flex items-center gap-1.5 text-sm font-medium ${job.utility_waiver_signed ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                      {job.utility_waiver_signed ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                      )}
+                      {job.utility_waiver_signed
+                        ? `Signed by ${job.utility_waiver_signer_name || 'unknown'}${job.utility_waiver_signed_at ? ` at ${new Date(job.utility_waiver_signed_at).toLocaleString()}` : ''}`
+                        : 'Not yet signed'}
                     </dd>
                   </div>
                 )}

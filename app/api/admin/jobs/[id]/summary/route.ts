@@ -53,7 +53,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
         helper_assigned_to,
         foreman_name,
         foreman_phone,
-        project_name
+        project_name,
+        require_waiver_signature,
+        utility_waiver_signed,
+        utility_waiver_signer_name,
+        utility_waiver_signed_at
       `)
       .eq('id', jobId)
       .eq('tenant_id', tenantId)

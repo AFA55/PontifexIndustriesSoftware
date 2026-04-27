@@ -3,6 +3,9 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/admin/schedule-board/skill-match?jobId=X
  * Fetches the job's difficulty_rating, then returns all operators sorted by match quality.
+ * Optional query params:
+ *   date=YYYY-MM-DD        — filter for availability on that date
+ *   requiredBadge=GE       — add hasBadge / badgeExpiry to each operator result
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,6 +23,7 @@ export async function GET(request: NextRequest) {
 
     const jobId = request.nextUrl.searchParams.get('jobId');
     const date = request.nextUrl.searchParams.get('date'); // optional YYYY-MM-DD
+    const requiredBadge = request.nextUrl.searchParams.get('requiredBadge') ?? undefined; // optional badge type
     if (!jobId) {
       return NextResponse.json({ error: 'Missing required query param: jobId' }, { status: 400 });
     }
@@ -75,6 +79,27 @@ export async function GET(request: NextRequest) {
         if (endDate && endDate >= date) {
           if (j.assigned_to) busyIds.add(j.assigned_to);
           if ((j as any).helper_assigned_to) busyIds.add((j as any).helper_assigned_to);
+        }
+      }
+    }
+
+    // Fetch badge eligibility if a requiredBadge was specified
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const badgeMap = new Map<string, { hasBadge: boolean; badgeExpiry: string | null }>();
+    if (requiredBadge) {
+      const operatorIds = (operators || []).map((op) => op.id);
+      if (operatorIds.length > 0) {
+        const { data: badgeRows } = await supabaseAdmin
+          .from('operator_badges')
+          .select('operator_id, expiry_date')
+          .eq('badge_type', requiredBadge)
+          .in('operator_id', operatorIds);
+        for (const row of badgeRows || []) {
+          const valid = !row.expiry_date || row.expiry_date >= today;
+          badgeMap.set(row.operator_id, {
+            hasBadge: valid,
+            badgeExpiry: row.expiry_date ?? null,
+          });
         }
       }
     }
@@ -138,6 +163,10 @@ export async function GET(request: NextRequest) {
 
       if (isQualified) qualifiedCount++;
 
+      const badgeInfo = requiredBadge
+        ? (badgeMap.get(op.id) ?? { hasBadge: false, badgeExpiry: null })
+        : null;
+
       return {
         id: op.id,
         full_name: op.full_name,
@@ -147,6 +176,7 @@ export async function GET(request: NextRequest) {
         is_qualified: isQualified,
         is_available: date ? !busyIds.has(op.id) : true,
         tasks_qualified_for: qualifiedFor,
+        ...(requiredBadge ? { hasBadge: badgeInfo!.hasBadge, badgeExpiry: badgeInfo!.badgeExpiry } : {}),
       };
     });
 
@@ -167,6 +197,7 @@ export async function GET(request: NextRequest) {
         available_qualified_count: availableQualified,
         total_operators: totalOperators,
         date: date || null,
+        required_badge: requiredBadge ?? null,
         operators: results,
       },
     });

@@ -9,7 +9,7 @@ import {
   ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
   ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer,
   Paperclip, Upload, Trash2, PauseCircle, X, Image, File, MapPin, Phone, Eye,
-  AlertTriangle, Shield, Lock, Home
+  AlertTriangle, Shield, Lock, Home, FileSignature
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
@@ -1098,6 +1098,23 @@ export default function JobDetailPage() {
             <div className="space-y-3">
               {adminDocs.map(doc => renderDocCard(doc, false))}
             </div>
+          </div>
+        )}
+
+        {/* Utility Waiver Banner */}
+        {job.require_waiver_signature && !job.utility_waiver_signed && !isCompleted && (
+          <Link
+            href={`/dashboard/job-schedule/${job.id}/utility-waiver`}
+            className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-md transition-all"
+          >
+            <FileSignature size={20} />
+            Sign Utility Waiver
+          </Link>
+        )}
+        {job.require_waiver_signature && job.utility_waiver_signed && (
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-500/30 rounded-xl">
+            <CheckCircle2 size={16} className="text-emerald-500" />
+            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Utility Waiver Signed</span>
           </div>
         )}
 

@@ -63,6 +63,11 @@ export interface JobTicketData {
   scope_of_work?: string | null;
   // isHelper indicates the current user is the helper, not the operator
   isHelper?: boolean;
+  // Utility waiver
+  require_waiver_signature?: boolean;
+  utility_waiver_signed?: boolean;
+  utility_waiver_signer_name?: string | null;
+  utility_waiver_signed_at?: string | null;
 }
 
 interface JobTicketCardProps {
