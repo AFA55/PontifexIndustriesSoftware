@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { X, CalendarOff, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, CalendarOff, Loader2, ToggleLeft, ToggleRight, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 
 interface AddTimeOffModalProps {
   operators: { id: string; name: string }[];
@@ -10,31 +11,44 @@ interface AddTimeOffModalProps {
   onClose: () => void;
 }
 
-const TIME_OFF_TYPES = [
-  { value: 'pto', label: 'PTO', color: 'bg-blue-100 text-blue-700 border-blue-300' },
-  { value: 'unpaid', label: 'Unpaid', color: 'bg-gray-100 text-gray-700 border-gray-300' },
-  { value: 'worked_last_night', label: 'Worked Last Night', color: 'bg-purple-100 text-purple-700 border-purple-300' },
-  { value: 'sick', label: 'Sick', color: 'bg-red-100 text-red-700 border-red-300' },
-  { value: 'other', label: 'Other', color: 'bg-amber-100 text-amber-700 border-amber-300' },
+interface TypeOption {
+  value: string;
+  label: string;
+  paidDefault: boolean;
+  color: string;
+}
+
+const TIME_OFF_TYPES: TypeOption[] = [
+  { value: 'pto',             label: 'PTO',              paidDefault: true,  color: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700' },
+  { value: 'vacation',        label: 'Vacation',         paidDefault: true,  color: 'bg-cyan-100 text-cyan-700 border-cyan-300 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-700' },
+  { value: 'sick',            label: 'Sick',             paidDefault: false, color: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700' },
+  { value: 'callout',         label: 'Callout',          paidDefault: false, color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700' },
+  { value: 'no_show',         label: 'No Show',          paidDefault: false, color: 'bg-red-200 text-red-800 border-red-400 dark:bg-red-900/50 dark:text-red-200 dark:border-red-600' },
+  { value: 'bereavement',     label: 'Bereavement',      paidDefault: true,  color: 'bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700' },
+  { value: 'personal',        label: 'Personal',         paidDefault: false, color: 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700' },
+  { value: 'unpaid',          label: 'Unpaid Leave',     paidDefault: false, color: 'bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-700/40 dark:text-gray-300 dark:border-gray-600' },
+  { value: 'worked_last_night', label: 'Worked Last Night', paidDefault: false, color: 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700' },
+  { value: 'other',           label: 'Other',            paidDefault: false, color: 'bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-700/40 dark:text-gray-300 dark:border-gray-600' },
 ];
 
 export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onClose }: AddTimeOffModalProps) {
   const [operatorId, setOperatorId] = useState('');
   const [date, setDate] = useState(defaultDate);
   const [type, setType] = useState('pto');
+  const [isPaid, setIsPaid] = useState(true);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync paid toggle when type changes
+  useEffect(() => {
+    const opt = TIME_OFF_TYPES.find(t => t.value === type);
+    if (opt) setIsPaid(opt.paidDefault);
+  }, [type]);
+
   const handleSubmit = async () => {
-    if (!operatorId) {
-      setError('Please select an operator');
-      return;
-    }
-    if (!date) {
-      setError('Please select a date');
-      return;
-    }
+    if (!operatorId) { setError('Please select an operator'); return; }
+    if (!date) { setError('Please select a date'); return; }
 
     setSaving(true);
     setError(null);
@@ -44,13 +58,14 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
       const { data: session } = await supabase.auth.getSession();
       const token = session.session?.access_token || '';
 
-      const res = await fetch('/api/admin/schedule-board/time-off', {
+      // Use the new unified API route
+      const res = await fetch('/api/admin/time-off', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ operator_id: operatorId, date, type, notes: notes || null }),
+        body: JSON.stringify({ operator_id: operatorId, date, type, is_paid: isPaid, notes: notes || null }),
       });
 
       const json = await res.json();
@@ -73,16 +88,16 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
 
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-white/10 animate-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-slate-600 to-slate-700 p-5 rounded-t-2xl text-white">
+          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <CalendarOff className="w-5 h-5" />
                   Add Time Off
                 </h2>
-                <p className="text-slate-300 text-sm">Mark an operator as unavailable</p>
+                <p className="text-white/70 text-sm mt-0.5">Block operator on schedule board</p>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
                 <X className="w-5 h-5" />
@@ -93,7 +108,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
           <div className="p-5 space-y-4">
             {/* Error banner */}
             {error && (
-              <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">
+              <div className="px-3 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700/50 rounded-lg text-sm text-red-700 dark:text-red-300 font-medium">
                 {error}
               </div>
             )}
@@ -131,10 +146,11 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
                 {TIME_OFF_TYPES.map((t) => (
                   <button
                     key={t.value}
+                    type="button"
                     onClick={() => setType(t.value)}
                     className={`px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
                       type === t.value
-                        ? `${t.color} ring-2 ring-offset-1 ring-slate-400`
+                        ? `${t.color} ring-2 ring-offset-1 ring-current border-transparent`
                         : 'bg-gray-50 dark:bg-white/[0.03] text-gray-500 dark:text-white/40 border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/[0.08]'
                     }`}
                   >
@@ -142,6 +158,23 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Paid toggle */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/[0.04] rounded-xl border border-gray-200 dark:border-white/10">
+              <span className="text-sm font-semibold text-gray-700 dark:text-white/70">Paid?</span>
+              <button
+                type="button"
+                onClick={() => setIsPaid(!isPaid)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  isPaid
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                    : 'bg-gray-100 text-gray-500 dark:bg-white/[0.08] dark:text-white/50'
+                }`}
+              >
+                {isPaid ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                {isPaid ? 'Paid' : 'Unpaid'}
+              </button>
             </div>
 
             {/* Notes */}
@@ -169,11 +202,23 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
               <button
                 onClick={handleSubmit}
                 disabled={saving || !operatorId}
-                className="flex-1 py-2.5 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {saving ? 'Saving...' : 'Add Time Off'}
               </button>
+            </div>
+
+            {/* Link to full management page */}
+            <div className="text-center pt-1">
+              <Link
+                href="/dashboard/admin/time-off"
+                className="inline-flex items-center gap-1 text-xs text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
+                onClick={onClose}
+              >
+                <ExternalLink className="w-3 h-3" />
+                View full Time Off management
+              </Link>
             </div>
           </div>
         </div>

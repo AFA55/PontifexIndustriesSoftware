@@ -19,6 +19,7 @@ import {
   Bell,
   BarChart3,
   Briefcase,
+  CalendarOff,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -73,6 +74,7 @@ const NAV_SECTIONS: NavSection[] = [
     accent: 'text-purple-400',
     items: [
       { label: 'Timecards', href: '/dashboard/admin/timecards', icon: Clock, badgeKey: 'timecards', flagKey: 'can_view_timecards' },
+      { label: 'Time Off', href: '/dashboard/admin/time-off', icon: CalendarOff, flagKey: 'can_view_timecards' },
       { label: 'Team Profiles', href: '/dashboard/admin/team-profiles', icon: Users, flagKey: 'can_manage_team' },
       { label: 'Customers', href: '/dashboard/admin/customers', icon: UserCircle2, flagKey: 'can_view_customers' },
       { label: 'Invoicing', href: '/dashboard/admin/billing', icon: CreditCard, flagKey: 'can_view_invoicing' },
