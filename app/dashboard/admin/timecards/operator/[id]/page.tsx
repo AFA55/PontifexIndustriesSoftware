@@ -9,7 +9,7 @@ import {
   Briefcase, AlertTriangle, TrendingUp, Loader2, MapPin,
   ExternalLink, Users, Shield, MessageSquare, Send, Coffee,
   Navigation, Hammer, Flag, X, Save, ChevronDown, ChevronUp,
-  RefreshCw, DollarSign, Zap
+  RefreshCw, DollarSign, Zap, Timer
 } from 'lucide-react';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -99,6 +99,11 @@ interface WeekStats {
   pendingCount: number;
   totalEntries: number;
   effectiveTotalPay?: number;
+  punctuality?: {
+    lateCountMonth: number;
+    avgMinutesLate: number;
+    lastLateDate: string | null;
+  };
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -981,7 +986,7 @@ function OperatorTimecardDetailPageInner() {
 
         {/* ── Metrics Row ──────────────────────────────────── */}
         {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-5">
             {/* Total Hours — hero card */}
             <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 rounded-xl p-4 text-white shadow-lg shadow-purple-500/10 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
@@ -1060,6 +1065,38 @@ function OperatorTimecardDetailPageInner() {
               </p>
               <p className="text-[10px] text-gray-400 mt-0.5">with multipliers</p>
             </div>
+
+            {/* Punctuality — 30-day late arrivals */}
+            {(() => {
+              const p = stats.punctuality;
+              const lateCount = p?.lateCountMonth ?? 0;
+              const color = lateCount === 0
+                ? { iconBg: 'bg-emerald-500/10', icon: 'text-emerald-400', value: 'text-emerald-600', sub: 'text-emerald-400' }
+                : lateCount <= 2
+                  ? { iconBg: 'bg-amber-500/10', icon: 'text-amber-400', value: 'text-amber-600', sub: 'text-amber-400' }
+                  : { iconBg: 'bg-red-500/10', icon: 'text-red-400', value: 'text-red-600', sub: 'text-red-400' };
+              return (
+                <div className={`bg-white rounded-xl p-3.5 border shadow-sm ${lateCount >= 3 ? 'border-red-200 ring-1 ring-red-100' : 'border-gray-100'}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Punctuality</span>
+                    <div className={`w-7 h-7 rounded-lg ${color.iconBg} flex items-center justify-center`}>
+                      <Timer size={13} className={color.icon} />
+                    </div>
+                  </div>
+                  <p className={`text-xl font-bold ${color.value}`}>
+                    {lateCount === 0 ? '0' : `${lateCount}×`}
+                  </p>
+                  <p className={`text-[10px] mt-0.5 ${lateCount === 0 ? 'text-gray-400' : color.sub}`}>
+                    {lateCount === 0 ? 'On time (30 days)' : `${p?.avgMinutesLate ?? 0}m avg late`}
+                  </p>
+                  {lateCount > 0 && p?.lastLateDate && (
+                    <p className="text-[9px] text-gray-400 mt-0.5 truncate">
+                      Last: {new Date(p.lastLateDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 

@@ -182,6 +182,37 @@ export async function GET(
       // Table may not exist
     }
 
+    // 6a. Punctuality stats — last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    let punctualityStats = {
+      lateCountMonth: 0,
+      avgMinutesLate: 0,
+      lastLateDate: null as string | null,
+    };
+    try {
+      const { data: lateEntries } = await supabaseAdmin
+        .from('timecards')
+        .select('date, late_minutes')
+        .eq('user_id', operatorId)
+        .eq('is_late', true)
+        .gte('date', thirtyDaysAgoStr)
+        .order('date', { ascending: false });
+
+      if (lateEntries && lateEntries.length > 0) {
+        const totalMinutes = lateEntries.reduce((sum: number, e: any) => sum + (e.late_minutes || 0), 0);
+        punctualityStats = {
+          lateCountMonth: lateEntries.length,
+          avgMinutesLate: Math.round(totalMinutes / lateEntries.length),
+          lastLateDate: lateEntries[0].date,
+        };
+      }
+    } catch {
+      // Non-critical
+    }
+
     // 6. Calculate weekly stats
     const mandatoryOTHours = enrichedEntries
       .filter((e: any) => e.hour_type === 'mandatory_overtime')
@@ -244,6 +275,7 @@ export async function GET(
           approvedCount,
           pendingCount,
           totalEntries: enrichedEntries.length,
+          punctuality: punctualityStats,
         },
       },
     });

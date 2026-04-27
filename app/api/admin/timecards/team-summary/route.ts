@@ -134,6 +134,7 @@ export async function GET(request: NextRequest) {
     let totalBreakMinutes = 0;
     let pendingApprovals = 0;
     let activeClockins = 0;
+    let lateArrivalsThisWeek = 0;
 
     const teamMembers = (profiles || [])
       .filter(p => p.active !== false) // exclude deactivated accounts
@@ -170,6 +171,10 @@ export async function GET(request: NextRequest) {
             dailyHours[dayName].firstClockIn = tc.clock_in_time || null;
           }
           if ((tc as any).is_late) {
+            if (!dailyHours[dayName].isLate) {
+              // Only count once per day per operator
+              lateArrivalsThisWeek++;
+            }
             dailyHours[dayName].isLate = true;
             dailyHours[dayName].lateMinutes = Math.max(dailyHours[dayName].lateMinutes, (tc as any).late_minutes || 0);
           }
@@ -259,6 +264,7 @@ export async function GET(request: NextRequest) {
           totalBreakMinutes,
           pendingApprovals,
           activeClockins,
+          lateArrivalsThisWeek,
         },
       },
     });
