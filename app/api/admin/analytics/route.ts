@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
     const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
     const firstOfYear = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
     const today = now.toISOString().split('T')[0];
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // Run all queries in parallel
@@ -68,11 +67,11 @@ export async function GET(request: NextRequest) {
         .select('id, full_name, role')
         .in('role', ['operator', 'apprentice']),
 
-      // Recent 30 days jobs for trend
+      // Recent 7 days jobs for trend
       supabaseAdmin
         .from('job_orders')
         .select('id, status, scheduled_date, job_quote, job_type')
-        .gte('scheduled_date', thirtyDaysAgo)
+        .gte('scheduled_date', sevenDaysAgo)
         .is('deleted_at', null)
         .order('scheduled_date', { ascending: true }),
 
@@ -122,7 +121,7 @@ export async function GET(request: NextRequest) {
       jobTypeBreakdown[type] = (jobTypeBreakdown[type] || 0) + 1;
     }
 
-    // ── Daily trend (last 30 days, grouped by date) ─
+    // ── Daily trend (last 7 days, grouped by date) ─
     const dailyTrend: Record<string, { jobs: number; quoted: number; completed: number }> = {};
     for (const job of recentJobs) {
       const d = job.scheduled_date;

@@ -518,11 +518,11 @@ export async function GET(request: NextRequest) {
     // ─── CALENDAR widget (dataKey: 'calendar') ──────────────────
     queries.push((async () => {
       const fourteenDays = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
       const { data } = await withTenant(supabaseAdmin
         .from('job_orders')
         .select('id, job_number, customer_name, status, scheduled_date, scheduled_time'))
-        .gte('scheduled_date', thirtyDaysAgo)
+        .gte('scheduled_date', sevenDaysAgo)
         .lte('scheduled_date', fourteenDays)
         .order('scheduled_date');
 
