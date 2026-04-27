@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle, PauseCircle, PlayCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle, PauseCircle, PlayCircle, RefreshCw, ChevronDown, ChevronUp, ChevronRight, History } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DayNavigator from './_components/DayNavigator';
 import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
@@ -35,8 +35,48 @@ export default function MyJobsPage() {
   const [completingShop, setCompletingShop] = useState(false);
   const [shopDescription, setShopDescription] = useState('');
   const [scheduleUpdatedBanner, setScheduleUpdatedBanner] = useState(false);
+  const [pastJobs, setPastJobs] = useState<any[]>([]);
+  const [pastJobsOpen, setPastJobsOpen] = useState(false);
+  const [pastJobsLoading, setPastJobsLoading] = useState(false);
+  const [doneTodayMap, setDoneTodayMap] = useState<Record<string, boolean>>({});
 
   const isHelper = userRole === 'apprentice';
+
+  // Check which of today's jobs have a "Done for Today" log (day_completed_at set today)
+  const fetchDoneTodayStatus = useCallback(async (jobList: any[]) => {
+    if (!jobList.length) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const today = toDateString(new Date());
+      const map: Record<string, boolean> = {};
+
+      await Promise.all(
+        jobList.map(async (job: any) => {
+          try {
+            const res = await fetch(`/api/job-orders/${job.id}/daily-log`, {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            if (res.ok) {
+              const json = await res.json();
+              const logs: any[] = json.logs || [];
+              const hasTodayLog = logs.some(
+                (l: any) => l.log_date === today && l.day_completed_at != null
+              );
+              if (hasTodayLog) map[job.id] = true;
+            }
+          } catch {
+            // silent per job
+          }
+        })
+      );
+
+      setDoneTodayMap(map);
+    } catch {
+      // silent
+    }
+  }, []);
 
   const fetchJobs = useCallback(async (date: string) => {
     setLoading(true);
@@ -65,6 +105,10 @@ export default function MyJobsPage() {
           }));
           setJobs(enriched);
           if (json.user_role) setUserRole(json.user_role);
+          // Fetch done-for-today status when viewing today's schedule
+          if (date === toDateString(new Date())) {
+            fetchDoneTodayStatus(enriched);
+          }
         }
       }
     } catch (err) {
@@ -73,7 +117,7 @@ export default function MyJobsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, fetchDoneTodayStatus]);
 
   // Check for long-duration jobs (>3 days) for 7-day lookahead
   const checkLongDurationJobs = useCallback(async () => {
@@ -163,6 +207,45 @@ export default function MyJobsPage() {
     }
   }, []);
 
+  // Fetch completed/pending_completion jobs from the past 30 days
+  const fetchPastJobs = useCallback(async () => {
+    setPastJobsLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      const cutoffStr = toDateString(cutoff);
+
+      const res = await fetch(
+        `/api/job-orders?includeCompleted=true&include_helper_jobs=true&date_from=${cutoffStr}`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
+
+      if (res.ok) {
+        const json = await res.json();
+        const uid = session.user.id;
+        const completed = (json.data || []).filter((j: any) => {
+          const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid;
+          const isCompletedStatus = j.status === 'completed' || j.status === 'pending_completion';
+          return isAssigned && isCompletedStatus;
+        });
+        // Sort newest first
+        completed.sort((a: any, b: any) => {
+          const aDate = a.work_completed_at || a.scheduled_date || '';
+          const bDate = b.work_completed_at || b.scheduled_date || '';
+          return bDate.localeCompare(aDate);
+        });
+        setPastJobs(completed);
+      }
+    } catch {
+      // silent
+    } finally {
+      setPastJobsLoading(false);
+    }
+  }, []);
+
   // Fetch active shop ticket for today (helpers only)
   const fetchShopTicket = useCallback(async () => {
     if (!isHelper) return;
@@ -218,7 +301,8 @@ export default function MyJobsPage() {
   useEffect(() => {
     checkLongDurationJobs();
     fetchContinuingProjects();
-  }, [checkLongDurationJobs, fetchContinuingProjects]);
+    fetchPastJobs();
+  }, [checkLongDurationJobs, fetchContinuingProjects, fetchPastJobs]);
 
   useEffect(() => {
     fetchShopTicket();
@@ -448,7 +532,7 @@ export default function MyJobsPage() {
         ) : (
           <div className="space-y-4">
             {jobs.map((job) => (
-              <JobTicketCard key={job.id} job={job} />
+              <JobTicketCard key={job.id} job={job} doneToday={!!doneTodayMap[job.id]} />
             ))}
           </div>
         )}
@@ -496,6 +580,75 @@ export default function MyJobsPage() {
             {jobs.length} job{jobs.length !== 1 ? 's' : ''} for this day
           </div>
         )}
+
+        {/* Past 30 Days — Completed Jobs */}
+        <div className="mt-6 mb-2">
+          <button
+            onClick={() => setPastJobsOpen((o) => !o)}
+            className="w-full flex items-center gap-3 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl px-4 py-3 shadow-sm hover:bg-gray-50 dark:hover:bg-white/10 transition-all"
+            aria-expanded={pastJobsOpen}
+          >
+            <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+              <History className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="flex-1 text-left">
+              <span className="text-sm font-bold text-gray-800 dark:text-white">Past 30 Days</span>
+              {!pastJobsLoading && pastJobs.length > 0 && (
+                <span className="ml-2 text-xs px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-full font-semibold border border-emerald-200 dark:border-emerald-700">
+                  {pastJobs.length}
+                </span>
+              )}
+            </div>
+            {pastJobsLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-gray-400 dark:text-white/40" />
+            ) : pastJobsOpen ? (
+              <ChevronUp className="w-4 h-4 text-gray-400 dark:text-white/40" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-400 dark:text-white/40" />
+            )}
+          </button>
+
+          {pastJobsOpen && (
+            <div className="mt-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
+              {pastJobs.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-400 dark:text-white/40">
+                  No completed jobs in the past 30 days.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 dark:divide-white/10">
+                  {pastJobs.map((job: any) => (
+                    <a
+                      key={job.id}
+                      href={`/dashboard/my-jobs/${job.id}`}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-emerald-400" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
+                          {job.customer_name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-white/50 truncate">
+                          {job.job_number}
+                          {(job.work_completed_at || job.scheduled_date) && (
+                            <> &bull; {new Date(job.work_completed_at || job.scheduled_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                          )}
+                        </p>
+                      </div>
+                      <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-semibold border ${
+                        job.status === 'completed'
+                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700'
+                          : 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700'
+                      }`}>
+                        {job.status === 'completed' ? 'Completed' : 'Pending'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-300 dark:text-white/30 flex-shrink-0" />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

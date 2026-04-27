@@ -67,6 +67,8 @@ export interface JobTicketData {
 
 interface JobTicketCardProps {
   job: JobTicketData;
+  /** True when the operator already submitted "Done for Today" on this job today */
+  doneToday?: boolean;
 }
 
 function formatTime(time: string | null) {
@@ -102,18 +104,24 @@ function getPriorityIndicator(priority: string) {
   }
 }
 
-export default function JobTicketCard({ job }: JobTicketCardProps) {
+export default function JobTicketCard({ job, doneToday }: JobTicketCardProps) {
   const arrivalDisplay = formatTime(job.arrival_time);
   const shopArrival = formatTime(job.shop_arrival_time);
   const priorityInfo = getPriorityIndicator(job.priority);
   const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
   const isCompleted = job.status === 'completed';
 
+  // Green highlight logic: completed gets full emerald border+bg, doneToday gets softer variant
+  const greenBorder = isCompleted
+    ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
+    : doneToday
+    ? 'border-emerald-400 bg-emerald-50/60 dark:bg-emerald-900/20'
+    : 'border-gray-200/50 dark:border-white/10 hover:border-blue-300 dark:hover:border-white/30';
 
   return (
     <Link
       href={`/dashboard/my-jobs/${job.id}`}
-      className={`block w-full text-left bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border-2 transition-all duration-200 hover:shadow-2xl hover:scale-[1.01] border-gray-200/50 dark:border-white/10 hover:border-blue-300 dark:hover:border-white/30 ${isCompleted ? 'opacity-70' : ''}`}
+      className={`block w-full text-left bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border-2 transition-all duration-200 hover:shadow-2xl hover:scale-[1.01] ${greenBorder} ${isCompleted ? 'opacity-80' : ''}`}
     >
       {/* Special Arrival Time Banner */}
       {(arrivalDisplay || shopArrival) && !isCompleted && (
@@ -121,7 +129,7 @@ export default function JobTicketCard({ job }: JobTicketCardProps) {
           <Clock className="w-4 h-4" />
           <span className="text-sm font-bold">
             {shopArrival ? `Shop: ${shopArrival}` : ''}
-            {shopArrival && arrivalDisplay ? ' \u2022 ' : ''}
+            {shopArrival && arrivalDisplay ? ' • ' : ''}
             {arrivalDisplay ? `Arrive: ${arrivalDisplay}` : ''}
           </span>
           {priorityInfo && (
@@ -149,6 +157,16 @@ export default function JobTicketCard({ job }: JobTicketCardProps) {
               {job.isHelper && (
                 <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-semibold border border-emerald-200">
                   Team Member
+                </span>
+              )}
+              {isCompleted && (
+                <span className="text-xs px-2 py-0.5 bg-emerald-500 text-white rounded-full font-bold border border-emerald-600 shadow-sm">
+                  Completed ✓
+                </span>
+              )}
+              {!isCompleted && doneToday && (
+                <span className="text-xs px-2 py-0.5 bg-amber-400 text-white rounded-full font-bold border border-amber-500 shadow-sm">
+                  Done for Today ✓
                 </span>
               )}
             </div>
