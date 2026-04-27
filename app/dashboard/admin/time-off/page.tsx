@@ -12,9 +12,6 @@ import {
   Calendar,
   Loader2,
   TrendingUp,
-  Award,
-  AlertTriangle,
-  Star,
   ChevronDown,
   ChevronUp,
   Sun,
@@ -109,36 +106,6 @@ function getInitials(name: string) {
     .slice(0, 2)
     .map((n) => n[0].toUpperCase())
     .join('');
-}
-
-function calculateScore(card: ScorecardData): number {
-  // On-time rate (40 pts)
-  const totalDays = Math.max(card.totalDaysWorked, 1);
-  const lateDays = card.lateCount;
-  const onTimeScore = Math.round(((totalDays - lateDays) / totalDays) * 40);
-
-  // PTO responsibility (20 pts) — placeholder: full score if callouts are low
-  const ptoScore = card.calloutCount <= 1 ? 20 : card.calloutCount <= 3 ? 12 : 5;
-
-  // Weekend availability (20 pts)
-  const weekendScore = Math.min(20, Math.round((card.weekendDaysWorked / Math.max(1, totalDays)) * 20));
-
-  // Job completion (20 pts) — placeholder
-  const jobScore = totalDays > 0 ? 20 : 0;
-
-  return Math.min(100, onTimeScore + ptoScore + weekendScore + jobScore);
-}
-
-function scoreLabel(score: number): { label: string; ring: string; text: string; bg: string } {
-  if (score >= 80) return { label: 'Excellent', ring: 'ring-emerald-400', text: 'text-emerald-600', bg: 'from-emerald-400 to-emerald-500' };
-  if (score >= 60) return { label: 'Good', ring: 'ring-amber-400', text: 'text-amber-600', bg: 'from-amber-400 to-amber-500' };
-  return { label: 'Needs Improvement', ring: 'ring-rose-400', text: 'text-rose-600', bg: 'from-rose-400 to-rose-500' };
-}
-
-function bonusEligibility(score: number, lateCount: number): { label: string; color: string; icon: string } {
-  if (score >= 80 && lateCount <= 1) return { label: 'Bonus Eligible', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', icon: '✓' };
-  if (score >= 60 || lateCount <= 3) return { label: 'Review Needed', color: 'text-amber-700 bg-amber-50 border-amber-200', icon: '~' };
-  return { label: 'Not Eligible', color: 'text-rose-700 bg-rose-50 border-rose-200', icon: '✗' };
 }
 
 function roleBadgeColor(role: string) {
@@ -532,19 +499,15 @@ function ScorecardsTab({ token }: { token: string }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.map((card) => {
-            const score = calculateScore(card);
-            const { label: scoreText, ring, text: scoreColor, bg: scoreBg } = scoreLabel(score);
-            const bonus = bonusEligibility(score, card.lateCount);
             const ptoPct = Math.min(100, Math.round((card.ptoDaysUsed / Math.max(1, card.ptoDaysAllocated)) * 100));
             const isExpanded = expandedId === card.operatorId;
 
             return (
               <div
                 key={card.operatorId}
-                className={`bg-white dark:bg-white/[0.05] border border-gray-100 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow`}
+                className="bg-white dark:bg-white/[0.05] border border-gray-100 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
-                {/* Gradient top border based on score */}
-                <div className={`h-1 bg-gradient-to-r ${scoreBg}`} />
+                <div className="h-1 bg-gradient-to-r from-purple-400 to-indigo-500" />
 
                 <div className="p-5">
                   {/* Header */}
@@ -613,26 +576,6 @@ function ScorecardsTab({ token }: { token: string }) {
                     ) : (
                       <p className="text-emerald-500">No callouts on record</p>
                     )}
-                  </div>
-
-                  {/* Performance Score */}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-semibold text-gray-500 dark:text-white/40 uppercase tracking-wide">Performance Score</span>
-                      <span className={`text-sm font-bold ${scoreColor}`}>{score}/100 — {scoreText}</span>
-                    </div>
-                    <div className="h-2 bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full bg-gradient-to-r ${scoreBg} transition-all`}
-                        style={{ width: `${score}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Bonus eligibility */}
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${bonus.color}`}>
-                    <span>{bonus.icon}</span>
-                    <span>{bonus.label}</span>
                   </div>
 
                   {/* Expand toggle */}
@@ -722,7 +665,7 @@ export default function TimeOffPage() {
   }
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'scorecards', label: 'Operator Scorecards', icon: Award },
+    { id: 'scorecards', label: 'Operator Metrics', icon: Users },
     { id: 'requests', label: 'Time-Off Requests', icon: CalendarOff },
     { id: 'calendar', label: 'Attendance Calendar', icon: Calendar },
   ];
