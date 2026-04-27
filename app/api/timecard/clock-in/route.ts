@@ -312,11 +312,20 @@ export async function POST(request: NextRequest) {
             const actualTimeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
             const notifications = (adminProfiles || []).map((p: { id: string }) => ({
-              operator_id: p.id,
+              recipient_id: p.id,
               type: 'late_arrival',
-              message: `⚠️ ${operatorName} clocked in ${lateMinutes} min late (scheduled: ${expectedTimeStr}, actual: ${actualTimeStr}) — Job: ${job.customer_name}`,
+              title: 'Late Clock-In',
+              message: `${operatorName} clocked in ${lateMinutes} min late (scheduled: ${expectedTimeStr}, actual: ${actualTimeStr}) — Job: ${job.customer_name}`,
               tenant_id: auth.tenantId || null,
               job_order_id: job.id,
+              read: false,
+              metadata: {
+                operator_id: user.id,
+                operator_name: operatorName,
+                minutes_late: lateMinutes,
+                scheduled_start: expectedTimeStr,
+                actual_clock_in: actualTimeStr,
+              },
             }));
 
             if (notifications.length > 0) {

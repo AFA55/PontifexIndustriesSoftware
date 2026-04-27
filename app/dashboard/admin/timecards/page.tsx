@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, AlertTriangle,
   Search, TrendingUp, Users, Loader2, Shield, Zap,
   Bell, DollarSign, Coffee, Eye, ChevronDown, Moon, Settings, Save, X,
-  Edit2, AlertCircle
+  Edit2, AlertCircle, Timer
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -51,6 +51,7 @@ interface TeamTotals {
   totalBreakMinutes: number;
   pendingApprovals: number;
   activeClockins: number;
+  lateArrivalsThisWeek: number;
 }
 
 // ── Week helpers ──────────────────────────────────────────────
@@ -114,7 +115,7 @@ export default function AdminTimecardsPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [totals, setTotals] = useState<TeamTotals>({
     totalPayrollHours: 0, totalRegularHours: 0, totalOvertimeHours: 0,
-    totalBreakMinutes: 0, pendingApprovals: 0, activeClockins: 0
+    totalBreakMinutes: 0, pendingApprovals: 0, activeClockins: 0, lateArrivalsThisWeek: 0
   });
   const [weekOffset, setWeekOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -594,7 +595,7 @@ export default function AdminTimecardsPage() {
         </div>
 
         {/* ── Summary Cards ──────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-5">
           {/* Total Payroll Hours */}
           <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl p-4 relative overflow-hidden shadow-lg">
             <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full -translate-y-4 translate-x-4" />
@@ -658,6 +659,34 @@ export default function AdminTimecardsPage() {
               {totals.activeClockins}
             </p>
             <p className="text-[10px] text-gray-400 dark:text-white/30 mt-0.5">clocked in now</p>
+          </div>
+
+          {/* Late Arrivals This Week */}
+          <div className={`bg-white dark:bg-white/5 rounded-xl p-4 border shadow-sm ${
+            (totals.lateArrivalsThisWeek ?? 0) > 2
+              ? 'border-red-200 dark:border-red-500/30'
+              : 'border-gray-100 dark:border-white/10'
+          }`}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Timer size={13} className={
+                (totals.lateArrivalsThisWeek ?? 0) === 0
+                  ? 'text-gray-300 dark:text-white/20'
+                  : (totals.lateArrivalsThisWeek ?? 0) <= 2
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-red-600 dark:text-red-400'
+              } />
+              <span className="text-[10px] font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider">Late</span>
+            </div>
+            <p className={`text-2xl font-bold tabular-nums ${
+              (totals.lateArrivalsThisWeek ?? 0) === 0
+                ? 'text-gray-300 dark:text-white/20'
+                : (totals.lateArrivalsThisWeek ?? 0) <= 2
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-red-600 dark:text-red-400'
+            }`}>
+              {totals.lateArrivalsThisWeek ?? 0}
+            </p>
+            <p className="text-[10px] text-gray-400 dark:text-white/30 mt-0.5">late this week</p>
           </div>
         </div>
 
@@ -792,6 +821,9 @@ export default function AdminTimecardsPage() {
                     <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider w-[60px]">
                       OT
                     </th>
+                    <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider w-[70px]">
+                      Late
+                    </th>
                     <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider w-[90px]">
                       Status
                     </th>
@@ -874,6 +906,24 @@ export default function AdminTimecardsPage() {
                           ) : (
                             <span className="text-sm text-gray-300 dark:text-white/20">-</span>
                           )}
+                        </td>
+
+                        {/* Punctuality — late days this week */}
+                        <td className="px-3 py-3 text-center">
+                          {(() => {
+                            const lateDays = DAY_NAMES.filter(d => member.dailyHours[d]?.isLate).length;
+                            if (lateDays === 0) return <span className="text-sm text-gray-300 dark:text-white/20">-</span>;
+                            return (
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                lateDays >= 3
+                                  ? 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/30'
+                                  : 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
+                              }`}>
+                                <Timer size={9} />
+                                {lateDays}d
+                              </span>
+                            );
+                          })()}
                         </td>
 
                         {/* Status */}
@@ -981,6 +1031,16 @@ export default function AdminTimecardsPage() {
                         {filteredMembers.reduce((s, m) => s + m.overtimeHours, 0).toFixed(1)}
                       </span>
                     </td>
+                    <td className="px-3 py-3 text-center">
+                      {(() => {
+                        const totalLate = filteredMembers.reduce((s, m) => s + DAY_NAMES.filter(d => m.dailyHours[d]?.isLate).length, 0);
+                        return totalLate > 0 ? (
+                          <span className="text-xs font-bold text-red-600 dark:text-red-400 tabular-nums">{totalLate}d</span>
+                        ) : (
+                          <span className="text-xs text-gray-300 dark:text-white/20">-</span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-3 py-3" />
                     <td className="px-3 py-3" />
                   </tr>
@@ -1011,6 +1071,10 @@ export default function AdminTimecardsPage() {
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-orange-100 dark:bg-orange-500/15 border border-orange-300 dark:border-orange-400/30" />
             <span>Has Overtime</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Timer size={11} className="text-red-500" />
+            <span>Late column = days clocked in late this week</span>
           </div>
           <div className="ml-auto text-gray-400 dark:text-white/30">
             Click any row to view detailed breakdown
