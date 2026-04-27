@@ -307,6 +307,16 @@ const SERVICE_EQUIPMENT: Record<string, ServiceEquipConfig> = {
       { id: 'push_saw', label: 'Push Saw', type: 'toggle' },
     ],
   },
+  'Brokk': {
+    items: [
+      { id: 'brokk_480_cable', label: '480 Cable', type: 'toggle' },
+      { id: 'brokk_pigtail', label: 'Pigtail / Adapter', type: 'toggle' },
+      { id: 'brokk_waterbomb', label: 'Waterbomb', type: 'toggle' },
+      { id: 'brokk_hepa_fans', label: 'HEPA Fans', type: 'toggle' },
+      { id: 'brokk_generator', label: 'Generator', type: 'toggle' },
+      { id: 'brokk_mist_water', label: 'Mist Water Attachment', type: 'toggle' },
+    ],
+  },
 };
 
 // ── Form state type ──────────────────────────────────────────
@@ -3241,12 +3251,45 @@ export default function ScheduleFormPage() {
               />
               {form.badging_required && (
                 <div className="pl-4 border-l-2 border-emerald-200 ml-2 space-y-2">
-                  <Label>Badge Type</Label>
-                  <InputField
-                    placeholder="e.g. TWIC, Site Badge, etc."
-                    value={form.badging_type}
-                    onChange={e => updateForm({ badging_type: e.target.value })}
-                  />
+                  <p className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Badge Type Required</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(['GE', 'BMW', 'M3', 'Other'] as const).map(badge => {
+                      const isOther = badge === 'Other';
+                      const isKnown = ['GE', 'BMW', 'M3'].includes(form.badging_type);
+                      const selected = isOther
+                        ? !!form.badging_type && !isKnown
+                        : form.badging_type === badge;
+                      return (
+                        <button
+                          key={badge}
+                          type="button"
+                          onClick={() => {
+                            if (isOther) {
+                              updateForm({ badging_type: selected ? '' : ' ' });
+                            } else {
+                              updateForm({ badging_type: selected ? '' : badge });
+                            }
+                          }}
+                          className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
+                            selected
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                              : 'bg-white dark:bg-white/5 text-slate-600 dark:text-white/60 border-slate-200 dark:border-white/10 hover:border-blue-300'
+                          }`}
+                        >
+                          {badge}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!!form.badging_type && !['GE', 'BMW', 'M3'].includes(form.badging_type) && (
+                    <input
+                      type="text"
+                      placeholder="Specify badge type..."
+                      value={form.badging_type.trim()}
+                      onChange={e => updateForm({ badging_type: e.target.value })}
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                    />
+                  )}
                 </div>
               )}
             </SectionCard>
