@@ -12,9 +12,10 @@ import {
   AlertCircle,
   ChevronRight,
   MapPin,
-  User,
   RefreshCw,
   StickyNote,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 interface ActiveJob {
@@ -77,6 +78,8 @@ export default function ActiveJobsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'today' | 'coming_up' | 'attention'>('all');
   const [viewAll, setViewAll] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<ActiveJob | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -97,6 +100,27 @@ export default function ActiveJobsPage() {
     fetchJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, viewAll]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/admin/jobs/${deleteTarget.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        setJobs(prev => prev.filter(j => j.id !== deleteTarget.id));
+        setDeleteTarget(null);
+      }
+    } catch (err) {
+      console.error('Error deleting job:', err);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -181,6 +205,42 @@ export default function ActiveJobsPage() {
         dark:from-[#0b0618] dark:to-[#0e0720]
       "
     >
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white dark:bg-[#1a0d2e] border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white">Delete Job?</h3>
+                <p className="text-sm text-slate-500 dark:text-white/60">This cannot be undone.</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-700 dark:text-white/80 mb-5">
+              Permanently remove <span className="font-semibold">{deleteTarget.job_number}</span>
+              {deleteTarget.title ? ` — ${deleteTarget.title}` : ''}?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              >
+                {deleting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
@@ -411,7 +471,16 @@ export default function ActiveJobsPage() {
                         </span>
                       </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-slate-400 dark:text-white/40 flex-shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(job); }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete job"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <ChevronRight className="w-5 h-5 text-slate-400 dark:text-white/40 mt-1 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
                   </div>
                 </Link>
               );

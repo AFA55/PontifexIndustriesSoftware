@@ -32,6 +32,8 @@ import {
   Timer,
   Navigation,
   StickyNote,
+  Radio,
+  Wifi,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -153,6 +155,33 @@ interface OperatorNote {
   created_at: string;
 }
 
+interface LiveStatusData {
+  status: string;
+  operator_name: string | null;
+  helper_name: string | null;
+  in_route_at: string | null;
+  arrived_at: string | null;
+  work_started_at: string | null;
+  standby_active: boolean;
+  standby_started_at: string | null;
+  standby_duration_minutes: number | null;
+  time_on_site_minutes: number | null;
+  clock_in_time: string | null;
+  clock_out_time: string | null;
+  work_performed_today: Array<{
+    id: string;
+    work_type: string | null;
+    quantity_completed: number;
+    notes: string | null;
+    scope_item_description: string | null;
+  }>;
+  status_history: Array<{
+    status: string;
+    changed_at: string;
+    changed_by: string | null;
+  }>;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function getToken() {
@@ -196,6 +225,17 @@ function formatTime(time: string | null) {
   const ampm = hour >= 12 ? 'PM' : 'AM';
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${minutes} ${ampm}`;
+}
+
+function formatMinutes(mins: number | null): string {
+  if (mins === null || mins < 0) return '—';
+  if (mins < 60) return `${mins}m`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+function formatTimeFromISO(ts: string | null): string {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string; accent: string }> = {
@@ -429,6 +469,10 @@ export default function AdminJobDetailPage({
   const [operatorNotes, setOperatorNotes] = useState<OperatorNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
 
+  // Live status
+  const [liveStatus, setLiveStatus] = useState<LiveStatusData | null>(null);
+  const [liveStatusFetchedAt, setLiveStatusFetchedAt] = useState<Date | null>(null);
+
   // Auth guard
   useEffect(() => {
     const user = getCurrentUser();
@@ -541,6 +585,24 @@ export default function AdminJobDetailPage({
       setNotesLoading(false);
     }
   }, [jobId]);
+
+  const fetchLiveStatus = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/live-status`);
+      if (res.ok) {
+        const json = await res.json();
+        setLiveStatus(json.data ?? null);
+        setLiveStatusFetchedAt(new Date());
+      }
+    } catch { /* ignore — non-critical */ }
+  }, [jobId]);
+
+  // Poll live status every 30 seconds
+  useEffect(() => {
+    fetchLiveStatus();
+    const timer = setInterval(fetchLiveStatus, 30000);
+    return () => clearInterval(timer);
+  }, [fetchLiveStatus]);
 
   const handleReviewChangeRequest = async (crId: string, status: 'approved' | 'rejected') => {
     setCrReviewing(crId);
@@ -1115,6 +1177,165 @@ export default function AdminJobDetailPage({
 
           {/* Right column: Job Details */}
           <div className="space-y-6">
+
+            {/* ── Live Status Panel ── */}
+            {liveStatus && (
+              <div className="
+                relative overflow-hidden rounded-2xl shadow-sm
+                bg-white border border-slate-200
+                dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+                dark:border-white/10 dark:backdrop-blur
+              ">
+                {/* Purple accent stripe */}
+                <span className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500" aria-hidden />
+
+                <div className="p-5 pt-6">
+                  {/* Header */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                      <Radio className="w-4 h-4" />
+                    </span>
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-white">Live Status</h2>
+                    <div className="ml-auto flex items-center gap-2">
+                      {liveStatusFetchedAt && Date.now() - liveStatusFetchedAt.getTime() < 60000 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          LIVE
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-white/50">
+                          <Wifi className="w-3 h-3" />
+                          Polling
+                        </span>
+                      )}
+                      <button
+                        onClick={fetchLiveStatus}
+                        title="Refresh"
+                        className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                      >
+                        <Loader2 className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Standby alert */}
+                  {liveStatus.standby_active && (
+                    <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-400/30">
+                      <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0 animate-pulse" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wide">Standby Active</p>
+                        <p className="text-xs text-rose-600 dark:text-rose-400">
+                          Started {formatTimeFromISO(liveStatus.standby_started_at)}
+                          {liveStatus.standby_duration_minutes !== null && (
+                            <span className="font-semibold"> · {formatMinutes(liveStatus.standby_duration_minutes)}</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Operator + time on site */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10">
+                      <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-1">Operator</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
+                        {liveStatus.operator_name || '—'}
+                      </p>
+                      {liveStatus.helper_name && (
+                        <p className="text-xs text-slate-500 dark:text-white/50 truncate">+ {liveStatus.helper_name}</p>
+                      )}
+                    </div>
+                    <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10">
+                      <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-1">Time On Site</p>
+                      <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
+                        {formatMinutes(liveStatus.time_on_site_minutes)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Timestamps */}
+                  <div className="space-y-2 mb-4">
+                    {liveStatus.clock_in_time && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-white/40 flex-shrink-0" />
+                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">Clocked In</span>
+                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.clock_in_time)}</span>
+                      </div>
+                    )}
+                    {liveStatus.in_route_at && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Navigation className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">In Route</span>
+                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.in_route_at)}</span>
+                      </div>
+                    )}
+                    {liveStatus.arrived_at && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <MapPin className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">Arrived</span>
+                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.arrived_at)}</span>
+                      </div>
+                    )}
+                    {liveStatus.work_started_at && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Wrench className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">Work Started</span>
+                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.work_started_at)}</span>
+                      </div>
+                    )}
+                    {liveStatus.clock_out_time && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Clock className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">Clocked Out</span>
+                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.clock_out_time)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Work performed today */}
+                  {liveStatus.work_performed_today.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-2 flex items-center gap-1">
+                        <Activity className="w-3 h-3" />
+                        Work Today
+                      </p>
+                      <ul className="space-y-1.5">
+                        {liveStatus.work_performed_today.map((item) => (
+                          <li key={item.id} className="flex items-start gap-2 text-xs">
+                            <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-fuchsia-400 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <span className="font-medium text-slate-800 dark:text-white/85">
+                                {item.scope_item_description || item.work_type || 'Work item'}
+                              </span>
+                              <span className="ml-1.5 font-mono text-violet-600 dark:text-violet-300">
+                                ×{item.quantity_completed}
+                              </span>
+                              {item.notes && (
+                                <p className="text-slate-400 dark:text-white/35 italic truncate mt-0.5">{item.notes}</p>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* No active data placeholder */}
+                  {!liveStatus.in_route_at && !liveStatus.arrived_at && !liveStatus.clock_in_time && liveStatus.work_performed_today.length === 0 && (
+                    <p className="text-center text-xs text-slate-400 dark:text-white/35 py-2">
+                      No live activity yet — operator has not started this job today.
+                    </p>
+                  )}
+
+                  {/* Last refreshed */}
+                  {liveStatusFetchedAt && (
+                    <p className="text-[10px] text-slate-300 dark:text-white/25 text-right mt-3">
+                      Updated {liveStatusFetchedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* ── Pending Completion Approval ── */}
             {isPendingCompletion && (

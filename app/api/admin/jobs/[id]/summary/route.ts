@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const tenantId = auth.tenantId;
 
     // ── 1. Fetch the job ────────────────────────────────────────────────────
-    const { data: job, error: jobError } = await supabaseAdmin
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select(`
         id,
@@ -59,9 +59,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
         utility_waiver_signer_name,
         utility_waiver_signed_at
       `)
-      .eq('id', jobId)
-      .eq('tenant_id', tenantId)
-      .single();
+      .eq('id', jobId);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       console.error('[summary] job fetch failed', { jobId, tenantId, jobError });
@@ -81,15 +81,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     (job as any).profiles = operatorProfile;
 
     // ── 2. Fetch scope items ────────────────────────────────────────────────
-    const { data: scopeItems } = await supabaseAdmin
+    let scopeQuery = supabaseAdmin
       .from('job_scope_items')
       .select('id, work_type, description, unit, target_quantity, sort_order')
-      .eq('job_order_id', jobId)
-      .eq('tenant_id', tenantId)
-      .order('sort_order', { ascending: true });
+      .eq('job_order_id', jobId);
+    if (tenantId) scopeQuery = scopeQuery.eq('tenant_id', tenantId);
+    const { data: scopeItems } = await scopeQuery.order('sort_order', { ascending: true });
 
     // ── 3. Fetch all progress entries ───────────────────────────────────────
-    const { data: progressEntries } = await supabaseAdmin
+    let progressQuery = supabaseAdmin
       .from('job_progress_entries')
       .select(`
         id,
@@ -102,9 +102,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
         profiles!job_progress_entries_operator_id_fkey(full_name),
         job_scope_items!job_progress_entries_scope_item_id_fkey(description, work_type, unit)
       `)
-      .eq('job_order_id', jobId)
-      .eq('tenant_id', tenantId)
-      .order('date', { ascending: false });
+      .eq('job_order_id', jobId);
+    if (tenantId) progressQuery = progressQuery.eq('tenant_id', tenantId);
+    const { data: progressEntries } = await progressQuery.order('date', { ascending: false });
 
     // ── 4. Fetch the latest completion request ──────────────────────────────
     let completionRequest: {
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       profiles: { full_name: string } | { full_name: string }[] | null;
     } | null = null;
     try {
-      const { data: crData } = await supabaseAdmin
+      let crQuery = supabaseAdmin
         .from('job_completion_requests')
         .select(`
           id,
@@ -128,8 +128,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
           submitted_by,
           profiles!job_completion_requests_submitted_by_fkey(full_name)
         `)
-        .eq('job_order_id', jobId)
-        .eq('tenant_id', tenantId)
+        .eq('job_order_id', jobId);
+      if (tenantId) crQuery = crQuery.eq('tenant_id', tenantId);
+      const { data: crData } = await crQuery
         .order('submitted_at', { ascending: false })
         .limit(1)
         .single();
