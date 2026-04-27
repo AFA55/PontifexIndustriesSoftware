@@ -3,6 +3,36 @@
 
 ---
 
+## APRIL 26, 2026 SESSION — Operator Workflow, Dark Mode, Time-Off & Attendance, Late Clock-In
+
+### What shipped
+- **Work-performed page** — all 28 `alert()` calls replaced with `showNotification()` toast system (warning/error/success variants).
+- **Daily-log 403 fix** — assignment check now covers: primary operator → helper (`helper_assigned_to`) → admin role bypass → existing-log fallback. Previously operators who were helpers or admins got blocked.
+- **Post-submission locked card** — after "Done for Today" or "Complete Job", the day-complete page shows a polished success card (Sun amber / Trophy green) with expandable "Add a note for your supervisor" form instead of raw form or redirect.
+- **Operator past 7-day job history** — My Jobs page now has a collapsible "Past 7 Days" section at bottom. Fetches completed/cancelled jobs within 7-day cutoff.
+- **Green ticket highlights** — JobTicketCard highlights done-for-today jobs in emerald border + amber "Done for Today ✓" badge; completed jobs in full emerald + green "Completed ✓" badge.
+- **"Continuing Tomorrow" section** — My Jobs shows amber section for `status=scheduled` + `is_multi_day=true` jobs. Day detail shows "Ready to Start Day X" banner.
+- **Admin job detail — Daily Progress** — per-day cards with gradient day-number badge, hours worked, route/work start timestamps, work items list, operator name. Fetches via `GET /api/job-orders/[id]/daily-log`.
+- **Admin job detail — Operator Notes panel** — right-column section showing notes from operators after submission; type badges: amber=done_for_day, emerald=completion, violet=amendment.
+- **Admin active jobs** — `operator_notes_count` field + sky `StickyNote` badge on job cards when notes exist.
+- **Admin completed jobs** — 4-tile metrics (Days Worked, Total Hours, Standby Time, Labor Cost) in job detail; Operator Notes panel.
+- **Schedule board Mark Out** — rose "Mark Out" button on operator rows; `MarkOutModal` with reason dropdown (Sick, Personal Day, No-Show, Vacation, Other). Creates approved `operator_time_off` record. Operator row goes red (`bg-rose-50`) with "OUT" badge and disabled +Assign.
+- **Time-off admin page** (`/dashboard/admin/time-off`) — 2-tab: Requests (table, filter by status/type, LogTimeOffModal) + Attendance Metrics (per-operator PTO progress bar, callout counts color-coded green/amber/red). Navigation item in admin sidebar.
+- **PTO balance system** — `operator_pto_balance` table, `GET/PUT /api/admin/operators/pto-balance`, `GET /api/admin/time-off/stats`. Syncs on every time-off write.
+- **Late clock-in tracking** — `is_late`, `late_minutes`, `scheduled_start_time`, `late_notified_at` columns on `timecards` fully wired. Flags ≥15 min late, sends fire-and-forget `schedule_notifications` to all admins in tenant. Fixed `recipient_id` column name bug.
+- **Team payroll page** — 7th summary card "Late Arrivals This Week" (gray/amber/red); new "Late" column with per-operator color-coded badge (`Timer` icon); tfoot total; legend entry.
+- **Operator detail timecard page** — 7th metric tile "Punctuality": 30-day late count, avg minutes late, last late date; color-coded emerald/amber/red with red border ring at 3+.
+- **Stale "Needs Attention" badge fix** — `job_completion_requests` rows now cancelled when operator submits "Done for Today" (`continueNextDay=true`).
+- **total_days_worked** — incremented on each successful "Done for Today" submission.
+- **Migrations applied**: `20260426_job_notes.sql`, `job_orders_total_hours_worked`, `time_off_enhanced`, `operator_time_off_enhanced`, `time_off_enhancements`.
+
+### Pending / next
+- End-to-end workflow test: create job → dispatch → operator executes → Done for Today → Day 2 → Final completion → admin approves → invoice
+- Mobile responsive audit on operator pages
+- Patriot-specific visual assets and prod deploy prep
+
+---
+
 ## APRIL 24, 2026 SESSION — Jobs UI refresh, Change Orders, Operator Skills
 
 ### What shipped

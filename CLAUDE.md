@@ -127,7 +127,29 @@ npm run build      # Production build check (must pass with 0 errors)
 - [x] Team Profiles — new "Skills & Proficiency" tab in right panel
 - [x] Smart scheduling — uses per-scope skill when a job's service codes map to a scope
 
-### Week 2 — Final Polish & Launch (April 1-2)
+### Session — April 26, 2026 — Operator Workflow, Dark Mode, Time-Off, Late Clock-In ✅ COMPLETE
+- [x] Replace all browser alert() dialogs with toast notifications in work-performed page (28 calls)
+- [x] Fix "You are not assigned to this job" 403 — helper + admin bypass + existing-log fallback
+- [x] Full dark mode pass: day-complete, in-route, standby, timecard, my-profile pages
+- [x] Post-submission locked state: done-for-today and complete show success card with optional notes
+- [x] Operator past 7-day job history on My Jobs (collapsible section, collapsed by default)
+- [x] Green ticket highlights: done-for-today (emerald border) and completed (full emerald) on My Jobs
+- [x] "Continuing Tomorrow" amber section on My Jobs for multi-day jobs resuming next day
+- [x] Admin job detail — Daily Progress per-day cards (hours, timestamps, work items, operator names)
+- [x] Admin job detail — Operator Notes panel with type badges (done_for_day, completion, amendment)
+- [x] Admin active jobs — operator notes count badge (sky StickyNote icon)
+- [x] Admin completed jobs — 4-tile metrics (days worked, total hours, standby time, labor cost) + notes
+- [x] Schedule board — Mark Out button (rose) → operator row blocked, disabled +Assign
+- [x] Time-off admin page — 2-tab: Requests + Attendance Metrics; PTO tracking; callout counts per operator
+- [x] PTO balance API — operator_pto_balance table, per-year allocation, admin adjust endpoint
+- [x] Late clock-in tracking — is_late/late_minutes flagged at clock-in, fire-and-forget admin notifications
+- [x] Team payroll page — Late Arrivals summary card + Late column (color-coded badge, Timer icon)
+- [x] Operator detail timecard page — Punctuality tile (30-day late count, avg minutes, last late date)
+- [x] Stale "Needs Attention" badge fix — job_completion_requests cancelled on continueNextDay
+- [x] total_days_worked incremented on each Done for Today submission
+- [x] Migrations applied: job_notes, job_orders_total_hours_worked, time_off_enhanced, operator_time_off_enhanced, time_off_enhancements
+
+### Week 2 — Final Polish & Launch
 - [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
 - [ ] Mobile responsive audit on all operator pages
 - [ ] Loading states & error handling audit across remaining pages
