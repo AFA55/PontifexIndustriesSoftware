@@ -10,7 +10,7 @@ import QuickAccessButtons from '@/components/QuickAccessButtons';
 import EquipmentUsageForm from '@/components/EquipmentUsageForm';
 import RecommendedItems from './_components/RecommendedItems';
 import PhotoUploader from '@/components/PhotoUploader';
-import { Camera, Mic, Save, Zap, Home } from 'lucide-react';
+import { Camera, Mic, Save, Zap, Home, CheckCircle2, ChevronDown, ChevronUp, Send, Loader2, MessageSquarePlus, Clock } from 'lucide-react';
 import VoiceMemoNotes from './_components/VoiceMemoNotes';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 
@@ -220,6 +220,13 @@ export default function WorkPerformed() {
   const [dayAlreadySubmitted, setDayAlreadySubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ─── Amendment note state (shown when day is already submitted) ──────────
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [noteContent, setNoteContent] = useState('');
+  const [noteSubmitting, setNoteSubmitting] = useState(false);
+  const [noteSubmitted, setNoteSubmitted] = useState(false);
+  const [submittedNotes, setSubmittedNotes] = useState<Array<{ id: string; content: string; created_at: string; author_name: string }>>([]);
+
   // ─── Auto-save state ─────────────────────────────────────────────────────────
   type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -280,12 +287,55 @@ export default function WorkPerformed() {
           const todayLog = (json.logs || []).find((l: any) => l.log_date === today && l.day_completed_at);
           if (todayLog) {
             setDayAlreadySubmitted(true);
+            // Also fetch any existing amendment notes for this job today
+            fetchAmendmentNotes(session.access_token);
           }
         }
       } catch { /* non-critical — default to editable */ }
     };
     checkDaySubmitted();
   }, [params.id]);
+
+  // Fetch amendment notes already submitted for this job
+  const fetchAmendmentNotes = async (accessToken: string) => {
+    try {
+      const res = await fetch(`/api/job-orders/${params.id}/notes`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const amendmentNotes = (json.data || []).filter((n: any) => n.note_type === 'amendment');
+        setSubmittedNotes(amendmentNotes);
+      }
+    } catch { /* non-critical */ }
+  };
+
+  // Submit amendment note
+  const handleSubmitNote = async () => {
+    if (!noteContent.trim()) return;
+    setNoteSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/job-orders/${params.id}/notes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ content: noteContent.trim(), noteType: 'amendment' }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setSubmittedNotes(prev => [json.data, ...prev]);
+        setNoteContent('');
+        setNoteSubmitted(true);
+        setShowNoteForm(false);
+        setTimeout(() => setNoteSubmitted(false), 4000);
+      }
+    } catch { /* non-critical */ }
+    finally { setNoteSubmitting(false); }
+  };
 
   // ─── Draft save/load helpers ──────────────────────────────────────────────────
   const saveDraft = useCallback(async (draft: object | null) => {
@@ -1482,20 +1532,109 @@ export default function WorkPerformed() {
         {/* Quick Access Buttons */}
         <QuickAccessButtons jobId={params.id as string} />
 
-        {/* ─── Day Already Submitted Banner ───────────────────────────── */}
+        {/* ─── Day Already Submitted — Locked Card ───────────────────── */}
         {dayAlreadySubmitted && (
-          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-4 flex items-start gap-3">
-            <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0-6v2m-6 4h12a2 2 0 002-2V9a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <div>
-              <p className="text-sm font-bold text-amber-800">Day already submitted</p>
-              <p className="text-xs text-amber-700 mt-0.5">You have already tapped &quot;Done for Today&quot; for this job. Your work log is saved and cannot be edited.</p>
+          <div className="space-y-4 mb-6">
+            {/* Main locked card */}
+            <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-green-200 dark:border-green-800/50 shadow-sm overflow-hidden">
+              {/* Green header stripe */}
+              <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-5 py-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-base">Done for Today ✓</p>
+                  <p className="text-emerald-100 text-xs mt-0.5">Your work log for today has been saved.</p>
+                </div>
+              </div>
+              {/* Body */}
+              <div className="px-5 py-4">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  This form is now locked. Your supervisor has received your work log.
+                  Need to add something? Leave a note below.
+                </p>
+
+                {/* Success flash */}
+                {noteSubmitted && (
+                  <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 rounded-xl px-4 py-3 mb-4">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Note sent to supervisor ✓</p>
+                  </div>
+                )}
+
+                {/* Expandable note form */}
+                <button
+                  onClick={() => setShowNoteForm(v => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <MessageSquarePlus className="w-4 h-4 text-purple-500 dark:text-purple-400" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Add a note or amendment?</span>
+                  </div>
+                  {showNoteForm
+                    ? <ChevronUp className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    : <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  }
+                </button>
+
+                {showNoteForm && (
+                  <div className="mt-3 space-y-3">
+                    <textarea
+                      value={noteContent}
+                      onChange={(e) => setNoteContent(e.target.value)}
+                      placeholder="Leave a note for your supervisor..."
+                      rows={4}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.07] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                    />
+                    <button
+                      onClick={handleSubmitNote}
+                      disabled={noteSubmitting || !noteContent.trim()}
+                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-50 shadow-sm"
+                    >
+                      {noteSubmitting
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                        : <><Send className="w-4 h-4" /> Submit Note</>
+                      }
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Previously submitted amendment notes */}
+            {submittedNotes.length > 0 && (
+              <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
+                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Notes Submitted Today</p>
+                </div>
+                <ul className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                  {submittedNotes.map((note) => (
+                    <li key={note.id} className="px-5 py-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {new Date(note.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                          {note.author_name ? ` · ${note.author_name}` : ''}
+                        </p>
+                      </div>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{note.content}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Back to My Jobs */}
+            <button
+              onClick={() => router.push('/dashboard/my-jobs')}
+              className="w-full py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 font-medium text-sm hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+            >
+              Back to My Jobs
+            </button>
           </div>
         )}
 
-        {view === 'search' ? (
+        {!dayAlreadySubmitted && view === 'search' ? (
           <>
             {/* Autocomplete Search Bar */}
             <div className="bg-white dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 mb-4">
@@ -2025,52 +2164,56 @@ export default function WorkPerformed() {
           </div>
         )}
 
-        {/* Job Photos Section */}
-        <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Camera className="w-5 h-5 text-purple-500" />
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Photos</h3>
-            <span className="text-xs text-gray-400 dark:text-white/40">(optional)</span>
-          </div>
-          <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
-            Document your work — site conditions, before/after, and your team in action
-          </p>
-          <PhotoUploader
-            bucket="job-photos"
-            pathPrefix={params.id as string}
-            photos={jobPhotos}
-            onPhotosChange={setJobPhotos}
-            maxPhotos={10}
-            label="Add Job Photos"
-            lightMode={true}
-          />
-          <div className="mt-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 flex items-start gap-2">
-            <span className="text-blue-500 text-lg flex-shrink-0">📸</span>
-            <div>
-              <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Showcase your work!</p>
-              <p className="text-xs text-blue-700 dark:text-blue-400">
-                Photos of you and your crew working are encouraged — they demonstrate professionalism and effort to the customer.
+        {!dayAlreadySubmitted && (
+          <>
+            {/* Job Photos Section */}
+            <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Camera className="w-5 h-5 text-purple-500" />
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Photos</h3>
+                <span className="text-xs text-gray-400 dark:text-white/40">(optional)</span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
+                Document your work — site conditions, before/after, and your team in action
               </p>
+              <PhotoUploader
+                bucket="job-photos"
+                pathPrefix={params.id as string}
+                photos={jobPhotos}
+                onPhotosChange={setJobPhotos}
+                maxPhotos={10}
+                label="Add Job Photos"
+                lightMode={true}
+              />
+              <div className="mt-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 flex items-start gap-2">
+                <span className="text-blue-500 text-lg flex-shrink-0">📸</span>
+                <div>
+                  <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Showcase your work!</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
+                    Photos of you and your crew working are encouraged — they demonstrate professionalism and effort to the customer.
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Voice Memo Notes */}
-        <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Mic className="w-5 h-5 text-purple-500" />
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Notes</h3>
-            <span className="text-xs text-gray-400 dark:text-white/40">(voice or typed)</span>
-          </div>
-          <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
-            Describe work performed, conditions encountered, or anything noteworthy. Use the mic button to dictate notes hands-free.
-          </p>
-          <VoiceMemoNotes
-            notes={voiceNotes}
-            onNotesChange={setVoiceNotes}
-            placeholder="Tap the mic and describe what you did today..."
-          />
-        </div>
+            {/* Voice Memo Notes */}
+            <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Mic className="w-5 h-5 text-purple-500" />
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Notes</h3>
+                <span className="text-xs text-gray-400 dark:text-white/40">(voice or typed)</span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
+                Describe work performed, conditions encountered, or anything noteworthy. Use the mic button to dictate notes hands-free.
+              </p>
+              <VoiceMemoNotes
+                notes={voiceNotes}
+                onNotesChange={setVoiceNotes}
+                placeholder="Tap the mic and describe what you did today..."
+              />
+            </div>
+          </>
+        )}
 
         {/* Submit Button */}
         {selectedItems.length > 0 && !dayAlreadySubmitted && (
