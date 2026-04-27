@@ -175,11 +175,13 @@ export async function POST(
     }
 
     if (continueNextDay) {
-      // Mark as multi-day job and reset timestamps for next day
+      // Increment total_days_worked and mark as multi-day; reset timestamps for next day
+      const nextDayCount = (job.total_days_worked || 0) + 1;
       const { error: updateError } = await supabaseAdmin
         .from('job_orders')
         .update({
           is_multi_day: true,
+          total_days_worked: nextDayCount,
           status: 'scheduled', // Reset to scheduled for next day
           route_started_at: null, // Clear timestamps for next day
           work_started_at: null,
@@ -193,6 +195,13 @@ export async function POST(
       if (updateError) {
         console.error('Error updating job for next day:', updateError);
       }
+
+      // Cancel any pending completion requests so "Awaiting approval" doesn't linger
+      await supabaseAdmin
+        .from('job_completion_requests')
+        .update({ status: 'cancelled' })
+        .eq('job_order_id', jobId)
+        .eq('status', 'pending');
 
       // Reset workflow for next day — gracefully handle missing table
       const { error: workflowError } = await supabaseAdmin
@@ -220,7 +229,45 @@ export async function POST(
         continueNextDay: true
       });
     } else {
-      // This was the final day - keep job in current state for final completion
+      // This was the final day — if a signer was provided, this is a confirmed on-site
+      // completion. Aggregate all daily logs and update job to completed as a fallback
+      // (the day-complete page also calls /status PATCH, but this ensures consistency
+      // even if that call is skipped or fires out of order).
+      if (signerName) {
+        try {
+          const { data: allLogs } = await supabaseAdmin
+            .from('daily_job_logs')
+            .select('hours_worked, log_date, work_performed')
+            .eq('job_order_id', jobId)
+            .order('log_date', { ascending: true });
+
+          const totalHours = (allLogs || []).reduce(
+            (sum: number, l: any) => sum + (Number(l.hours_worked) || 0),
+            0
+          );
+          const totalDays = (allLogs || []).length;
+
+          // Fire-and-forget — don't block the response
+          Promise.resolve(
+            supabaseAdmin
+              .from('job_orders')
+              .update({
+                status: 'completed',
+                work_completed_at: now,
+                total_hours_worked: Number(totalHours.toFixed(2)),
+                total_days_worked: totalDays,
+                is_multi_day: totalDays > 1,
+                completion_signer_name: signerName,
+              })
+              .eq('id', jobId)
+          ).then(({ error: cErr }) => {
+            if (cErr) console.warn('Fallback completion update failed:', cErr.message);
+          }).catch(() => {});
+        } catch (finalErr) {
+          console.warn('Fallback completion aggregation failed:', finalErr);
+        }
+      }
+
       return NextResponse.json({
         success: true,
         message: 'Daily log saved. Ready for final completion.',

@@ -50,6 +50,11 @@ interface CompletedJob {
   customer_cleanliness_rating: number | null;
   customer_communication_rating: number | null;
   customer_feedback_comments: string | null;
+  // Multi-day fields
+  is_multi_day: boolean;
+  total_days_worked: number | null;
+  total_hours_worked: number | null;
+  work_completed_at: string | null;
 }
 
 interface JobDetails {
@@ -62,6 +67,12 @@ interface JobDetails {
   totalJobHours: number;
   laborCost: number;
   documents: any[];
+  // Multi-day metrics
+  dailyLogs: any[];
+  totalDaysWorked: number;
+  totalHoursWorked: number;
+  firstLogDate: string | null;
+  lastLogDate: string | null;
 }
 
 export default function CompletedJobsArchivePage() {
@@ -135,7 +146,7 @@ export default function CompletedJobsArchivePage() {
         .from('job_orders')
         .select('*')
         .eq('status', 'completed')
-        .order('scheduled_date', { ascending: false });
+        .order('work_completed_at', { ascending: false, nullsFirst: false });
 
       if (error && error.message) {
         throw error;
@@ -195,10 +206,43 @@ export default function CompletedJobsArchivePage() {
         workPerformed = workItems || [];
       } catch (_) {}
 
-      const startTime = new Date(job.arrival_time || job.scheduled_date);
-      const endTime = new Date(job.completion_signed_at);
-      const totalJobHours =
-        (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+      // Fetch daily logs for multi-day metrics
+      let dailyLogs: any[] = [];
+      try {
+        const { data: logs } = await supabase
+          .from('daily_job_logs')
+          .select('id, log_date, hours_worked, work_performed, day_number')
+          .eq('job_order_id', job.id)
+          .order('log_date', { ascending: true });
+        dailyLogs = logs || [];
+      } catch (_) {}
+
+      // Prefer aggregated data stored on the job; fall back to computed from daily logs
+      const totalDaysWorked =
+        job.total_days_worked ??
+        (dailyLogs.length > 0 ? dailyLogs.length : 1);
+
+      const totalHoursFromLogs = dailyLogs.reduce(
+        (sum, l) => sum + (Number(l.hours_worked) || 0),
+        0
+      );
+      const totalHoursWorked =
+        job.total_hours_worked != null && job.total_hours_worked > 0
+          ? Number(job.total_hours_worked)
+          : totalHoursFromLogs;
+
+      const firstLogDate = dailyLogs.length > 0 ? dailyLogs[0].log_date : null;
+      const lastLogDate = dailyLogs.length > 0 ? dailyLogs[dailyLogs.length - 1].log_date : null;
+
+      // totalJobHours: use aggregated hours if available, else fall back to timestamp diff
+      let totalJobHours: number;
+      if (totalHoursWorked > 0) {
+        totalJobHours = totalHoursWorked;
+      } else {
+        const startTime = new Date(job.arrival_time || job.scheduled_date);
+        const endTime = new Date(job.completion_signed_at || job.work_completed_at || new Date());
+        totalJobHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+      }
       const laborCost = totalJobHours * 75;
 
       let documents: any[] = [];
@@ -222,6 +266,11 @@ export default function CompletedJobsArchivePage() {
         totalJobHours,
         laborCost,
         documents,
+        dailyLogs,
+        totalDaysWorked,
+        totalHoursWorked,
+        firstLogDate,
+        lastLogDate,
       });
     } catch (err) {
       console.error('Error loading job details:', err);
@@ -443,7 +492,7 @@ export default function CompletedJobsArchivePage() {
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-slate-500 dark:text-white/50">
-                              {new Date(job.completion_signed_at).toLocaleDateString()}
+                              {new Date(job.work_completed_at || job.completion_signed_at).toLocaleDateString()}
                             </span>
                             {job.customer_overall_rating && (
                               <span className="px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-1 bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30">
@@ -529,6 +578,7 @@ export default function CompletedJobsArchivePage() {
                           [
                             'Completion Date',
                             new Date(
+                              selectedJobDetails.job.work_completed_at ||
                               selectedJobDetails.job.completion_signed_at
                             ).toLocaleString(),
                           ],
@@ -545,12 +595,20 @@ export default function CompletedJobsArchivePage() {
                       </div>
 
                       {/* Metrics */}
-                      <div className="grid grid-cols-3 gap-3 mb-6">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                         {[
                           {
+                            icon: Calendar,
+                            label: 'Days Worked',
+                            value: `${selectedJobDetails.totalDaysWorked}`,
+                            tile: 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-400/30',
+                          },
+                          {
                             icon: Clock,
-                            label: 'Total Time',
-                            value: `${selectedJobDetails.totalJobHours.toFixed(1)}h`,
+                            label: 'Total Hours',
+                            value: `${selectedJobDetails.totalHoursWorked > 0
+                              ? selectedJobDetails.totalHoursWorked.toFixed(1)
+                              : selectedJobDetails.totalJobHours.toFixed(1)}h`,
                             tile: 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-400/30',
                           },
                           {
@@ -578,6 +636,21 @@ export default function CompletedJobsArchivePage() {
                           </div>
                         ))}
                       </div>
+
+                      {/* Date range for multi-day jobs */}
+                      {selectedJobDetails.job.is_multi_day && selectedJobDetails.firstLogDate && (
+                        <div className="mb-6 flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-50 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/30 text-sm text-violet-700 dark:text-violet-300">
+                          <Calendar className="w-4 h-4 flex-shrink-0" />
+                          <span className="font-semibold">Multi-day job</span>
+                          <span className="text-violet-500 dark:text-violet-400">•</span>
+                          <span>
+                            {new Date(selectedJobDetails.firstLogDate).toLocaleDateString()}
+                            {selectedJobDetails.lastLogDate && selectedJobDetails.lastLogDate !== selectedJobDetails.firstLogDate
+                              ? ` → ${new Date(selectedJobDetails.lastLogDate).toLocaleDateString()}`
+                              : ''}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Scope */}
                       <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10 mb-6">

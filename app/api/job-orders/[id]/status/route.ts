@@ -125,6 +125,29 @@ async function updateJobStatus(
       updateData.work_completed_at = now;
       updateData.work_end_latitude = latitude;
       updateData.work_end_longitude = longitude;
+
+      // Aggregate total hours and days worked from all daily_job_logs for this job
+      try {
+        const { data: logsAgg } = await supabaseAdmin
+          .from('daily_job_logs')
+          .select('hours_worked, log_date')
+          .eq('job_order_id', jobId);
+
+        if (logsAgg && logsAgg.length > 0) {
+          const totalHours = logsAgg.reduce(
+            (sum: number, log: any) => sum + (Number(log.hours_worked) || 0),
+            0
+          );
+          updateData.total_hours_worked = Number(totalHours.toFixed(2));
+          // total_days_worked is incremented per day in daily-log route, but
+          // ensure it reflects the actual log count if it ever drifted
+          updateData.total_days_worked = logsAgg.length;
+          updateData.is_multi_day = logsAgg.length > 1;
+        }
+      } catch (aggErr) {
+        // Non-fatal — aggregation is best-effort
+        console.warn('Failed to aggregate daily logs on completion:', aggErr);
+      }
     }
 
     // Allow additional known fields to be updated (whitelisted for safety)
