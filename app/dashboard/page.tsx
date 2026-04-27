@@ -97,8 +97,9 @@ export default function Dashboard() {
       return;
     }
 
-    // Redirect based on role
-    if (currentUser.role === 'admin') {
+    // Redirect management roles to their admin dashboard
+    const ADMIN_ROLES = ['super_admin', 'admin', 'operations_manager', 'salesman', 'shop_manager', 'inventory_manager'];
+    if (ADMIN_ROLES.includes(currentUser.role)) {
       router.push('/dashboard/admin');
       return;
     }
