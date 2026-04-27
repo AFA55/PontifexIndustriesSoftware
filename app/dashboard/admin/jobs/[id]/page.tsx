@@ -140,7 +140,6 @@ interface DailyLog {
   work_performed: WorkPerformedItem[] | null;
   notes: string | null;
   daily_signer_name: string | null;
-  // operator name enriched client-side
   operator_name?: string;
 }
 
@@ -523,6 +522,16 @@ export default function AdminJobDetailPage({
     } catch { /* ignore */ }
   }, [jobId]);
 
+  const fetchCompletionRequest = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/completion-request`);
+      if (res.ok) {
+        const json = await res.json();
+        setCompletionRequest(json.data ?? null);
+      }
+    } catch { /* ignore */ }
+  }, [jobId]);
+
   const fetchChangeRequests = useCallback(async () => {
     setCrLoading(true);
     try {
@@ -534,16 +543,6 @@ export default function AdminJobDetailPage({
     } catch { /* ignore */ } finally {
       setCrLoading(false);
     }
-  }, [jobId]);
-
-  const fetchCompletionRequest = useCallback(async () => {
-    try {
-      const res = await apiFetch(`/api/admin/jobs/${jobId}/completion-request`);
-      if (res.ok) {
-        const json = await res.json();
-        setCompletionRequest(json.data ?? null);
-      }
-    } catch { /* ignore */ }
   }, [jobId]);
 
   const fetchDailyLogs = useCallback(async () => {
