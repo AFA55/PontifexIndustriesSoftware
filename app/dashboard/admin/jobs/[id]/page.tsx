@@ -25,6 +25,8 @@ import {
   MessageSquare,
   ThumbsUp,
   ThumbsDown,
+  ShieldAlert,
+  HardHat,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -89,6 +91,17 @@ interface ChangeRequest {
   review_notes: string | null;
   requester: { full_name: string } | null;
   reviewer: { full_name: string } | null;
+}
+
+interface CompletionRequest {
+  id: string;
+  status: string;
+  operator_notes: string | null;
+  submitted_at: string;
+  review_notes: string | null;
+  submitted_by: string;
+  submitted_by_name: string | null;
+  submitted_by_email: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -357,6 +370,9 @@ export default function AdminJobDetailPage({
   const [crReviewing, setCrReviewing] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string>('admin');
 
+  // Completion request detail
+  const [completionRequest, setCompletionRequest] = useState<CompletionRequest | null>(null);
+
   // Auth guard
   useEffect(() => {
     const user = getCurrentUser();
@@ -420,6 +436,16 @@ export default function AdminJobDetailPage({
     }
   }, [jobId]);
 
+  const fetchCompletionRequest = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/completion-request`);
+      if (res.ok) {
+        const json = await res.json();
+        setCompletionRequest(json.data ?? null);
+      }
+    } catch { /* ignore */ }
+  }, [jobId]);
+
   const handleReviewChangeRequest = async (crId: string, status: 'approved' | 'rejected') => {
     setCrReviewing(crId);
     try {
@@ -439,11 +465,11 @@ export default function AdminJobDetailPage({
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests()]);
+      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchCompletionRequest()]);
       setLoading(false);
     };
     load();
-  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests]);
+  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests, fetchCompletionRequest]);
 
   const handleApprove = async () => {
     if (!job) return;
@@ -456,9 +482,9 @@ export default function AdminJobDetailPage({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Approval failed');
-      setActionFeedback({ type: 'success', msg: json.message || 'Job approved.' });
+      setActionFeedback({ type: 'success', msg: json.message || 'Job approved and marked complete.' });
       setReviewNotes('');
-      await fetchJob();
+      await Promise.all([fetchJob(), fetchCompletionRequest()]);
     } catch (e: unknown) {
       setActionFeedback({ type: 'error', msg: e instanceof Error ? e.message : 'Action failed' });
     } finally {
@@ -477,9 +503,9 @@ export default function AdminJobDetailPage({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Rejection failed');
-      setActionFeedback({ type: 'success', msg: json.message || 'Completion request rejected.' });
+      setActionFeedback({ type: 'success', msg: json.message || 'Completion request sent back to operator.' });
       setReviewNotes('');
-      await fetchJob();
+      await Promise.all([fetchJob(), fetchCompletionRequest()]);
     } catch (e: unknown) {
       setActionFeedback({ type: 'error', msg: e instanceof Error ? e.message : 'Action failed' });
     } finally {
@@ -659,78 +685,43 @@ export default function AdminJobDetailPage({
 
             <JobProgressChart jobId={jobId} scopeItems={scopeItems} />
 
-            {/* Completion Request Panel */}
-            {isPendingCompletion && (
+            {/* Completion request submitted — work log context (left column) */}
+            {isPendingCompletion && activityLog.length > 0 && (
               <div className="
-                rounded-2xl p-5
-                bg-orange-50 border border-orange-200
-                dark:bg-orange-500/10 dark:border-orange-400/30
+                rounded-2xl p-4
+                bg-amber-50 border border-amber-200
+                dark:bg-amber-500/8 dark:border-amber-400/25
               ">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-orange-500 dark:text-orange-300 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-orange-900 dark:text-orange-200">Completion Review Required</h3>
-                    <p className="text-sm text-orange-700 dark:text-orange-300/80 mt-1">
-                      {job.operator_name || 'Operator'} submitted on{' '}
-                      {formatDateTime(job.completion_requested_at)}
-                    </p>
-                    {job.completion_request_notes && (
-                      <p className="
-                        text-sm mt-2 rounded-lg p-3 italic
-                        bg-white border border-orange-200 text-slate-700
-                        dark:bg-white/5 dark:border-orange-400/20 dark:text-white/80
-                      ">
-                        &ldquo;{job.completion_request_notes}&rdquo;
-                      </p>
-                    )}
-                    <textarea
-                      value={reviewNotes}
-                      onChange={(e) => setReviewNotes(e.target.value)}
-                      placeholder="Review notes (optional)..."
-                      rows={3}
-                      className="
-                        mt-3 w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none
-                        bg-white border border-orange-200 text-slate-900
-                        dark:bg-white/5 dark:border-orange-400/20 dark:text-white dark:placeholder-white/40
-                      "
-                    />
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      <button
-                        onClick={handleApprove}
-                        disabled={approving || rejecting}
-                        className="
-                          inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors
-                          bg-emerald-600 text-white hover:bg-emerald-700
-                          dark:bg-emerald-500 dark:hover:bg-emerald-400
-                          disabled:opacity-50
-                        "
-                      >
-                        {approving ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="w-4 h-4" />
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                  <HardHat className="w-3.5 h-3.5" />
+                  Work Performed (submitted with completion request)
+                </p>
+                <div className="space-y-2">
+                  {activityLog.slice(0, 5).map((entry) => (
+                    <div key={entry.id} className="flex items-start gap-2 text-sm">
+                      <span className="w-1.5 h-1.5 mt-2 rounded-full bg-amber-400 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium text-slate-800 dark:text-white/85">{entry.operator_name}</span>
+                        {' — '}
+                        <span className="text-slate-600 dark:text-white/65">
+                          {entry.linear_feet
+                            ? `${entry.linear_feet} linear ft`
+                            : entry.cores
+                            ? `${entry.cores} cores`
+                            : `${entry.quantity} units`}{' '}
+                          {WORK_TYPE_LABELS[entry.work_type] || entry.work_type}
+                        </span>
+                        {entry.notes && (
+                          <p className="text-xs text-slate-400 dark:text-white/40 italic mt-0.5">{entry.notes}</p>
                         )}
-                        Approve &amp; Complete Job
-                      </button>
-                      <button
-                        onClick={handleReject}
-                        disabled={approving || rejecting}
-                        className="
-                          inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors
-                          bg-rose-100 text-rose-700 hover:bg-rose-200
-                          dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/25
-                          disabled:opacity-50
-                        "
-                      >
-                        {rejecting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <XCircle className="w-4 h-4" />
-                        )}
-                        Send Back to Operator
-                      </button>
+                      </div>
                     </div>
-                  </div>
+                  ))}
+                  {activityLog.length > 5 && (
+                    <p className="text-xs text-slate-400 dark:text-white/40 pl-3.5">
+                      + {activityLog.length - 5} more entries in the activity log below
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -834,6 +825,110 @@ export default function AdminJobDetailPage({
 
           {/* Right column: Job Details */}
           <div className="space-y-6">
+
+            {/* ── Pending Completion Approval ── */}
+            {isPendingCompletion && (
+              <div className="
+                relative overflow-hidden rounded-2xl shadow-md
+                border-2 border-amber-400
+                bg-gradient-to-br from-amber-50 to-orange-50
+                dark:from-amber-500/12 dark:to-orange-500/10
+                dark:border-amber-400/50
+              ">
+                {/* Accent stripe */}
+                <span className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400" aria-hidden />
+
+                <div className="p-5 pt-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-400/20 flex-shrink-0 mt-0.5">
+                      <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-300" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-amber-900 dark:text-amber-200 text-base leading-tight">
+                        Pending Completion Approval
+                      </h3>
+                      <p className="text-sm text-amber-700 dark:text-amber-300/80 mt-0.5">
+                        Action required — operator submitted this job for review
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Operator + submitted time */}
+                  <div className="rounded-xl p-3 mb-3
+                    bg-white/70 border border-amber-200
+                    dark:bg-white/5 dark:border-amber-400/20
+                  ">
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="w-4 h-4 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                      <span className="font-semibold text-slate-800 dark:text-white">
+                        {completionRequest?.submitted_by_name || job.operator_name || 'Operator'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-white/55 mt-1">
+                      <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                      Submitted {formatDateTime(completionRequest?.submitted_at || job.completion_requested_at)}
+                    </div>
+                    {(completionRequest?.operator_notes || job.completion_request_notes) && (
+                      <p className="mt-2 text-sm italic text-slate-600 dark:text-white/70 border-t border-amber-200 dark:border-amber-400/20 pt-2">
+                        &ldquo;{completionRequest?.operator_notes || job.completion_request_notes}&rdquo;
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Review notes input */}
+                  <textarea
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    placeholder="Optional notes for operator (reason for rejection, etc.)..."
+                    rows={3}
+                    className="
+                      w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none mb-3
+                      bg-white border border-amber-200 text-slate-900 placeholder-slate-400
+                      dark:bg-white/5 dark:border-amber-400/20 dark:text-white dark:placeholder-white/35
+                    "
+                  />
+
+                  {/* Approve / Reject buttons */}
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={handleApprove}
+                      disabled={approving || rejecting}
+                      className="
+                        w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors
+                        bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-600/20
+                        dark:bg-emerald-500 dark:hover:bg-emerald-400
+                        disabled:opacity-50
+                      "
+                    >
+                      {approving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4" />
+                      )}
+                      Approve &amp; Complete Job
+                    </button>
+                    <button
+                      onClick={handleReject}
+                      disabled={approving || rejecting}
+                      className="
+                        w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors
+                        bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-200
+                        dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/25 dark:border-rose-400/30
+                        disabled:opacity-50
+                      "
+                    >
+                      {rejecting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <XCircle className="w-4 h-4" />
+                      )}
+                      Send Back to Operator
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="
               rounded-2xl p-6 shadow-sm
               bg-white border border-slate-200
