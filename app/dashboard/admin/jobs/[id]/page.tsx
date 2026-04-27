@@ -27,6 +27,11 @@ import {
   ThumbsDown,
   ShieldAlert,
   HardHat,
+  Activity,
+  ListChecks,
+  Timer,
+  Navigation,
+  StickyNote,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -102,6 +107,35 @@ interface CompletionRequest {
   submitted_by: string;
   submitted_by_name: string | null;
   submitted_by_email: string | null;
+}
+
+interface WorkPerformedItem {
+  name?: string;
+  work_type?: string;
+  type?: string;
+  quantity?: number | string;
+  details?: string;
+  notes?: string;
+  linear_feet_cut?: number | string;
+  core_quantity?: number | string;
+  core_size?: string;
+}
+
+interface DailyLog {
+  id: string;
+  job_order_id: string;
+  operator_id: string;
+  log_date: string;
+  day_number: number | null;
+  hours_worked: number | null;
+  route_started_at: string | null;
+  work_started_at: string | null;
+  day_completed_at: string | null;
+  work_performed: WorkPerformedItem[] | null;
+  notes: string | null;
+  daily_signer_name: string | null;
+  // operator name enriched client-side
+  operator_name?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -373,6 +407,9 @@ export default function AdminJobDetailPage({
   // Completion request detail
   const [completionRequest, setCompletionRequest] = useState<CompletionRequest | null>(null);
 
+  // Daily logs
+  const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
+
   // Auth guard
   useEffect(() => {
     const user = getCurrentUser();
@@ -446,6 +483,33 @@ export default function AdminJobDetailPage({
     } catch { /* ignore */ }
   }, [jobId]);
 
+  const fetchDailyLogs = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/job-orders/${jobId}/daily-log`);
+      if (!res.ok) return;
+      const json = await res.json();
+      const logs: DailyLog[] = json.logs || [];
+      if (logs.length === 0) { setDailyLogs([]); return; }
+
+      // Enrich with operator names from profiles via Supabase client
+      const operatorIds = [...new Set(logs.map((l) => l.operator_id).filter(Boolean))];
+      let nameMap: Record<string, string> = {};
+      if (operatorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', operatorIds);
+        (profiles || []).forEach((p: { id: string; full_name: string | null }) => {
+          nameMap[p.id] = p.full_name || 'Operator';
+        });
+      }
+
+      setDailyLogs(
+        logs.map((l) => ({ ...l, operator_name: nameMap[l.operator_id] || 'Operator' }))
+      );
+    } catch { /* ignore */ }
+  }, [jobId]);
+
   const handleReviewChangeRequest = async (crId: string, status: 'approved' | 'rejected') => {
     setCrReviewing(crId);
     try {
@@ -465,11 +529,11 @@ export default function AdminJobDetailPage({
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchCompletionRequest()]);
+      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchCompletionRequest(), fetchDailyLogs()]);
       setLoading(false);
     };
     load();
-  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests, fetchCompletionRequest]);
+  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests, fetchCompletionRequest, fetchDailyLogs]);
 
   const handleApprove = async () => {
     if (!job) return;
@@ -541,7 +605,7 @@ export default function AdminJobDetailPage({
     );
   }
 
-  const isPendingCompletion = job.status === 'pending_completion';
+  const isPendingCompletion = completionRequest?.status === 'pending';
   const heroAccent = statusConfig?.accent ?? 'from-violet-500 to-fuchsia-500';
 
   return (
@@ -684,6 +748,200 @@ export default function AdminJobDetailPage({
             />
 
             <JobProgressChart jobId={jobId} scopeItems={scopeItems} />
+
+            {/* ── Daily Progress Section ── */}
+            <div className="
+              rounded-2xl p-6 shadow-sm
+              bg-white border border-slate-200
+              dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+              dark:border-white/10 dark:backdrop-blur
+            ">
+              <div className="flex items-center gap-2 mb-5">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                  <Activity className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Daily Progress</h2>
+                {dailyLogs.length > 0 && (
+                  <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                    {dailyLogs.length} {dailyLogs.length === 1 ? 'day' : 'days'} logged
+                  </span>
+                )}
+              </div>
+
+              {dailyLogs.length === 0 ? (
+                <div className="text-center py-8">
+                  <Activity className="w-10 h-10 text-slate-200 dark:text-white/15 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500 dark:text-white/50">No progress logged yet.</p>
+                  <p className="text-xs text-slate-400 dark:text-white/35 mt-1">
+                    Data appears here after the operator submits &ldquo;Done for Today&rdquo;.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Multi-day summary bar */}
+                  {dailyLogs.length > 1 && (
+                    <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10 flex items-center gap-4 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Timer className="w-4 h-4 text-violet-500 dark:text-violet-400" />
+                        <span className="font-semibold text-slate-800 dark:text-white">
+                          {dailyLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0).toFixed(1)}h
+                        </span>
+                        <span className="text-slate-500 dark:text-white/50">total</span>
+                      </div>
+                      <div className="flex gap-1">
+                        {dailyLogs.map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-6 h-2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
+                            title={`Day ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Day cards */}
+                  {dailyLogs.map((log, idx) => {
+                    const dayNum = log.day_number ?? idx + 1;
+                    const logDate = log.log_date
+                      ? new Date(log.log_date + 'T00:00:00').toLocaleDateString('en-US', {
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                      : '—';
+                    const workItems: WorkPerformedItem[] = Array.isArray(log.work_performed)
+                      ? log.work_performed
+                      : [];
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden"
+                      >
+                        {/* Day header */}
+                        <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-500/10 dark:to-fuchsia-500/10 border-b border-slate-200 dark:border-white/10">
+                          <span className="
+                            inline-flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold
+                            bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white flex-shrink-0
+                          ">
+                            {dayNum}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-800 dark:text-white">
+                              Day {dayNum} — {logDate}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-white/55 flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {log.operator_name}
+                            </p>
+                          </div>
+                          {log.hours_worked != null && (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300 flex-shrink-0">
+                              <Clock className="w-3 h-3" />
+                              {log.hours_worked.toFixed(1)}h
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Day body */}
+                        <div className="px-4 py-3 space-y-3">
+                          {/* Timestamps */}
+                          {(log.route_started_at || log.work_started_at) && (
+                            <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-white/55">
+                              {log.route_started_at && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Navigation className="w-3 h-3 text-amber-500" />
+                                  Route started: {formatDateTime(log.route_started_at)}
+                                </span>
+                              )}
+                              {log.work_started_at && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Wrench className="w-3 h-3 text-violet-500" />
+                                  Work started: {formatDateTime(log.work_started_at)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Work performed items */}
+                          {workItems.length > 0 ? (
+                            <div>
+                              <p className="text-xs font-semibold text-slate-500 dark:text-white/55 uppercase tracking-wide mb-2 flex items-center gap-1">
+                                <ListChecks className="w-3.5 h-3.5" />
+                                Work Performed
+                              </p>
+                              <ul className="space-y-1.5">
+                                {workItems.map((item, itemIdx) => {
+                                  const label =
+                                    item.name ||
+                                    item.work_type ||
+                                    item.type ||
+                                    'Work Item';
+                                  const qty = item.quantity
+                                    ? `× ${item.quantity}`
+                                    : item.linear_feet_cut
+                                    ? `${item.linear_feet_cut} lin ft`
+                                    : item.core_quantity
+                                    ? `${item.core_quantity} cores${item.core_size ? ` (${item.core_size})` : ''}`
+                                    : null;
+                                  const detail = item.details || item.notes;
+                                  return (
+                                    <li key={itemIdx} className="flex items-start gap-2 text-sm">
+                                      <span className="w-1.5 h-1.5 mt-2 rounded-full bg-fuchsia-400 flex-shrink-0" />
+                                      <div>
+                                        <span className="font-medium text-slate-800 dark:text-white/85">
+                                          {label}
+                                        </span>
+                                        {qty && (
+                                          <span className="ml-1.5 text-xs font-mono text-violet-600 dark:text-violet-300">
+                                            {qty}
+                                          </span>
+                                        )}
+                                        {detail && (
+                                          <p className="text-xs text-slate-400 dark:text-white/40 italic mt-0.5">
+                                            {detail}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 dark:text-white/35 italic">
+                              No work items recorded for this day.
+                            </p>
+                          )}
+
+                          {/* Notes */}
+                          {log.notes && (
+                            <div className="rounded-lg p-2.5 bg-amber-50 border border-amber-100 dark:bg-amber-500/10 dark:border-amber-400/20">
+                              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 mb-1">
+                                <StickyNote className="w-3 h-3" />
+                                Notes
+                              </p>
+                              <p className="text-xs text-slate-700 dark:text-white/75 leading-relaxed">
+                                {log.notes}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Daily signer */}
+                          {log.daily_signer_name && (
+                            <p className="text-xs text-slate-400 dark:text-white/40 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                              Signed off by {log.daily_signer_name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Completion request submitted — work log context (left column) */}
             {isPendingCompletion && activityLog.length > 0 && (
