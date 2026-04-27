@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Users, Plus, Briefcase, ChevronDown, ChevronUp, Check, CalendarX, XCircle } from 'lucide-react';
+import {
+  Users, Plus, Briefcase, ChevronDown, ChevronUp, Check,
+  CalendarX, XCircle, UserX,
+} from 'lucide-react';
 import JobCard from './JobCard';
 import type { JobCardData } from './JobCard';
 
@@ -38,6 +41,7 @@ interface OperatorRowProps {
   onAddTimeOff?: (type: string, notes: string) => void;
   onRemoveTimeOff?: () => void;
   onSaveRowNote?: (note: string) => void;
+  onMarkUnavailable?: () => void;
 }
 
 const TIME_OFF_LABELS: Record<string, string> = {
@@ -46,6 +50,10 @@ const TIME_OFF_LABELS: Record<string, string> = {
   worked_last_night: 'Worked Last Night',
   sick: 'Sick',
   other: 'Other',
+  unavailable: 'Unavailable',
+  personal_day: 'Personal Day',
+  no_show: 'No-Show',
+  vacation: 'Vacation',
 };
 
 const TIME_OFF_OPTIONS = [
@@ -62,7 +70,14 @@ const TIME_OFF_BADGE_COLORS: Record<string, string> = {
   sick: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/30',
   worked_last_night: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/30',
   other: 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/70 border-gray-200 dark:border-white/20',
+  unavailable: 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-500/40',
+  personal_day: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-500/30',
+  no_show: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-300 dark:border-red-500/40',
+  vacation: 'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-500/30',
 };
+
+// Types that fully block the operator slot (red bg, "UNAVAILABLE" label, no-assign)
+const BLOCKED_TYPES = new Set(['unavailable', 'sick', 'no_show', 'personal_day', 'vacation']);
 
 // ── Inline dropdown for picking operator or helper ──────────────────────
 function PersonDropdown({
@@ -172,8 +187,10 @@ export default function OperatorRow({
   onAddTimeOff,
   onRemoveTimeOff,
   onSaveRowNote,
+  onMarkUnavailable,
 }: OperatorRowProps) {
   const hasJobs = jobs.length > 0;
+  const isBlocked = !!timeOff && BLOCKED_TYPES.has(timeOff.type);
   const [dragOver, setDragOver] = useState(false);
 
   // Time-off panel state
@@ -232,7 +249,11 @@ export default function OperatorRow({
 
   return (
     <div
-      className={`border-l-4 ${colorScheme.border} bg-white dark:bg-white/[0.05] rounded-xl shadow-sm dark:shadow-none dark:ring-1 dark:ring-white/10 hover:shadow-md dark:hover:ring-white/20 transition-all ${
+      className={`border-l-4 rounded-xl shadow-sm dark:shadow-none dark:ring-1 hover:shadow-md transition-all ${
+        isBlocked
+          ? 'border-rose-400 dark:border-rose-500/60 bg-rose-50 dark:bg-rose-900/20 dark:ring-rose-500/20 dark:hover:ring-rose-500/30'
+          : `${colorScheme.border} bg-white dark:bg-white/[0.05] dark:ring-white/10 dark:hover:ring-white/20`
+      } ${
         dragOver
           ? 'ring-2 ring-purple-400 ring-offset-2 shadow-lg scale-[1.01] bg-purple-50/30 dark:bg-purple-500/10 dark:ring-purple-400/60'
           : ''
@@ -245,10 +266,12 @@ export default function OperatorRow({
         {/* Row header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorScheme.bg} dark:opacity-80`}>
-              {hasJobs
-                ? <Briefcase className={`w-5 h-5 ${colorScheme.icon}`} />
-                : <Users className={`w-5 h-5 ${colorScheme.icon}`} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isBlocked ? 'bg-rose-100 dark:bg-rose-500/20' : colorScheme.bg} dark:opacity-80`}>
+              {isBlocked
+                ? <UserX className="w-5 h-5 text-rose-600 dark:text-rose-300" />
+                : hasJobs
+                  ? <Briefcase className={`w-5 h-5 ${colorScheme.icon}`} />
+                  : <Users className={`w-5 h-5 ${colorScheme.icon}`} />
               }
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
@@ -260,7 +283,7 @@ export default function OperatorRow({
                     busyMap={busyOperators}
                     placeholder="Select Operator"
                     onSelect={(name) => onChangeOperator?.(name)}
-                    colorScheme={colorScheme}
+                    colorScheme={isBlocked ? { bg: 'bg-rose-100 dark:bg-rose-500/20', text: 'text-rose-700 dark:text-rose-300' } : colorScheme}
                   />
                   <span className="text-gray-300 dark:text-white/20 hidden sm:inline">+</span>
                   <PersonDropdown
@@ -286,15 +309,20 @@ export default function OperatorRow({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Time-off badge when active */}
+            {/* Time-off / unavailable badge when active */}
             {timeOff && operatorName && (
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${TIME_OFF_BADGE_COLORS[timeOff.type] || TIME_OFF_BADGE_COLORS.other}`}>
-                <span>{TIME_OFF_LABELS[timeOff.type] || timeOff.type} — {operatorName} is out</span>
+                {isBlocked && <UserX className="w-3 h-3 flex-shrink-0" />}
+                <span>
+                  {isBlocked ? 'OUT' : TIME_OFF_LABELS[timeOff.type] || timeOff.type}
+                  {' — '}
+                  {TIME_OFF_LABELS[timeOff.type] || timeOff.type}
+                </span>
                 {canEdit && (
                   <button
                     onClick={onRemoveTimeOff}
                     className="ml-0.5 hover:opacity-70 transition-opacity"
-                    title="Remove time off"
+                    title="Remove / clear unavailability"
                   >
                     <XCircle className="w-3.5 h-3.5" />
                   </button>
@@ -306,6 +334,7 @@ export default function OperatorRow({
               {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}
             </span>
 
+            {/* +Assign: only show when available and NOT blocked */}
             {canEdit && isAvailable && !timeOff && (
               <button
                 onClick={onAssignJob}
@@ -313,6 +342,25 @@ export default function OperatorRow({
                 title="Assign job to this operator"
               >
                 <Plus className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* +Assign greyed out when blocked */}
+            {canEdit && isAvailable && isBlocked && (
+              <div title="Operator unavailable — clear status first" className="p-1.5 rounded-lg text-gray-300 dark:text-white/20 cursor-not-allowed">
+                <Plus className="w-4 h-4" />
+              </div>
+            )}
+
+            {/* Mark Out button — quick unavailability marking */}
+            {canEdit && operatorName && !timeOff && (
+              <button
+                onClick={onMarkUnavailable}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/30 transition-colors"
+                title="Mark operator as unavailable today"
+              >
+                <UserX className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Mark Out</span>
               </button>
             )}
 
@@ -381,16 +429,44 @@ export default function OperatorRow({
           </div>
         </div>
 
-        {/* Time-off overlay (body) */}
+        {/* Time-off / unavailable overlay (body) */}
         {timeOff && (
-          <div className="flex items-center gap-3 py-3 px-4 mb-3 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-white/70">
-            <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-sm">&#128564;</span>
+          <div className={`flex items-center gap-3 py-3 px-4 mb-3 rounded-lg border ${
+            isBlocked
+              ? 'bg-rose-100/70 dark:bg-rose-900/30 border-rose-300 dark:border-rose-500/40 text-rose-800 dark:text-rose-200'
+              : 'bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-white/70'
+          }`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              isBlocked ? 'bg-rose-200 dark:bg-rose-500/30' : 'bg-gray-200 dark:bg-white/10'
+            }`}>
+              {isBlocked
+                ? <UserX className="w-4 h-4 text-rose-600 dark:text-rose-300" />
+                : <span className="text-sm">&#128564;</span>
+              }
             </div>
-            <div>
-              <span className="text-sm font-bold">{TIME_OFF_LABELS[timeOff.type] || timeOff.type}</span>
-              {timeOff.notes && <p className="text-xs text-gray-500 dark:text-white/40 mt-0.5">{timeOff.notes}</p>}
+            <div className="flex-1">
+              <span className="text-sm font-bold">
+                {isBlocked ? 'UNAVAILABLE' : TIME_OFF_LABELS[timeOff.type] || timeOff.type}
+                {' — '}
+                {TIME_OFF_LABELS[timeOff.type] || timeOff.type}
+              </span>
+              {timeOff.notes && <p className="text-xs mt-0.5 opacity-70">{timeOff.notes}</p>}
             </div>
+            {isBlocked && (
+              <span className="px-2 py-0.5 rounded-full bg-rose-200 dark:bg-rose-500/30 text-rose-700 dark:text-rose-300 text-[10px] font-bold uppercase tracking-wide">
+                Blocked
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Blocked slot message */}
+        {timeOff && isBlocked && jobs.length === 0 && (
+          <div className="flex items-center justify-center py-3 rounded-lg border-2 border-dashed border-rose-300 dark:border-rose-500/40 bg-rose-50/50 dark:bg-rose-900/10">
+            <p className="text-sm font-medium text-rose-500 dark:text-rose-400 flex items-center gap-2">
+              <UserX className="w-4 h-4" />
+              Operator Unavailable — No assignments allowed
+            </p>
           </div>
         )}
 

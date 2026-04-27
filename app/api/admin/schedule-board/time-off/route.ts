@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 /**
  * API Route: /api/admin/schedule-board/time-off
  * GET: fetch time-off entries for a date or date range
- * POST: create a time-off entry
+ * POST: create a time-off entry (includes notification for blocked types)
  * DELETE: delete a time-off entry by id
  */
 
@@ -93,7 +93,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: operator_id, date, type' }, { status: 400 });
     }
 
-    const validTypes = ['pto', 'unpaid', 'worked_last_night', 'sick', 'other'];
+    const validTypes = [
+      'pto', 'unpaid', 'worked_last_night', 'sick', 'other',
+      'unavailable', 'personal_day', 'no_show', 'vacation',
+    ];
     if (!validTypes.includes(type)) {
       return NextResponse.json({ error: `Invalid type. Must be one of: ${validTypes.join(', ')}` }, { status: 400 });
     }
@@ -119,6 +122,48 @@ export async function POST(request: NextRequest) {
       }
       console.error('Error creating time-off:', error);
       return NextResponse.json({ error: 'Failed to create time-off entry' }, { status: 500 });
+    }
+
+    // Fire in-app notification when admin marks an operator as blocked/unavailable
+    const BLOCKED_TYPES = ['unavailable', 'sick', 'no_show', 'personal_day', 'vacation'];
+    if (BLOCKED_TYPES.includes(type)) {
+      // Fetch operator name for the notification message
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', operator_id)
+        .single();
+      const operatorName = profile?.full_name || 'An operator';
+      const reasonLabel: Record<string, string> = {
+        unavailable: 'Unavailable', sick: 'Sick', no_show: 'No-Show',
+        personal_day: 'Personal Day', vacation: 'Vacation',
+      };
+      const label = reasonLabel[type] || type;
+      const notifMessage = `${operatorName} is unavailable on ${date} (${label})${notes ? ` — ${notes}` : ''}`;
+
+      // Notify all admins/ops managers in the tenant
+      const { data: admins } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .in('role', ['admin', 'super_admin', 'operations_manager']);
+
+      if (admins && admins.length > 0) {
+        const notifRows = admins.map((a: { id: string }) => ({
+          user_id: a.id,
+          tenant_id: tenantId,
+          type: 'warning',
+          title: 'Operator Marked Unavailable',
+          message: notifMessage,
+          notification_type: 'operator_unavailable',
+          related_entity_type: 'operator_time_off',
+          related_entity_id: data?.id || null,
+          action_url: '/dashboard/admin/schedule-board',
+        }));
+        Promise.resolve(supabaseAdmin.from('notifications').insert(notifRows))
+          .then((res: any) => { if (res.error) console.error('Notification insert error:', res.error); })
+          .catch(() => {});
+      }
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 });

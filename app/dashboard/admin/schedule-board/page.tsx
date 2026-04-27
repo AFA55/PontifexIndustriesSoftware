@@ -37,6 +37,7 @@ import OperatorRowView from './_components/OperatorRowView';
 import ViewToggle from './_components/ViewToggle';
 import CrewScheduleGrid from './_components/CrewScheduleGrid';
 import CancelJobModal from './_components/CancelJobModal';
+import MarkOutModal from './_components/MarkOutModal';
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
@@ -225,6 +226,7 @@ export default function ScheduleBoardPage() {
   const [editTarget, setEditTarget] = useState<{ job: JobCardData; rowIndex: number | null } | null>(null);
   const [changeRequestTarget, setChangeRequestTarget] = useState<JobCardData | null>(null);
   const [cancelJobTarget, setCancelJobTarget] = useState<JobCardData | null>(null);
+  const [markOutTarget, setMarkOutTarget] = useState<{ rowIdx: number; operatorName: string } | null>(null);
   const [notesTarget, setNotesTarget] = useState<JobCardData | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
@@ -1444,6 +1446,32 @@ export default function ScheduleBoardPage() {
     } catch { addToast('error', 'Error', 'Network error'); }
   };
 
+  const handleMarkUnavailable = async (rowIdx: number, reason: string, notes?: string) => {
+    const opName = rowAssignments[rowIdx]?.operator;
+    const opId = opName ? operatorIdMap[opName] : null;
+    if (!opId || !opName) throw new Error('Operator not found');
+
+    const res = await apiFetch('/api/admin/schedule-board/time-off', {
+      method: 'POST',
+      body: JSON.stringify({ operator_id: opId, date: selectedDate, type: reason, notes: notes || null }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Could not mark operator as unavailable');
+    }
+
+    const json = await res.json();
+    const reasonLabel: Record<string, string> = {
+      sick: 'Sick', personal_day: 'Personal Day', no_show: 'No-Show',
+      vacation: 'Vacation', unavailable: 'Unavailable',
+    };
+    const label = reasonLabel[reason] || reason;
+
+    setTimeOffMap(prev => ({ ...prev, [opId]: { id: json.data.id, type: reason, notes: notes || null } }));
+    addToast('success', `${opName} Marked Unavailable`, `${label} on ${selectedDate}`);
+  };
+
   const handleSaveRowNote = async (rowIdx: number, note: string) => {
     const opName = rowAssignments[rowIdx]?.operator;
     const opId = opName ? operatorIdMap[opName] : null;
@@ -2113,6 +2141,7 @@ export default function ScheduleBoardPage() {
                 onAddTimeOff={(type, notes) => handleAddTimeOff(idx, type, notes)}
                 onRemoveTimeOff={() => handleRemoveTimeOff(idx)}
                 onSaveRowNote={(note) => handleSaveRowNote(idx, note)}
+                onMarkUnavailable={rowAssignments[idx]?.operator ? () => setMarkOutTarget({ rowIdx: idx, operatorName: rowAssignments[idx].operator! }) : undefined}
               />
             ))}
           </>
@@ -2263,6 +2292,14 @@ export default function ScheduleBoardPage() {
         />
       )}
       {changeRequestTarget && <ChangeRequestModal job={changeRequestTarget} onSuccess={handleChangeRequestSuccess} onClose={() => setChangeRequestTarget(null)} />}
+      {markOutTarget && (
+        <MarkOutModal
+          operatorName={markOutTarget.operatorName}
+          date={selectedDate}
+          onConfirm={(reason, notes) => handleMarkUnavailable(markOutTarget.rowIdx, reason, notes)}
+          onClose={() => setMarkOutTarget(null)}
+        />
+      )}
       {cancelJobTarget && (
         <CancelJobModal
           job={cancelJobTarget}
