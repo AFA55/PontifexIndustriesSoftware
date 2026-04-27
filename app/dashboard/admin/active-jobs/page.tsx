@@ -14,6 +14,7 @@ import {
   MapPin,
   User,
   RefreshCw,
+  StickyNote,
 } from 'lucide-react';
 
 interface ActiveJob {
@@ -30,6 +31,7 @@ interface ActiveJob {
   created_by_name?: string;
   pending_change_requests?: number;
   pending_completion_approval?: boolean;
+  operator_notes_count?: number;
 }
 
 // Status pill hues. Light: `bg-{hue}-100 text-{hue}-700 ring-{hue}-200`.
@@ -360,6 +362,16 @@ export default function ActiveJobsPage() {
                             dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30
                           ">
                             Awaiting approval
+                          </span>
+                        )}
+                        {(job.operator_notes_count ?? 0) > 0 && (
+                          <span className="
+                            inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium
+                            bg-sky-100 text-sky-700 ring-1 ring-sky-200
+                            dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30
+                          ">
+                            <StickyNote className="w-3 h-3" />
+                            {job.operator_notes_count} note{job.operator_notes_count !== 1 ? 's' : ''}
                           </span>
                         )}
                       </div>

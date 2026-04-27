@@ -138,6 +138,17 @@ interface DailyLog {
   operator_name?: string;
 }
 
+interface OperatorNote {
+  id: string;
+  job_order_id: string;
+  author_id: string;
+  author_name: string | null;
+  content: string;
+  note_type: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function getToken() {
@@ -410,6 +421,10 @@ export default function AdminJobDetailPage({
   // Daily logs
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
 
+  // Operator notes
+  const [operatorNotes, setOperatorNotes] = useState<OperatorNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+
   // Auth guard
   useEffect(() => {
     const user = getCurrentUser();
@@ -510,6 +525,19 @@ export default function AdminJobDetailPage({
     } catch { /* ignore */ }
   }, [jobId]);
 
+  const fetchOperatorNotes = useCallback(async () => {
+    setNotesLoading(true);
+    try {
+      const res = await apiFetch(`/api/job-orders/${jobId}/notes`);
+      if (res.ok) {
+        const json = await res.json();
+        setOperatorNotes(json.data || []);
+      }
+    } catch { /* ignore */ } finally {
+      setNotesLoading(false);
+    }
+  }, [jobId]);
+
   const handleReviewChangeRequest = async (crId: string, status: 'approved' | 'rejected') => {
     setCrReviewing(crId);
     try {
@@ -529,11 +557,11 @@ export default function AdminJobDetailPage({
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchCompletionRequest(), fetchDailyLogs()]);
+      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchCompletionRequest(), fetchDailyLogs(), fetchOperatorNotes()]);
       setLoading(false);
     };
     load();
-  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests, fetchCompletionRequest, fetchDailyLogs]);
+  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests, fetchCompletionRequest, fetchDailyLogs, fetchOperatorNotes]);
 
   const handleApprove = async () => {
     if (!job) return;
@@ -1413,6 +1441,83 @@ export default function AdminJobDetailPage({
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* Operator Notes */}
+            <div className="
+              rounded-2xl p-5 shadow-sm
+              bg-white border border-slate-200
+              dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+              dark:border-white/10 dark:backdrop-blur
+            ">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300">
+                  <StickyNote className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Operator Notes</h2>
+                <div className="ml-auto flex items-center gap-1.5">
+                  {operatorNotes.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                      {operatorNotes.length}
+                    </span>
+                  )}
+                  <button
+                    onClick={fetchOperatorNotes}
+                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                    title="Refresh notes"
+                  >
+                    <Loader2 className={`w-3.5 h-3.5 text-slate-400 dark:text-white/40 ${notesLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {notesLoading && operatorNotes.length === 0 ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-300 dark:text-white/30" />
+                </div>
+              ) : operatorNotes.length === 0 ? (
+                <div className="text-center py-6">
+                  <StickyNote className="w-8 h-8 text-slate-200 dark:text-white/15 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400 dark:text-white/45">No operator notes yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {operatorNotes.map((note) => {
+                    const noteTypeColors: Record<string, string> = {
+                      done_for_day: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+                      completion: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+                      amendment: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300',
+                      manual: 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-white/70',
+                    };
+                    const colorClass = noteTypeColors[note.note_type] ?? noteTypeColors.manual;
+                    const initials = (note.author_name || 'O').split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase();
+                    return (
+                      <div
+                        key={note.id}
+                        className="rounded-xl border p-3 text-sm border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5"
+                      >
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold text-white bg-gradient-to-br from-sky-500 to-blue-600">
+                            {initials}
+                          </span>
+                          <span className="font-semibold text-slate-800 dark:text-white text-xs">
+                            {note.author_name || 'Operator'}
+                          </span>
+                          <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${colorClass}`}>
+                            {note.note_type.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 dark:text-white/70 text-xs leading-relaxed whitespace-pre-line">
+                          {note.content}
+                        </p>
+                        <p className="text-slate-400 dark:text-white/40 text-[10px] mt-1.5">
+                          {formatDateTime(note.created_at)}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
