@@ -207,7 +207,7 @@ export default function MyJobsPage() {
     }
   }, []);
 
-  // Fetch completed/pending_completion jobs from the past 30 days
+  // Fetch completed/pending_completion jobs from the past 7 days
   const fetchPastJobs = useCallback(async () => {
     setPastJobsLoading(true);
     try {
@@ -215,7 +215,7 @@ export default function MyJobsPage() {
       if (!session) return;
 
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 30);
+      cutoff.setDate(cutoff.getDate() - 7);
       const cutoffStr = toDateString(cutoff);
 
       const res = await fetch(
@@ -581,7 +581,7 @@ export default function MyJobsPage() {
           </div>
         )}
 
-        {/* Past 30 Days — Completed Jobs */}
+        {/* Past 7 Days — Completed Jobs */}
         <div className="mt-6 mb-2">
           <button
             onClick={() => setPastJobsOpen((o) => !o)}
@@ -592,7 +592,7 @@ export default function MyJobsPage() {
               <History className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="flex-1 text-left">
-              <span className="text-sm font-bold text-gray-800 dark:text-white">Past 30 Days</span>
+              <span className="text-sm font-bold text-gray-800 dark:text-white">Past 7 Days</span>
               {!pastJobsLoading && pastJobs.length > 0 && (
                 <span className="ml-2 text-xs px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-full font-semibold border border-emerald-200 dark:border-emerald-700">
                   {pastJobs.length}
@@ -612,7 +612,7 @@ export default function MyJobsPage() {
             <div className="mt-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
               {pastJobs.length === 0 ? (
                 <div className="py-8 text-center text-sm text-gray-400 dark:text-white/40">
-                  No completed jobs in the past 30 days.
+                  No completed jobs in the past 7 days.
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-white/10">
