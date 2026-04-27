@@ -96,15 +96,24 @@ export default function MyJobsPage() {
       if (res.ok) {
         const json = await res.json();
         if (json.success) {
-          // Mark jobs where current user is the helper (not the operator)
           const uid = session.user.id;
           setUserId(uid);
-          const enriched = (json.data || []).map((j: any) => ({
+          const role = json.user_role || 'operator';
+          if (json.user_role) setUserRole(role);
+
+          // Non-apprentice operators should only see jobs where they are the
+          // primary assigned_to — not jobs where they happen to be listed as
+          // helper_assigned_to on another operator's ticket.
+          let visible = (json.data || []) as any[];
+          if (role !== 'apprentice') {
+            visible = visible.filter((j: any) => j.assigned_to === uid);
+          }
+
+          const enriched = visible.map((j: any) => ({
             ...j,
             isHelper: j.helper_assigned_to === uid && j.assigned_to !== uid,
           }));
           setJobs(enriched);
-          if (json.user_role) setUserRole(json.user_role);
           // Fetch done-for-today status when viewing today's schedule
           if (date === toDateString(new Date())) {
             fetchDoneTodayStatus(enriched);
@@ -182,10 +191,14 @@ export default function MyJobsPage() {
 
       // Combine, filter to past dates only (don't double-show today's jobs)
       const uid = session.user.id;
+      // Non-apprentices only see jobs where they are the primary assigned_to
+      const isPrimaryOrHelper = (j: any) =>
+        userRole === 'apprentice'
+          ? j.assigned_to === uid || j.helper_assigned_to === uid
+          : j.assigned_to === uid;
       const all = [...onHoldData, ...inProgressData, ...pendingCompletionData].filter((j: any) => {
-        const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid;
         const isPastDate = j.scheduled_date && j.scheduled_date < today;
-        return isAssigned && isPastDate;
+        return isPrimaryOrHelper(j) && isPastDate;
       });
 
       // Deduplicate by id
@@ -195,10 +208,9 @@ export default function MyJobsPage() {
       setContinuingProjects(unique);
 
       // Multi-day jobs in scheduled status (reset after "Done for Today") assigned to this user
-      const multiDay = scheduledData.filter((j: any) => {
-        const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid;
-        return isAssigned && j.is_multi_day === true;
-      });
+      const multiDay = scheduledData.filter((j: any) =>
+        isPrimaryOrHelper(j) && j.is_multi_day === true
+      );
       const seenMulti = new Set<string>();
       const uniqueMulti = multiDay.filter((j: any) => { if (seenMulti.has(j.id)) return false; seenMulti.add(j.id); return true; });
       setMultiDayScheduled(uniqueMulti);
@@ -227,7 +239,9 @@ export default function MyJobsPage() {
         const json = await res.json();
         const uid = session.user.id;
         const completed = (json.data || []).filter((j: any) => {
-          const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid;
+          const isAssigned = userRole === 'apprentice'
+            ? j.assigned_to === uid || j.helper_assigned_to === uid
+            : j.assigned_to === uid;
           const isCompletedStatus = j.status === 'completed' || j.status === 'pending_completion';
           return isAssigned && isCompletedStatus;
         });

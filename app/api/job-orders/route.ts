@@ -177,19 +177,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Returning job orders with shop_arrival_time:',
-      (jobOrders || []).map((j: any) => ({
-        id: j.id,
-        job_number: j.job_number,
-        shop_arrival_time: j.shop_arrival_time,
-        arrival_time: j.arrival_time
-      }))
-    );
+    // For non-admin users viewing a specific date: respect job_daily_assignments.
+    // The schedule board can override which operator is on a job for a given day
+    // (e.g., reassigning or unassigning a multi-day job). If such an override exists
+    // and the current user is NOT the assigned operator for that day, exclude the job
+    // so the operator's view stays in sync with what the schedule board shows.
+    let filteredOrders = jobOrders || [];
+    if (!isAdmin && scheduledDate && filteredOrders.length > 0) {
+      const jobIds = filteredOrders.map((j: any) => j.id);
+      const { data: dailyAssignments } = await supabaseAdmin
+        .from('job_daily_assignments')
+        .select('job_order_id, operator_id')
+        .eq('assignment_date', scheduledDate)
+        .in('job_order_id', jobIds);
+
+      if (dailyAssignments && dailyAssignments.length > 0) {
+        const dailyMap = new Map(dailyAssignments.map((a: any) => [a.job_order_id, a.operator_id]));
+        filteredOrders = filteredOrders.filter((j: any) => {
+          const dailyOperator = dailyMap.get(j.id);
+          // If no daily override exists, fall through (base assignment applies)
+          if (dailyOperator === undefined) return true;
+          // Daily override exists — only show this job if the override assigns it to THIS user
+          return dailyOperator === user.id;
+        });
+      }
+    }
 
     return NextResponse.json(
       {
         success: true,
-        data: jobOrders || [],
+        data: filteredOrders,
         user_role: userRole,
       },
       { status: 200 }
