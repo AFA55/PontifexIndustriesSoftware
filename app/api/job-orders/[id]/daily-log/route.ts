@@ -69,20 +69,31 @@ export async function POST(
     const isOperator = job.assigned_to === user.id;
     const isHelper = job.helper_assigned_to === user.id;
     if (!isOperator && !isHelper) {
-      // Fallback: allow if user has existing daily_job_logs for this job
-      // (handles edge cases where assignment changed after work started)
-      const { data: existingLog } = await supabaseAdmin
-        .from('daily_job_logs')
-        .select('id')
-        .eq('job_order_id', jobId)
-        .eq('operator_id', user.id)
-        .limit(1)
+      // Allow admins/managers to bypass assignment check
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
         .maybeSingle();
-      if (!existingLog) {
-        return NextResponse.json(
-          { error: 'You are not assigned to this job' },
-          { status: 403 }
-        );
+      const adminRoles = ['admin', 'super_admin', 'operations_manager'];
+      const isAdmin = profile && adminRoles.includes(profile.role);
+
+      if (!isAdmin) {
+        // Fallback: allow if user has existing daily_job_logs for this job
+        // (handles edge cases where assignment changed after work started)
+        const { data: existingLog } = await supabaseAdmin
+          .from('daily_job_logs')
+          .select('id')
+          .eq('job_order_id', jobId)
+          .eq('operator_id', user.id)
+          .limit(1)
+          .maybeSingle();
+        if (!existingLog) {
+          return NextResponse.json(
+            { error: 'You are not assigned to this job' },
+            { status: 403 }
+          );
+        }
       }
     }
 

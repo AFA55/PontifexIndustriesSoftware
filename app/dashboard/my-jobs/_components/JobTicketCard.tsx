@@ -56,6 +56,11 @@ export interface JobTicketData {
   pause_reason?: string | null;
   return_date?: string | null;
   paused_at?: string | null;
+  // Multi-day job fields
+  is_multi_day?: boolean;
+  total_days_worked?: number | null;
+  // scope_of_work field alias
+  scope_of_work?: string | null;
   // isHelper indicates the current user is the helper, not the operator
   isHelper?: boolean;
 }

@@ -220,6 +220,8 @@ export default function JobDetailPage() {
   // pending_completion = operator submitted for approval; treat same as in_progress so they can still navigate freely
   const isPendingCompletion = job?.status === 'pending_completion';
   const isInProgress = job ? ['in_route', 'in_progress', 'pending_completion'].includes(job.status) : false;
+  // Multi-day job that was reset to "scheduled" after "Done for Today"
+  const isMultiDayReadyToStart = job?.status === 'scheduled' && job?.is_multi_day === true && dayNumber > 1;
   const jobIsHelper = job?.isHelper || isHelper;
 
   // Split documents into admin-attached and operator-uploaded
@@ -682,6 +684,21 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {/* Multi-Day Ready to Start Banner */}
+        {isMultiDayReadyToStart && (
+          <div className="bg-amber-50 dark:bg-amber-500/10 border-2 border-amber-300 dark:border-amber-500/40 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <PlayCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-base font-bold text-amber-800 dark:text-amber-300">Ready to Start Day {dayNumber}</p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                  You completed Day {dayNumber - 1} of this job. Check your equipment and start your route to begin Day {dayNumber}.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* On-Hold Banner */}
         {isOnHold && (
           <div className="bg-purple-50 dark:bg-purple-500/10 border-2 border-purple-300 dark:border-purple-500/40 rounded-2xl p-5 shadow-sm">
@@ -1108,7 +1125,9 @@ export default function JobDetailPage() {
                 {startingRoute ? (
                   <><Loader2 className="w-6 h-6 animate-spin" /> Starting...</>
                 ) : canStartRoute ? (
-                  <><PlayCircle className="w-6 h-6" /> Start In Route</>
+                  isMultiDayReadyToStart
+                    ? <><PlayCircle className="w-6 h-6" /> Start Day {dayNumber} In Route</>
+                    : <><PlayCircle className="w-6 h-6" /> Start In Route</>
                 ) : (
                   <><Wrench className="w-6 h-6" /> Complete Required Equipment First</>
                 )}

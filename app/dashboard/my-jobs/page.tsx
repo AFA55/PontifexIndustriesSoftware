@@ -30,6 +30,7 @@ export default function MyJobsPage() {
   const [userId, setUserId] = useState<string>('');
   const [hasLongDurationJob, setHasLongDurationJob] = useState(false);
   const [continuingProjects, setContinuingProjects] = useState<any[]>([]);
+  const [multiDayScheduled, setMultiDayScheduled] = useState<any[]>([]);
   const [activeShopTicket, setActiveShopTicket] = useState<any>(null);
   const [completingShop, setCompletingShop] = useState(false);
   const [shopDescription, setShopDescription] = useState('');
@@ -114,8 +115,8 @@ export default function MyJobsPage() {
 
       const today = toDateString(new Date());
 
-      // Fetch on_hold, in_progress, and pending_completion jobs assigned to this user (any date)
-      const [onHoldRes, inProgressRes, pendingCompletionRes] = await Promise.all([
+      // Fetch on_hold, in_progress, pending_completion, and scheduled (multi-day reset) jobs
+      const [onHoldRes, inProgressRes, pendingCompletionRes, scheduledRes] = await Promise.all([
         fetch(`/api/job-orders?status=on_hold&include_helper_jobs=true&includeCompleted=false`, {
           headers: { Authorization: `Bearer ${session.access_token}` }
         }),
@@ -125,11 +126,15 @@ export default function MyJobsPage() {
         fetch(`/api/job-orders?status=pending_completion&include_helper_jobs=true&includeCompleted=false`, {
           headers: { Authorization: `Bearer ${session.access_token}` }
         }),
+        fetch(`/api/job-orders?status=scheduled&include_helper_jobs=true&includeCompleted=false`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        }),
       ]);
 
       const onHoldData = onHoldRes.ok ? (await onHoldRes.json()).data || [] : [];
       const inProgressData = inProgressRes.ok ? (await inProgressRes.json()).data || [] : [];
       const pendingCompletionData = pendingCompletionRes.ok ? (await pendingCompletionRes.json()).data || [] : [];
+      const scheduledData = scheduledRes.ok ? (await scheduledRes.json()).data || [] : [];
 
       // Combine, filter to past dates only (don't double-show today's jobs)
       const uid = session.user.id;
@@ -144,6 +149,15 @@ export default function MyJobsPage() {
       const unique = all.filter((j: any) => { if (seen.has(j.id)) return false; seen.add(j.id); return true; });
 
       setContinuingProjects(unique);
+
+      // Multi-day jobs in scheduled status (reset after "Done for Today") assigned to this user
+      const multiDay = scheduledData.filter((j: any) => {
+        const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid;
+        return isAssigned && j.is_multi_day === true;
+      });
+      const seenMulti = new Set<string>();
+      const uniqueMulti = multiDay.filter((j: any) => { if (seenMulti.has(j.id)) return false; seenMulti.add(j.id); return true; });
+      setMultiDayScheduled(uniqueMulti);
     } catch {
       // silent
     }
@@ -306,6 +320,44 @@ export default function MyJobsPage() {
             >
               ✕
             </button>
+          </div>
+        )}
+
+        {/* Multi-Day Jobs Continuing Tomorrow (scheduled + is_multi_day) */}
+        {multiDayScheduled.length > 0 && (
+          <div className="mb-5 bg-amber-50 border-2 border-amber-300 rounded-2xl overflow-hidden shadow-md">
+            <div className="flex items-center gap-3 px-4 py-3 bg-amber-500">
+              <Clock className="w-5 h-5 text-white" />
+              <h3 className="text-sm font-bold text-white">
+                Continuing Tomorrow ({multiDayScheduled.length})
+              </h3>
+            </div>
+            <div className="divide-y divide-amber-100">
+              {multiDayScheduled.map((job: any) => (
+                <div key={job.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0 bg-amber-400" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{job.customer_name}</p>
+                    <p className="text-xs text-slate-500 truncate">{job.job_number} &bull; {job.address || job.location || 'No address'}</p>
+                    {job.total_days_worked != null && (
+                      <p className="text-xs text-amber-600 mt-0.5">Day {job.total_days_worked + 1} tomorrow</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700">
+                      Multi-Day
+                    </span>
+                    <a
+                      href={`/dashboard/my-jobs/${job.id}`}
+                      className="text-xs text-amber-700 font-semibold flex items-center gap-0.5 hover:text-amber-900"
+                    >
+                      <PlayCircle className="w-3 h-3" />
+                      View
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

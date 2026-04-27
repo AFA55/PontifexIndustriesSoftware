@@ -36,6 +36,7 @@ export default function DayCompletePage() {
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isAdminViewing, setIsAdminViewing] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
   const [signerName, setSignerName] = useState('');
   const [signatureData, setSignatureData] = useState('');
@@ -99,6 +100,13 @@ export default function DayCompletePage() {
         setRemotePhone(phone);
       } else {
         console.error('Failed to fetch job details:', res.status);
+      }
+
+      // Check if the current user is an admin/manager visiting this operator page
+      const adminRoles = ['admin', 'super_admin', 'operations_manager'];
+      const currentUser = getCurrentUser();
+      if (currentUser && adminRoles.includes(currentUser.role)) {
+        setIsAdminViewing(true);
       }
     } catch (err) {
       console.error('Error fetching job:', err);
@@ -611,6 +619,16 @@ export default function DayCompletePage() {
       )}
 
       <div className="container mx-auto px-4 py-6 max-w-lg space-y-6">
+        {/* Admin viewing banner */}
+        {isAdminViewing && (
+          <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 shadow-sm">
+            <AlertTriangle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-blue-800 font-medium">
+              You are viewing this page as an admin. Operator actions apply.
+            </p>
+          </div>
+        )}
+
         {/* Hours Worked Today */}
         <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
