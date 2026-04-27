@@ -2191,6 +2191,64 @@ export default function ScheduleFormPage() {
                                   )}
                                 </div>
                               )}
+
+                              {/* Work Location */}
+                              <div className="pt-3 border-t border-slate-100 dark:border-white/10">
+                                <p className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2">Work Location</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {([
+                                    { value: 'elevated_slab', label: 'Elevated Slab' },
+                                    { value: 'slab_on_grade', label: 'Slab on Grade' },
+                                    { value: 'on_wall', label: 'On Wall' },
+                                  ] as const).map(opt => {
+                                    const selected = form.scope_details[code]?.work_location === opt.value;
+                                    return (
+                                      <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => updateScopeDetail(code, 'work_location', selected ? '' : opt.value)}
+                                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                                          selected
+                                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                            : 'bg-white dark:bg-white/5 text-slate-600 dark:text-white/60 border-slate-200 dark:border-white/10 hover:border-blue-300 hover:text-blue-600'
+                                        }`}
+                                      >
+                                        {opt.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* On Wall follow-up */}
+                                {form.scope_details[code]?.work_location === 'on_wall' && (
+                                  <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-500/30 rounded-xl">
+                                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
+                                      Is a lift or ladder onsite?
+                                    </p>
+                                    <div className="flex gap-2">
+                                      {(['yes', 'no'] as const).map(opt => {
+                                        const selected = form.scope_details[code]?.lift_or_ladder_onsite === opt;
+                                        return (
+                                          <button
+                                            key={opt}
+                                            type="button"
+                                            onClick={() => updateScopeDetail(code, 'lift_or_ladder_onsite', selected ? '' : opt)}
+                                            className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${
+                                              selected
+                                                ? opt === 'yes'
+                                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                                  : 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                                                : 'bg-white dark:bg-white/5 text-slate-600 dark:text-white/60 border-slate-200 dark:border-white/10 hover:border-amber-400 hover:text-amber-700'
+                                            }`}
+                                          >
+                                            {opt === 'yes' ? '✓ Yes' : '✗ No'}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })()
