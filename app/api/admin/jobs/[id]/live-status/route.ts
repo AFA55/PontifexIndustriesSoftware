@@ -1,13 +1,10 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * API Route: GET /api/admin/jobs/[id]/live-status
+ * GET /api/admin/jobs/[id]/live-status
  * Real-time operator transparency panel for admin job detail view.
- *
  * Returns current job status, timestamps, active timecard, standby logs,
  * and work performed today so admins can monitor field progress live.
- *
- * GET — requireAdmin
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,21 +13,10 @@ import { requireAdmin } from '@/lib/api-auth';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-function minutesSince(ts: string | null): number | null {
+function minutesSince(ts: string | null | undefined): number | null {
   if (!ts) return null;
   return Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
 }
-
-type JobRow = {
-  id: string;
-  status: string;
-  assigned_to: string | null;
-  helper_assigned_to: string | null;
-  in_route_at: string | null;
-  arrived_at_jobsite_at: string | null;
-  work_started_at: string | null;
-  route_started_at: string | null;
-};
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
@@ -40,42 +26,58 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
 
-    // ── 1. Fetch job with live columns ───────────────────────────────────────
+    // ── 1. Fetch core job fields ─────────────────────────────────────────────
+    // Use a minimal select of known-typed columns; cast to any to pick up
+    // columns that may not be in generated types yet (in_route_at, etc.)
     let jobQuery = supabaseAdmin
       .from('job_orders')
-      .select(
-        'id, status, assigned_to, helper_assigned_to, ' +
-        'in_route_at, arrived_at_jobsite_at, work_started_at, route_started_at'
-      )
+      .select('id, status, assigned_to, helper_assigned_to')
       .eq('id', jobId);
     if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
-    const { data: jobRaw, error: jobError } = await jobQuery.single();
+    const { data: jobRaw, error: jobError } = await jobQuery.maybeSingle();
 
     if (jobError || !jobRaw) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Cast to known shape (columns may not be in generated Supabase types yet)
-    const jobRow = jobRaw as unknown as JobRow;
+    const job = jobRaw as {
+      id: string;
+      status: string;
+      assigned_to: string | null;
+      helper_assigned_to: string | null;
+    };
+
+    // Fetch extra timestamp columns separately to avoid GenericStringError
+    // from unknown column names in the Supabase TS schema
+    const { data: tsRaw } = await supabaseAdmin
+      .from('job_orders')
+      .select('in_route_at, arrived_at_jobsite_at, work_started_at')
+      .eq('id', jobId)
+      .maybeSingle();
+
+    const ts = (tsRaw ?? {}) as Record<string, string | null>;
+    const inRouteAt: string | null = ts['in_route_at'] ?? null;
+    const arrivedAt: string | null = ts['arrived_at_jobsite_at'] ?? null;
+    const workStartedAt: string | null = ts['work_started_at'] ?? null;
 
     // ── 2. Resolve operator and helper names ─────────────────────────────────
     let operatorName: string | null = null;
     let helperName: string | null = null;
 
-    if (jobRow.assigned_to) {
+    if (job.assigned_to) {
       const { data: opProf } = await supabaseAdmin
         .from('profiles')
         .select('full_name')
-        .eq('id', jobRow.assigned_to)
+        .eq('id', job.assigned_to)
         .maybeSingle();
       operatorName = opProf?.full_name ?? null;
     }
 
-    if (jobRow.helper_assigned_to) {
+    if (job.helper_assigned_to) {
       const { data: helperProf } = await supabaseAdmin
         .from('profiles')
         .select('full_name')
-        .eq('id', jobRow.helper_assigned_to)
+        .eq('id', job.helper_assigned_to)
         .maybeSingle();
       helperName = helperProf?.full_name ?? null;
     }
@@ -85,58 +87,50 @@ export async function GET(request: NextRequest, context: RouteContext) {
     let clockInTime: string | null = null;
     let clockOutTime: string | null = null;
 
-    if (jobRow.assigned_to) {
+    if (job.assigned_to) {
       const { data: timecardRows } = await supabaseAdmin
         .from('timecards')
-        .select('clock_in_time, clock_out_time, date')
-        .eq('user_id', jobRow.assigned_to)
+        .select('clock_in_time, clock_out_time')
+        .eq('user_id', job.assigned_to)
         .eq('date', todayStr)
         .order('clock_in_time', { ascending: true })
         .limit(1);
 
       if (timecardRows && timecardRows.length > 0) {
-        clockInTime = (timecardRows[0] as { clock_in_time?: string | null }).clock_in_time ?? null;
-        clockOutTime = (timecardRows[0] as { clock_out_time?: string | null }).clock_out_time ?? null;
+        const tc = timecardRows[0] as { clock_in_time?: string | null; clock_out_time?: string | null };
+        clockInTime = tc.clock_in_time ?? null;
+        clockOutTime = tc.clock_out_time ?? null;
       }
     }
 
-    // ── 4. Active standby log ────────────────────────────────────────────────
+    // ── 4. Active standby log (gracefully skip if table absent) ─────────────
     let standbyActive = false;
     let standbyStartedAt: string | null = null;
     let standbyDurationMinutes: number | null = null;
 
     const { data: standbyRows, error: standbyErr } = await supabaseAdmin
       .from('standby_logs')
-      .select('id, started_at, ended_at, status, reason')
+      .select('started_at, ended_at')
       .eq('job_order_id', jobId)
-      .eq('status', 'active')
+      .is('ended_at', null)
       .order('started_at', { ascending: false })
       .limit(1);
 
-    // standby_logs table might not exist — gracefully skip
     const standbyTableMissing =
       standbyErr &&
       (standbyErr.code === '42P01' ||
-        (standbyErr.message || '').includes('does not exist'));
+        (standbyErr.message ?? '').includes('does not exist'));
 
     if (!standbyTableMissing && standbyRows && standbyRows.length > 0) {
-      const activeLog = standbyRows[0] as { started_at: string; ended_at: string | null };
-      if (!activeLog.ended_at) {
+      const row = standbyRows[0] as { started_at: string; ended_at: string | null };
+      if (!row.ended_at) {
         standbyActive = true;
-        standbyStartedAt = activeLog.started_at;
-        standbyDurationMinutes = minutesSince(activeLog.started_at);
+        standbyStartedAt = row.started_at;
+        standbyDurationMinutes = minutesSince(row.started_at);
       }
     }
 
     // ── 5. Work performed today ──────────────────────────────────────────────
-    let workPerformedToday: Array<{
-      id: string;
-      work_type: string | null;
-      quantity_completed: number;
-      notes: string | null;
-      scope_item_description: string | null;
-    }> = [];
-
     const { data: progressRows } = await supabaseAdmin
       .from('job_progress_entries')
       .select(`
@@ -150,23 +144,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .eq('date', todayStr)
       .order('created_at', { ascending: true });
 
-    if (progressRows) {
-      workPerformedToday = progressRows.map((r) => ({
-        id: r.id,
-        work_type: r.work_type ?? null,
-        quantity_completed: Number(r.quantity_completed),
-        notes: r.notes ?? null,
-        scope_item_description: (r.job_scope_items as { description?: string } | null)?.description ?? null,
-      }));
-    }
+    const workPerformedToday = (progressRows ?? []).map((r) => ({
+      id: r.id,
+      work_type: (r as any).work_type ?? null,
+      quantity_completed: Number(r.quantity_completed),
+      notes: (r as any).notes ?? null,
+      scope_item_description:
+        (r.job_scope_items as { description?: string } | null)?.description ?? null,
+    }));
 
-    // ── 6. Status history (optional table) ──────────────────────────────────
-    let statusHistory: Array<{
-      status: string;
-      changed_at: string;
-      changed_by: string | null;
-    }> = [];
-
+    // ── 6. Status history (gracefully skip if table absent) ──────────────────
     const { data: historyRows, error: historyErr } = await supabaseAdmin
       .from('job_status_history')
       .select('status, changed_at, changed_by')
@@ -177,22 +164,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const historyTableMissing =
       historyErr &&
       (historyErr.code === '42P01' ||
-        (historyErr.message || '').includes('does not exist'));
+        (historyErr.message ?? '').includes('does not exist'));
 
-    if (!historyTableMissing && historyRows) {
-      statusHistory = (historyRows as Array<{ status: string; changed_at: string; changed_by?: string | null }>).map((h) => ({
-        status: h.status,
-        changed_at: h.changed_at,
-        changed_by: h.changed_by ?? null,
-      }));
-    }
+    const statusHistory = (!historyTableMissing && historyRows)
+      ? (historyRows as Array<{ status: string; changed_at: string; changed_by?: string | null }>).map((h) => ({
+          status: h.status,
+          changed_at: h.changed_at,
+          changed_by: h.changed_by ?? null,
+        }))
+      : [];
 
-    // ── 7. Computed values ───────────────────────────────────────────────────
-    const arrivedAt = jobRow.arrived_at_jobsite_at;
-    const inRouteAt = jobRow.in_route_at;
-    const workStartedAt = jobRow.work_started_at;
-
-    // Time on site = minutes since arrived, or since work started if no arrived timestamp
+    // ── 7. Computed durations ────────────────────────────────────────────────
     const onSiteAnchor = arrivedAt ?? workStartedAt;
     const timeOnSiteMinutes =
       onSiteAnchor && !clockOutTime ? minutesSince(onSiteAnchor) : null;
@@ -200,7 +182,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({
       success: true,
       data: {
-        status: jobRow.status,
+        status: job.status,
         operator_name: operatorName,
         helper_name: helperName,
         in_route_at: inRouteAt,

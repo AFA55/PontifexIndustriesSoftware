@@ -40,7 +40,11 @@ export async function GET(request: NextRequest) {
     }
 
     const difficulty = job.difficulty_rating || 5; // default to 5 if not set
-    const jobTypes = (job.job_type || '').split(',').map((t: string) => t.trim().toLowerCase()).filter(Boolean);
+    // Split by comma AND slash — handles combined codes like "WS/TS", "ECD,HCD"
+    const jobTypes = (job.job_type || '')
+      .split(/[,/]/)
+      .map((t: string) => t.trim().toLowerCase())
+      .filter(Boolean);
 
     // Determine scope keys this job requires (primary + secondary mappings).
     // jobTypes come in as lowercased service codes already.
