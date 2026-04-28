@@ -151,6 +151,69 @@ export async function POST(
       .update({ work_performed: workSummary })
       .eq('id', jobId);
 
+    // ── Notify tenant admins (fire-and-forget) ────────────────────────────────
+    // Operator just logged work performed — admins should see this in real time.
+    Promise.resolve((async () => {
+      try {
+        // Pull the tenant + job_number off the job (already loaded `job` lacks them).
+        const { data: jobMeta } = await supabaseAdmin
+          .from('job_orders')
+          .select('tenant_id, job_number')
+          .eq('id', jobId)
+          .maybeSingle();
+
+        const tenantId = jobMeta?.tenant_id ?? null;
+        const jobNumber = jobMeta?.job_number ?? jobId;
+
+        if (!tenantId) return; // Nothing safe to scope notifications to.
+
+        // Operator name for the message body.
+        const { data: operatorProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name')
+          .eq('id', auth.userId)
+          .maybeSingle();
+        const operatorName = operatorProfile?.full_name || 'An operator';
+
+        // Build a concise summary: total count + first item description.
+        const totalCount = items.reduce(
+          (sum: number, it: any) => sum + (Number(it.quantity) || 1),
+          0
+        );
+        const firstName = items[0]?.name ? String(items[0].name) : 'work';
+        const moreCount = items.length > 1 ? ` (+${items.length - 1} more)` : '';
+        const message = `${operatorName} logged ${totalCount} ${firstName}${moreCount} on ${jobNumber}`;
+
+        // Find admins in this tenant.
+        const { data: admins } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .in('role', ['admin', 'super_admin', 'operations_manager'])
+          .eq('tenant_id', tenantId);
+
+        if (!admins || admins.length === 0) return;
+
+        const notifications = admins.map((a: { id: string }) => ({
+          user_id: a.id,
+          type: 'work_performed',
+          title: 'Work performed update',
+          message,
+          job_id: jobId,
+          tenant_id: tenantId,
+          sender_id: auth.userId,
+          related_entity_type: 'job_order',
+          related_entity_id: jobId,
+          action_url: `/dashboard/admin/jobs/${jobId}`,
+          read: false,
+          is_read: false,
+        }));
+
+        await supabaseAdmin.from('notifications').insert(notifications);
+      } catch {
+        // Non-critical — never block the operator's submit response.
+      }
+    })()).catch(() => {});
+
     return NextResponse.json({
       success: true,
       data: savedItems,
