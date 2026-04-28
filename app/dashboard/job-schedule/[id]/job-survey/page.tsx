@@ -356,7 +356,7 @@ export default function JobSurveyPage() {
                           <button
                             key={opt}
                             onClick={() => updateEquipmentField('wall_saw', 'water_source', opt)}
-                            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            className={`flex-1 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all ${
                               equipmentQuestions.wall_saw?.water_source === opt
                                 ? 'bg-purple-500 text-white' : 'bg-white border border-gray-200 text-gray-700'
                             }`}
@@ -402,7 +402,7 @@ export default function JobSurveyPage() {
                           <button
                             key={opt}
                             onClick={() => updateEquipmentField('track_saw', 'water_source', opt)}
-                            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            className={`flex-1 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all ${
                               equipmentQuestions.track_saw?.water_source === opt
                                 ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200 text-gray-700'
                             }`}
@@ -428,7 +428,7 @@ export default function JobSurveyPage() {
                           <button
                             key={String(opt)}
                             onClick={() => updateEquipmentField('core_drill', 'pump_can_used', opt)}
-                            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            className={`flex-1 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all ${
                               equipmentQuestions.core_drill?.pump_can_used === opt
                                 ? 'bg-orange-500 text-white' : 'bg-white border border-gray-200 text-gray-700'
                             }`}
@@ -457,7 +457,7 @@ export default function JobSurveyPage() {
                               <button
                                 key={opt}
                                 onClick={() => updateEquipmentField('core_drill', 'water_source', opt)}
-                                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                className={`flex-1 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all ${
                                   equipmentQuestions.core_drill?.water_source === opt
                                     ? 'bg-orange-500 text-white' : 'bg-white border border-gray-200 text-gray-700'
                                 }`}
@@ -533,7 +533,7 @@ export default function JobSurveyPage() {
                           <button
                             key={opt}
                             onClick={() => updateEquipmentField('wire_saw', 'water_source', opt)}
-                            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            className={`flex-1 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all ${
                               equipmentQuestions.wire_saw?.water_source === opt
                                 ? 'bg-indigo-500 text-white' : 'bg-white border border-gray-200 text-gray-700'
                             }`}

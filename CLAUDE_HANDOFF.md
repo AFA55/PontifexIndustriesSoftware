@@ -1,5 +1,61 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 27, 2026 | **Branch:** `main` | **Build Status:** PASSING ✅ (0 errors)
+**Date:** April 28, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) → ready to merge to `main` | **Build Status:** PASSING ✅ (0 errors, 11.5s)
+
+---
+
+## APRIL 28, 2026 SESSION — Pending Migrations Applied, Parallel Polish (Mobile / Loading / Deploy Doc)
+
+### Head-developer parallel sprint
+Dispatched 3 isolated-worktree agents simultaneously, all returned clean builds, all merged with zero conflicts (deliberate non-overlapping file scopes: page.tsx vs loading/error.tsx vs new doc).
+
+#### Track 1 — Mobile responsive audit on operator pages
+- 4 pages fixed, 9 already clean.
+- `app/dashboard/my-jobs/page.tsx` — schedule-updated banner dismiss button, multi-day "View" links, "Resume" links upgraded to ≥40×32px touch targets, "Awaiting Approval" badge shortened to fit at 375px.
+- `app/dashboard/job-schedule/[id]/work-performed/page.tsx` — Add Hole Entry modal grid: `grid-cols-3` → `grid-cols-1 sm:grid-cols-3`. Cut Area form: `grid-cols-4` → `grid-cols-2 sm:grid-cols-4`.
+- `app/dashboard/job-schedule/[id]/job-survey/page.tsx` — 5 segmented water-source pickers were 36px tall (below iOS 44px target); bumped to `min-h-[44px]`.
+- Already clean: my-jobs detail, jobsite, in-route, day-complete, standby, utility-waiver, timecard, my-profile, request-time-off, notifications.
+- **Pre-existing color bug flagged (not in scope)**: 4 modal close buttons in work-performed (lines 3534, 3699, 3928, 4103) use `text-white hover:bg-white/20` on a white sticky modal header — invisible until hovered.
+
+#### Track 2 — Loading & error boundaries on dashboard routes
+- 54 `loading.tsx` files added (custom skeletons for high-traffic routes: jobs/[id], team-profiles, time-off, operator timecard, mobile pages; generic admin/operator templates for the rest).
+- 55 `error.tsx` files added (client-component, retry button, "Back to dashboard" link; job detail and operator timecard get tailored back-links).
+- Existing loading skeletons preserved on `app/dashboard/admin/`, `admin/billing/`, `admin/customers/`, `admin/schedule-board/`, `admin/timecards/`.
+- Skipped intentionally: `app/dashboard/debug/*` (internal tools).
+
+#### Track 3 — Production deployment checklist
+- New file [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) at repo root — 9-section launch runbook.
+- **26 distinct env vars** found in code; 6 missing from `.env.example`. White-label-critical: `NEXT_PUBLIC_CONTACT_EMAIL`.
+- **24 hardcoded "Pontifex" strings** still rendering to customers. Highest-priority offenders:
+  - [app/sign/[token]/page.tsx:818](app/sign/[token]/page.tsx:818) — "Powered by Pontifex Industries" on customer signature page
+  - [app/error.tsx:59](app/error.tsx:59) and [app/global-error.tsx:136](app/global-error.tsx:136)
+  - Single-source-of-truth: [components/landing/brand-config.ts](components/landing/brand-config.ts)
+- **Production hazard found**: [app/api/send-email/route.ts:17](app/api/send-email/route.ts:17) hardcodes the old vercel.app domain in SSRF allowlist — must add custom domain before launch.
+- **Risk**: [lib/supabase.ts:4-5](lib/supabase.ts:4) and [lib/supabase-admin.ts:36-37](lib/supabase-admin.ts:36) silently fall back to `placeholder.supabase.co` if env vars missing — recommended fail-fast hardening.
+- 1130 `console.*` calls (mostly legit catch-blocks); worst offender [lib/database.ts](lib/database.ts) at 27.
+- Stale [app/dashboard/admin/schedule-board/page.backup.tsx](app/dashboard/admin/schedule-board/page.backup.tsx) shipping in bundle — delete before launch.
+- Vercel project confirmed: `prj_vubQAdrHfAlSq9msk0sfedlBq5zJ`, region `iad1`.
+
+### Migrations applied (start of session)
+- `20260427_utility_waiver_fields` — 5 utility_waiver_* columns on job_orders
+- `20260427_operator_badges` — table + RLS (admins manage / operators see own).
+  - **FK fix during apply**: original migration had `tenant_id REFERENCES auth.users(id)`; corrected to `REFERENCES tenants(id) ON DELETE CASCADE` to match codebase convention. SQL file in repo updated to match what was applied.
+
+### Commits on `claude/sleepy-shannon-95c45b` (pushed to origin)
+```
+7b77c9b7  Merge: add production deployment checklist (Track 3)
+7e383838  Merge: add loading and error boundaries to dashboard routes (Track 2)
+54745538  Merge: mobile responsive audit on operator pages (Track 1)
+029c76bb  chore: apply pending migrations + fix operator_badges tenant FK
+3991407b  feat: add loading and error boundaries to dashboard routes
+5ea5e163  docs: add production deployment checklist
+3cc84357  fix: mobile responsive audit on operator pages
+```
+
+### Pending manual actions
+- **Merge `claude/sleepy-shannon-95c45b` → `main`** to deploy to Vercel.
+- **Delete test job**: JOB-2026-119492 (WS/TS test job) — use the trash icon on Active Jobs page.
+- **Address white-label rebranding TODOs** — see [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) section "White-label rebranding TODOs". Most-visible: customer signature footer.
+- **Add custom domain to SSRF allowlist** in [app/api/send-email/route.ts:17](app/api/send-email/route.ts:17) once domain is decided.
 
 ---
 
@@ -63,9 +119,11 @@ c66b1f7b  fix: admin role-fail redirects and operator back button navigation
 
 ### Pending manual actions
 - **Delete test job**: JOB-2026-119492 (WS/TS test job) — use the trash icon on Active Jobs page
-- **Apply 2 Supabase migrations** (user must run in Supabase SQL editor):
-  1. `supabase/migrations/20260427_utility_waiver_fields.sql` — adds 5 columns to job_orders
-  2. `supabase/migrations/20260427_operator_badges.sql` — creates operator_badges table with RLS
+
+### Migrations applied (April 27, late session)
+- `20260427_utility_waiver_fields` — 5 utility_waiver_* columns on job_orders
+- `20260427_operator_badges` — operator_badges table + RLS (admins manage / operators see own).
+  - **FK fix during apply**: original migration had `tenant_id REFERENCES auth.users(id)`; corrected to `REFERENCES tenants(id) ON DELETE CASCADE` to match codebase convention. SQL file in repo updated to match.
 
 ### Known remaining issues (low priority)
 - Clock-in event isn't persisted across page navigation if user force-navigates mid-flow (timecard state in operator dashboard resets on back-navigation). The underlying timecard row IS correctly saved to DB — this is a display-only race.

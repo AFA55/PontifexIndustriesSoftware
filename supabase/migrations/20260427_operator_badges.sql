@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS operator_badges (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   operator_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  tenant_id uuid REFERENCES auth.users(id),
+  tenant_id uuid REFERENCES tenants(id) ON DELETE CASCADE,
   badge_type text NOT NULL, -- 'GE', 'BMW', 'M3', 'OSHA_10', 'OSHA_30', etc.
   badge_number text,
   issued_date date,
