@@ -34,7 +34,10 @@ import {
   StickyNote,
   Radio,
   Wifi,
+  Pencil,
+  ChevronDown,
 } from 'lucide-react';
+import EditTimestampModal from '@/components/admin/EditTimestampModal';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import JobScopePanel, { type ScopeItem } from '@/components/JobScopePanel';
@@ -154,6 +157,14 @@ interface OperatorNote {
   created_at: string;
 }
 
+interface StandbySegment {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_minutes: number;
+  reason: string | null;
+}
+
 interface LiveStatusData {
   status: string;
   operator_name: string | null;
@@ -161,6 +172,7 @@ interface LiveStatusData {
   in_route_at: string | null;
   arrived_at: string | null;
   work_started_at: string | null;
+  work_completed_at?: string | null;
   standby_active: boolean;
   standby_started_at: string | null;
   standby_duration_minutes: number | null;
@@ -179,7 +191,15 @@ interface LiveStatusData {
     changed_at: string;
     changed_by: string | null;
   }>;
+  // Extended fields delivered by live-status backend agent
+  standby_segments_today?: StandbySegment[];
+  last_work_performed_at?: string | null;
+  work_performed_count_today?: number;
+  route_start_coords?: { lat: number; lng: number } | null;
+  work_start_coords?: { lat: number; lng: number } | null;
 }
+
+type EditableTimestampField = 'in_route_at' | 'arrived_at_jobsite_at' | 'work_started_at' | 'work_completed_at';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -444,7 +464,7 @@ export default function AdminJobDetailPage({
   const [job, setJob] = useState<JobSummary | null>(null);
   const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
   const [activityLog, setActivityLog] = useState<ActivityEntry[]>([]);
-  const [pageError, setPageError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<{ status?: number; message: string } | null>(null);
 
   const [showEditSchedule, setShowEditSchedule] = useState(false);
   const [reviewNotes, setReviewNotes] = useState('');
@@ -472,6 +492,19 @@ export default function AdminJobDetailPage({
   const [liveStatus, setLiveStatus] = useState<LiveStatusData | null>(null);
   const [liveStatusFetchedAt, setLiveStatusFetchedAt] = useState<Date | null>(null);
 
+  // Edit timestamp modal
+  const [editTimestampField, setEditTimestampField] = useState<{
+    field: EditableTimestampField;
+    label: string;
+    currentValue: string | null;
+  } | null>(null);
+
+  // Standby segments collapsible
+  const [standbySegmentsOpen, setStandbySegmentsOpen] = useState(false);
+
+  // Live ticking clock for standby active timer
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+
   // Auth guard
   useEffect(() => {
     const user = getCurrentUser();
@@ -487,14 +520,16 @@ export default function AdminJobDetailPage({
       setPageError(null);
       const res = await apiFetch(`/api/admin/jobs/${jobId}/summary`);
       if (!res.ok) {
-        if (res.status === 404) setPageError('Job not found.');
-        else setPageError('Failed to load job details.');
+        setPageError({
+          status: res.status,
+          message: res.status === 404 ? 'Job not found.' : 'Failed to load job details.',
+        });
         return;
       }
       const json = await res.json();
       setJob(json.data.job);
     } catch {
-      setPageError('Network error loading job.');
+      setPageError({ message: 'Network error loading job.' });
     }
   }, [jobId]);
 
@@ -603,6 +638,13 @@ export default function AdminJobDetailPage({
     return () => clearInterval(timer);
   }, [fetchLiveStatus]);
 
+  // 1-second ticker — only runs while standby is active so we don't waste cycles
+  useEffect(() => {
+    if (!liveStatus?.standby_active) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [liveStatus?.standby_active]);
+
   const handleReviewChangeRequest = async (crId: string, status: 'approved' | 'rejected') => {
     setCrReviewing(crId);
     try {
@@ -680,20 +722,405 @@ export default function AdminJobDetailPage({
     );
   }
 
-  if (pageError || !job) {
+  // ── Helpers used by live status panel ──
+  const formatHMS = (totalMs: number): string => {
+    if (totalMs < 0) totalMs = 0;
+    const totalSec = Math.floor(totalMs / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    return `${m}m ${s}s`;
+  };
+
+  const liveStatusIsStale = !!(
+    liveStatusFetchedAt && Date.now() - liveStatusFetchedAt.getTime() > 90000
+  );
+  const liveStatusIsLive = !!(
+    liveStatusFetchedAt && Date.now() - liveStatusFetchedAt.getTime() < 60000
+  );
+
+  // ── Render the live status panel — used both in normal page and in the no-job error fallback shell
+  const renderLiveStatusPanel = () => {
+    if (!liveStatus) return null;
+    const standbySegments = liveStatus.standby_segments_today ?? [];
+    const workPerformedCount = liveStatus.work_performed_count_today ?? liveStatus.work_performed_today.length;
+    const standbyElapsedMs = liveStatus.standby_active && liveStatus.standby_started_at
+      ? nowTick - new Date(liveStatus.standby_started_at).getTime()
+      : 0;
+
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
-        <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-slate-300 dark:text-white/20 mx-auto mb-3" />
-          <p className="text-slate-600 dark:text-white/70">{pageError || 'Job not found.'}</p>
+      <div className="
+        relative overflow-hidden rounded-2xl shadow-sm
+        bg-white border border-slate-200
+        dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+        dark:border-white/10 dark:backdrop-blur
+      ">
+        {/* Purple accent stripe */}
+        <span className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500" aria-hidden />
+
+        <div className="p-5 pt-6">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+              <Radio className="w-4 h-4" />
+            </span>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Live Status</h2>
+            <div className="ml-auto flex items-center gap-2">
+              {liveStatusIsLive ? (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  LIVE
+                </span>
+              ) : liveStatusIsStale ? (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  STALE
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-white/50">
+                  <Wifi className="w-3 h-3" />
+                  Polling
+                </span>
+              )}
+              <button
+                onClick={fetchLiveStatus}
+                title="Refresh"
+                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+              >
+                <Loader2 className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
+              </button>
+            </div>
+          </div>
+
+          {/* Standby alert with live ticking timer */}
+          {liveStatus.standby_active && (
+            <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-400/30">
+              <span className="relative inline-flex flex-shrink-0">
+                <span className="absolute inline-flex w-3 h-3 rounded-full bg-rose-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex w-3 h-3 rounded-full bg-rose-500" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wide">Standby Active</p>
+                <p className="text-xs text-rose-600 dark:text-rose-400">
+                  Started {formatTimeFromISO(liveStatus.standby_started_at)}
+                  <span className="font-semibold font-mono"> · {formatHMS(standbyElapsedMs)}</span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Today's standby segments — collapsible */}
+          {standbySegments.length > 0 && (
+            <div className="mb-4 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+              <button
+                onClick={() => setStandbySegmentsOpen((o) => !o)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-white/70 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+              >
+                <Timer className="w-3.5 h-3.5 text-rose-500" />
+                Today&rsquo;s standby ({standbySegments.length})
+                <ChevronDown
+                  className={`ml-auto w-3.5 h-3.5 transition-transform ${standbySegmentsOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {standbySegmentsOpen && (
+                <ul className="divide-y divide-slate-100 dark:divide-white/5">
+                  {/* TODO: inline-edit standby segments in a future iteration */}
+                  {standbySegments.map((seg) => (
+                    <li key={seg.id} className="px-3 py-2 text-xs flex items-start gap-2">
+                      <span className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 ${seg.ended_at ? 'bg-slate-400' : 'bg-rose-500 animate-pulse'}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-slate-700 dark:text-white/80">
+                            {formatTimeFromISO(seg.started_at)}
+                          </span>
+                          <span className="text-slate-400 dark:text-white/35">→</span>
+                          <span className="font-mono text-slate-700 dark:text-white/80">
+                            {seg.ended_at ? formatTimeFromISO(seg.ended_at) : <em className="text-rose-500">ongoing</em>}
+                          </span>
+                          <span className="ml-auto font-semibold text-slate-600 dark:text-white/70">
+                            {formatMinutes(seg.duration_minutes)}
+                          </span>
+                        </div>
+                        {seg.reason && (
+                          <p className="text-slate-500 dark:text-white/45 italic mt-0.5">{seg.reason}</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Operator + time on site */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10">
+              <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-1">Operator</p>
+              <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
+                {liveStatus.operator_name || '—'}
+              </p>
+              {liveStatus.helper_name && (
+                <p className="text-xs text-slate-500 dark:text-white/50 truncate">+ {liveStatus.helper_name}</p>
+              )}
+            </div>
+            <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10">
+              <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-1">Time On Site</p>
+              <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
+                {formatMinutes(liveStatus.time_on_site_minutes)}
+              </p>
+            </div>
+          </div>
+
+          {/* Work performed pill */}
+          {workPerformedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof document !== 'undefined') {
+                  document.getElementById('daily-progress-section')?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                  });
+                }
+              }}
+              className="
+                mb-4 w-full inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium
+                bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors
+                dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-400/30 dark:hover:bg-sky-500/20
+              "
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span className="font-semibold">{workPerformedCount}</span>
+              <span>work {workPerformedCount === 1 ? 'item' : 'items'} today</span>
+              {liveStatus.last_work_performed_at && (
+                <span className="ml-auto text-[10px] text-sky-600/80 dark:text-sky-300/70">
+                  last update {formatTimeFromISO(liveStatus.last_work_performed_at)}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Timestamps — always render rows so admin can fill in missed clicks */}
+          <div className="space-y-2 mb-4">
+            {liveStatus.clock_in_time && (
+              <div className="flex items-center gap-2 text-xs">
+                <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-white/40 flex-shrink-0" />
+                <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Clocked In</span>
+                <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.clock_in_time)}</span>
+              </div>
+            )}
+            {/* In Route — editable */}
+            <div className="flex items-center gap-2 text-xs">
+              <Navigation className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+              <span className="text-slate-500 dark:text-white/55 min-w-[88px]">In Route</span>
+              <span className="font-medium text-slate-800 dark:text-white">
+                {liveStatus.in_route_at ? formatTimeFromISO(liveStatus.in_route_at) : <span className="text-slate-300 dark:text-white/30">—</span>}
+              </span>
+              <button
+                onClick={() => setEditTimestampField({
+                  field: 'in_route_at',
+                  label: 'In Route Time',
+                  currentValue: liveStatus.in_route_at,
+                })}
+                title="Edit in-route timestamp"
+                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-violet-600 dark:text-white/35 dark:hover:text-violet-300"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {/* Arrived — editable, always shown */}
+            <div className="flex items-center gap-2 text-xs">
+              <MapPin className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+              <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Arrived</span>
+              <span className="font-medium text-slate-800 dark:text-white">
+                {liveStatus.arrived_at ? formatTimeFromISO(liveStatus.arrived_at) : <span className="text-slate-300 dark:text-white/30">—</span>}
+              </span>
+              <button
+                onClick={() => setEditTimestampField({
+                  field: 'arrived_at_jobsite_at',
+                  label: 'Arrived On Site Time',
+                  currentValue: liveStatus.arrived_at,
+                })}
+                title="Edit arrival timestamp"
+                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-violet-600 dark:text-white/35 dark:hover:text-violet-300"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {/* Work Started — editable */}
+            <div className="flex items-center gap-2 text-xs">
+              <Wrench className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+              <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Work Started</span>
+              <span className="font-medium text-slate-800 dark:text-white">
+                {liveStatus.work_started_at ? formatTimeFromISO(liveStatus.work_started_at) : <span className="text-slate-300 dark:text-white/30">—</span>}
+              </span>
+              <button
+                onClick={() => setEditTimestampField({
+                  field: 'work_started_at',
+                  label: 'Work Started Time',
+                  currentValue: liveStatus.work_started_at,
+                })}
+                title="Edit work-started timestamp"
+                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-violet-600 dark:text-white/35 dark:hover:text-violet-300"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {/* Work Completed — editable, only show if backend provides field */}
+            {liveStatus.work_completed_at !== undefined && (
+              <div className="flex items-center gap-2 text-xs">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Work Completed</span>
+                <span className="font-medium text-slate-800 dark:text-white">
+                  {liveStatus.work_completed_at ? formatTimeFromISO(liveStatus.work_completed_at) : <span className="text-slate-300 dark:text-white/30">—</span>}
+                </span>
+                <button
+                  onClick={() => setEditTimestampField({
+                    field: 'work_completed_at',
+                    label: 'Work Completed Time',
+                    currentValue: liveStatus.work_completed_at ?? null,
+                  })}
+                  title="Edit work-completed timestamp"
+                  className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-violet-600 dark:text-white/35 dark:hover:text-violet-300"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+            {liveStatus.clock_out_time && (
+              <div className="flex items-center gap-2 text-xs">
+                <Clock className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Clocked Out</span>
+                <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.clock_out_time)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Work performed today */}
+          {liveStatus.work_performed_today.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-2 flex items-center gap-1">
+                <Activity className="w-3 h-3" />
+                Work Today
+              </p>
+              <ul className="space-y-1.5">
+                {liveStatus.work_performed_today.map((item) => (
+                  <li key={item.id} className="flex items-start gap-2 text-xs">
+                    <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-fuchsia-400 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <span className="font-medium text-slate-800 dark:text-white/85">
+                        {item.scope_item_description || item.work_type || 'Work item'}
+                      </span>
+                      <span className="ml-1.5 font-mono text-violet-600 dark:text-violet-300">
+                        ×{item.quantity_completed}
+                      </span>
+                      {item.notes && (
+                        <p className="text-slate-400 dark:text-white/35 italic truncate mt-0.5">{item.notes}</p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* No active data placeholder */}
+          {!liveStatus.in_route_at && !liveStatus.arrived_at && !liveStatus.clock_in_time && liveStatus.work_performed_today.length === 0 && (
+            <p className="text-center text-xs text-slate-400 dark:text-white/35 py-2">
+              No live activity yet — operator has not started this job today.
+            </p>
+          )}
+
+          {/* Last refreshed */}
+          {liveStatusFetchedAt && (
+            <p className="text-[10px] text-slate-300 dark:text-white/25 text-right mt-3">
+              Updated {liveStatusFetchedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Inline error banner used both in fallback shell and at top of populated page
+  const errorBanner = pageError ? (
+    <div className="rounded-2xl border border-rose-200 bg-rose-50 ring-1 ring-rose-200 px-4 py-3 dark:bg-rose-500/10 dark:border-rose-400/30 dark:ring-rose-400/20">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-300 flex-shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-rose-700 dark:text-rose-200">
+            {pageError.message}
+            {pageError.status ? (
+              <span className="ml-2 text-xs font-mono font-medium text-rose-500 dark:text-rose-300/80">
+                HTTP {pageError.status}
+              </span>
+            ) : null}
+          </p>
+          <p className="text-xs text-rose-600/80 dark:text-rose-300/70 mt-0.5">
+            If this keeps happening, your session may have expired.
+          </p>
+          <div className="flex items-center gap-2 flex-wrap mt-2.5">
+            <button
+              onClick={() => fetchJob()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors dark:bg-rose-500 dark:hover:bg-rose-400"
+            >
+              <Loader2 className="w-3 h-3" />
+              Retry
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-rose-700 border border-rose-200 hover:bg-rose-50 transition-colors dark:bg-white/5 dark:text-rose-200 dark:border-rose-400/30 dark:hover:bg-white/10"
+            >
+              Reload page
+            </button>
+            <Link
+              href="/login"
+              className="ml-auto text-xs text-rose-500 hover:text-rose-700 underline underline-offset-2 dark:text-rose-300/70 dark:hover:text-rose-200"
+            >
+              Sign out
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  // No job loaded yet AND no live status either — show minimal shell with banner
+  if (!job) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
           <Link
             href="/dashboard/admin/schedule-board"
-            className="mt-4 inline-flex items-center gap-1.5 text-sm text-violet-600 hover:underline dark:text-violet-300"
+            className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors dark:text-white/60 dark:hover:text-white"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Schedule Board
           </Link>
+
+          {errorBanner ?? (
+            <div className="text-center py-12">
+              <AlertCircle className="w-12 h-12 text-slate-300 dark:text-white/20 mx-auto mb-3" />
+              <p className="text-slate-600 dark:text-white/70">Job not found.</p>
+            </div>
+          )}
+
+          {/* Render live status panel even on summary error so admin can still see operator activity */}
+          {liveStatus && renderLiveStatusPanel()}
         </div>
+
+        {/* Edit Timestamp Modal — also reachable in fallback shell */}
+        {editTimestampField && (
+          <EditTimestampModal
+            jobId={jobId}
+            field={editTimestampField.field}
+            label={editTimestampField.label}
+            currentValue={editTimestampField.currentValue}
+            onClose={() => setEditTimestampField(null)}
+            onSaved={fetchLiveStatus}
+          />
+        )}
       </div>
     );
   }
@@ -713,6 +1140,9 @@ export default function AdminJobDetailPage({
           <ArrowLeft className="w-4 h-4" />
           Back to Schedule Board
         </Link>
+
+        {/* Inline error banner — non-blocking; shown alongside live data */}
+        {errorBanner}
 
         {/* Hero card */}
         <div className="
@@ -843,7 +1273,9 @@ export default function AdminJobDetailPage({
             <JobProgressChart jobId={jobId} scopeItems={scopeItems} />
 
             {/* ── Daily Progress Section ── */}
-            <div className="
+            <div
+              id="daily-progress-section"
+              className="
               rounded-2xl p-6 shadow-sm
               bg-white border border-slate-200
               dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
@@ -1177,164 +1609,8 @@ export default function AdminJobDetailPage({
           {/* Right column: Job Details */}
           <div className="space-y-6">
 
-            {/* ── Live Status Panel ── */}
-            {liveStatus && (
-              <div className="
-                relative overflow-hidden rounded-2xl shadow-sm
-                bg-white border border-slate-200
-                dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
-                dark:border-white/10 dark:backdrop-blur
-              ">
-                {/* Purple accent stripe */}
-                <span className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500" aria-hidden />
-
-                <div className="p-5 pt-6">
-                  {/* Header */}
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
-                      <Radio className="w-4 h-4" />
-                    </span>
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-white">Live Status</h2>
-                    <div className="ml-auto flex items-center gap-2">
-                      {liveStatusFetchedAt && Date.now() - liveStatusFetchedAt.getTime() < 60000 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          LIVE
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-white/50">
-                          <Wifi className="w-3 h-3" />
-                          Polling
-                        </span>
-                      )}
-                      <button
-                        onClick={fetchLiveStatus}
-                        title="Refresh"
-                        className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
-                      >
-                        <Loader2 className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Standby alert */}
-                  {liveStatus.standby_active && (
-                    <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-400/30">
-                      <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0 animate-pulse" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wide">Standby Active</p>
-                        <p className="text-xs text-rose-600 dark:text-rose-400">
-                          Started {formatTimeFromISO(liveStatus.standby_started_at)}
-                          {liveStatus.standby_duration_minutes !== null && (
-                            <span className="font-semibold"> · {formatMinutes(liveStatus.standby_duration_minutes)}</span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Operator + time on site */}
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10">
-                      <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-1">Operator</p>
-                      <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
-                        {liveStatus.operator_name || '—'}
-                      </p>
-                      {liveStatus.helper_name && (
-                        <p className="text-xs text-slate-500 dark:text-white/50 truncate">+ {liveStatus.helper_name}</p>
-                      )}
-                    </div>
-                    <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10">
-                      <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-1">Time On Site</p>
-                      <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
-                        {formatMinutes(liveStatus.time_on_site_minutes)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Timestamps */}
-                  <div className="space-y-2 mb-4">
-                    {liveStatus.clock_in_time && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-white/40 flex-shrink-0" />
-                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">Clocked In</span>
-                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.clock_in_time)}</span>
-                      </div>
-                    )}
-                    {liveStatus.in_route_at && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <Navigation className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">In Route</span>
-                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.in_route_at)}</span>
-                      </div>
-                    )}
-                    {liveStatus.arrived_at && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <MapPin className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">Arrived</span>
-                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.arrived_at)}</span>
-                      </div>
-                    )}
-                    {liveStatus.work_started_at && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <Wrench className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
-                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">Work Started</span>
-                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.work_started_at)}</span>
-                      </div>
-                    )}
-                    {liveStatus.clock_out_time && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <Clock className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
-                        <span className="text-slate-500 dark:text-white/55 min-w-[72px]">Clocked Out</span>
-                        <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.clock_out_time)}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Work performed today */}
-                  {liveStatus.work_performed_today.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-2 flex items-center gap-1">
-                        <Activity className="w-3 h-3" />
-                        Work Today
-                      </p>
-                      <ul className="space-y-1.5">
-                        {liveStatus.work_performed_today.map((item) => (
-                          <li key={item.id} className="flex items-start gap-2 text-xs">
-                            <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-fuchsia-400 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <span className="font-medium text-slate-800 dark:text-white/85">
-                                {item.scope_item_description || item.work_type || 'Work item'}
-                              </span>
-                              <span className="ml-1.5 font-mono text-violet-600 dark:text-violet-300">
-                                ×{item.quantity_completed}
-                              </span>
-                              {item.notes && (
-                                <p className="text-slate-400 dark:text-white/35 italic truncate mt-0.5">{item.notes}</p>
-                              )}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* No active data placeholder */}
-                  {!liveStatus.in_route_at && !liveStatus.arrived_at && !liveStatus.clock_in_time && liveStatus.work_performed_today.length === 0 && (
-                    <p className="text-center text-xs text-slate-400 dark:text-white/35 py-2">
-                      No live activity yet — operator has not started this job today.
-                    </p>
-                  )}
-
-                  {/* Last refreshed */}
-                  {liveStatusFetchedAt && (
-                    <p className="text-[10px] text-slate-300 dark:text-white/25 text-right mt-3">
-                      Updated {liveStatusFetchedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* ── Live Status Panel (rendered via shared renderer) ── */}
+            {renderLiveStatusPanel()}
 
             {/* ── Pending Completion Approval ── */}
             {isPendingCompletion && (
@@ -1811,6 +2087,18 @@ export default function AdminJobDetailPage({
           job={job}
           onClose={() => setShowEditSchedule(false)}
           onSaved={fetchJob}
+        />
+      )}
+
+      {/* Edit Timestamp Modal */}
+      {editTimestampField && (
+        <EditTimestampModal
+          jobId={jobId}
+          field={editTimestampField.field}
+          label={editTimestampField.label}
+          currentValue={editTimestampField.currentValue}
+          onClose={() => setEditTimestampField(null)}
+          onSaved={fetchLiveStatus}
         />
       )}
     </div>
