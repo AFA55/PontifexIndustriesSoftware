@@ -149,13 +149,28 @@ npm run build      # Production build check (must pass with 0 errors)
 - [x] total_days_worked incremented on each Done for Today submission
 - [x] Migrations applied: job_notes, job_orders_total_hours_worked, time_off_enhanced, operator_time_off_enhanced, time_off_enhancements
 
+### Session — April 27, 2026 — Auth Fixes, Navigation Cross-Contamination, Transparency ✅ COMPLETE
+- [x] Fix stale localStorage cache causing role bleed — `getCurrentUser()` now cross-validates `supabase-user` against active `sb-*-auth-token` Supabase session
+- [x] New `lib/hooks/useAuthUser.ts` — async-safe hook with Supabase session as ground truth + role enforcement
+- [x] `logout()` clears all `sb-*-auth-token` keys to prevent session bleed across users
+- [x] Admin page role guards split: `!currentUser` → `/login`, wrong role → `/dashboard` (schedule-form, timecards pages)
+- [x] Operator dashboard Active Jobs stat tile converted from `div` to `Link href="/dashboard/my-jobs"`
+- [x] Super Admin redirect — expanded role check from `admin` only to all 6 management roles
+- [x] Stale timecard blocking clock-in — `.eq('date', today)` added to both clock-in and current timecard queries; auto-close loop for previous-day open timecards
+- [x] Job daily assignments sync — `GET /api/job-orders` now respects `job_daily_assignments` overrides for date-scoped non-admin queries
+- [x] `my-jobs/page.tsx` — client-side role filter: non-apprentices only see `assigned_to === uid` jobs
+- [x] Super Admin "Job not found" — `summary/route.ts` all 4 queries now use conditional tenant filter (null-safe for super_admin)
+- [x] Real-time live status panel — `GET /api/admin/jobs/[id]/live-status` (30s poll): in-route, arrived, standby, work performed, status history
+- [x] Delete job — trash icon + confirmation modal on Active Jobs cards
+- [x] Skill-match slash split — `split(/[,/]/)` handles "WS/TS" combined service codes
+
 ### Week 2 — Final Polish & Launch
 - [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
 - [ ] Mobile responsive audit on all operator pages
 - [ ] Loading states & error handling audit across remaining pages
 - [ ] Patriot-specific visual assets (logos, custom colors)
 - [ ] Production deployment prep (env vars, custom domain, SSL)
-- [ ] Final build verification & merge to main
+- [ ] Apply pending migrations: `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql`
 
 ### Ongoing / As-Needed
 - [ ] SMS integration for signature request delivery
