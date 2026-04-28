@@ -63,9 +63,11 @@ c66b1f7b  fix: admin role-fail redirects and operator back button navigation
 
 ### Pending manual actions
 - **Delete test job**: JOB-2026-119492 (WS/TS test job) — use the trash icon on Active Jobs page
-- **Apply 2 Supabase migrations** (user must run in Supabase SQL editor):
-  1. `supabase/migrations/20260427_utility_waiver_fields.sql` — adds 5 columns to job_orders
-  2. `supabase/migrations/20260427_operator_badges.sql` — creates operator_badges table with RLS
+
+### Migrations applied (April 27, late session)
+- `20260427_utility_waiver_fields` — 5 utility_waiver_* columns on job_orders
+- `20260427_operator_badges` — operator_badges table + RLS (admins manage / operators see own).
+  - **FK fix during apply**: original migration had `tenant_id REFERENCES auth.users(id)`; corrected to `REFERENCES tenants(id) ON DELETE CASCADE` to match codebase convention. SQL file in repo updated to match.
 
 ### Known remaining issues (low priority)
 - Clock-in event isn't persisted across page navigation if user force-navigates mid-flow (timecard state in operator dashboard resets on back-navigation). The underlying timecard row IS correctly saved to DB — this is a display-only race.
