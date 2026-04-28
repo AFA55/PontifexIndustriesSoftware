@@ -25,12 +25,15 @@ import {
   MapPin,
   User as UserIcon,
   Tag,
+  Wallet,
+  HandCoins,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 import AdminOnboardingTour from '@/components/AdminOnboardingTour';
 import { ADMIN_DASHBOARD_ROLES } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
+import CommissionsCard from '@/components/CommissionsCard';
 
 // ─── API response types ───────────────────────────────────────────────────────
 
@@ -92,6 +95,34 @@ interface DashboardData {
   crew_utilization: CrewUtilization;
   team_status: TeamMember[];
   recent_activity: ActivityItem[];
+}
+
+interface SalesCommissionRow {
+  job_id: string;
+  job_number: string;
+  job_status: string;
+  customer_name: string;
+  scheduled_date: string;
+  total_quoted: number;
+  total_invoiced: number;
+  total_paid: number;
+  commission_rate: number;
+  commission_pending: number;
+  commission_earned: number;
+}
+
+interface SalesDashboardData {
+  user: { id: string; full_name: string; role: string; commission_rate_default: number };
+  quoted: { mtd: number; ytd: number; last_month: number; trend_pct: number };
+  jobs: { active_count: number; completed_count_mtd: number; total_count_mtd: number };
+  commissions: {
+    pending: number;
+    earned_mtd: number;
+    earned_ytd: number;
+    earned_last_month: number;
+    trend_pct: number;
+    breakdown: SalesCommissionRow[];
+  };
 }
 
 interface ActiveJob {
@@ -340,6 +371,11 @@ export default function AdminDashboard() {
   const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
   const [activeJobsLoading, setActiveJobsLoading] = useState(true);
 
+  // ── salesman-specific dashboard state ──────────────────────────────────
+  const [salesData, setSalesData] = useState<SalesDashboardData | null>(null);
+  const [salesLoading, setSalesLoading] = useState(true);
+  const isSalesman = user?.role === 'salesman';
+
   // ── scope toggle (personal / team) ────────────────────────────────────────
   const [scope, setScope] = useState<'personal' | 'team'>('personal');
 
@@ -393,9 +429,14 @@ export default function AdminDashboard() {
     setLoading(false);
   }, [router]);
 
-  // ── dashboard data ────────────────────────────────────────────────────────
+  // ── dashboard data (full admins) ──────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
+    // Salesmen use a dedicated endpoint — skip the admin summary entirely.
+    if (user.role === 'salesman') {
+      setDashLoading(false);
+      return;
+    }
 
     const fetchDash = async () => {
       setDashLoading(true);
@@ -422,9 +463,64 @@ export default function AdminDashboard() {
     fetchDash();
   }, [user, scope]);
 
+  // ── sales dashboard data (salesman only) ──────────────────────────────────
+  useEffect(() => {
+    if (!user || user.role !== 'salesman') {
+      setSalesLoading(false);
+      return;
+    }
+
+    const fetchSales = async () => {
+      setSalesLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch('/api/sales/dashboard', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setSalesData(json.data);
+        }
+      } catch {
+        // silent — UI shows empty state
+      } finally {
+        setSalesLoading(false);
+      }
+    };
+
+    fetchSales();
+  }, [user]);
+
+  // ── default-rate updater (passed to CommissionsCard) ──────────────────
+  const handleUpdateDefaultRate = async (rate: number) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const res = await fetch('/api/profile/commission-rate-default', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ commission_rate_default: rate }),
+    });
+    if (!res.ok) throw new Error('Failed to update default rate');
+    // Optimistically reflect in local state
+    setSalesData((prev) =>
+      prev
+        ? { ...prev, user: { ...prev.user, commission_rate_default: rate } }
+        : prev
+    );
+  };
+
   // ── active jobs fetch ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
+    // Salesmen get their active count from /api/sales/dashboard.
+    if (user.role === 'salesman') {
+      setActiveJobsLoading(false);
+      return;
+    }
 
     const fetchActiveJobs = async () => {
       setActiveJobsLoading(true);
@@ -508,6 +604,219 @@ export default function AdminDashboard() {
     : 0;
 
   const isSeniorRole = user?.role === 'super_admin' || user?.role === 'operations_manager';
+
+  // ── Salesman render branch (separate layout) ──────────────────────────────
+  if (isSalesman) {
+    const sd = salesData;
+    const trendUp = (sd?.quoted.trend_pct ?? 0) >= 0;
+    const earnedTrendUp = (sd?.commissions.trend_pct ?? 0) >= 0;
+
+    return (
+      <div className="p-6 space-y-6 bg-gray-50 dark:bg-slate-900 min-h-full">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Sales Dashboard
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+              {today} · Hi {user?.name?.split(' ')[0] ?? 'there'}
+            </p>
+          </div>
+          <Link
+            href="/dashboard/admin/schedule-form"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Quote
+          </Link>
+        </div>
+
+        {/* KPI tiles */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 1. Active Jobs */}
+          <Link
+            href="/dashboard/admin/active-jobs"
+            className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 hover:shadow-md transition-shadow group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-10 h-10 bg-violet-100 dark:bg-violet-900/40 rounded-full flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-violet-500 transition-colors" />
+            </div>
+            {salesLoading ? (
+              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-12 mb-2" />
+            ) : (
+              <p className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
+                {sd?.jobs.active_count ?? 0}
+              </p>
+            )}
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">My Active Jobs</p>
+          </Link>
+
+          {/* 2. Quoted MTD */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-10 h-10 bg-sky-100 dark:bg-sky-900/40 rounded-full flex items-center justify-center">
+                <FileText className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+              </div>
+              {!salesLoading && sd && (
+                <span
+                  className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    trendUp
+                      ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+                      : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
+                  }`}
+                >
+                  {trendUp ? (
+                    <TrendingUp className="w-3 h-3" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3" />
+                  )}
+                  {Math.abs(sd.quoted.trend_pct ?? 0)}%
+                </span>
+              )}
+            </div>
+            {salesLoading ? (
+              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-24 mb-2" />
+            ) : (
+              <p className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
+                {formatCurrency(sd?.quoted.mtd ?? 0)}
+              </p>
+            )}
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Quoted MTD</p>
+            <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
+              vs {formatCurrency(sd?.quoted.last_month ?? 0)} last month
+            </p>
+          </div>
+
+          {/* 3. Pending Commissions (amber) */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-amber-100 dark:border-amber-900/40 p-6 ring-1 ring-amber-100 dark:ring-amber-900/30">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/40 rounded-full flex items-center justify-center">
+                <HandCoins className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              {!salesLoading && (sd?.commissions.pending ?? 0) > 0 && (
+                <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
+              )}
+            </div>
+            {salesLoading ? (
+              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-24 mb-2" />
+            ) : (
+              <p className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
+                {formatCurrency(sd?.commissions.pending ?? 0)}
+              </p>
+            )}
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Pending Commissions</p>
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+              From invoices not yet paid
+            </p>
+          </div>
+
+          {/* 4. Earned MTD (emerald) */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-emerald-100 dark:border-emerald-900/40 p-6 ring-1 ring-emerald-100 dark:ring-emerald-900/30">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              {!salesLoading && sd && (
+                <span
+                  className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    earnedTrendUp
+                      ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+                      : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
+                  }`}
+                >
+                  {earnedTrendUp ? (
+                    <TrendingUp className="w-3 h-3" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3" />
+                  )}
+                  {Math.abs(sd.commissions.trend_pct ?? 0)}%
+                </span>
+              )}
+            </div>
+            {salesLoading ? (
+              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-24 mb-2" />
+            ) : (
+              <p className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
+                {formatCurrency(sd?.commissions.earned_mtd ?? 0)}
+              </p>
+            )}
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Earned MTD</p>
+            <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
+              vs {formatCurrency(sd?.commissions.earned_last_month ?? 0)} last month
+            </p>
+          </div>
+        </div>
+
+        {/* Commissions card */}
+        {salesLoading ? (
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
+            <div className="animate-pulse space-y-3">
+              <div className="h-6 w-40 bg-slate-200 dark:bg-slate-700 rounded" />
+              <div className="grid grid-cols-3 gap-2">
+                <div className="h-16 bg-slate-100 dark:bg-slate-700/60 rounded-xl" />
+                <div className="h-16 bg-slate-100 dark:bg-slate-700/60 rounded-xl" />
+                <div className="h-16 bg-slate-100 dark:bg-slate-700/60 rounded-xl" />
+              </div>
+              <div className="h-32 bg-slate-50 dark:bg-slate-700/40 rounded" />
+            </div>
+          </div>
+        ) : (
+          <CommissionsCard
+            pending={sd?.commissions.pending ?? 0}
+            earnedMtd={sd?.commissions.earned_mtd ?? 0}
+            earnedYtd={sd?.commissions.earned_ytd ?? 0}
+            breakdown={sd?.commissions.breakdown ?? []}
+            defaultRate={sd?.user.commission_rate_default ?? 0}
+            onUpdateDefaultRate={handleUpdateDefaultRate}
+          />
+        )}
+
+        {/* Quick actions */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Quick Actions</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Link
+              href="/dashboard/admin/schedule-form"
+              className="flex flex-col items-center gap-2 p-4 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/40 rounded-xl border border-violet-200 dark:border-violet-800/50 text-violet-700 dark:text-violet-400 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="text-xs font-semibold">New Quote</span>
+            </Link>
+            <Link
+              href="/dashboard/admin/active-jobs"
+              className="flex flex-col items-center gap-2 p-4 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded-xl border border-sky-200 dark:border-sky-800/50 text-sky-700 dark:text-sky-400 transition-colors"
+            >
+              <Briefcase className="w-5 h-5" />
+              <span className="text-xs font-semibold">Active Jobs</span>
+            </Link>
+            <Link
+              href="/dashboard/admin/billing"
+              className="flex flex-col items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl border border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 transition-colors"
+            >
+              <CreditCard className="w-5 h-5" />
+              <span className="text-xs font-semibold">Billing</span>
+            </Link>
+            <Link
+              href="/dashboard/admin/completed-jobs"
+              className="flex flex-col items-center gap-2 p-4 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400 transition-colors"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              <span className="text-xs font-semibold">Completed</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Onboarding hook still respects salesman path */}
+        {showWalkthrough && isDemoAdmin && user && (
+          <AdminOnboardingTour userId={user.id} onComplete={markWalkthroughComplete} />
+        )}
+      </div>
+    );
+  }
 
   // ── render ────────────────────────────────────────────────────────────────
   return (

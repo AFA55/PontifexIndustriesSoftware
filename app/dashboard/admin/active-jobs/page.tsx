@@ -35,6 +35,17 @@ interface ActiveJob {
   operator_notes_count?: number;
 }
 
+interface ScopeMeta {
+  is_scoped: boolean;
+  role: string;
+  scoped_to_user: string | null;
+}
+
+interface JobProgress {
+  pct: number;
+  loading: boolean;
+}
+
 // Status pill hues. Light: `bg-{hue}-100 text-{hue}-700 ring-{hue}-200`.
 // Dark: translucent versions on the dark purple backdrop.
 const STATUS_COLORS: Record<string, string> = {
@@ -80,6 +91,8 @@ export default function ActiveJobsPage() {
   const [viewAll, setViewAll] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<ActiveJob | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [scopeMeta, setScopeMeta] = useState<ScopeMeta | null>(null);
+  const [progressMap, setProgressMap] = useState<Record<string, JobProgress>>({});
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -135,13 +148,76 @@ export default function ActiveJobsPage() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const json = await res.json();
-      if (json.success) setJobs(json.data || []);
+      if (json.success) {
+        setJobs(json.data || []);
+        if (json.scope) setScopeMeta(json.scope as ScopeMeta);
+        // Reset progress map — will be rehydrated by the progress effect.
+        setProgressMap({});
+      }
     } catch (err) {
       console.error('Error fetching active jobs:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  // ── Lazy-fetch per-job progress (% complete) with concurrency limit ─────
+  useEffect(() => {
+    if (!jobs.length) return;
+    let cancelled = false;
+    const ids = jobs.map(j => j.id);
+
+    // Mark all as loading
+    setProgressMap(prev => {
+      const next = { ...prev };
+      for (const id of ids) {
+        if (!next[id]) next[id] = { pct: 0, loading: true };
+      }
+      return next;
+    });
+
+    const fetchOne = async (id: string) => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`/api/admin/jobs/${id}/summary`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!res.ok) {
+          if (!cancelled) {
+            setProgressMap(prev => ({ ...prev, [id]: { pct: 0, loading: false } }));
+          }
+          return;
+        }
+        const json = await res.json();
+        const pct = Math.max(0, Math.min(100, Math.round(json?.data?.scope?.overall_pct ?? 0)));
+        if (!cancelled) {
+          setProgressMap(prev => ({ ...prev, [id]: { pct, loading: false } }));
+        }
+      } catch {
+        if (!cancelled) {
+          setProgressMap(prev => ({ ...prev, [id]: { pct: 0, loading: false } }));
+        }
+      }
+    };
+
+    // Run with a tiny concurrency pool of 3.
+    const queue = [...ids];
+    const POOL = 3;
+    const workers = Array.from({ length: POOL }).map(async () => {
+      while (queue.length && !cancelled) {
+        const id = queue.shift();
+        if (!id) break;
+        await fetchOne(id);
+      }
+    });
+    Promise.all(workers).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs]);
 
   const filtered = jobs.filter(j => {
     const today = new Date().toISOString().split('T')[0];
@@ -243,28 +319,50 @@ export default function ActiveJobsPage() {
       )}
       <div className="max-w-6xl mx-auto">
         {/* Header */}
+        {(() => {
+          const isScoped = scopeMeta?.is_scoped === true;
+          const isSalesman = scopeMeta?.role === 'salesman';
+          // Salesman is forced-scoped server-side regardless of viewAll toggle.
+          const subtitle = isScoped
+            ? (isSalesman ? 'My active jobs' : 'My assigned jobs')
+            : 'All company jobs';
+          const badgeLabel = isScoped ? 'My Jobs' : 'Showing All';
+          const badgeClass = isScoped
+            ? 'bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-500/15 dark:border-sky-400/30 dark:text-sky-200'
+            : 'bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-500/15 dark:border-violet-400/30 dark:text-violet-200';
+          // Salesman cannot toggle to "all"; the server enforces scoping. Hide toggle for them.
+          const canToggle = !isSalesman;
+          return (
         <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
               Active Jobs
             </h1>
             <p className="text-slate-600 dark:text-white/60 mt-1">
-              {viewAll ? 'All company jobs' : 'My assigned jobs'}
+              {subtitle}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setViewAll(!viewAll)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
-                ${viewAll
-                  ? 'bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-500/15 dark:border-violet-400/30 dark:text-violet-200'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10'
-                }
-              `}
-            >
-              {viewAll ? 'Showing All' : 'My Jobs Only'}
-            </button>
+            {canToggle ? (
+              <button
+                onClick={() => setViewAll(!viewAll)}
+                className={`
+                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
+                  ${badgeClass}
+                `}
+              >
+                {badgeLabel}
+              </button>
+            ) : (
+              <span
+                className={`
+                  inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border
+                  ${badgeClass}
+                `}
+              >
+                {badgeLabel}
+              </span>
+            )}
             <button
               onClick={fetchJobs}
               disabled={loading}
@@ -278,6 +376,8 @@ export default function ActiveJobsPage() {
             </button>
           </div>
         </div>
+          );
+        })()}
 
         {/* Stats / quick filters */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -368,12 +468,21 @@ export default function ActiveJobsPage() {
             dark:bg-white/5 dark:border-white/10 dark:backdrop-blur
           ">
             <Briefcase className="w-12 h-12 text-slate-300 dark:text-white/20 mx-auto mb-3" />
-            <p className="text-slate-500 dark:text-white/60">No jobs match this filter</p>
+            <p className="text-slate-500 dark:text-white/60">
+              {filter !== 'all'
+                ? 'No jobs match this filter'
+                : scopeMeta?.is_scoped
+                  ? 'You have no active jobs'
+                  : 'No active jobs'}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
             {filtered.map(job => {
               const accent = STATUS_ACCENT[job.status] ?? STATUS_ACCENT.scheduled;
+              const progress = progressMap[job.id];
+              const pct = progress?.pct ?? 0;
+              const progressLoading = progress?.loading ?? true;
               return (
                 <Link
                   key={job.id}
@@ -480,6 +589,34 @@ export default function ActiveJobsPage() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                       <ChevronRight className="w-5 h-5 text-slate-400 dark:text-white/40 mt-1 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </div>
+
+                  {/* Progress bar — % work complete (lazy-loaded per card) */}
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-slate-500 dark:text-white/50">
+                        {progressLoading
+                          ? 'Loading progress…'
+                          : pct === 0
+                            ? '0% — not started'
+                            : pct === 100
+                              ? '100% complete'
+                              : `${pct}% complete`}
+                      </span>
+                    </div>
+                    <div className="h-1 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className={`h-1 rounded-full transition-all duration-500 ${
+                          pct === 0
+                            ? 'bg-slate-300 dark:bg-white/20'
+                            : pct >= 100
+                              ? 'bg-emerald-500 dark:bg-emerald-400'
+                              : 'bg-emerald-500 dark:bg-emerald-400'
+                        }`}
+                        style={{ width: `${Math.max(pct, pct === 0 ? 0 : 4)}%` }}
+                        aria-hidden
+                      />
                     </div>
                   </div>
                 </Link>

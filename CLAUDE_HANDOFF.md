@@ -1,5 +1,63 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 28, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) → ready to merge to `main` | **Build Status:** PASSING ✅ (0 errors, 11.5s)
+**Date:** April 28, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~14 commits | **Build Status:** PASSING ✅ (0 errors, 8.6s)
+
+---
+
+## APRIL 28, 2026 SESSION (PT 2) — Operator Transparency Panel + Editable Timestamps
+
+### Problem reported
+Admin opens job detail for an active job and gets "Failed to load job details" full-screen. User needed real-time visibility into operator activity (in-route, arrived, work performed, standby) AND the ability to edit timestamps when operators forget to click.
+
+### Diagnosis
+- **Root cause of page-load failure:** stale browser session token. Server-side `/summary` endpoint returns 200 with valid JSON when called with a fresh token (verified via E2E magic-link test). The browser was sending an expired bearer.
+- **Hidden UX flaw:** the page short-circuits the entire layout when `/summary` errors, hiding the live-status panel that *did* successfully load. So even when transparency data was available, admins saw nothing.
+
+### Three parallel agent tracks (all merged, all build-clean)
+
+#### Track A — Backend: editable timestamps + work-performed notifications
+- New `PATCH /api/admin/jobs/[id]/timestamps` — accepts any of `in_route_at`, `arrived_at_jobsite_at`, `work_started_at`, `work_completed_at` (each can be ISO string or `null` to clear) + optional `edit_reason`. requireAdmin. Returns updated values. Validation: 400 on no keys / malformed ISO; 404 if job not found.
+- Audit-logged via `audit_logs.action='admin_edit_job_timestamps'` with `before/after` snapshot + `edit_reason` in `details` JSON.
+- `app/api/job-orders/[id]/work-items/route.ts` (operator submission endpoint) now fans out a `notifications` row to every `admin/super_admin/operations_manager` profile in the tenant after each work-performed insert. Fire-and-forget pattern, doesn't block operator response.
+- Notification fields used: `type='work_performed'`, `title='Work performed update'`, computed message string, `action_url=/dashboard/admin/jobs/<id>`, `sender_id=operator`, `tenant_id=job.tenant_id`.
+
+#### Track B — Backend: live-status enriched
+- `GET /api/admin/jobs/[id]/live-status` extended (existing fields preserved):
+  - `standby_segments_today: Array<{ id, started_at, ended_at, duration_minutes, reason }>` — all of today's segments, ongoing duration computed live
+  - `last_work_performed_at: string|null`
+  - `work_performed_count_today: number`
+  - `route_start_coords: {lat, lng}|null` and `work_start_coords: {lat, lng}|null` (from existing `route_start_*`/`work_start_*` columns)
+- All new queries wrapped in try/catch with safe defaults so a single failure doesn't kill the response.
+
+#### Track C — Frontend: non-blocking error + live ops panel + edit modal
+- `pageError` state widened from `string|null` → `{status?: number; message: string}|null` so HTTP status is preserved for display.
+- Old full-screen "Failed to load job details" replaced with rose-accent inline banner. **Live status panel still renders even when summary fails**, so dispatch never loses operator visibility.
+- Banner shows status code, "Retry" button (calls `fetchJob`), "Reload page", and a small "Sign out" link in case of corrupted session.
+- New [components/admin/EditTimestampModal.tsx](components/admin/EditTimestampModal.tsx) (293 lines) — bottom-sheet on mobile, centered on desktop, datetime-local input + edit-reason textarea + Save/Clear/Cancel.
+- Pencil icons next to in-route, arrived, work-started, work-completed timestamps in the live-status panel — opens the edit modal.
+- Always-rendered rows (em-dash placeholder + pencil) so admins can fill in missed clicks for any of the four timestamps.
+- Active standby block now shows a **live ticking elapsed timer** (`formatHMS`, 1s setInterval) with pulsing rose dot.
+- New collapsible "Today's standby (N)" list when there are completed segments.
+- Sky chip showing work-performed count + last update timestamp; click scrolls to Daily Progress card.
+- Live indicator now intelligent: emerald LIVE (<60s), amber STALE (>90s), grey "Polling".
+
+### E2E verification (against running localhost:3000 with super_admin token)
+- ✅ `GET /live-status` → 200 with all new fields populated
+- ✅ `PATCH /timestamps` setting `arrived_at_jobsite_at` → 200, value persists, reflected in next GET
+- ✅ `PATCH /timestamps` to null → 200, clears column
+- ✅ Audit log captures both edits with correct `changed_keys` and `edit_reason`
+- ✅ Empty body → 400; malformed ISO → 400
+- ✅ Page renders 67KB shell without React error markers
+
+### Commits on `main` (LOCAL only — NOT pushed to origin yet pending user QA)
+```
+[merge] live operator transparency — editable timestamps, standby segments, non-blocking errors
+0acaee11  feat: live ops transparency — editable timestamps + standby segments + non-blocking errors
+1ec00aaa  feat: extend live-status with standby segments, work counts, GPS coords
+92f34146  feat: editable job timestamps API + work-performed admin notifications
+```
+
+### Note on the original "Failed to load" report
+The user's specific page-load failure was a stale browser session — the server endpoint was 200ing the whole time. With Track C's non-blocking error UI, this scenario now degrades gracefully (banner + live panel) instead of total blackout. If it recurs, the banner offers a "Sign out" → re-login path.
 
 ---
 
