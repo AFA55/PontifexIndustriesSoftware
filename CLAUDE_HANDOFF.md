@@ -1,5 +1,63 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 28, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~14 commits | **Build Status:** PASSING ✅ (0 errors, 8.6s)
+**Date:** April 28, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~22 commits | **Build Status:** PASSING ✅ (0 errors, 9.2s)
+
+---
+
+## APRIL 28, 2026 SESSION (PT 3) — Sales Scoping + Commissions Dashboard
+
+### Three parallel tracks shipped (all merged, all build-clean, all E2E-tested)
+
+#### Track A — Server-enforced active-jobs role scoping
+- `app/api/admin/active-jobs/route.ts` and `app/api/admin/active-jobs-summary/route.ts`
+- Salesmen can ONLY see jobs they created (`created_by = userId`). Server enforces regardless of `?mine` flag.
+- Full admins (`super_admin`, `operations_manager`, `admin`) see all tenant jobs by default; can opt into `?mine=true` for their own.
+- Response now includes `scope: { is_scoped, role, scoped_to_user }` so the UI can render appropriate copy.
+- Active-jobs-summary aligned with the same scoping logic — counts no longer leak across salesmen.
+
+#### Track B — Sales dashboard backend
+- New `GET /api/sales/dashboard` — returns `{ user, quoted (mtd/ytd/last_month/trend_pct), jobs (active/completed/total counts), commissions (pending/earned_mtd/earned_ytd/breakdown[]) }`. Self-scoped; super_admin can pass `?userId=`.
+- New `PATCH /api/admin/invoices/[id]/mark-paid` — admin-only. Updates `amount_paid`, `paid_at`, `paid_by`, `balance_due`, `status` (paid/partial). Audit-logged.
+- New `PATCH /api/admin/jobs/[id]/commission-rate` — admin-only. Validates 0–100. Audit-logged.
+- New `PATCH /api/profile/commission-rate-default` — self-update; admins can target via `?userId=`. Validates 0–100.
+- Invoice → job linkage flows through `invoice_line_items.job_order_id` (no `job_id` direct column on invoices). Multi-job invoices are distributed proportionally by line-item amount share.
+
+#### Track C — Salesman dashboard UI + scoped active-jobs UI + per-job % progress
+- `app/dashboard/admin/page.tsx` — when `role === 'salesman'`, page short-circuits to a sales-specific layout: 4 KPI tiles (Active / Quoted MTD / Pending Commissions / Earned MTD), Commissions card, quick actions. Other roles untouched.
+- New `components/CommissionsCard.tsx` — gradient card with editable default rate, 3 stat tiles, desktop table / mobile cards breakdown by job, status badges (Earned / Pending / No invoice), empty state.
+- `app/dashboard/admin/active-jobs/page.tsx` — reads new `scope.is_scoped` from the API. When scoped: header subtitle becomes "My active jobs", top-right badge sky "My Jobs" (instead of violet "Showing All"), empty-state copy adapts. Salesmen see no toggle button.
+- Per-job % complete progress bar on each card — lazy fetches `/api/admin/jobs/[id]/summary` with concurrency 3. Thin emerald bar, "X% complete" label.
+
+### Schema added (Supabase MCP applied)
+Migration `20260428_commission_and_paid_invoice_fields`:
+- `profiles.commission_rate_default numeric(5,2) DEFAULT 0`
+- `job_orders.commission_rate numeric(5,2) NULL` (per-job override)
+- `invoices.paid_at timestamptz`, `invoices.paid_by uuid REFERENCES profiles(id)`
+- Indexes: `invoices_paid_at_idx`, `job_orders_created_by_active_idx` (partial)
+
+### E2E verification (against running localhost:3000 with magic-link minted tokens)
+- ✅ Salesman GET `/active-jobs` → returns ONLY their 2 jobs, `is_scoped: true`
+- ✅ Super Admin GET `/active-jobs` → returns all jobs, `is_scoped: false`
+- ✅ Super Admin GET `/active-jobs?mine=true` → returns 0 jobs (correctly scoped to super_admin's own)
+- ✅ Salesman GET `/api/sales/dashboard` → 200, full payload populated
+- ✅ Salesman PATCH `/api/profile/commission-rate-default` (rate 7.5) → 200, persisted
+- ✅ Super Admin PATCH `/api/admin/jobs/.../commission-rate` (rate 10) → 200, persisted
+- ✅ Validation: rate=150 → 400
+- ✅ Authorization: salesman trying to PATCH job commission-rate → 403
+- Test artifacts (test rates) rolled back to clean state
+
+### Commits on `main` (LOCAL — NOT pushed to origin yet)
+```
+d9ee644f  feat: sales dashboard endpoints — quoted revenue, commissions, mark-paid
+54d6c455  feat: server-enforced role scoping on active-jobs endpoint
+2ee40e75  feat: salesman dashboard — quoted MTD, commissions card, scoped active jobs UI, % progress
+```
+
+### Pending follow-ups (deferred from Track C)
+- **Mark Paid button on invoice list page** ([app/dashboard/admin/billing/page.tsx](app/dashboard/admin/billing/page.tsx)) — backend ready (PATCH `/api/admin/invoices/[id]/mark-paid`), UI not wired. Need: row-level "Mark Paid" button + modal capturing paid_amount/paid_at.
+- **Commission Rate inline editor on job detail page** ([app/dashboard/admin/jobs/[id]/page.tsx](app/dashboard/admin/jobs/[id]/page.tsx)) — backend ready (PATCH `/api/admin/jobs/[id]/commission-rate`), UI not wired. Mirror the pattern from CommissionsCard's default-rate inline editor.
+- **Partial billing UI** — backend has `summary.scope.overall_pct`. Could add "Bill at X%" CTA on Active Jobs cards that pre-fills an invoice draft for the completed portion.
+
+---
 
 ---
 
