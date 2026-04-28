@@ -60,6 +60,48 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const arrivedAt: string | null = ts['arrived_at_jobsite_at'] ?? null;
     const workStartedAt: string | null = ts['work_started_at'] ?? null;
 
+    // ── 1b. Fetch GPS coordinates for route start / work start ───────────────
+    let routeStartCoords: { lat: number; lng: number } | null = null;
+    let workStartCoords: { lat: number; lng: number } | null = null;
+    try {
+      const { data: gpsRaw } = await supabaseAdmin
+        .from('job_orders')
+        .select(
+          'route_start_latitude, route_start_longitude, work_start_latitude, work_start_longitude'
+        )
+        .eq('id', jobId)
+        .maybeSingle();
+
+      const gps = (gpsRaw ?? {}) as Record<string, number | string | null>;
+      const routeLat =
+        gps['route_start_latitude'] != null ? Number(gps['route_start_latitude']) : null;
+      const routeLng =
+        gps['route_start_longitude'] != null ? Number(gps['route_start_longitude']) : null;
+      const workLat =
+        gps['work_start_latitude'] != null ? Number(gps['work_start_latitude']) : null;
+      const workLng =
+        gps['work_start_longitude'] != null ? Number(gps['work_start_longitude']) : null;
+
+      if (
+        routeLat != null &&
+        routeLng != null &&
+        Number.isFinite(routeLat) &&
+        Number.isFinite(routeLng)
+      ) {
+        routeStartCoords = { lat: routeLat, lng: routeLng };
+      }
+      if (
+        workLat != null &&
+        workLng != null &&
+        Number.isFinite(workLat) &&
+        Number.isFinite(workLng)
+      ) {
+        workStartCoords = { lat: workLat, lng: workLng };
+      }
+    } catch (e) {
+      console.error('live-status: GPS coord fetch failed', e);
+    }
+
     // ── 2. Resolve operator and helper names ─────────────────────────────────
     let operatorName: string | null = null;
     let helperName: string | null = null;
@@ -130,6 +172,59 @@ export async function GET(request: NextRequest, context: RouteContext) {
       }
     }
 
+    // ── 4b. All standby segments started today (gracefully skip if absent) ──
+    type StandbySegment = {
+      id: string;
+      started_at: string;
+      ended_at: string | null;
+      duration_minutes: number;
+      reason: string | null;
+    };
+    let standbySegmentsToday: StandbySegment[] = [];
+    if (!standbyTableMissing) {
+      try {
+        const tomorrow = new Date(todayStr);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+        let segQuery = supabaseAdmin
+          .from('standby_logs')
+          .select('id, started_at, ended_at, reason')
+          .eq('job_order_id', jobId)
+          .gte('started_at', todayStr)
+          .lt('started_at', tomorrowStr)
+          .order('started_at', { ascending: false });
+        if (tenantId) segQuery = segQuery.eq('tenant_id', tenantId);
+
+        const { data: segRows, error: segErr } = await segQuery;
+
+        const segTableMissing =
+          segErr &&
+          (segErr.code === '42P01' ||
+            (segErr.message ?? '').includes('does not exist'));
+
+        if (!segTableMissing && segRows) {
+          standbySegmentsToday = (segRows as Array<Record<string, unknown>>).map((r) => {
+            const startedAt = String(r['started_at']);
+            const endedAt = (r['ended_at'] as string | null) ?? null;
+            const endMs = endedAt ? new Date(endedAt).getTime() : Date.now();
+            const startMs = new Date(startedAt).getTime();
+            const durationMinutes = Math.max(0, Math.floor((endMs - startMs) / 60000));
+            return {
+              id: String(r['id']),
+              started_at: startedAt,
+              ended_at: endedAt,
+              duration_minutes: durationMinutes,
+              reason: (r['reason'] as string | null) ?? null,
+            };
+          });
+        }
+      } catch (e) {
+        console.error('live-status: standby_segments_today fetch failed', e);
+        standbySegmentsToday = [];
+      }
+    }
+
     // ── 5. Work performed today ──────────────────────────────────────────────
     const { data: progressRows } = await supabaseAdmin
       .from('job_progress_entries')
@@ -152,6 +247,36 @@ export async function GET(request: NextRequest, context: RouteContext) {
       scope_item_description:
         (r.job_scope_items as { description?: string } | null)?.description ?? null,
     }));
+
+    // ── 5b. Work performed count + last entry timestamp (today) ─────────────
+    let workPerformedCountToday = 0;
+    let lastWorkPerformedAt: string | null = null;
+    try {
+      const { data: latestRows } = await supabaseAdmin
+        .from('job_progress_entries')
+        .select('created_at, date')
+        .eq('job_order_id', jobId)
+        .eq('date', todayStr)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (latestRows && latestRows.length > 0) {
+        const r = latestRows[0] as Record<string, string | null>;
+        lastWorkPerformedAt = r['created_at'] ?? r['date'] ?? null;
+      }
+
+      const { count: progressCount } = await supabaseAdmin
+        .from('job_progress_entries')
+        .select('id', { count: 'exact', head: true })
+        .eq('job_order_id', jobId)
+        .eq('date', todayStr);
+
+      workPerformedCountToday = progressCount ?? 0;
+    } catch (e) {
+      console.error('live-status: work_performed count/last fetch failed', e);
+      workPerformedCountToday = 0;
+      lastWorkPerformedAt = null;
+    }
 
     // ── 6. Status history (gracefully skip if table absent) ──────────────────
     const { data: historyRows, error: historyErr } = await supabaseAdmin
@@ -196,6 +321,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
         clock_out_time: clockOutTime,
         work_performed_today: workPerformedToday,
         status_history: statusHistory,
+        // New fields
+        standby_segments_today: standbySegmentsToday,
+        last_work_performed_at: lastWorkPerformedAt,
+        work_performed_count_today: workPerformedCountToday,
+        route_start_coords: routeStartCoords,
+        work_start_coords: workStartCoords,
       },
     });
   } catch (error: unknown) {
