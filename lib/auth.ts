@@ -70,24 +70,44 @@ export const getCurrentUser = (): User | null => {
   if (typeof window === 'undefined') return null;
 
   try {
-    // First check for Supabase user (new system)
     const supabaseUserStr = localStorage.getItem('supabase-user');
     if (supabaseUserStr && supabaseUserStr.trim()) {
       const user = JSON.parse(supabaseUserStr);
-      console.log('👤 Current user from Supabase session:', user);
+
+      // Cross-validate cached user ID against the actual Supabase session.
+      // Supabase stores its session under 'sb-{projectRef}-auth-token'.
+      // If the IDs don't match, the cache is stale (different user logged in).
+      try {
+        const supabaseKeys = Object.keys(localStorage).filter(
+          k => k.startsWith('sb-') && k.endsWith('-auth-token')
+        );
+        for (const key of supabaseKeys) {
+          const sessionStr = localStorage.getItem(key);
+          if (sessionStr) {
+            const session = JSON.parse(sessionStr);
+            const sessionUserId = session?.user?.id;
+            if (sessionUserId && user.id !== sessionUserId) {
+              // Stale cache — different user is actually logged in
+              localStorage.removeItem('supabase-user');
+              return null;
+            }
+          }
+        }
+      } catch {
+        // If validation fails, trust the localStorage value (best-effort)
+      }
+
       return user;
     }
 
-    // Fallback to old localStorage system for backwards compatibility
+    // Fallback to old patriot-user key
     const userStr = localStorage.getItem('patriot-user');
     if (userStr && userStr.trim()) {
       const user = JSON.parse(userStr);
-      console.log('👤 Current user from localStorage:', user);
       return user;
     }
   } catch (error) {
     console.error('Error getting user from localStorage:', error);
-    // Clear corrupted data
     localStorage.removeItem('patriot-user');
     localStorage.removeItem('supabase-user');
   }
@@ -114,6 +134,10 @@ export const logout = async (): Promise<void> => {
   Object.keys(localStorage).forEach(key => {
     if (key.startsWith('branding-')) localStorage.removeItem(key);
   });
+  // Clear Supabase-managed session keys to prevent stale session bleed across users
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    .forEach(k => localStorage.removeItem(k));
   console.log('User logged out');
 };
 
