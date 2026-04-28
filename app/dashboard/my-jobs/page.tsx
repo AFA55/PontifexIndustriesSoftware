@@ -413,7 +413,7 @@ export default function MyJobsPage() {
             <span className="text-sm font-medium flex-1">Your schedule was updated — jobs have been refreshed.</span>
             <button
               onClick={() => setScheduleUpdatedBanner(false)}
-              className="text-blue-400 hover:text-blue-600 transition-colors"
+              className="p-2 -mr-2 text-blue-400 hover:text-blue-600 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"
               aria-label="Dismiss"
             >
               ✕
@@ -441,15 +441,15 @@ export default function MyJobsPage() {
                       <p className="text-xs text-amber-600 mt-0.5">Day {job.total_days_worked + 1} tomorrow</p>
                     )}
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700">
                       Multi-Day
                     </span>
                     <a
                       href={`/dashboard/my-jobs/${job.id}`}
-                      className="text-xs text-amber-700 font-semibold flex items-center gap-0.5 hover:text-amber-900"
+                      className="text-xs text-amber-700 font-semibold flex items-center gap-1 hover:text-amber-900 px-2 py-1.5 min-h-[32px]"
                     >
-                      <PlayCircle className="w-3 h-3" />
+                      <PlayCircle className="w-3.5 h-3.5" />
                       View
                     </a>
                   </div>
@@ -482,21 +482,21 @@ export default function MyJobsPage() {
                       <p className="text-xs text-purple-500">Return: {job.return_date}</p>
                     )}
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
                       job.status === 'on_hold' ? 'bg-purple-100 text-purple-700' :
                       job.status === 'pending_completion' ? 'bg-blue-100 text-blue-700' :
                       'bg-orange-100 text-orange-700'
                     }`}>
                       {job.status === 'on_hold' ? 'On Hold' :
-                       job.status === 'pending_completion' ? 'Awaiting Approval' :
+                       job.status === 'pending_completion' ? 'Awaiting' :
                        'In Progress'}
                     </span>
                     <a
                       href={`/dashboard/my-jobs/${job.id}`}
-                      className="text-xs text-purple-600 font-semibold flex items-center gap-0.5 hover:text-purple-800"
+                      className="text-xs text-purple-600 font-semibold flex items-center gap-1 hover:text-purple-800 px-2 py-1.5 min-h-[32px]"
                     >
-                      <PlayCircle className="w-3 h-3" />
+                      <PlayCircle className="w-3.5 h-3.5" />
                       Resume
                     </a>
                   </div>

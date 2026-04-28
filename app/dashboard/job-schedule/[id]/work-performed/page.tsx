@@ -2321,7 +2321,7 @@ export default function WorkPerformed() {
                         Add Hole Entry
                       </h5>
 
-                      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                         {/* Bit Size - Text Input */}
                         <div>
                           <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
@@ -2763,7 +2763,7 @@ export default function WorkPerformed() {
                             <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3">
                               Add Cut Area (e.g., 5&apos; × 7&apos;)
                             </label>
-                            <div className="grid grid-cols-4 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                               <div>
                                 <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Length (ft)</label>
                                 <input
