@@ -800,7 +800,11 @@ export default function ScheduleFormPage() {
 
   useEffect(() => {
     const currentUser = getCurrentUser();
-    if (!currentUser || !isAdmin()) {
+    if (!currentUser) {
+      router.push('/login');
+      return;
+    }
+    if (!isAdmin()) {
       router.push('/dashboard');
       return;
     }

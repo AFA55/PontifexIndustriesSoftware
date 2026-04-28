@@ -151,7 +151,8 @@ export default function AdminTimecardsPage() {
 
   useEffect(() => {
     const currentUser = getCurrentUser();
-    if (!currentUser || !isAdmin()) { router.push('/dashboard'); return; }
+    if (!currentUser) { router.push('/login'); return; }
+    if (!isAdmin()) { router.push('/dashboard'); return; }
     setUser(currentUser);
   }, [router]);
 
