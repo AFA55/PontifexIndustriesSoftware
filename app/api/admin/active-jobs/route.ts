@@ -3,13 +3,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
+// Roles that see ALL active jobs in their tenant. Everyone else (salesman,
+// supervisor, ...) is forced to a created_by=self filter on the server.
+const FULL_ADMIN_ROLES = ['super_admin', 'operations_manager', 'admin'] as const;
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
-    const mineOnly = request.nextUrl.searchParams.get('mine') === 'true';
-    const isSuperAdmin = ['super_admin', 'operations_manager'].includes(auth.role);
+    const isFullAdmin = (FULL_ADMIN_ROLES as readonly string[]).includes(auth.role);
+    const mineFlag = request.nextUrl.searchParams.get('mine') === 'true';
+    // Non-admins are ALWAYS scoped to their own jobs regardless of the `mine`
+    // query flag — the server is the source of truth, not the client.
+    // Full admins can opt in to a "my jobs only" view via `?mine=true`.
+    const shouldScope = !isFullAdmin || mineFlag;
 
     // Base query for active (non-completed, non-cancelled) jobs
     let query = supabaseAdmin
@@ -33,9 +41,10 @@ export async function GET(request: NextRequest) {
       .not('status', 'in', '("completed","cancelled","archived")')
       .order('scheduled_date', { ascending: true });
 
-    // Scope to user's own jobs only when explicitly requested
-    if (mineOnly) {
-      query = query.or(`created_by.eq.${auth.userId},assigned_to.eq.${auth.userId}`);
+    if (shouldScope) {
+      // Created_by is the only correct ownership signal for sales staff —
+      // salesmen are not assigned to jobs as operators.
+      query = query.eq('created_by', auth.userId);
     }
 
     const { data: jobsRaw, error } = await query;
@@ -47,7 +56,15 @@ export async function GET(request: NextRequest) {
     const jobs = jobsRaw || [];
 
     if (jobs.length === 0) {
-      return NextResponse.json({ success: true, data: [] });
+      return NextResponse.json({
+        success: true,
+        data: [],
+        scope: {
+          is_scoped: shouldScope,
+          role: auth.role,
+          scoped_to_user: shouldScope ? auth.userId : null,
+        },
+      });
     }
 
     // Fetch operator names
@@ -118,7 +135,15 @@ export async function GET(request: NextRequest) {
       operator_notes_count: notesCounts[j.id] || 0,
     }));
 
-    return NextResponse.json({ success: true, data: result });
+    return NextResponse.json({
+      success: true,
+      data: result,
+      scope: {
+        is_scoped: shouldScope,
+        role: auth.role,
+        scoped_to_user: shouldScope ? auth.userId : null,
+      },
+    });
   } catch (err) {
     console.error('Unexpected error in active-jobs GET:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
