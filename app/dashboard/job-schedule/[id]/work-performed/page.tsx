@@ -3,16 +3,30 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import dynamicImport from 'next/dynamic';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import QuickAccessButtons from '@/components/QuickAccessButtons';
-import EquipmentUsageForm from '@/components/EquipmentUsageForm';
-import RecommendedItems from './_components/RecommendedItems';
-import PhotoUploader from '@/components/PhotoUploader';
 import { Camera, Mic, Save, Zap, Home, CheckCircle2, ChevronDown, ChevronUp, Send, Loader2, MessageSquarePlus, Clock } from 'lucide-react';
-import VoiceMemoNotes from './_components/VoiceMemoNotes';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
+
+const EquipmentUsageForm = dynamicImport(() => import('@/components/EquipmentUsageForm'), {
+  ssr: false,
+  loading: () => null,
+});
+const RecommendedItems = dynamicImport(() => import('./_components/RecommendedItems'), {
+  ssr: false,
+  loading: () => null,
+});
+const PhotoUploader = dynamicImport(() => import('@/components/PhotoUploader'), {
+  ssr: false,
+  loading: () => null,
+});
+const VoiceMemoNotes = dynamicImport(() => import('./_components/VoiceMemoNotes'), {
+  ssr: false,
+  loading: () => null,
+});
 
 // Organized work item categories based on DSM screenshots
 const WORK_CATEGORIES = {
@@ -83,6 +97,28 @@ const POPULAR_ITEMS = [
   'BREAK & REMOVE',
   'JACK HAMMERING'
 ];
+
+// ─── Pure helpers (top-level so they aren't recreated each render) ───────────
+const requiresDetailedData = (itemName: string) =>
+  itemName.includes('CORE DRILL') ||
+  itemName.includes('SAW') ||
+  itemName.includes('CUTTING');
+
+const isCoreDrilling = (itemName: string) => itemName.includes('CORE DRILL');
+const isSawing = (itemName: string) =>
+  itemName.includes('SAW') && !itemName.includes('CORE DRILL');
+const isHandSaw = (itemName: string) => itemName.includes('HAND SAW');
+const isSlabSaw = (itemName: string) => itemName.includes('SLAB SAW');
+const isWallSaw = (itemName: string) => itemName.includes('WALL SAW');
+const isChainsaw = (itemName: string) => itemName.includes('CHAIN SAW');
+const isBreakAndRemove = (itemName: string) =>
+  itemName.includes('BREAK & REMOVE') ||
+  itemName.includes('REMOVAL') ||
+  itemName.includes('DEMOLITION');
+const isJackHammering = (itemName: string) =>
+  itemName.includes('JACK HAMMERING') || itemName.includes('JACKHAMMER');
+const isChipping = (itemName: string) => itemName.includes('CHIPPING');
+const isBrokk = (itemName: string) => itemName.includes('BROKK');
 
 interface WorkItem {
   name: string;
@@ -588,51 +624,6 @@ export default function WorkPerformed() {
   };
 
   // Check if item requires detailed data collection
-  const requiresDetailedData = (itemName: string) => {
-    return itemName.includes('CORE DRILL') ||
-           itemName.includes('SAW') ||
-           itemName.includes('CUTTING');
-  };
-
-  const isCoreDrilling = (itemName: string) => {
-    return itemName.includes('CORE DRILL');
-  };
-
-  const isSawing = (itemName: string) => {
-    return itemName.includes('SAW') && !itemName.includes('CORE DRILL');
-  };
-
-  const isHandSaw = (itemName: string) => {
-    return itemName.includes('HAND SAW');
-  };
-
-  const isSlabSaw = (itemName: string) => {
-    return itemName.includes('SLAB SAW');
-  };
-
-  const isWallSaw = (itemName: string) => {
-    return itemName.includes('WALL SAW');
-  };
-
-  const isChainsaw = (itemName: string) => {
-    return itemName.includes('CHAIN SAW');
-  };
-
-  const isBreakAndRemove = (itemName: string) => {
-    return itemName.includes('BREAK & REMOVE') || itemName.includes('REMOVAL') || itemName.includes('DEMOLITION');
-  };
-
-  const isJackHammering = (itemName: string) => {
-    return itemName.includes('JACK HAMMERING') || itemName.includes('JACKHAMMER');
-  };
-
-  const isChipping = (itemName: string) => {
-    return itemName.includes('CHIPPING');
-  };
-
-  const isBrokk = (itemName: string) => {
-    return itemName.includes('BROKK');
-  };
 
   const handleSelectItem = (itemName: string) => {
     setCurrentItem(itemName);
