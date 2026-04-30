@@ -26,8 +26,8 @@ import {
   MapPin,
   User as UserIcon,
   Tag,
-  Wallet,
   HandCoins,
+  Eye,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
@@ -612,7 +612,8 @@ export default function AdminDashboard() {
   if (isSalesman) {
     const sd = salesData;
     const trendUp = (sd?.quoted.trend_pct ?? 0) >= 0;
-    const earnedTrendUp = (sd?.commissions.trend_pct ?? 0) >= 0;
+    const expectedCommission =
+      (sd?.commissions.pending ?? 0) + (sd?.commissions.earned_mtd ?? 0);
 
     return (
       <div className="p-6 space-y-6 bg-gray-50 dark:bg-slate-900 min-h-full">
@@ -636,8 +637,8 @@ export default function AdminDashboard() {
         </div>
 
         {/* KPI tiles */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* 1. Active Jobs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* 1. My Active Jobs */}
           <Link
             href="/dashboard/admin/active-jobs"
             className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 hover:shadow-md transition-shadow group"
@@ -656,6 +657,9 @@ export default function AdminDashboard() {
               </p>
             )}
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">My Active Jobs</p>
+            <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
+              Quote and ship more
+            </p>
           </Link>
 
           {/* 2. Quoted MTD */}
@@ -694,64 +698,31 @@ export default function AdminDashboard() {
             </p>
           </div>
 
-          {/* 3. Pending Commissions (amber) */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-amber-100 dark:border-amber-900/40 p-6 ring-1 ring-amber-100 dark:ring-amber-900/30">
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/40 rounded-full flex items-center justify-center">
-                <HandCoins className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              {!salesLoading && (sd?.commissions.pending ?? 0) > 0 && (
-                <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
-              )}
-            </div>
-            {salesLoading ? (
-              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-24 mb-2" />
-            ) : (
-              <p className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
-                {formatCurrency(sd?.commissions.pending ?? 0)}
-              </p>
-            )}
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Pending Commissions</p>
-            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
-              From invoices not yet paid
-            </p>
-          </div>
-
-          {/* 4. Earned MTD (emerald) */}
+          {/* 3. Expected Commission (emerald) — forward-looking, replaces Pending + Earned tiles */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-emerald-100 dark:border-emerald-900/40 p-6 ring-1 ring-emerald-100 dark:ring-emerald-900/30">
             <div className="flex items-start justify-between mb-4">
               <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <HandCoins className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              {!salesLoading && sd && (
-                <span
-                  className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    earnedTrendUp
-                      ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
-                      : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
-                  }`}
-                >
-                  {earnedTrendUp ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3" />
-                  )}
-                  {Math.abs(sd.commissions.trend_pct ?? 0)}%
-                </span>
-              )}
             </div>
             {salesLoading ? (
               <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-24 mb-2" />
             ) : (
               <p className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
-                {formatCurrency(sd?.commissions.earned_mtd ?? 0)}
+                {formatCurrency(expectedCommission)}
               </p>
             )}
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Earned MTD</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Expected Commission</p>
             <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
-              vs {formatCurrency(sd?.commissions.earned_last_month ?? 0)} last month
+              If all current invoices get paid
             </p>
           </div>
+        </div>
+
+        {/* Scoping hint */}
+        <div className="flex items-center gap-1.5 -mt-2 text-xs text-slate-500 dark:text-white/50">
+          <Eye className="w-3.5 h-3.5" />
+          <span>Showing your jobs only</span>
         </div>
 
         {/* Commissions card */}
