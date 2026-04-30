@@ -1,5 +1,63 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 28, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~22 commits | **Build Status:** PASSING ✅ (0 errors, 9.2s)
+**Date:** April 30, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~30 commits | **Build Status:** PASSING ✅ (0 errors, 8.8s)
+
+---
+
+## APRIL 30, 2026 SESSION — Active-Jobs Filter, Real-Time Draft, Back-Nav, Survey Redesign
+
+### Four-issue fix shipped (3 parallel tracks + 2 follow-up bug fixes)
+
+#### Issue 1 — Hide pending_approval from Active Jobs
+- `app/api/admin/active-jobs/route.ts` — added `pending_approval` to the excluded status set: `not('status', 'in', '("completed","cancelled","archived","pending_approval")')`.
+- Active-jobs-summary route already used a whitelist (`['assigned','in_route','on_site','in_progress']`), so it was already correctly excluding pending_approval.
+
+#### Issue 2 — Real-time draft transparency
+- `app/api/admin/jobs/[id]/live-status/route.ts` extended with `draft_work_performed: { items, notes, updated_at, source } | null`.
+- Pulls from `daily_job_logs.work_performed_draft` jsonb for the operator's row on today's date. Picks the most recently edited row (operator vs helper) that has actual items.
+- `app/dashboard/admin/jobs/[id]/page.tsx` — new pulsing violet "Draft in progress" pill on the Live Status panel showing typed item chips with quantities + "edited Xs ago".
+
+#### Issue 3 — Work-performed back-nav data loss
+- `handleSubmit` no longer clears the draft on the Next button. Drafts survive navigation away and back.
+- Auto-save debounce reduced **2000ms → 500ms** for near-real-time admin transparency.
+- Mount fallback: if no draft exists in DB or localStorage, GET `/api/job-orders/[id]/work-history` and hydrate the form from today's submitted work_items (highest day_number rows). User who already submitted can re-edit on Back-button return.
+
+#### Issue 4 — Job Survey UI redesign
+- Full visual rewrite preserving all state, logic, localStorage keys, equipment categories, and submit flow.
+- Gradient violet→indigo header accent stripe, sticky header with back/home/dark-mode buttons.
+- Progress indicator: "X / Y sections" + gradient fill bar driven by `useMemo` over completeness.
+- Helper Rating: 10 buttons in `grid-cols-5`, color-coded selection (rose 1-2, amber 3-5, emerald 6-10).
+- Equipment Details: lucide thumbnails per category (Drill / Scissors / Cable etc.); per-category card with tone-coded accent (violet/sky/amber/rose/teal/indigo).
+- Segmented Yes/No and Water Source buttons with Droplets/Truck icons, all `min-h-[44px]` (iOS guideline preserved from session 2 mobile audit).
+- Summary review card before submit + emerald-gradient submit button with `CheckCircle` icon.
+
+### Two follow-up bug fixes (caught during E2E test)
+- `daily_job_logs` has NO `updated_at` column — only `created_at` and `work_performed_draft_updated_at`.
+  - Live-status query was selecting `updated_at` → silently returned null draft → admin pill never appeared.
+  - PUT `/work-performed-draft` was writing `updated_at: now` → every draft save returned 500.
+  - Both fixed: live-status now uses `work_performed_draft_updated_at` (with `created_at` fallback). PUT route stripped the bogus column write.
+
+### E2E verification (against running localhost:3000 with magic-link minted tokens)
+- ✅ Operator PUTs draft → 200 (no more 500)
+- ✅ Admin GET live-status sees the draft with 2 items, correct source='operator', fresh updated_at
+- ✅ Operator updates draft → admin sees the UPDATED draft (1 item, qty 15)
+- ✅ Operator clears draft (PUT null) → 200; admin sees `draft_work_performed: null`
+- ✅ Active-jobs returns 1 job (in_progress only); pending_approval WS/TS correctly excluded
+- ✅ Build passes; pre-commit TypeScript check green
+
+### Commits on `main` (LOCAL — NOT pushed)
+```
+a31bd3b4  fix: live-status draft query and work-performed-draft PUT use real column names
+1c4d36fc  feat: hide pending_approval jobs + real-time draft transparency for admins
+[merge]   Track C — job survey redesign
+[merge]   Track B — work-performed back-nav fix
+b77b90cb  fix: persist work-performed draft across back-navigation; hydrate from submitted items when draft empty
+cfc35bb9  feat: redesign job survey page UI for operators
+```
+
+### Known follow-up
+- `day-complete` page submission does NOT yet clear `daily_job_logs.work_performed_draft` after final submit. Track B left a TODO. Without it, drafts orphan after day-complete (not user-visible — fallback hydration logic uses `max(day_number)` to surface only today's items). Address when next touching day-complete.
+
+---
 
 ---
 
