@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
+import nextDynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -30,10 +31,12 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
-import AdminOnboardingTour from '@/components/AdminOnboardingTour';
 import { ADMIN_DASHBOARD_ROLES } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
 import CommissionsCard from '@/components/CommissionsCard';
+
+// Heavy demo-only walkthrough — only renders when showWalkthrough && isDemoAdmin
+const AdminOnboardingTour = nextDynamic(() => import('@/components/AdminOnboardingTour'), { ssr: false, loading: () => null });
 
 // ─── API response types ───────────────────────────────────────────────────────
 
