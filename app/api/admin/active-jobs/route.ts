@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         priority
       `)
       .eq('tenant_id', auth.tenantId)
-      .not('status', 'in', '("completed","cancelled","archived")')
+      .not('status', 'in', '("completed","cancelled","archived","pending_approval")')
       .order('scheduled_date', { ascending: true });
 
     if (shouldScope) {

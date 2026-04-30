@@ -299,6 +299,57 @@ export async function GET(request: NextRequest, context: RouteContext) {
         }))
       : [];
 
+    // ── 6b. Live draft from operator's work-performed page (real-time) ───────
+    type DraftWorkPerformed = {
+      items: unknown[];
+      notes: string | null;
+      updated_at: string | null;
+      source: 'operator' | 'helper';
+    } | null;
+    let draftWorkPerformed: DraftWorkPerformed = null;
+    try {
+      const candidateIds = [job.assigned_to, job.helper_assigned_to].filter(
+        (x): x is string => typeof x === 'string' && x.length > 0
+      );
+      if (candidateIds.length > 0) {
+        const { data: draftRows } = await supabaseAdmin
+          .from('daily_job_logs')
+          .select('operator_id, work_performed_draft, updated_at')
+          .eq('job_order_id', jobId)
+          .eq('log_date', todayStr)
+          .in('operator_id', candidateIds)
+          .order('updated_at', { ascending: false });
+
+        const rows = (draftRows ?? []) as Array<{
+          operator_id: string;
+          work_performed_draft: Record<string, unknown> | null;
+          updated_at: string | null;
+        }>;
+        const withItems = rows.find((r) => {
+          const draft = r.work_performed_draft;
+          if (!draft || typeof draft !== 'object') return false;
+          const items = (draft as { selectedItems?: unknown[] }).selectedItems;
+          return Array.isArray(items) && items.length > 0;
+        });
+        if (withItems) {
+          const draft = withItems.work_performed_draft as {
+            selectedItems?: unknown[];
+            jobNotes?: string;
+          };
+          draftWorkPerformed = {
+            items: Array.isArray(draft.selectedItems) ? draft.selectedItems : [],
+            notes: typeof draft.jobNotes === 'string' ? draft.jobNotes : null,
+            updated_at: withItems.updated_at,
+            source:
+              withItems.operator_id === job.assigned_to ? 'operator' : 'helper',
+          };
+        }
+      }
+    } catch (err) {
+      console.error('[live-status] draft_work_performed error', err);
+      draftWorkPerformed = null;
+    }
+
     // ── 7. Computed durations ────────────────────────────────────────────────
     const onSiteAnchor = arrivedAt ?? workStartedAt;
     const timeOnSiteMinutes =
@@ -327,6 +378,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         work_performed_count_today: workPerformedCountToday,
         route_start_coords: routeStartCoords,
         work_start_coords: workStartCoords,
+        draft_work_performed: draftWorkPerformed,
       },
     });
   } catch (error: unknown) {
