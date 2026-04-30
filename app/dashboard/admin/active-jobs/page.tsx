@@ -29,6 +29,7 @@ interface ActiveJob {
   customer_name?: string;
   address?: string;
   assigned_operator_name?: string;
+  helper_assigned_name?: string | null;
   created_by_name?: string;
   pending_change_requests?: number;
   pending_completion_approval?: boolean;
@@ -463,6 +464,11 @@ export default function ActiveJobsPage() {
                               {job.assigned_operator_name.trim().charAt(0).toUpperCase()}
                             </span>
                             {job.assigned_operator_name}
+                            {job.helper_assigned_name && (
+                              <span className="text-xs text-slate-500 dark:text-white/50 ml-1">
+                                + {job.helper_assigned_name}
+                              </span>
+                            )}
                           </span>
                         )}
                         <span className="flex items-center gap-1">

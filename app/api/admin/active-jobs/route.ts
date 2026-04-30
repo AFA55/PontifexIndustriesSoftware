@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         location,
         customer_name,
         assigned_to,
+        helper_assigned_to,
         created_by,
         priority
       `)
@@ -52,8 +53,9 @@ export async function GET(request: NextRequest) {
 
     // Fetch operator names
     const operatorIds = [...new Set(jobs.map((j: any) => j.assigned_to).filter(Boolean))];
+    const helperIds = [...new Set(jobs.map((j: any) => j.helper_assigned_to).filter(Boolean))];
     const creatorIds = [...new Set(jobs.map((j: any) => j.created_by).filter(Boolean))];
-    const allProfileIds = [...new Set([...operatorIds, ...creatorIds])];
+    const allProfileIds = [...new Set([...operatorIds, ...helperIds, ...creatorIds])];
 
     let profileMap: Record<string, string> = {};
     if (allProfileIds.length > 0) {
@@ -112,6 +114,7 @@ export async function GET(request: NextRequest) {
       customer_name: j.customer_name,
       address: j.address || j.location,
       assigned_operator_name: j.assigned_to ? (profileMap[j.assigned_to] ?? null) : null,
+      helper_assigned_name: j.helper_assigned_to ? (profileMap[j.helper_assigned_to] ?? null) : null,
       created_by_name: j.created_by ? (profileMap[j.created_by] ?? null) : null,
       pending_change_requests: changeRequestCounts[j.id] || 0,
       pending_completion_approval: completionPendingSet.has(j.id),
