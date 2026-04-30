@@ -1218,12 +1218,17 @@ export default function AdminJobDetailPage({
 
           {/* Left column: Scope + Chart */}
           <div className="lg:col-span-2 space-y-6">
-            <JobScopePanel
-              jobId={jobId}
-              jobNumber={job.job_number}
-              readOnly={false}
-              onScopeChange={fetchScope}
-            />
+            <div>
+              <p className="text-xs text-slate-500 dark:text-white/55 mb-2 px-1">
+                From the dispatched ticket — admin can edit as work progresses.
+              </p>
+              <JobScopePanel
+                jobId={jobId}
+                jobNumber={job.job_number}
+                readOnly={false}
+                onScopeChange={fetchScope}
+              />
+            </div>
 
             <JobProgressChart jobId={jobId} scopeItems={scopeItems} />
 
@@ -2002,20 +2007,22 @@ export default function AdminJobDetailPage({
             ">
               <h3 className="text-xs font-semibold text-slate-500 dark:text-white/55 uppercase tracking-wide mb-3">Quick Links</h3>
               <div className="space-y-1">
-                <Link
-                  href={`/dashboard/admin/completed-job-tickets/${jobId}`}
-                  className="
-                    flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors group
-                    text-slate-700 hover:bg-slate-50
-                    dark:text-white/80 dark:hover:bg-white/5
-                  "
-                >
-                  <span className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-slate-400 dark:text-white/45" />
-                    View Dispatch Ticket
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-white/30 group-hover:text-slate-500 dark:group-hover:text-white/60" />
-                </Link>
+                {job.status === 'completed' && (
+                  <Link
+                    href={`/dashboard/admin/completed-job-tickets/${jobId}`}
+                    className="
+                      flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors group
+                      text-slate-700 hover:bg-slate-50
+                      dark:text-white/80 dark:hover:bg-white/5
+                    "
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-400 dark:text-white/45" />
+                      View Dispatch Ticket
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-slate-300 dark:text-white/30 group-hover:text-slate-500 dark:group-hover:text-white/60" />
+                  </Link>
+                )}
                 <Link
                   href="/dashboard/admin/billing"
                   className="
