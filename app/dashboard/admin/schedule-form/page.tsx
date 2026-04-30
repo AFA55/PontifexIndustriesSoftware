@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import nextDynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
@@ -20,11 +21,14 @@ import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { CustomerAutocomplete } from '@/components/ui/CustomerAutocomplete';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { VoiceMicButton } from '@/components/ui/VoiceMicButton';
-import AISmartFillModal from './_components/AISmartFillModal';
-import CustomerForm from '../customers/_components/CustomerForm';
 // Equipment presets no longer displayed as grid; now using SERVICE_EQUIPMENT config
 import PhotoUploader from '@/components/PhotoUploader';
 import SmartCombobox, { ContactCombobox } from '@/components/SmartCombobox';
+
+// Dynamic-imported modals — only loaded when their state flag flips true.
+// AISmartFillModal pulls in framer-motion; CustomerForm is a large dialog used for the new-customer flow.
+const AISmartFillModal = nextDynamic(() => import('./_components/AISmartFillModal'), { ssr: false });
+const CustomerForm = nextDynamic(() => import('../customers/_components/CustomerForm'), { ssr: false });
 // Equipment detail type (inline after equipment-recommendations removal)
 interface EquipmentDetail {
   selected: boolean;

@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import nextDynamic from 'next/dynamic';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -13,12 +14,15 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
-import HelperWorkLog from '../_components/HelperWorkLog';
 import type { JobTicketData } from '../_components/JobTicketCard';
 import { isMandatoryComplete } from '@/lib/equipment-map';
 import { unifyEquipmentSelections, allItemsConfirmed as checkAllConfirmed } from '@/lib/equipment-unifier';
 import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
 import { PhotoViewer } from '@/components/PhotoUploader';
+
+// HelperWorkLog only renders when the current user is an apprentice (jobIsHelper).
+// Non-apprentice operators (the majority) never need this code on first paint.
+const HelperWorkLog = nextDynamic(() => import('../_components/HelperWorkLog'), { ssr: false });
 
 function toDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
