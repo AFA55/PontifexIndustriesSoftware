@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -13,17 +14,9 @@ import { getCurrentUser } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
 import { supabase } from '@/lib/supabase';
 import OperatorRow from './_components/OperatorRow';
-import PendingQueueSidebar from './_components/PendingQueueSidebar';
 import Toast from './_components/Toast';
-import ApprovalModal from './_components/ApprovalModal';
-import MissingInfoModal from './_components/MissingInfoModal';
 import NotificationBell from './_components/NotificationBell';
-import AssignOperatorModal from './_components/AssignOperatorModal';
-import EditJobPanel from './_components/EditJobPanel';
-import ChangeRequestModal from './_components/ChangeRequestModal';
-import NotesDrawer from './_components/NotesDrawer';
-import QuickAddModal, { type QuickAddData } from './_components/QuickAddModal';
-import ConflictModal from './_components/ConflictModal';
+import type { QuickAddData } from './_components/QuickAddModal';
 import ScheduleDatePicker from './_components/ScheduleDatePicker';
 import DailyNotesSection from './_components/DailyNotesSection';
 import type { DailyNote } from './_components/DailyNotesSection';
@@ -31,13 +24,24 @@ import type { JobCardData } from './_components/JobCard';
 import type { PendingJob } from './_components/PendingQueueSidebar';
 import type { ToastData } from './_components/Toast';
 import type { NoteData } from './_components/NotesDrawer';
-import JobDetailView from './_components/JobDetailView';
 import DndBoardWrapper from './_components/DndBoardWrapper';
-import OperatorRowView from './_components/OperatorRowView';
 import ViewToggle from './_components/ViewToggle';
-import CrewScheduleGrid from './_components/CrewScheduleGrid';
-import CancelJobModal from './_components/CancelJobModal';
-import MarkOutModal from './_components/MarkOutModal';
+
+// ─── Heavy components — dynamic-imported (rendered conditionally) ─────────
+const PendingQueueSidebar = dynamic(() => import('./_components/PendingQueueSidebar'), { ssr: false, loading: () => null });
+const ApprovalModal = dynamic(() => import('./_components/ApprovalModal'), { ssr: false, loading: () => null });
+const MissingInfoModal = dynamic(() => import('./_components/MissingInfoModal'), { ssr: false, loading: () => null });
+const AssignOperatorModal = dynamic(() => import('./_components/AssignOperatorModal'), { ssr: false, loading: () => null });
+const EditJobPanel = dynamic(() => import('./_components/EditJobPanel'), { ssr: false, loading: () => null });
+const ChangeRequestModal = dynamic(() => import('./_components/ChangeRequestModal'), { ssr: false, loading: () => null });
+const NotesDrawer = dynamic(() => import('./_components/NotesDrawer'), { ssr: false, loading: () => null });
+const QuickAddModal = dynamic(() => import('./_components/QuickAddModal'), { ssr: false, loading: () => null });
+const ConflictModal = dynamic(() => import('./_components/ConflictModal'), { ssr: false, loading: () => null });
+const JobDetailView = dynamic(() => import('./_components/JobDetailView'), { ssr: false, loading: () => null });
+const OperatorRowView = dynamic(() => import('./_components/OperatorRowView'), { ssr: false, loading: () => null });
+const CrewScheduleGrid = dynamic(() => import('./_components/CrewScheduleGrid'), { ssr: false, loading: () => null });
+const CancelJobModal = dynamic(() => import('./_components/CancelJobModal'), { ssr: false, loading: () => null });
+const MarkOutModal = dynamic(() => import('./_components/MarkOutModal'), { ssr: false, loading: () => null });
 
 // ─── Operator color palette ─────────────────────────────────────────────
 const OPERATOR_COLORS = [
