@@ -76,6 +76,7 @@ interface JobSummary {
   utility_waiver_signed?: boolean | null;
   utility_waiver_signer_name?: string | null;
   utility_waiver_signed_at?: string | null;
+  commission_rate?: number | null;
 }
 
 interface ActivityEntry {
@@ -471,6 +472,64 @@ export default function AdminJobDetailPage({
   // Live status
   const [liveStatus, setLiveStatus] = useState<LiveStatusData | null>(null);
   const [liveStatusFetchedAt, setLiveStatusFetchedAt] = useState<Date | null>(null);
+
+  // Commission rate inline editor
+  const [editingCommission, setEditingCommission] = useState(false);
+  const [commissionInput, setCommissionInput] = useState<string>('');
+  const [savingCommission, setSavingCommission] = useState(false);
+  const [commissionError, setCommissionError] = useState<string | null>(null);
+
+  const startEditCommission = () => {
+    setCommissionInput(
+      job?.commission_rate !== null && job?.commission_rate !== undefined
+        ? String(job.commission_rate)
+        : ''
+    );
+    setCommissionError(null);
+    setEditingCommission(true);
+  };
+
+  const cancelEditCommission = () => {
+    setEditingCommission(false);
+    setCommissionInput('');
+    setCommissionError(null);
+  };
+
+  const saveCommission = async () => {
+    if (!job) return;
+    const trimmed = commissionInput.trim();
+    let payload: { commission_rate: number | null };
+    if (trimmed === '') {
+      payload = { commission_rate: null };
+    } else {
+      const n = parseFloat(trimmed);
+      if (isNaN(n) || n < 0 || n > 100) {
+        setCommissionError('Enter 0–100 or leave blank for default.');
+        return;
+      }
+      payload = { commission_rate: n };
+    }
+    setSavingCommission(true);
+    setCommissionError(null);
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${job.id}/commission-rate`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCommissionError(data.error || 'Failed to update commission rate.');
+        return;
+      }
+      setEditingCommission(false);
+      setCommissionInput('');
+      await fetchJob();
+    } catch {
+      setCommissionError('Network error updating commission rate.');
+    } finally {
+      setSavingCommission(false);
+    }
+  };
 
   // Auth guard
   useEffect(() => {
@@ -1530,6 +1589,91 @@ export default function AdminJobDetailPage({
                     </dd>
                   </div>
                 )}
+
+                {/* Commission Rate (admin inline editor) */}
+                <div>
+                  <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Commission Rate</dt>
+                  <dd className="mt-0.5">
+                    {editingCommission ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={commissionInput}
+                            onChange={(e) => setCommissionInput(e.target.value)}
+                            placeholder="Default"
+                            className="
+                              w-20 px-2 py-1 rounded-md text-sm tabular-nums
+                              bg-white border border-slate-300 text-slate-900
+                              focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                              dark:bg-white/5 dark:border-white/15 dark:text-white
+                              dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                            "
+                            autoFocus
+                          />
+                          <span className="text-xs text-slate-500 dark:text-white/60">%</span>
+                          <button
+                            type="button"
+                            onClick={saveCommission}
+                            disabled={savingCommission}
+                            title="Save"
+                            className="
+                              p-1 rounded-md transition-colors disabled:opacity-50
+                              bg-emerald-50 text-emerald-600 hover:bg-emerald-100 ring-1 ring-emerald-200
+                              dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 dark:ring-emerald-400/30
+                            "
+                          >
+                            {savingCommission ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEditCommission}
+                            disabled={savingCommission}
+                            title="Cancel"
+                            className="
+                              p-1 rounded-md transition-colors disabled:opacity-50
+                              bg-slate-100 text-slate-500 hover:bg-slate-200 ring-1 ring-slate-200
+                              dark:bg-white/10 dark:text-white/60 dark:hover:bg-white/15 dark:ring-white/15
+                            "
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        {commissionError && (
+                          <p className="text-xs text-rose-600 dark:text-rose-300">{commissionError}</p>
+                        )}
+                        <p className="text-[11px] text-slate-400 dark:text-white/45">Leave blank to use salesperson default.</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          job.commission_rate !== null && job.commission_rate !== undefined
+                            ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30'
+                            : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white/70 dark:ring-white/10'
+                        }`}>
+                          {job.commission_rate !== null && job.commission_rate !== undefined
+                            ? `${Number(job.commission_rate).toFixed(1)}%`
+                            : 'Default'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={startEditCommission}
+                          title="Edit commission rate"
+                          className="
+                            p-1 rounded-md transition-colors
+                            text-slate-400 hover:text-violet-600 hover:bg-violet-50
+                            dark:text-white/45 dark:hover:text-violet-300 dark:hover:bg-violet-500/15
+                          "
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </dd>
+                </div>
 
                 {job.require_waiver_signature && (
                   <div>
