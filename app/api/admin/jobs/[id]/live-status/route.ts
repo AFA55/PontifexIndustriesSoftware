@@ -314,16 +314,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       if (candidateIds.length > 0) {
         const { data: draftRows } = await supabaseAdmin
           .from('daily_job_logs')
-          .select('operator_id, work_performed_draft, updated_at')
+          .select('operator_id, work_performed_draft, work_performed_draft_updated_at, created_at')
           .eq('job_order_id', jobId)
           .eq('log_date', todayStr)
           .in('operator_id', candidateIds)
-          .order('updated_at', { ascending: false });
+          .order('work_performed_draft_updated_at', { ascending: false, nullsFirst: false });
 
         const rows = (draftRows ?? []) as Array<{
           operator_id: string;
           work_performed_draft: Record<string, unknown> | null;
-          updated_at: string | null;
+          work_performed_draft_updated_at: string | null;
+          created_at: string | null;
         }>;
         const withItems = rows.find((r) => {
           const draft = r.work_performed_draft;
@@ -339,7 +340,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
           draftWorkPerformed = {
             items: Array.isArray(draft.selectedItems) ? draft.selectedItems : [],
             notes: typeof draft.jobNotes === 'string' ? draft.jobNotes : null,
-            updated_at: withItems.updated_at,
+            updated_at:
+              withItems.work_performed_draft_updated_at ?? withItems.created_at,
             source:
               withItems.operator_id === job.assigned_to ? 'operator' : 'helper',
           };

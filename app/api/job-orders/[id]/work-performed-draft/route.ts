@@ -165,13 +165,14 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     let savedLogId: string | null = null;
 
     if (existingLog) {
-      // Update draft on the existing row
+      // Update draft on the existing row.
+      // Note: daily_job_logs has no `updated_at` column (only created_at);
+      // the timestamp lives on `work_performed_draft_updated_at`.
       const { data: updated, error: updateError } = await supabaseAdmin
         .from('daily_job_logs')
         .update({
           work_performed_draft: draft,
           work_performed_draft_updated_at: now,
-          updated_at: now,
         })
         .eq('id', existingLog.id)
         .select('id')
