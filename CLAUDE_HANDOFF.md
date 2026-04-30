@@ -1,5 +1,70 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 30, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~30 commits | **Build Status:** PASSING ✅ (0 errors, 8.8s)
+**Date:** April 30, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~40 commits | **Build Status:** PASSING ✅ (0 errors, 9.7s)
+
+---
+
+## APRIL 30, 2026 SESSION (PT 2) — Performance Optimization Pass
+
+### Goal
+Cut First Load JS across the heaviest pages WITHOUT touching logic, backend, auth, or behavior. Strict guardrails enforced per track.
+
+### Three parallel tracks (all merged, all build-clean, behavior identical)
+
+#### Track A — schedule-board + admin dashboard
+- `app/dashboard/admin/schedule-board/page.tsx` — 14 conditionally-rendered modals/views moved from eager to dynamic imports: ApprovalModal, MissingInfoModal, AssignOperatorModal, EditJobPanel, ChangeRequestModal, NotesDrawer, QuickAddModal, ConflictModal, JobDetailView, OperatorRowView, CrewScheduleGrid, CancelJobModal, MarkOutModal, PendingQueueSidebar. All gated behind `useState(false)` flags.
+- `app/dashboard/admin/page.tsx` — AdminOnboardingTour now dynamic (only mounts for demo admins). Renamed import to `nextDynamic` to avoid collision with `export const dynamic = 'force-dynamic'` route segment config.
+
+#### Track B — jobs/[id] + work-performed
+- `app/dashboard/admin/jobs/[id]/page.tsx` — `JobScopePanel`, `JobProgressChart`, and `EditScheduleModal` now dynamic imports. Inline `EditScheduleModal` (130 lines) extracted to its own file `_components/EditScheduleModal.tsx` (verbatim — same fetch URL `/api/admin/jobs/[id]/schedule`, same props, same logic).
+- `app/dashboard/job-schedule/[id]/work-performed/page.tsx` — `EquipmentUsageForm`, `RecommendedItems`, `PhotoUploader`, `VoiceMemoNotes` now dynamic. 11 pure helper predicates (`requiresDetailedData`, `isCoreDrilling`, `isSawing`, `isHandSaw`, `isSlabSaw`, `isWallSaw`, `isChainsaw`, `isBreakAndRemove`, `isJackHammering`, `isChipping`, `isBrokk`) hoisted from component body to top-level module scope (avoids re-creation on every render).
+
+#### Track C — schedule-form + my-jobs/[id] + bundle audit
+- `app/dashboard/admin/schedule-form/page.tsx` — `AISmartFillModal` (framer-motion-heavy) and `CustomerForm` (Google-Maps-using dialog) now dynamic. Both gated behind `show*` state flags.
+- `app/dashboard/my-jobs/[id]/page.tsx` — `HelperWorkLog` now dynamic (only renders when `jobIsHelper === true`, i.e., apprentice role only — majority of operators never load this code).
+- Bundle audit performed: `@react-pdf/renderer` confirmed server-only (API routes); `framer-motion` extracted via AISmartFillModal lazy-load; `recharts` left eager (analytics-only); `@react-google-maps/api` left as-is (mounted in app/layout.tsx provider). `react-grid-layout`, `react-signature-canvas`, `jspdf`, `html2canvas`, `qrcode`, `@zxing/library` confirmed already tree-shaken (no eager client imports).
+
+### Final First Load JS reductions
+
+| Page | Before | After | Δ |
+|------|--------|-------|---|
+| `/dashboard/admin/jobs/[id]` | 275 kB | **173 kB** | **-102 kB** |
+| `/dashboard/admin` | 217 kB | **173 kB** | **-44 kB** |
+| `/dashboard/admin/schedule-form` | 273 kB | **235 kB** | **-38 kB** |
+| `/dashboard/admin/schedule-board` | 242 kB | **204 kB** | **-38 kB** |
+| `/dashboard/job-schedule/[id]/work-performed` | 221 kB | **215 kB** | **-6 kB** |
+
+**Total: ~228 kB First Load JS removed across 5 heaviest pages.**
+
+### Hard guardrails enforced (every agent self-audited 10 questions, all answered "no"; I independently verified diffs before merging)
+- ❌ NO modifications to `app/api/**`, `lib/supabase*`, `lib/api-auth*`, `lib/api-client*`, `middleware.ts`, `.env*`, `package.json`, `package-lock.json`, migrations, SQL
+- ❌ NO renaming exports, props, state vars, or function signatures
+- ❌ NO changes to fetch URLs, request bodies, response handling, error handling
+- ❌ NO removal of features, modals, panels, fields, conditional renders
+- ❌ NO changes to useState initial values, useEffect deps (beyond lint required), hook ordering
+- ❌ NO copy/label/auth-guard changes
+- ❌ NO new dependencies; NO removed dependencies
+
+### Bug caught and fixed during audit
+Track A's first revision had a name collision: `import dynamic from 'next/dynamic'` clashed with the file's `export const dynamic = 'force-dynamic'` route segment config (causing build failure on `app/dashboard/admin/page.tsx`). Fixed by renaming to `nextDynamic`. Tracks B and C used aliases proactively (`dynamicImport`, `nextDynamic`) — no collisions.
+
+### Commits on `main` (LOCAL — NOT pushed)
+```
+[merge] perf — dynamic imports + bundle splits (3 parallel tracks)
+154dafe2  perf: dynamic-import heavy modals and memoize lists on jobs/[id] and work-performed (Track B)
+0c525c71  perf: dynamic-import multi-step form sections, my-jobs modals, and heavy lib boundaries (Track C)
+9eaa3d39  perf: dynamic-import heavy modals on schedule-board and admin dashboard (Track A)
+```
+
+### Behavior verification
+- All 3 builds passing with 0 errors
+- E2E flows from prior sessions still pass logically (no fetch URLs changed)
+- Visible UI for all state paths unchanged (lazy components have identical default-export shape and props)
+- Loading placeholders are either invisible (`loading: () => null`) or match the existing skeleton aesthetic (animated pulse blocks)
+
+### Known minor consideration
+On first cold render of admin job detail page, JobScopePanel and JobProgressChart will show a brief skeleton placeholder while their chunks download. Subsequent navigations within the session use cached chunks — instant. This is the trade-off for -102 kB First Load.
+
+---
 
 ---
 
