@@ -387,12 +387,58 @@ export default function WorkPerformed() {
         }
 
         // ── Restore state ─────────────────────────────────────────────────────
+        const draftHasItems = !!(draft && (
+          (draft.selectedItems && draft.selectedItems.length > 0) ||
+          draft.sawingData ||
+          draft.coreDrillingData ||
+          (draft.jobNotes !== undefined && draft.jobNotes !== '')
+        ));
+
         if (draft) {
           if (draft.selectedItems?.length > 0) setSelectedItems(draft.selectedItems);
           if (draft.sawingData) setSawingData(draft.sawingData);
           if (draft.coreDrillingData) setCoreDrillingData(draft.coreDrillingData);
           if (draft.jobNotes !== undefined) setVoiceNotes(draft.jobNotes);
-          showNotification('Draft restored', 'success');
+          if (draftHasItems) showNotification('Draft restored', 'success');
+        }
+
+        // ── Final fallback: hydrate from already-submitted work_items ─────────
+        // If neither the DB draft nor localStorage produced anything to render,
+        // the user may have already submitted work items today and is now
+        // back-navigating from the day-complete/survey page. Pull the most
+        // recent day's items from /work-history so the form isn't empty.
+        if (!draftHasItems) {
+          try {
+            const histRes = await fetch(`/api/job-orders/${params.id}/work-history`, {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            if (histRes.ok) {
+              const histJson = await histRes.json();
+              const allItems: any[] = histJson?.data?.work_items || [];
+              if (allItems.length > 0) {
+                // The latest day_number rows are today's submitted items.
+                // Mirrors the POST handler in /work-items which deletes-and-replaces
+                // by (job_order_id, day_number).
+                const maxDay = allItems.reduce(
+                  (m, wi) => Math.max(m, Number(wi.day_number) || 1),
+                  1
+                );
+                const todayItems = allItems.filter(
+                  (wi) => (Number(wi.day_number) || 1) === maxDay
+                );
+                if (todayItems.length > 0) {
+                  const hydrated: WorkItem[] = todayItems.map((wi) => ({
+                    name: wi.work_type,
+                    quantity: Number(wi.quantity) || 1,
+                    notes: wi.notes || undefined,
+                    details: wi.details_json || undefined,
+                  }));
+                  setSelectedItems(hydrated);
+                  showNotification('Loaded today’s submitted work', 'success');
+                }
+              }
+            }
+          } catch { /* non-critical — leave form empty */ }
         }
       } catch { /* non-critical */ }
       // Always mark draft as loaded so auto-save can proceed
@@ -402,7 +448,9 @@ export default function WorkPerformed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
-  // Debounced auto-save: fires 2 s after any major state change
+  // Debounced auto-save: fires 500 ms after any major state change
+  // (kept >300ms to avoid hammering the API; admin live-status panel polls
+  // separately, so this cadence keeps that view current.)
   useEffect(() => {
     if (!draftLoadedRef.current) return; // don't save before draft is loaded
     // Don't overwrite a previously saved draft with a completely empty state
@@ -447,7 +495,7 @@ export default function WorkPerformed() {
       } catch {
         setSaveStatus('error');
       }
-    }, 2000);
+    }, 500);
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
@@ -1435,9 +1483,13 @@ export default function WorkPerformed() {
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
 
-      // Clear draft on successful submission (DB + localStorage)
-      saveDraft(null).catch(() => {});
-      try { localStorage.removeItem(`work-draft-${params.id}`); } catch { /* ignore */ }
+      // NOTE: Intentionally do NOT clear the work-performed draft here. The draft
+      // belongs to "today's in-progress work" — if the user presses Back from the
+      // day-complete page, we want their items to still be visible. The draft
+      // should only be cleared on the final day-complete submission.
+      // TODO: day-complete page does not currently clear `work-draft-<id>` /
+      // `work_performed_draft` after final submission — when that page is touched
+      // next, add a draft clear there (saveDraft(null) + localStorage.removeItem).
 
       showNotification('Work performed saved!', 'success');
 
@@ -1460,7 +1512,7 @@ export default function WorkPerformed() {
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
       localStorage.removeItem(`job_last_page_${params.id}`);
-      try { localStorage.removeItem(`work-draft-${params.id}`); } catch { /* ignore */ }
+      // NOTE: draft preserved on purpose — see comment in success path above.
       router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
     } finally {
       setIsSubmitting(false);
