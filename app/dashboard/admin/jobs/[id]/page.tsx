@@ -197,6 +197,12 @@ interface LiveStatusData {
   work_performed_count_today?: number;
   route_start_coords?: { lat: number; lng: number } | null;
   work_start_coords?: { lat: number; lng: number } | null;
+  draft_work_performed?: {
+    items: Array<{ name?: string; quantity?: number } | unknown>;
+    notes: string | null;
+    updated_at: string | null;
+    source: 'operator' | 'helper';
+  } | null;
 }
 
 type EditableTimestampField = 'in_route_at' | 'arrived_at_jobsite_at' | 'work_started_at' | 'work_completed_at';
@@ -871,6 +877,55 @@ export default function AdminJobDetailPage({
               </p>
             </div>
           </div>
+
+          {/* Live draft pill — operator is currently typing */}
+          {liveStatus.draft_work_performed && liveStatus.draft_work_performed.items.length > 0 && (
+            <div
+              className="
+                mb-3 w-full px-3 py-2 rounded-xl text-xs
+                bg-violet-50 text-violet-800 border border-violet-200
+                dark:bg-violet-500/10 dark:text-violet-200 dark:border-violet-400/30
+              "
+            >
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+                </span>
+                <span className="font-semibold">Draft in progress</span>
+                <span className="text-violet-700/80 dark:text-violet-300/80">
+                  · {liveStatus.draft_work_performed.items.length}{' '}
+                  {liveStatus.draft_work_performed.items.length === 1 ? 'item' : 'items'} typed
+                </span>
+                {liveStatus.draft_work_performed.updated_at && (
+                  <span className="ml-auto text-[10px] text-violet-700/70 dark:text-violet-300/60">
+                    edited {formatTimeFromISO(liveStatus.draft_work_performed.updated_at)}
+                  </span>
+                )}
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {liveStatus.draft_work_performed.items.slice(0, 8).map((it, i) => {
+                  const item = it as { name?: string; quantity?: number };
+                  return (
+                    <span
+                      key={i}
+                      className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/70 dark:bg-violet-400/10 text-[10px] font-medium ring-1 ring-violet-200/60 dark:ring-violet-400/30"
+                    >
+                      {item.name ?? '—'}
+                      {typeof item.quantity === 'number' && (
+                        <span className="ml-1 text-violet-500 dark:text-violet-300">×{item.quantity}</span>
+                      )}
+                    </span>
+                  );
+                })}
+                {liveStatus.draft_work_performed.items.length > 8 && (
+                  <span className="text-[10px] text-violet-600/80 dark:text-violet-300/70 self-center">
+                    +{liveStatus.draft_work_performed.items.length - 8} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Work performed pill */}
           {workPerformedCount > 0 && (
