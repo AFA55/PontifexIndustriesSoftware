@@ -139,6 +139,62 @@ export default function BillingPage() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [confirmVoid, setConfirmVoid] = useState<string | null>(null);
 
+  // Mark Paid modal state
+  const [markPaidInvoice, setMarkPaidInvoice] = useState<Invoice | null>(null);
+  const [markPaidAmount, setMarkPaidAmount] = useState<string>('');
+  const [markPaidDate, setMarkPaidDate] = useState<string>('');
+  const [markPaidSaving, setMarkPaidSaving] = useState(false);
+  const [markPaidError, setMarkPaidError] = useState<string | null>(null);
+
+  const openMarkPaidModal = (inv: Invoice) => {
+    setMarkPaidInvoice(inv);
+    setMarkPaidAmount(Number(inv.total_amount || 0).toFixed(2));
+    setMarkPaidDate(new Date().toISOString().split('T')[0]);
+    setMarkPaidError(null);
+  };
+
+  const closeMarkPaidModal = () => {
+    setMarkPaidInvoice(null);
+    setMarkPaidAmount('');
+    setMarkPaidDate('');
+    setMarkPaidError(null);
+    setMarkPaidSaving(false);
+  };
+
+  const submitMarkPaid = async () => {
+    if (!markPaidInvoice) return;
+    const amt = parseFloat(markPaidAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setMarkPaidError('Enter a valid amount.');
+      return;
+    }
+    if (!markPaidDate) {
+      setMarkPaidError('Select a payment date.');
+      return;
+    }
+    setMarkPaidSaving(true);
+    setMarkPaidError(null);
+    try {
+      const res = await apiFetch(`/api/admin/invoices/${markPaidInvoice.id}/mark-paid`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paid_amount: amt, paid_at: markPaidDate }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMarkPaidError(data.error || 'Failed to mark invoice as paid.');
+        return;
+      }
+      setSuccessMsg(`Invoice ${markPaidInvoice.invoice_number} marked as paid.`);
+      closeMarkPaidModal();
+      fetchData();
+    } catch (err) {
+      console.error('Error marking invoice paid:', err);
+      setMarkPaidError('Failed to mark invoice as paid.');
+    } finally {
+      setMarkPaidSaving(false);
+    }
+  };
+
   useEffect(() => {
     const guard = async () => {
       const currentUser = getCurrentUser();
@@ -764,6 +820,21 @@ export default function BillingPage() {
                             )}
                           </div>
                           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            {inv.status !== 'paid' && inv.status !== 'void' && (
+                              <button
+                                type="button"
+                                onClick={() => openMarkPaidModal(inv)}
+                                className="
+                                  inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all
+                                  bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100
+                                  dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30 dark:hover:bg-emerald-500/25
+                                "
+                                title="Mark Paid"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Mark Paid</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => viewInvoice(inv.id)}
@@ -1202,6 +1273,118 @@ export default function BillingPage() {
                     <p className="text-sm text-slate-700 dark:text-white/80 whitespace-pre-line">{selectedInvoice.notes}</p>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mark Paid Modal */}
+        {markPaidInvoice && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+            <div className="
+              w-full max-w-md rounded-2xl shadow-2xl ring-1
+              bg-white ring-slate-200
+              dark:bg-[#120826] dark:ring-white/10
+            ">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-white/10">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Mark as Paid</h3>
+                    <p className="text-xs text-slate-500 dark:text-white/60">{markPaidInvoice.invoice_number} · {markPaidInvoice.customer_name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeMarkPaidModal}
+                  className="
+                    p-1.5 rounded-lg transition-colors
+                    hover:bg-slate-100 text-slate-500
+                    dark:hover:bg-white/10 dark:text-white/70
+                  "
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                {markPaidError && (
+                  <div className="
+                    p-3 rounded-lg flex items-center gap-2 text-sm
+                    bg-rose-50 ring-1 ring-rose-200 text-rose-700
+                    dark:bg-rose-500/10 dark:ring-rose-400/30 dark:text-rose-200
+                  ">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{markPaidError}</span>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider mb-1.5">
+                    Amount paid
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="w-4 h-4 text-slate-400 dark:text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={markPaidAmount}
+                      onChange={(e) => setMarkPaidAmount(e.target.value)}
+                      className="
+                        w-full pl-9 pr-3 py-2 rounded-lg text-sm transition-all tabular-nums
+                        bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400
+                        focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200
+                        dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/40
+                        dark:focus:border-emerald-400 dark:focus:ring-emerald-500/30
+                      "
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-500 dark:text-white/50">
+                    Invoice total: ${Number(markPaidInvoice.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider mb-1.5">
+                    Date paid
+                  </label>
+                  <input
+                    type="date"
+                    value={markPaidDate}
+                    onChange={(e) => setMarkPaidDate(e.target.value)}
+                    className="
+                      w-full px-3 py-2 rounded-lg text-sm transition-all
+                      bg-white border border-slate-200 text-slate-900
+                      focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200
+                      dark:bg-white/5 dark:border-white/10 dark:text-white
+                      dark:focus:border-emerald-400 dark:focus:ring-emerald-500/30
+                    "
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-200 dark:border-white/10">
+                <button
+                  onClick={closeMarkPaidModal}
+                  disabled={markPaidSaving}
+                  className="
+                    px-3 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50
+                    bg-slate-100 text-slate-700 hover:bg-slate-200
+                    dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10
+                  "
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitMarkPaid}
+                  disabled={markPaidSaving}
+                  className="
+                    inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50
+                    bg-gradient-to-r from-emerald-500 to-teal-500 text-white
+                    shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30
+                  "
+                >
+                  {markPaidSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Save
+                </button>
               </div>
             </div>
           </div>
