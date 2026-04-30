@@ -33,6 +33,29 @@ export async function POST(request: NextRequest) {
 
     const tenantId = await getTenantId(auth.userId);
 
+    // Reject creation when no tenant scope can be resolved. Super_admin must
+    // pass ?tenantId=<uuid> to create on behalf of a specific tenant; everyone
+    // else's tenant comes from their profile.
+    if (!tenantId) {
+      const queryTenantId =
+        auth.role === 'super_admin'
+          ? request.nextUrl.searchParams.get('tenantId')
+          : null;
+      if (!queryTenantId) {
+        return NextResponse.json(
+          {
+            error:
+              auth.role === 'super_admin'
+                ? 'super_admin must pass ?tenantId=<uuid> to create a job'
+                : 'No tenant scope on profile — contact admin',
+          },
+          { status: 400 }
+        );
+      }
+    }
+    const resolvedTenantId =
+      tenantId ?? request.nextUrl.searchParams.get('tenantId');
+
     const body = await request.json();
 
     // Validate required fields
@@ -111,7 +134,7 @@ export async function POST(request: NextRequest) {
       jobsite_conditions: body.jobsite_conditions || {},
 
       // ── Tenant ────────────────────────────────────────────
-      tenant_id: tenantId || null,
+      tenant_id: resolvedTenantId,
     };
 
     // Insert job order

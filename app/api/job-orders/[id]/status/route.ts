@@ -42,14 +42,29 @@ async function updateJobStatus(
     const body = await request.json();
     const { status, latitude, longitude, accuracy, departure_time, ...additionalFields } = body;
 
-    // Validate status
-    const validStatuses = ['scheduled', 'assigned', 'in_route', 'on_site', 'in_progress', 'completed', 'cancelled'];
+    // Validate status value is in the recognized set
+    const validStatuses = ['scheduled', 'assigned', 'in_route', 'on_site', 'in_progress', 'completed', 'cancelled', 'archived'];
     if (!status || !validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
         { status: 400 }
       );
     }
+
+    // Legal status transitions — operators may only walk forward through the
+    // pipeline. Cancellation/archival are admin-only (enforced after we
+    // resolve the user's role below).
+    const LEGAL_TRANSITIONS: Record<string, string[]> = {
+      pending_approval: ['scheduled', 'cancelled'],
+      scheduled: ['assigned', 'in_route', 'cancelled'],
+      assigned: ['in_route', 'scheduled', 'cancelled'],
+      in_route: ['on_site', 'in_progress', 'cancelled'],
+      on_site: ['in_progress', 'cancelled'],
+      in_progress: ['completed', 'cancelled'],
+      completed: ['archived'],
+      cancelled: [],
+      archived: [],
+    };
 
     // Resolve tenant scope — supabaseAdmin bypasses RLS, must scope manually
     const tenantId = await getTenantId(user.id);
@@ -78,11 +93,31 @@ async function updateJobStatus(
 
     // Check permissions: operator/helper can update their own jobs, admin roles can update any
     const adminRoles = ['admin', 'super_admin', 'operations_manager'];
+    const isAdmin = adminRoles.includes(profile?.role || '');
     const isAssignedOperator = existingJob.assigned_to === user.id;
     const isAssignedHelper = existingJob.helper_assigned_to === user.id;
-    if (!adminRoles.includes(profile?.role || '') && !isAssignedOperator && !isAssignedHelper) {
+    if (!isAdmin && !isAssignedOperator && !isAssignedHelper) {
       return NextResponse.json(
         { error: 'You can only update jobs assigned to you' },
+        { status: 403 }
+      );
+    }
+
+    // Enforce legal status transition. Operators must walk the pipeline
+    // forward; only admins may cancel or archive.
+    const currentStatus: string = existingJob.status ?? 'scheduled';
+    const allowedNext = LEGAL_TRANSITIONS[currentStatus] ?? [];
+    if (currentStatus !== status && !allowedNext.includes(status)) {
+      return NextResponse.json(
+        {
+          error: `Illegal status transition: ${currentStatus} → ${status}. Allowed next states: ${allowedNext.join(', ') || '(none)'}`,
+        },
+        { status: 400 }
+      );
+    }
+    if ((status === 'cancelled' || status === 'archived') && !isAdmin) {
+      return NextResponse.json(
+        { error: `Only admins may set status='${status}'` },
         { status: 403 }
       );
     }

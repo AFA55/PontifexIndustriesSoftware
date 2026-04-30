@@ -192,8 +192,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Resolve tenant scope — REQUIRED for supabaseAdmin (service role bypasses RLS)
-    const tenantIdPost = await getTenantId(user.id);
+    // Resolve tenant scope — REQUIRED for supabaseAdmin (service role bypasses RLS).
+    // Reject creation when no tenant can be resolved (orphaned-row hazard).
+    const tenantIdPost =
+      (await getTenantId(user.id)) ?? request.nextUrl.searchParams.get('tenantId');
+    if (!tenantIdPost) {
+      return NextResponse.json(
+        { error: 'Tenant scope required. super_admin must pass ?tenantId=<uuid>.' },
+        { status: 400 }
+      );
+    }
 
     // Prepare job order data
     const jobOrderData: any = {
@@ -222,7 +230,7 @@ export async function POST(request: NextRequest) {
       po_number: body.po_number,
       customer_job_number: body.customer_job_number,
       created_by: user.id,
-      tenant_id: tenantIdPost || undefined,
+      tenant_id: tenantIdPost,
     };
 
     // Set assigned_at if assigning to operator

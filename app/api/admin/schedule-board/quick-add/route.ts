@@ -37,6 +37,18 @@ export async function POST(request: NextRequest) {
     const endDate: string | null = end_date || start_date;
     const jobType = Array.isArray(jobTypes) ? jobTypes.join(', ') : (jobTypes as string);
 
+    // Resolve tenant scope BEFORE insert. Legacy quick-add wasn't writing
+    // tenant_id at all, leaving rows orphaned and invisible to tenant-scoped
+    // reads. Reject if no tenant can be determined.
+    const resolvedTenantId =
+      auth.tenantId ?? request.nextUrl.searchParams.get('tenantId');
+    if (!resolvedTenantId) {
+      return NextResponse.json(
+        { error: 'Tenant scope required. super_admin must pass ?tenantId=<uuid>.' },
+        { status: 400 }
+      );
+    }
+
     const jobNumber = `QA-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
     const jobOrderData: Record<string, any> = {
@@ -60,6 +72,7 @@ export async function POST(request: NextRequest) {
       created_via: 'quick_add',
       missing_info_items: ['equipment_needed', 'jobsite_conditions', 'permits', 'full_scope'],
       missing_info_note: 'Created via Quick Add — please complete the full Schedule Form.',
+      tenant_id: resolvedTenantId,
     };
 
     const { data: jobOrder, error: insertError } = await supabaseAdmin

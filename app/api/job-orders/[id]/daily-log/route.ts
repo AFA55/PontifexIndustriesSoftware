@@ -100,11 +100,42 @@ export async function POST(
     const now = new Date().toISOString();
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-    // Calculate hours worked today
-    const routeStarted = job.route_started_at ? new Date(job.route_started_at) : null;
-    const workStarted = job.work_started_at ? new Date(job.work_started_at) : null;
-    const startTime = workStarted || routeStarted;
-    const hoursWorked = startTime ? (new Date().getTime() - startTime.getTime()) / (1000 * 60 * 60) : 0;
+    // Calculate hours worked today.
+    // Prefer the operator's timecard for the day (clock_in / clock_out / total_hours)
+    // because it accounts for breaks/lunch. If no timecard exists yet (operator
+    // submitting day-complete before clocking out), fall back to wall-clock since
+    // work_started_at — flagged so admins know to verify.
+    let hoursWorked = 0;
+    let hoursSource: 'timecard' | 'wall_clock' = 'wall_clock';
+    try {
+      const { data: tc } = await supabaseAdmin
+        .from('timecards')
+        .select('clock_in_time, clock_out_time, total_hours')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .order('clock_in_time', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (tc?.total_hours != null) {
+        hoursWorked = Number(tc.total_hours);
+        hoursSource = 'timecard';
+      } else if (tc?.clock_in_time && tc?.clock_out_time) {
+        hoursWorked =
+          (new Date(tc.clock_out_time).getTime() - new Date(tc.clock_in_time).getTime()) /
+          3600000;
+        hoursSource = 'timecard';
+      }
+    } catch {
+      // fall through to wall-clock fallback
+    }
+    if (hoursSource !== 'timecard') {
+      const routeStarted = job.route_started_at ? new Date(job.route_started_at) : null;
+      const workStarted = job.work_started_at ? new Date(job.work_started_at) : null;
+      const startTime = workStarted || routeStarted;
+      hoursWorked = startTime
+        ? (new Date().getTime() - startTime.getTime()) / 3600000
+        : 0;
+    }
 
     // Create daily log entry — gracefully handle missing table
     let dailyLog = null;

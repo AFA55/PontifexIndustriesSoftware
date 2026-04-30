@@ -124,12 +124,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Double-check the tag is valid and active
-      const tagQuery = nfc_tag_id
-        ? supabaseAdmin.from('nfc_tags').select('id, tag_uid, is_active, label, tag_type').eq('id', nfc_tag_id).maybeSingle()
-        : supabaseAdmin.from('nfc_tags').select('id, tag_uid, is_active, label, tag_type').eq('tag_uid', nfc_tag_uid || nfc_tag_serial).maybeSingle();
-
-      const { data: tag } = await tagQuery;
+      // Double-check the tag is valid, active, AND belongs to the operator's tenant.
+      // Tenant scoping prevents an attacker from clocking in via another tenant's tag.
+      let tagBuilder = nfc_tag_id
+        ? supabaseAdmin.from('nfc_tags').select('id, tag_uid, is_active, label, tag_type, tenant_id').eq('id', nfc_tag_id)
+        : supabaseAdmin.from('nfc_tags').select('id, tag_uid, is_active, label, tag_type, tenant_id').eq('tag_uid', nfc_tag_uid || nfc_tag_serial);
+      if (auth.tenantId) tagBuilder = tagBuilder.eq('tenant_id', auth.tenantId);
+      const { data: tag } = await tagBuilder.maybeSingle();
 
       if (!tag || !tag.is_active) {
         return NextResponse.json(

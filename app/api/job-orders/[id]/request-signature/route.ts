@@ -88,6 +88,10 @@ export async function POST(
     // Generate unique token
     const token = crypto.randomUUID();
 
+    // Signature requests expire 7 days after creation. Public links beyond
+    // this window are rejected by the public sign endpoint.
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
     const { data, error } = await supabaseAdmin
       .from('signature_requests')
       .insert({
@@ -100,6 +104,7 @@ export async function POST(
         form_template_id: form_template_id || null,
         status: 'pending',
         sent_at: new Date().toISOString(),
+        expires_at: expiresAt,
         created_by: auth.userId,
       })
       .select()
@@ -110,10 +115,10 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to create signature request' }, { status: 500 });
     }
 
-    // Build the public signing URL
-    const baseUrl = request.headers.get('x-forwarded-host')
-      ? `https://${request.headers.get('x-forwarded-host')}`
-      : request.headers.get('origin') || 'http://localhost:3000';
+    // Build the public signing URL.
+    // Use server-trusted env first to prevent host-header injection. Fall back
+    // to the request's parsed origin (server-set, NOT a client-supplied header).
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
 
     const signUrl = `${baseUrl}/sign/${token}`;
 

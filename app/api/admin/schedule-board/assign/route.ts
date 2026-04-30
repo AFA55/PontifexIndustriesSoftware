@@ -75,11 +75,13 @@ export async function POST(request: NextRequest) {
       );
 
       // 3. Fetch job to decide whether to touch job_orders.assigned_to
-      const { data: job } = await supabaseAdmin
+      //    (tenant-scoped — prevents cross-tenant assignment via guessed UUID)
+      let jobLookup = supabaseAdmin
         .from('job_orders')
         .select('id, job_number, customer_name, assigned_to, helper_assigned_to, status, scheduled_date, end_date')
-        .eq('id', jobOrderId)
-        .single();
+        .eq('id', jobOrderId);
+      if (tenantId) jobLookup = jobLookup.eq('tenant_id', tenantId);
+      const { data: job } = await jobLookup.single();
 
       const isMultiDay =
         job?.end_date != null && job.end_date !== job?.scheduled_date;
