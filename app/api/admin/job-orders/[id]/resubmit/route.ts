@@ -32,12 +32,13 @@ export async function POST(
       return NextResponse.json({ error: 'form_data is required and must be an object' }, { status: 400 });
     }
 
-    // Fetch the job order
-    const { data: jobOrder, error: fetchError } = await supabaseAdmin
+    // Fetch the job order (tenant-scoped — defense against cross-tenant write)
+    let fetchQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (auth.tenantId) fetchQuery = fetchQuery.eq('tenant_id', auth.tenantId);
+    const { data: jobOrder, error: fetchError } = await fetchQuery.single();
 
     if (fetchError || !jobOrder) {
       return NextResponse.json({ error: 'Job order not found' }, { status: 404 });
@@ -93,12 +94,12 @@ export async function POST(
       updateFields.title = `${customerName} - ${jobType?.split(',')[0]?.trim() || 'Job'}`;
     }
 
-    const { data: updatedJob, error: updateError } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from('job_orders')
       .update(updateFields)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+    if (auth.tenantId) updateQuery = updateQuery.eq('tenant_id', auth.tenantId);
+    const { data: updatedJob, error: updateError } = await updateQuery.select().single();
 
     if (updateError) {
       console.error('Error resubmitting job order:', updateError);

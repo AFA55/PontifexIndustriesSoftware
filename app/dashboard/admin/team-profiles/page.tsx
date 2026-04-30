@@ -11,7 +11,7 @@ import {
   AlertTriangle, CheckCircle2, Mail, Phone, Calendar,
   Loader2, ChevronRight, Activity, Clock, UserCheck, Pencil,
   Wrench, Save, CheckCircle, Award, Truck,
-  Plus, Trash2, IdCard, ShieldCheck,
+  Plus, Trash2, IdCard, ShieldCheck, Percent,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
@@ -421,6 +421,180 @@ function ProfileInfoSection({
       <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(member.date_of_birth)} />
       {member.nickname && <InfoRow icon={User} label="Nickname" value={member.nickname} />}
       <EditableDateRow icon={Clock} label="Hire Date" value={member.hire_date} onSave={onSaveHireDate} />
+    </div>
+  );
+}
+
+// ─── Sales Settings (Default Commission Rate) ────────────────────────────────
+
+function SalesSettingsCard({
+  memberId,
+  getAuthHeaders,
+}: {
+  memberId: string;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [defaultRate, setDefaultRate] = useState<number | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: dbErr } = await supabase
+          .from('profiles')
+          .select('commission_rate_default')
+          .eq('id', memberId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (dbErr) {
+          setError('Could not load commission rate.');
+        } else {
+          setDefaultRate(
+            data?.commission_rate_default !== null && data?.commission_rate_default !== undefined
+              ? Number(data.commission_rate_default)
+              : null
+          );
+        }
+      } catch {
+        if (!cancelled) setError('Could not load commission rate.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [memberId]);
+
+  const startEdit = () => {
+    setInputVal(defaultRate !== null ? String(defaultRate) : '');
+    setError(null);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setInputVal('');
+    setError(null);
+  };
+
+  const save = async () => {
+    const trimmed = inputVal.trim();
+    const n = parseFloat(trimmed);
+    if (trimmed === '' || isNaN(n) || n < 0 || n > 100) {
+      setError('Enter a value between 0 and 100.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/profile/commission-rate-default?userId=${memberId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ commission_rate_default: n }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error || 'Failed to update commission rate.');
+        return;
+      }
+      setDefaultRate(n);
+      setEditing(false);
+      setInputVal('');
+    } catch {
+      setError('Network error updating commission rate.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+      <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+        <Percent className="w-3.5 h-3.5" />
+        Sales Settings
+      </h3>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Default Commission Rate</p>
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400 dark:text-slate-500" />
+          ) : editing ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={inputVal}
+                  onChange={(e) => setInputVal(e.target.value)}
+                  className="
+                    w-24 px-2 py-1.5 rounded-md text-sm tabular-nums
+                    bg-white border border-gray-300 text-gray-900
+                    focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                    dark:bg-slate-900 dark:border-slate-600 dark:text-white
+                    dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                  "
+                  autoFocus
+                />
+                <span className="text-sm text-gray-500 dark:text-slate-400">%</span>
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={saving}
+                  className="
+                    inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors disabled:opacity-50
+                    bg-violet-600 text-white hover:bg-violet-700
+                  "
+                >
+                  {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  disabled={saving}
+                  className="
+                    px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors disabled:opacity-50
+                    bg-gray-100 text-gray-700 hover:bg-gray-200
+                    dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600
+                  "
+                >
+                  Cancel
+                </button>
+              </div>
+              {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-base font-semibold text-gray-900 dark:text-white tabular-nums">
+                {defaultRate !== null ? `${defaultRate.toFixed(1)}%` : 'Not set'}
+              </span>
+              <button
+                type="button"
+                onClick={startEdit}
+                title="Edit default commission rate"
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500 hover:text-violet-500" />
+              </button>
+            </div>
+          )}
+          {!editing && error && (
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>
+          )}
+        </div>
+      </div>
+      <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-2 leading-snug">
+        Used as the fallback commission rate on jobs assigned to this user when no per-job rate is set.
+      </p>
     </div>
   );
 }
@@ -1559,6 +1733,7 @@ function MemberDetailPanel({
   const showSkillsTab = member.role === 'operator' || member.role === 'apprentice';
   const showCredentialsTab = member.role === 'operator' || member.role === 'apprentice';
   const showTabBar = showPermissionsTab || showSkillsTab || showCredentialsTab || showBadgesTab;
+  const showSalesSettings = ['salesman', 'admin', 'operations_manager', 'super_admin'].includes(member.role);
 
   const visibleTabs: DetailTab[] = [
     'info',
@@ -1638,6 +1813,11 @@ function MemberDetailPanel({
             {/* Skill Snapshot — operators/apprentices only */}
             {showSkillsTab && (
               <SkillSnapshotCard memberId={member.id} getAuthHeaders={getAuthHeaders} />
+            )}
+
+            {/* Sales Settings — salesman / admin / operations_manager / super_admin */}
+            {showSalesSettings && (
+              <SalesSettingsCard memberId={member.id} getAuthHeaders={getAuthHeaders} />
             )}
 
             {/* Quick Actions */}

@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -31,12 +32,14 @@ export async function POST(
       );
     }
 
-    // Verify job exists
-    const { data: job, error: jobError } = await supabaseAdmin
+    // Verify job exists (tenant-scoped to prevent cross-tenant write)
+    const callerTenantId = await getTenantId(auth.userId);
+    let jobQuery = supabaseAdmin
       .from('job_orders')
-      .select('id, assigned_to, helper_assigned_to, status')
-      .eq('id', jobId)
-      .single();
+      .select('id, assigned_to, helper_assigned_to, status, tenant_id')
+      .eq('id', jobId);
+    if (callerTenantId) jobQuery = jobQuery.eq('tenant_id', callerTenantId);
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
@@ -146,10 +149,14 @@ export async function POST(
       }
     }
 
-    await supabaseAdmin
-      .from('job_orders')
-      .update({ work_performed: workSummary })
-      .eq('id', jobId);
+    {
+      let summaryUpdate = supabaseAdmin
+        .from('job_orders')
+        .update({ work_performed: workSummary })
+        .eq('id', jobId);
+      if (callerTenantId) summaryUpdate = summaryUpdate.eq('tenant_id', callerTenantId);
+      await summaryUpdate;
+    }
 
     // ── Notify tenant admins (fire-and-forget) ────────────────────────────────
     // Operator just logged work performed — admins should see this in real time.

@@ -57,7 +57,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
         require_waiver_signature,
         utility_waiver_signed,
         utility_waiver_signer_name,
-        utility_waiver_signed_at
+        utility_waiver_signed_at,
+        commission_rate
       `)
       .eq('id', jobId);
     if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
@@ -275,6 +276,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           completion_approved_at: null,
           completion_rejected_at: (job as any).rejected_at ?? null,
           completion_rejection_notes: (job as any).rejection_notes ?? (job as any).rejection_reason ?? null,
+          commission_rate: (job as any).commission_rate ?? null,
         },
         scope: {
           items: enrichedScopeItems,

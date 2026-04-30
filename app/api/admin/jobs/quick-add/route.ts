@@ -37,6 +37,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Scheduled date is required' }, { status: 400 });
     }
 
+    // Resolve tenant scope before insert (orphan-row guard)
+    const resolvedTenantId =
+      auth.tenantId ?? request.nextUrl.searchParams.get('tenantId');
+    if (!resolvedTenantId) {
+      return NextResponse.json(
+        { error: 'Tenant scope required. super_admin must pass ?tenantId=<uuid>.' },
+        { status: 400 }
+      );
+    }
+
     // Generate job number with QA prefix (Quick Add)
     const jobNumber = `QA-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -57,7 +67,7 @@ export async function POST(request: NextRequest) {
       notes: notes?.trim() || null,
       missing_info_items: ['equipment_needed', 'jobsite_conditions', 'permits', 'full_scope'],
       missing_info_note: 'Created via Quick Add — please complete the full Schedule Form.',
-      tenant_id: auth.tenantId || null,
+      tenant_id: resolvedTenantId,
     };
 
     const { data: jobOrder, error: insertError } = await supabaseAdmin

@@ -129,7 +129,21 @@ export async function POST(
 
     // Fire-and-forget: send payment receipt email when fully paid
     if (fullyPaid && invoice.customer_email) {
-      const fromAddress = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@resend.dev>';
+      // Resolve sender + signoff line from tenant_branding so the email is
+      // white-labeled per tenant. Fall back to env var, then to a generic name.
+      let companyName = 'Your Service Provider';
+      try {
+        const { data: branding } = await supabaseAdmin
+          .from('tenant_branding')
+          .select('company_name')
+          .eq('tenant_id', invoice.tenant_id)
+          .maybeSingle();
+        if (branding?.company_name) companyName = branding.company_name;
+      } catch {
+        // ignore — keep generic fallback
+      }
+      const fromAddress =
+        process.env.RESEND_FROM_EMAIL || `${companyName} <noreply@resend.dev>`;
       const fmt$ = (n: number) =>
         new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
       const resend = new Resend(process.env.RESEND_API_KEY);
@@ -156,7 +170,7 @@ export async function POST(
                     <tr><td style="padding: 4px 0; color: #64748b;">Remaining Balance</td><td style="padding: 4px 0; text-align: right; font-weight: bold; color: #059669;">$0.00 — Paid in Full</td></tr>
                   </table>
                 </div>
-                <p style="margin: 0; color: #64748b; font-size: 13px;">Thank you for choosing Patriot Concrete Cutting. We look forward to working with you again.</p>
+                <p style="margin: 0; color: #64748b; font-size: 13px;">Thank you for choosing ${companyName}. We look forward to working with you again.</p>
               </div>
             </div>
           `,
