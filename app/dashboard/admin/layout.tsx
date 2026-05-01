@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, Plus } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
@@ -125,14 +126,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* + New Job */}
-            <button
-              onClick={() => router.push('/dashboard/admin/schedule-form')}
+            {/* + New Job — Link prefetches the schedule-form chunk on hover/viewport
+                so the click feels instant instead of waiting for the JS to load. */}
+            <Link
+              href="/dashboard/admin/schedule-form"
+              prefetch
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all shadow-sm"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">New Job</span>
-            </button>
+            </Link>
 
             {/* Notification bell — light variant for white header */}
             <NotificationBell variant="light" />

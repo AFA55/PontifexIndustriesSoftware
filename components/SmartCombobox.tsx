@@ -290,7 +290,7 @@ export default function SmartCombobox({
             const isSelected = option.value === value;
             return (
               <li
-                key={option.value}
+                key={`${option.value}-${idx}`}
                 role="option"
                 aria-selected={isSelected}
                 className={[

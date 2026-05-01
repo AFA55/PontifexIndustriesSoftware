@@ -77,7 +77,13 @@ export async function POST(request: NextRequest) {
       // ── Auto-generated ──────────────────────────────────────
       job_number: jobNumber,
       title: `${body.customer_name} - ${body.job_type?.split(',')[0]?.trim() || 'Job'}`,
-      status: 'pending_approval', // All submissions require super_admin review before going on the board
+      // super_admin (and operations_manager) own the schedule and skip the
+      // approval gate; everyone else's submissions go to pending_approval for
+      // an admin to review before they hit the board.
+      status:
+        auth.role === 'super_admin' || auth.role === 'operations_manager'
+          ? 'scheduled'
+          : 'pending_approval',
       priority: 'medium',
       created_by: auth.userId,
       created_via: 'schedule_form',

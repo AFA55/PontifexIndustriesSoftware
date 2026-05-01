@@ -1,5 +1,39 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 30, 2026 | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~40 commits | **Build Status:** PASSING ✅ (0 errors, 9.7s)
+**Date:** April 30, 2026 (LATE SESSION) | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~50 commits | **Build Status:** PASSING ✅ (0 errors, 9.2s) | **DB:** WIPED — clean slate, Patriot Test GC customer preserved
+
+---
+
+## APRIL 30, 2026 (LATE SESSION) — Sales Polish + Workflow Audit + 9 Security Fixes + DB Reset
+
+### What shipped
+- **Track A** — Salesman dashboard tiles trimmed 4→3 (Active / Quoted MTD / Expected Commission). "Showing your jobs only" hint.
+- **Track B** — Admin "Mark Paid" button + modal on billing list. Commission rate inline editor on job detail. Default rate input on team-profiles.
+- **Track C** — End-to-end workflow + security audit doc: [WORKFLOW_AUDIT.md](WORKFLOW_AUDIT.md) (378 lines). 9 critical, 14 important, 7 polish.
+- **Track D** — 9 critical security/correctness fixes (Track D agent stalled mid-task; completed manually):
+  1. Tenant filter on `/api/admin/job-orders/[id]/resubmit`
+  2. Tenant filter on `/api/job-orders/[id]/work-items`
+  3. Tenant filter on `/api/admin/schedule-board/assign` multi-day SELECT
+  4. Tenant filter on `/api/timecard/clock-in` NFC tag lookup
+  5. Status state machine — `LEGAL_TRANSITIONS` map; `cancelled`/`archived` admin-only
+  6. Signature `expires_at = NOW() + 7 days`; URL from `NEXT_PUBLIC_APP_URL` || `request.nextUrl.origin` (no host-header injection)
+  7. `daily_log.hours_worked` reads from `timecards.total_hours` first
+  8. Payment receipt sender uses `tenant_branding.company_name`
+  9. Reject `tenant_id=null` on 4 creation paths (legacy quick-add wasn't writing tenant_id at all)
+
+### Database wiped to clean slate
+Executed via Supabase MCP. All 35+ transactional tables zeroed: `job_orders`, `invoices`, `invoice_line_items`, `payments`, `timecards`, `daily_job_logs`, `job_progress_entries`, `job_scope_items`, `job_completion_requests`, `job_notes`, `standby_logs`, `work_items`, `notifications`, `audit_logs`, `operator_time_off`, `change_orders`, `signature_requests`, `schedule_change_requests`, etc.
+
+**Preserved**: `tenants` (1), `tenant_branding` (1), `profiles` (8), `operator_badges`, NFC tags, schedule contacts, role permissions, feature flags. **Seed**: Patriot Test GC customer (id `a2cb81e6-790a-48f1-aba6-ac979c29de96`). `operator_pto_balance` zeroed.
+
+### Pending follow-ups (deferred — see WORKFLOW_AUDIT.md)
+- Audit log on status transitions, work-items, daily-log, completion-request, invoice create/send/void/PATCH, signature submission
+- Wrap `work_items` delete-then-insert in transaction or UPSERT
+- Optimistic concurrency on payment recording
+- DB-level `tenant_id NOT NULL` migration (API-level guards in place; DB constraint is a future migration)
+- IP rate limit on public signature endpoint
+- Drop `'supervisor'` from inline admin role lists
+
+---
 
 ---
 
