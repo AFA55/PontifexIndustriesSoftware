@@ -1,5 +1,73 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 1, 2026 (DEMO-DAY SESSION — IN PROGRESS) | **Branch:** `claude/nice-borg-4ffe67` (pushed to origin) → merged to local `main` (68 commits ahead of origin/main) | **Build Status:** PASSING ✅ | **DB:** Migration `20260501_customer_survey_v2` applied to live DB
+**Date:** May 1, 2026 (DEMO-DAY SESSION — IN PROGRESS) | **Branch:** `claude/nice-borg-4ffe67` (pushed to origin) → merged to local `main` (~72 commits ahead of origin/main) | **Build Status:** PASSING ✅ | **DB:** Migrations `20260501_customer_survey_v2` and `20260501_notifications_invoice_metadata_idx` applied
+
+---
+
+## MAY 1, 2026 (PT 3) — Invoice Review Modal + RBAC + Salesperson Notifications + Completed-Jobs Polish
+
+User request: hone the post-completion side. Five tasks bundled, dispatched 3 parallel agents in isolated worktrees, audited each diff, manually merged.
+
+### What shipped
+
+**Hydration fix on billing page**
+- Outer invoice card was a `<button>` with inner action buttons (Mark Paid / View / Download). React 19 hydration error. Converted outer to `<div role="button">` with `tabIndex={0}` + `onKeyDown` for Enter/Space. Inner action buttons now sit cleanly inside.
+
+**A — Completed Jobs detail polish** (Agent D — `app/dashboard/admin/completed-jobs/page.tsx`)
+- View + Download buttons added to the Service Completion Signature block when `job_orders.completion_pdf_url` is set. Falls back to muted "PDF not available" when missing.
+- New Completion Photos panel (responsive 2/3/4-col grid of operator-uploaded photos from `photo_urls`, hover ring + scale + count badge).
+- Operator + Helper rows now include "View timecard →" links (`/dashboard/admin/timecards/operator/{id}`). Helper name fetched in `loadJobDetails`. Both rows colored chips (violet for operator, indigo for helper).
+- 4 metric tiles upgraded from soft tints to vibrant gradients with white text + colored shadow rings: violet→indigo (Days Worked), cyan→sky (Total Hours), amber→orange (Standby Time), emerald→teal (Labor Cost).
+- Documents and Operator Notes panels gained matching gradient accent stripes.
+
+**B — Invoice Review & Confirm flow + RBAC** (Agent E)
+- New API `app/api/admin/invoices/preview/route.ts` — POST `{ jobOrderId }` returns `{ job, operator_name, work_performed_summary, line_items, subtotal, default_due_date, default_po_number, default_notes }`. Mirrors the line-item builder from the create route without inserting. `work_performed_summary` is bullet-text built from `work_items` rows (truncated to ~120 chars per line, indented notes appended).
+- `app/api/admin/invoices/route.ts` POST extended with optional `description_override` (string) and `line_items_override` (validated array). When override provided, replaces auto-built items + recomputes subtotal. Backwards-compatible.
+- `app/dashboard/admin/billing/page.tsx`:
+  - "Create Invoice" buttons on Ready-to-Bill cards now open a "Review & Confirm Invoice" modal (max-w-2xl, mobile-friendly, sticky header/footer, scrollable body).
+  - Modal shows: customer/job/billing-type/due-date grid, "Work Performed by Operator (X)" panel rendering `work_performed_summary` in mono `whitespace-pre-wrap`, editable line-items table (qty/unit/rate inline number+text inputs, per-row "Edit Description" textarea toggle), live subtotal recompute on edits, "Use Operator's Description" button (copies summary into first line item), Cancel + Submit Invoice actions.
+  - On submit POSTs `/api/admin/invoices` with `{ jobOrderId, line_items_override }`. Switches to All Invoices tab + success toast.
+- **RBAC**: `salesman` role added to `allowedRoles` page guard. Server-side filter on GET `/api/admin/invoices` (`.eq('created_by', auth.userId)` when `auth.role === 'salesman'`). Server-side guard on `/api/admin/invoices/preview` (404 if salesman doesn't own the job). Client-side filter on Ready-to-Bill query for salesman. Admin/super_admin/operations_manager unchanged.
+- "Submitted by: {name}" chips added to invoice cards and ready-to-bill cards. Bulk profile lookup cached in `profilesById` state on data load.
+
+**C — Salesperson notifications + 30-day unpaid reminder** (Agent F)
+- New `lib/notify-salesperson.ts` — fire-and-forget helper exporting `notifySalesperson({ event, jobOrderId?, invoiceId?, recipientUserId, tenantId?, subjectName?, customerName? })`. Inserts into `public.notifications` (sender_id null = system event) and best-effort emails the user via `auth.users.email` lookup + `lib/email.ts`. Five events:
+  - `job_active` — job → `in_progress`
+  - `job_completed` — job → `completed`
+  - `invoice_ready` — invoice created from completed job
+  - `invoice_paid` — invoice → `paid`
+  - `invoice_unpaid_30d` — 30-day reminder
+- Triggered from:
+  - `app/api/job-orders/[id]/status/route.ts` — fires `job_active` / `job_completed` to job's `created_by` on transition.
+  - `app/api/admin/invoices/route.ts` POST — fires `invoice_ready` to job's `created_by` (the salesperson who scheduled the work, not whoever created the invoice).
+  - `app/api/admin/invoices/[id]/mark-paid/route.ts` PATCH — fires `invoice_paid` via `invoice_line_items.job_order_id → job.created_by`, falls back to `invoices.created_by`.
+- New cron route `app/api/cron/invoice-30d-reminders/route.ts` — auth via `Authorization: Bearer ${CRON_SECRET}` env (falls back to `requireAdmin` for manual testing). Scans `invoices` where `status IN ('sent','overdue','partial')` AND `balance_due > 0` AND `invoice_date <= NOW() - 30 days`. Dedupes on 7-day window via `metadata->>invoiceId`. Fires `invoice_unpaid_30d` for each.
+- New migration `supabase/migrations/20260501_notifications_invoice_metadata_idx.sql` — partial index `idx_notifications_invoice_unpaid_30d` on `(user_id, type, created_at DESC)` filtered to `type = 'invoice_unpaid_30d'` for fast dedupe. **Applied via MCP**.
+
+**D — Analytics YTD revenue (no work needed)**
+- `/api/admin/analytics` already filters invoices by `status === 'paid'` and sums `total_amount` for `revenueYTD`. Dashboard reads this on every load → auto-updates as soon as Mark Paid succeeds. Verified, no changes required.
+
+### Merge ordering + manual conflict resolution
+- Agent D: clean patch apply.
+- Agent F: applied edits + lib + cron + migration cleanly. The agent's worktree was based on `main` and didn't see the existing PATCH `mark-paid` route, so it created a parallel POST handler instead. **Skipped** that file; manually inserted `invoice_paid` notification logic into the existing PATCH handler (line_items lookup → job.created_by → notifySalesperson, fire-and-forget).
+- Agent E: 7 of 8 hunks on billing page applied via `git apply`; the auth-guard hunk failed due to overlap with my hydration-fix line numbers. **Manually added** `salesman` to `allowedRoles` and the new state hooks (`profilesById`, `reviewJobId`, `reviewLoading`, `reviewError`, `reviewData`, `editLineItems`, `editingDescIdx`, `submittingReview`). Build then passed.
+
+### Verification
+- `npm run build` PASS (0 errors). New routes in manifest: `/api/admin/invoices/preview`, `/api/cron/invoice-30d-reminders`.
+- Migration applied + verified live.
+- Pre-commit type-check passed.
+
+### Commits on `main` (LOCAL — pushed to origin/claude/nice-borg-4ffe67, NOT to origin/main)
+```
+1a0c04a2  feat: invoice review modal + RBAC + salesperson notifications + completed-jobs polish
+3e80a747  feat: customer survey + admin photos + vibrant CTAs + PDF email
+```
+
+### Pending follow-ups for next session
+- Test the salesman RBAC flow with a real salesman-role user — confirm they see only own invoices/jobs.
+- Wire the cron route to a real scheduler (Vercel Cron / GH Action) — currently manual-trigger only.
+- Consider adding `invoice_paid` notification to the existing `/api/admin/invoices/[id]/payment/route.ts` (the payment-ledger handler) and `/api/admin/invoices/[id]/route.ts` PATCH for completeness — currently only the lightweight Mark Paid PATCH dispatches.
+- The Review & Confirm modal currently doesn't surface `survey` data, photos, or scope_details. If invoice description should be auto-populated from richer sources, extend `work_performed_summary` builder.
+- Add a "View Invoice" or "Edit Invoice" page route (currently invoice details are loaded into a modal in `viewInvoice` — fine for now, but admins might want a full page).
 
 ---
 
