@@ -117,8 +117,8 @@ function AgreementModal({
 
         <div className="space-y-4 mb-6">
           {[
-            '30-day trial at $1,647 — 100% refundable, no questions asked.',
-            'If you decide to continue: $2,000 for 6 months. Your $1,647 trial payment is credited, so you owe $686 to lock in the full term ($353 + $333 one-time onboarding fee).',
+            '30-day trial at $3,747 — 100% refundable, no questions asked.',
+            'If you decide to continue: $2,000 for 6 months. Your $3,747 trial payment is credited in full toward the next 6 months — you only owe the $333 one-time onboarding fee to lock it in.',
             'After the 6-month term, pricing adjusts monthly based on your actual team size.',
             'All your data is yours. Exportable at any time. No lock-in.',
             'Cancel with 30 days notice after the 6-month term ends.',
@@ -221,7 +221,7 @@ function CTAButton({
           </>
         ) : (
           <>
-            Claim Your Offer — $1,647
+            Claim Your Offer — $3,747
             <ArrowRight className="w-5 h-5" />
           </>
         )}
@@ -253,7 +253,7 @@ const comparisonRows = [
     label: 'Total — year one',
     dsm: '$6,396+',
     cenpoint: '$7,300+',
-    pontifex: '~$3,600',
+    pontifex: '~$4,080',
     pontifexHighlight: true,
     bold: true,
   },
@@ -433,7 +433,7 @@ const faqs = [
   },
   {
     q: 'How does the money-back guarantee work?',
-    a: 'If after 30 days you don\'t think it\'s worth every penny — just tell me. I\'ll process 100% of the $1,647 refund with no questions, no contracts, and no hard feelings. The risk is entirely on me.',
+    a: 'If after 30 days you don\'t think it\'s worth every penny — just tell me. I\'ll process 100% of the $3,747 refund with no questions, no contracts, and no hard feelings. The risk is entirely on me.',
   },
 ];
 
@@ -711,9 +711,9 @@ export default function OfferPage() {
               <p className="text-zinc-300 text-sm leading-relaxed">
                 <span className="text-white font-semibold">$2,000 for 6 months</span>{' '}
                 ($333.34/month) for your entire crew — operators and helpers included.
-                Your $1,647 trial payment is credited, so you only owe{' '}
-                <span className="text-violet-300 font-bold">$686 to lock in the full term</span>{' '}
-                ($353 + $333 one-time onboarding fee). After 6 months, pricing adjusts to your exact team size.
+                Your $3,747 trial payment is credited in full toward the next 6 months, so you only owe{' '}
+                <span className="text-violet-300 font-bold">$333 to lock in the full term</span>{' '}
+                (one-time onboarding fee). After 6 months, pricing adjusts to your exact team size.
               </p>
             </div>
           </div>
@@ -772,13 +772,13 @@ export default function OfferPage() {
             </p>
             <p className="text-3xl md:text-4xl font-black text-white mb-1">
               Your 30-day trial:{' '}
-              <span className="text-violet-400">$1,647</span>
+              <span className="text-violet-400">$3,747</span>
             </p>
             <p className="text-zinc-400 text-sm mb-1">
-              If you continue: $2,000 for 6 months ($333.34/month) — your $1,647 is credited.
+              If you continue: $2,000 for 6 months ($333.34/month) — your $3,747 is credited.
             </p>
             <p className="text-zinc-500 text-xs mb-6">
-              You only owe $686 to lock in the full 6-month term ($353 + $333 one-time onboarding). Still less than DSM&apos;s sign-on fee alone.
+              You only owe $333 to lock in the full 6-month term (one-time onboarding). Less than 1/6 of what DSM charges just to sign.
             </p>
             <CTAButton size="lg" />
           </div>
@@ -831,48 +831,138 @@ export default function OfferPage() {
       {/* ─── WHY THIS PRICE ─── */}
       <Section className="bg-zinc-950/50 border-y border-white/[0.04]">
         <Reveal>
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             <div className="text-center mb-10">
               <div className="inline-flex items-center gap-2 text-violet-400 text-sm font-semibold uppercase tracking-wider mb-4">
                 <Phone className="w-4 h-4" />
-                A Personal Note
+                Why $3,747?
               </div>
               <h2 className="text-4xl md:text-5xl font-black text-white mb-4">
-                Why this price?
+                Add up what you&apos;re losing right now.
               </h2>
+              <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+                $3,747 isn&apos;t a software fee. It&apos;s a fraction of what one year of the status quo costs you in invisible bleed.
+              </p>
             </div>
 
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 md:p-10">
-              <div className="flex items-center gap-4 mb-8 pb-8 border-b border-white/[0.06]">
-                <div className="w-14 h-14 rounded-full bg-violet-500/20 border border-violet-500/40 flex items-center justify-center flex-shrink-0">
-                  <span className="text-2xl font-black text-violet-300">A</span>
+            {/* ── Itemized cost breakdown ── */}
+            <div className="grid md:grid-cols-2 gap-4 mb-10">
+              {/* 1. Custom dev */}
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 hover:border-violet-500/30 transition-colors">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs text-violet-400 font-bold uppercase tracking-wider">1 · Custom software</p>
+                  <p className="text-xl font-black text-zinc-300">$30k–$100k+</p>
+                </div>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  Hiring a developer to build a platform shaped around concrete cutting ops costs $150–$250/hr. A real custom build runs <span className="text-white font-semibold">$30k to $100k+</span>. Off-the-shelf tools (DSM, Cenpoint) ignore 80% of how you actually work. You&apos;re getting the custom build for the price of a small fraction.
+                </p>
+              </div>
+
+              {/* 2. Cost of not upgrading */}
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 hover:border-violet-500/30 transition-colors">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs text-violet-400 font-bold uppercase tracking-wider">2 · Status quo cost</p>
+                  <p className="text-xl font-black text-zinc-300">Compounds monthly</p>
+                </div>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  Every month you stay on paper, spreadsheets, or generic tools is another month of buried problems — late billing, dropped follow-ups, missing photos, lost change-order context. Doesn&apos;t show up on a P&amp;L line, but it&apos;s real cash.
+                </p>
+              </div>
+
+              {/* 3. Inaccurate time tracking */}
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 hover:border-violet-500/30 transition-colors">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs text-violet-400 font-bold uppercase tracking-wider">3 · Phantom time</p>
+                  <p className="text-xl font-black text-rose-400">~$13,680/yr</p>
+                </div>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  Operators write down &ldquo;arrived at 8&rdquo; — they actually arrived at 8:23. Multiply <span className="text-white font-semibold">23 min × 4 days/week × 50 weeks × 4 crew × $45/hr loaded cost</span> = <span className="text-rose-300 font-semibold">$13,680/year</span> billed to you for hours nobody worked. Pontifex&apos;s 20-ft GPS clock-in eliminates it on day one.
+                </p>
+              </div>
+
+              {/* 4. Admin manual entry */}
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 hover:border-violet-500/30 transition-colors">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs text-violet-400 font-bold uppercase tracking-wider">4 · Admin retyping</p>
+                  <p className="text-xl font-black text-rose-400">~$7,500/yr</p>
+                </div>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  Office admin spends <span className="text-white font-semibold">30–60 min/day</span> chasing texts, photos, paper sheets, and manually retyping operator hours into payroll. At $25/hr loaded, that&apos;s <span className="text-rose-300 font-semibold">$7,500/year</span> just to keep up. Pontifex auto-flows clock-in straight to timecards — your admin sees, edits, approves. Done.
+                </p>
+              </div>
+
+              {/* 5. Inefficiency on completion + invoicing */}
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 hover:border-violet-500/30 transition-colors md:col-span-2">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs text-violet-400 font-bold uppercase tracking-wider">5 · Slow billing &amp; lost follow-up</p>
+                  <p className="text-xl font-black text-rose-400">Days of cashflow</p>
+                </div>
+                <p className="text-zinc-400 text-sm leading-relaxed mb-3">
+                  Every job that sits a week between completion and invoicing is a week your customer hasn&apos;t been billed. Every signature collected on paper is another hour finding the form, scanning it, attaching it, emailing it. Pontifex closes that loop:
+                </p>
+                <ul className="space-y-2 text-sm text-zinc-400">
+                  <li className="flex gap-2"><CheckCircle className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" /> <span>Operator&apos;s on-site customer signature → auto-converted to a polished PDF, attached to the job, viewable from the admin completed-jobs panel.</span></li>
+                  <li className="flex gap-2"><CheckCircle className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" /> <span>Operator-uploaded completion photos visible to admin in seconds — no &ldquo;send me that pic&rdquo; texts.</span></li>
+                  <li className="flex gap-2"><CheckCircle className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" /> <span>Operator + helper names linked directly to their timecards — admin sees who worked, edits time inline, approves payroll.</span></li>
+                  <li className="flex gap-2"><CheckCircle className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" /> <span>Job completed → invoice draft auto-built from the operator&apos;s actual work-performed entries. Review, edit, send. Days of admin loop collapse to minutes.</span></li>
+                </ul>
+              </div>
+            </div>
+
+            {/* ── The math summary ── */}
+            <div className="bg-gradient-to-br from-violet-500/10 to-violet-900/10 border border-violet-500/30 rounded-2xl p-8 md:p-10 mb-10">
+              <p className="text-violet-400 text-xs font-bold uppercase tracking-wider mb-3">Conservative math</p>
+              <div className="space-y-2 text-zinc-300 mb-5">
+                <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                  <span>Phantom time on operators</span>
+                  <span className="text-rose-300 font-semibold">$13,680/yr</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                  <span>Admin retyping hours</span>
+                  <span className="text-rose-300 font-semibold">$7,500/yr</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                  <span>Slow billing &amp; lost cashflow</span>
+                  <span className="text-rose-300 font-semibold">~$5,000/yr (low end)</span>
+                </div>
+                <div className="flex items-center justify-between pt-2 text-lg font-bold">
+                  <span className="text-white">Hidden bleed — year one</span>
+                  <span className="text-rose-400">~$26,180+</span>
+                </div>
+              </div>
+              <div className="border-t border-white/[0.08] pt-5 flex items-center justify-between">
+                <p className="text-white text-lg font-bold">Pontifex trial</p>
+                <p className="text-3xl font-black text-violet-300">$3,747</p>
+              </div>
+              <p className="text-zinc-400 text-sm mt-3 leading-relaxed">
+                One year of the leaks above pays for the platform <span className="text-white font-semibold">~7 times over</span>. And $3,747 is fully refundable for 30 days — you decide whether the math holds up before you commit.
+              </p>
+            </div>
+
+            {/* ── Personal note (kept, shorter) ── */}
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8">
+              <div className="flex items-center gap-4 mb-5">
+                <div className="w-12 h-12 rounded-full bg-violet-500/20 border border-violet-500/40 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xl font-black text-violet-300">A</span>
                 </div>
                 <div>
                   <p className="font-bold text-white">Andres</p>
-                  <p className="text-sm text-zinc-500">Developer & Operator, Pontifex Industries</p>
+                  <p className="text-sm text-zinc-500">Developer &amp; operator, Pontifex Industries</p>
                 </div>
               </div>
-
-              <div className="space-y-5 text-zinc-300 leading-relaxed">
+              <div className="space-y-4 text-zinc-300 leading-relaxed text-sm">
                 <p>
-                  This platform didn&apos;t come from me sitting behind a screen guessing what concrete
-                  cutting operations need. It came from working the same jobs, hearing the same
-                  frustrations firsthand, and building solutions around real feedback — from real
-                  operators who tested every screen, and management who told me exactly what visibility
-                  they needed.
+                  I built this around real feedback from real operators and admins running real jobs.
+                  Every feature was requested, tested, and refined by the people who use it daily.
+                  And I keep building — new screens, custom flows, and changes shaped around what
+                  Patriot specifically needs come at no extra cost during your term.
                 </p>
                 <p>
-                  I built what was actually requested. Not what I assumed would work. Every feature
-                  went through real-world testing with the people who use it daily. That&apos;s why
-                  the clock-in is GPS-verified, why payroll exports in two clicks, why the dispatch
-                  board shows everything a manager actually needs to know.
-                </p>
-                <p>
-                  The $1,647 covers my development costs for onboarding. I&apos;m not trying to
-                  extract a big payday on day one — I&apos;m trying to{' '}
-                  <span className="text-white font-semibold">prove I&apos;m worth it first</span>.
-                  After the trial: $2,000 for 6 months. That&apos;s less than what DSM charges just
-                  to sign the contract.
+                  $3,747 covers the custom development that goes into your platform. I&apos;m not
+                  trying to extract a big payday on day one — I&apos;m trying to{' '}
+                  <span className="text-white font-semibold">prove the platform is worth more than it costs</span>{' '}
+                  in the first 30 days. After that: $2,000 for 6 months, your trial credits in full,
+                  you owe just $333 onboarding to continue.
                 </p>
               </div>
             </div>
@@ -933,7 +1023,7 @@ export default function OfferPage() {
                   '30 days to run real jobs with real operators',
                   'Andres personally on-call for every question and change',
                   '100% money-back if it doesn\'t work — zero risk',
-                  'Continue: $2,000 for 6 months (trial credited — owe just $686)',
+                  'Continue: $2,000 for 6 months (trial credited in full — owe just $333 onboarding)',
                   'Daily automated backups of all your contact and job data',
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
@@ -945,7 +1035,7 @@ export default function OfferPage() {
               <div className="border-t border-white/[0.06] pt-6 flex items-end justify-between flex-wrap gap-4">
                 <div>
                   <p className="text-zinc-500 text-sm">30-day trial investment</p>
-                  <p className="text-4xl font-black text-white">$1,647</p>
+                  <p className="text-4xl font-black text-white">$3,747</p>
                   <p className="text-zinc-600 text-sm mt-1">one-time • 100% refundable</p>
                 </div>
                 <CTAButton size="lg" />
