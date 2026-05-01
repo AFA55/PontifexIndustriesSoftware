@@ -474,6 +474,16 @@ export default function NfcClockInModal({
                         APPROVAL
                       </span>
                     </button>
+
+                    {/* Testing bypass — only when env var is set */}
+                    {expectedBypassCode && (
+                      <button
+                        onClick={() => { setBypassCode(''); setBypassError(null); setFlow('bypass_code'); }}
+                        className="w-full mt-1 py-2 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <KeyRound className="w-3 h-3" /> Testing bypass
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -519,6 +529,16 @@ export default function NfcClockInModal({
                     'Verify Code'
                   )}
                 </button>
+
+                {/* Testing bypass — only when env var is set */}
+                {expectedBypassCode && (
+                  <button
+                    onClick={() => { setBypassCode(''); setBypassError(null); setFlow('bypass_code'); }}
+                    className="w-full mt-2 py-2 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <KeyRound className="w-3 h-3" /> Testing bypass
+                  </button>
+                )}
               </div>
             )}
 
