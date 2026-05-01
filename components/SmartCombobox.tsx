@@ -357,7 +357,28 @@ export function ContactCombobox({
   placeholder = 'Search contacts…',
   label,
 }: ContactComboboxProps) {
-  const comboOptions: ComboboxOption[] = options.map((c) => ({
+  // Dedupe by case-insensitive trimmed name. When multiple records share a
+  // name, keep the most-informative one (most fields populated, then highest
+  // job_count). This prevents 'two children with the same key' React errors
+  // and surfaces a cleaner picker to the user.
+  const dedupedOptions = (() => {
+    const byKey = new Map<string, ContactOption>();
+    for (const c of options) {
+      const key = (c.name ?? '').trim().toLowerCase();
+      if (!key) continue;
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, c);
+        continue;
+      }
+      const score = (x: ContactOption) =>
+        (x.phone ? 2 : 0) + (x.email ? 2 : 0) + (x.job_count ?? 0);
+      if (score(c) > score(existing)) byKey.set(key, c);
+    }
+    return Array.from(byKey.values());
+  })();
+
+  const comboOptions: ComboboxOption[] = dedupedOptions.map((c) => ({
     value: c.name,
     label: c.name,
     sublabel: c.phone ?? undefined,
@@ -365,7 +386,7 @@ export function ContactCombobox({
   }));
 
   const handleChange = (selectedName: string) => {
-    const match = options.find((c) => c.name === selectedName);
+    const match = dedupedOptions.find((c) => c.name === selectedName);
     onChange(selectedName, match?.phone ?? undefined, match?.email ?? undefined);
   };
 
