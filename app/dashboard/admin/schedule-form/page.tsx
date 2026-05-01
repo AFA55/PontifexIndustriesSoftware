@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { GoogleAddressAutocomplete } from '@/components/ui/GoogleAddressAutocomplete';
+import DriveTimeFromShop from '@/components/DriveTimeFromShop';
 import {
   ArrowLeft, ArrowRight, Check, ClipboardList, User as UserIcon,
   MapPin, Wrench, HardHat, Calendar, ShieldCheck, BarChart3,
@@ -809,6 +810,9 @@ export default function ScheduleFormPage() {
   const [showDraftPicker, setShowDraftPicker] = useState(false);
   const [savedDrafts, setSavedDrafts] = useState<{ id: string; customer: string; step: number; date: string }[]>([]);
   const [draftSaved, setDraftSaved] = useState(false);
+
+  // Site coordinates from Google Places autocomplete (used for drive-time chip)
+  const [siteCoords, setSiteCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // PO lookup state
   const [poMatch, setPoMatch] = useState<{
@@ -2030,9 +2034,23 @@ export default function ScheduleFormPage() {
               )}
               <GoogleAddressAutocomplete
                 value={form.site_address}
-                onChange={(address) => updateForm({ site_address: address })}
+                onChange={(address, details) => {
+                  updateForm({ site_address: address });
+                  if (details?.lat != null && details?.lng != null) {
+                    setSiteCoords({ lat: details.lat, lng: details.lng });
+                  } else if (!address) {
+                    setSiteCoords(null);
+                  }
+                }}
                 placeholder="Or type a new address..."
               />
+              {form.site_address && (
+                <DriveTimeFromShop
+                  lat={siteCoords?.lat}
+                  lng={siteCoords?.lng}
+                  fallbackAddress={!siteCoords ? form.site_address : undefined}
+                />
+              )}
             </div>
 
             {/* Location Name (secondary) */}
