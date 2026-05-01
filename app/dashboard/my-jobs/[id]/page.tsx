@@ -15,7 +15,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
 import type { JobTicketData } from '../_components/JobTicketCard';
-import { isMandatoryComplete } from '@/lib/equipment-map';
+import { isMandatoryComplete, getDisplayName } from '@/lib/equipment-map';
 import { unifyEquipmentSelections, allItemsConfirmed as checkAllConfirmed } from '@/lib/equipment-unifier';
 import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
 import { PhotoViewer } from '@/components/PhotoUploader';
@@ -192,6 +192,41 @@ export default function JobDetailPage() {
     () => unifyEquipmentSelections(job?.equipment_selections, job?.equipment_needed, job?.mandatory_equipment),
     [job?.equipment_selections, job?.equipment_needed, job?.mandatory_equipment],
   );
+
+  /**
+   * Custom equipment additions — items in `equipment_needed` that the salesman/admin
+   * typed in the schedule form's equipment step (e.g. "5000 DFS") which are NOT
+   * represented in the unified equipment list.
+   *
+   * The unifier ONLY reads `equipment_selections` (the structured JSONB) when present,
+   * so any extras stored in `equipment_needed` get dropped. Surface them here so the
+   * operator never misses a custom item the office added for this job.
+   *
+   * Build a normalized lookup of every label/id rendered in the unified panel,
+   * then keep only `equipment_needed` strings that don't match any of them.
+   */
+  const customEquipmentItems = useMemo(() => {
+    const needed = job?.equipment_needed || [];
+    if (!needed.length) return [] as string[];
+    const norm = (s: string) => s.toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const seen = new Set<string>();
+    for (const u of unifiedItems) {
+      seen.add(norm(u.id));
+      seen.add(norm(u.label));
+    }
+    const out: string[] = [];
+    const dedup = new Set<string>();
+    for (const item of needed) {
+      if (!item || typeof item !== 'string') continue;
+      const display = getDisplayName(item);
+      const k = norm(display);
+      if (!k || seen.has(k) || seen.has(norm(item))) continue;
+      if (dedup.has(k)) continue;
+      dedup.add(k);
+      out.push(display);
+    }
+    return out;
+  }, [job?.equipment_needed, unifiedItems]);
 
   const hasEquipmentSelections = !!(job?.equipment_selections &&
     Object.keys(job.equipment_selections).length > 0);
@@ -899,7 +934,10 @@ export default function JobDetailPage() {
               {job.scope_details && Object.keys(job.scope_details).length > 0 && (
                 <div>
                   <p className="text-sm font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider mb-2">Scope Quantities</p>
-                  <ScopeDetailsDisplay scopeDetails={job.scope_details} />
+                  <ScopeDetailsDisplay
+                    scopeDetails={job.scope_details}
+                    fallbackOvercutAllowed={!!job.jobsite_conditions?.overcutting_allowed}
+                  />
                 </div>
               )}
               {/* Scope Reference Photos */}
@@ -1024,7 +1062,7 @@ export default function JobDetailPage() {
         )}
 
         {/* Equipment Confirmation Panel */}
-        {unifiedItems.length > 0 && (
+        {(unifiedItems.length > 0 || customEquipmentItems.length > 0) && (
           <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 overflow-hidden">
             <button
               onClick={() => setEquipmentOpen(!equipmentOpen)}
@@ -1060,6 +1098,37 @@ export default function JobDetailPage() {
                   onToggle={toggleEquipment}
                   disabled={isCompleted || equipmentAlreadyConfirmed || isMultiDayReturnVisit}
                 />
+
+                {/* Additional / Custom Equipment — items the admin typed in the schedule
+                    form that aren't part of the structured recommendations (e.g. "5000 DFS").
+                    Surfaced here so the operator never misses an extra requested item. */}
+                {customEquipmentItems.length > 0 && (
+                  <div className="mt-4 rounded-xl border border-sky-200 dark:border-sky-500/30 bg-sky-50/70 dark:bg-sky-500/10 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Wrench className="w-4 h-4 text-sky-600 dark:text-sky-300" />
+                      <h4 className="text-xs font-bold text-sky-700 dark:text-sky-200 uppercase tracking-wider">
+                        Additional / Custom Equipment
+                      </h4>
+                      <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-500/30 text-sky-700 dark:text-sky-200">
+                        {customEquipmentItems.length}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-sky-700/80 dark:text-sky-200/70 mb-2">
+                      Extra items requested by the office for this job.
+                    </p>
+                    <ul className="flex flex-wrap gap-2">
+                      {customEquipmentItems.map(item => (
+                        <li
+                          key={item}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900/40 border border-sky-200 dark:border-sky-500/40 text-sm font-semibold text-sky-800 dark:text-sky-200"
+                        >
+                          <Wrench className="w-3.5 h-3.5 text-sky-500 dark:text-sky-300 flex-shrink-0" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>
