@@ -118,7 +118,7 @@ function AgreementModal({
         <div className="space-y-4 mb-6">
           {[
             '30-day trial at $3,747 — 100% refundable, no questions asked.',
-            'If you decide to continue: $2,000 for 6 months. Your $3,747 trial payment is credited in full toward the next 6 months — you only owe the $333 one-time onboarding fee to lock it in.',
+            'If you decide to continue: $3,747 for the next 6 months — same flat price, no surprise fees, no per-operator metering.',
             'After the 6-month term, pricing adjusts monthly based on your actual team size.',
             'All your data is yours. Exportable at any time. No lock-in.',
             'Cancel with 30 days notice after the 6-month term ends.',
@@ -246,14 +246,14 @@ const comparisonRows = [
     label: 'First 6 months',
     dsm: '$2,148',
     cenpoint: '$2,400 minimum',
-    pontifex: '$2,000',
+    pontifex: '$3,747',
     pontifexHighlight: false,
   },
   {
     label: 'Total — year one',
     dsm: '$6,396+',
     cenpoint: '$7,300+',
-    pontifex: '~$4,080',
+    pontifex: '$7,494',
     pontifexHighlight: true,
     bold: true,
   },
@@ -709,11 +709,10 @@ export default function OfferPage() {
             <div className="bg-violet-500/5 border border-violet-500/30 rounded-2xl p-6">
               <p className="text-sm text-violet-400 font-semibold uppercase tracking-wider mb-2">Pontifex 6-month deal</p>
               <p className="text-zinc-300 text-sm leading-relaxed">
-                <span className="text-white font-semibold">$2,000 for 6 months</span>{' '}
-                ($333.34/month) for your entire crew — operators and helpers included.
-                Your $3,747 trial payment is credited in full toward the next 6 months, so you only owe{' '}
-                <span className="text-violet-300 font-bold">$333 to lock in the full term</span>{' '}
-                (one-time onboarding fee). After 6 months, pricing adjusts to your exact team size.
+                <span className="text-white font-semibold">$3,747 every 6 months</span>{' '}
+                (~$624/month) for your entire crew — operators, helpers, apprentices, all included. No
+                per-seat metering. No surprise fees. <span className="text-violet-300 font-bold">Unlimited custom changes</span>{' '}
+                and a personal developer on-call are baked in. Compare to DSM&apos;s $35.80/operator/month for operators only.
               </p>
             </div>
           </div>
@@ -775,10 +774,10 @@ export default function OfferPage() {
               <span className="text-violet-400">$3,747</span>
             </p>
             <p className="text-zinc-400 text-sm mb-1">
-              If you continue: $2,000 for 6 months ($333.34/month) — your $3,747 is credited.
+              If you continue: $3,747 for the next 6 months (~$624/month) — entire crew included, unlimited custom changes.
             </p>
             <p className="text-zinc-500 text-xs mb-6">
-              You only owe $333 to lock in the full 6-month term (one-time onboarding). Less than 1/6 of what DSM charges just to sign.
+              Year-one total: <span className="text-zinc-300 font-semibold">$7,494</span>. DSM is $6,396+ for operators only — no helpers, no custom changes, no developer on call.
             </p>
             <CTAButton size="lg" />
           </div>
@@ -841,7 +840,7 @@ export default function OfferPage() {
                 Add up what you&apos;re losing right now.
               </h2>
               <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-                $3,747 isn&apos;t a software fee. It&apos;s a fraction of what one year of the status quo costs you in invisible bleed.
+                $3,747 isn&apos;t a software fee. It&apos;s your share of building a platform that pays for itself in the first quarter — and then keeps stacking returns.
               </p>
             </div>
 
@@ -930,12 +929,18 @@ export default function OfferPage() {
                   <span className="text-rose-400">~$26,180+</span>
                 </div>
               </div>
-              <div className="border-t border-white/[0.08] pt-5 flex items-center justify-between">
-                <p className="text-white text-lg font-bold">Pontifex trial</p>
-                <p className="text-3xl font-black text-violet-300">$3,747</p>
+              <div className="border-t border-white/[0.08] pt-5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-white text-base font-semibold">Pontifex 30-day trial</p>
+                  <p className="text-2xl font-black text-violet-300">$3,747</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-zinc-300 text-base font-semibold">Pontifex year one (full)</p>
+                  <p className="text-2xl font-black text-violet-300">$7,494</p>
+                </div>
               </div>
-              <p className="text-zinc-400 text-sm mt-3 leading-relaxed">
-                One year of the leaks above pays for the platform <span className="text-white font-semibold">~7 times over</span>. And $3,747 is fully refundable for 30 days — you decide whether the math holds up before you commit.
+              <p className="text-zinc-400 text-sm mt-4 leading-relaxed">
+                One year of the leaks above costs you <span className="text-rose-300 font-semibold">~3.5×</span> what the entire platform costs you for a year. And the $3,747 trial is fully refundable for 30 days — you decide whether the math holds up before you commit. Compared to DSM ($6,396+) and Cenpoint ($7,300+) you&apos;re getting <span className="text-white font-semibold">helper tracking, unlimited custom changes, and a personal developer on call</span> — none of which they offer at any price.
               </p>
             </div>
 
@@ -961,8 +966,8 @@ export default function OfferPage() {
                   $3,747 covers the custom development that goes into your platform. I&apos;m not
                   trying to extract a big payday on day one — I&apos;m trying to{' '}
                   <span className="text-white font-semibold">prove the platform is worth more than it costs</span>{' '}
-                  in the first 30 days. After that: $2,000 for 6 months, your trial credits in full,
-                  you owe just $333 onboarding to continue.
+                  in the first 30 days. After that: $3,747 every 6 months — flat, no per-seat
+                  fees, no surprise add-ons, unlimited custom changes for as long as you stay.
                 </p>
               </div>
             </div>
@@ -1023,7 +1028,7 @@ export default function OfferPage() {
                   '30 days to run real jobs with real operators',
                   'Andres personally on-call for every question and change',
                   '100% money-back if it doesn\'t work — zero risk',
-                  'Continue: $2,000 for 6 months (trial credited in full — owe just $333 onboarding)',
+                  'Continue: $3,747 every 6 months — entire crew, unlimited custom changes, no per-seat fees',
                   'Daily automated backups of all your contact and job data',
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
