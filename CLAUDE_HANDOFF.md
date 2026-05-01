@@ -3,6 +3,60 @@
 
 ---
 
+## MAY 1, 2026 (PT 4) — Tight 20ft Geofence on Clock-In + UI Test-Bypass Code
+
+### What shipped
+
+**Updated shop pin to user's exact coords** — `lib/geolocation.ts` now uses `34.76874307354808, -82.43569623308949` (was off by ~33ft). `ALLOWED_RADIUS_METERS = 6.1` (~20ft) was already correct.
+
+**Removed duplicate constants in `components/NfcClockInModal.tsx`** — was using its OWN local `SHOP_LAT/LNG` and `SHOP_RADIUS_M = 200` (656ft, way too lax). Now imports `SHOP_LOCATION`, `ALLOWED_RADIUS_METERS`, and `calculateDistance` from `lib/geolocation.ts`. Single source of truth.
+
+**Hardened the outside-radius branch** — previously when GPS placed the operator outside the shop radius, the modal showed "Yes, Clock In Anyway" as a soft override. Now removed. Operator sees their exact distance in feet (e.g. "GPS places you 45 ft away"). Two paths forward:
+1. "Switch to Direct-to-Jobsite" — emerald CTA that opens the existing `jobsite_camera` flow (photo + GPS + admin approval). This is the proper escape hatch for offsite clock-ins.
+2. "Cancel" — back to choose screen.
+
+**New `bypass_code` flow** — gated on `NEXT_PUBLIC_LOCATION_BYPASS_CODE` env var:
+- Small "Testing bypass" link appears at the bottom of the GPS-outside and GPS-error states (only when env var is set; in prod-without-env-var the link is hidden so it can't be exploited).
+- Click → numpad screen with "DEV/TEST ONLY" warning.
+- If entered code matches `process.env.NEXT_PUBLIC_LOCATION_BYPASS_CODE`, treats operator as at-shop, proceeds to clock-in with the configured shop coords.
+- Wrong code shakes the dot display and shows "Invalid bypass code".
+- The existing full-bypass env var (`NEXT_PUBLIC_BYPASS_LOCATION_CHECK=true`) still works unchanged — that one bypasses GPS entirely with no UI prompt.
+
+**Admin operator timecard view** — `app/dashboard/admin/timecards/operator/[id]/page.tsx` now recognizes both `'remote'` (current DB enum) and `'gps_remote'` (legacy) for:
+- The amber "Remote · Review" / "Remote · OK" badge in the entry header
+- The "Remote Clock-In Location" banner with Google Maps link
+- Shop-clock-in coords already rendered via `renderGpsLink` for both clock-in and clock-out — no change needed there.
+
+### Setup notes for testing
+To use the UI bypass at home, add to `.env.local` (or Vercel env vars):
+```
+NEXT_PUBLIC_LOCATION_BYPASS_CODE=4242
+```
+Restart dev server. When you click Clock In and GPS places you outside the shop radius (or fails), the "Testing bypass" link will appear. Enter the code → clock-in proceeds. Without the env var, the link is hidden — production stays locked.
+
+### Files changed
+```
+lib/geolocation.ts                                            (coord update)
+components/NfcClockInModal.tsx                                (refactor + bypass flow)
+app/dashboard/admin/timecards/operator/[id]/page.tsx          (remote method check)
+```
+
+### Commits on `main` (LOCAL)
+```
+1e9f488a  feat: tighten clock-in geofence to 20ft + UI test-bypass code
+```
+
+### Verification
+- `npm run build` PASS (0 errors).
+- Pre-commit type-check passed.
+
+### Pending follow-ups
+- Wire `NEXT_PUBLIC_LOCATION_BYPASS_CODE` to Vercel env vars for staging testing.
+- Consider also tightening the `app/dashboard/job-schedule/[id]/page.tsx` shop-arrival check (it imports `verifyShopLocation` too) — currently any caller of that helper inherits the new 20ft / new coords automatically, so this should "just work" but worth a manual test.
+- The clock-OUT flow is unchanged — operator can clock out from anywhere and GPS is recorded for the record. If you want to also enforce a shop-only clock-out, we'd need to mirror the new logic on the clock-out path.
+
+---
+
 ## MAY 1, 2026 (PT 3) — Invoice Review Modal + RBAC + Salesperson Notifications + Completed-Jobs Polish
 
 User request: hone the post-completion side. Five tasks bundled, dispatched 3 parallel agents in isolated worktrees, audited each diff, manually merged.

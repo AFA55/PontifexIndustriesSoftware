@@ -1408,7 +1408,7 @@ function OperatorTimecardDetailPageInner() {
                                     -{entry.break_minutes}m break
                                   </span>
                                 )}
-                                {entry.clock_in_method === 'gps_remote' && (
+                                {(entry.clock_in_method === 'gps_remote' || entry.clock_in_method === 'remote') && (
                                   <span
                                     title={
                                       entry.remote_verified === null
@@ -1511,8 +1511,8 @@ function OperatorTimecardDetailPageInner() {
                             </div>
                           )}
 
-                          {/* GPS Remote map link — shown for gps_remote clock-ins */}
-                          {entry.clock_in_method === 'gps_remote' && (entry.clock_in_latitude || entry.clock_in_gps_lat) && (
+                          {/* GPS Remote map link — shown for remote clock-ins */}
+                          {(entry.clock_in_method === 'gps_remote' || entry.clock_in_method === 'remote') && (entry.clock_in_latitude || entry.clock_in_gps_lat) && (
                             <div className="mt-2 px-2 py-1.5 bg-amber-50 rounded-md border border-amber-200 flex items-center justify-between">
                               <div className="flex items-center gap-1.5">
                                 <MapPin size={10} className="text-amber-500" />
