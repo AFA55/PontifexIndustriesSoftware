@@ -5,20 +5,31 @@
 
 import { Resend } from 'resend';
 
+export interface EmailAttachment {
+  filename: string;
+  /** base64-encoded string OR Buffer; passed through to Resend's `content` field. */
+  content: string | Buffer;
+  contentType?: string;
+}
+
 interface EmailOptions {
   to: string;
   subject: string;
   html: string;
+  attachments?: EmailAttachment[];
 }
 
 // Initialize Resend with API key from environment variables
 // Use a dummy key if not set to prevent build errors (checked before use)
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
 
-export async function sendEmail({ to, subject, html }: EmailOptions): Promise<boolean> {
+export async function sendEmail({ to, subject, html, attachments }: EmailOptions): Promise<boolean> {
   try {
     console.log(`📧 Sending email to: ${to}`);
     console.log(`📧 Subject: ${subject}`);
+    if (attachments?.length) {
+      console.log(`📧 Attachments: ${attachments.map((a) => a.filename).join(', ')}`);
+    }
 
     // Check if Resend API key is configured
     if (!process.env.RESEND_API_KEY) {
@@ -29,12 +40,21 @@ export async function sendEmail({ to, subject, html }: EmailOptions): Promise<bo
     }
 
     // Send email using Resend
-    const { data, error } = await resend.emails.send({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payload: any = {
       from: process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <onboarding@resend.dev>',
       to: [to],
       subject: subject,
       html: html,
-    });
+    };
+    if (attachments?.length) {
+      payload.attachments = attachments.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        ...(a.contentType ? { contentType: a.contentType } : {}),
+      }));
+    }
+    const { data, error } = await resend.emails.send(payload);
 
     if (error) {
       console.error('❌ Error sending email via Resend:', error);
