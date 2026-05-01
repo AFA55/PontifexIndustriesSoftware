@@ -1,5 +1,108 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 30, 2026 (DEMO-PREP SESSION) | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~55 commits | **Build Status:** PASSING ✅ (0 errors, 8.2s) | **DB:** WIPED — clean slate, Patriot Test GC customer preserved
+**Date:** May 1, 2026 (DEMO-DAY SESSION — IN PROGRESS) | **Branch:** `claude/nice-borg-4ffe67` (pushed to origin) → merged to local `main` (68 commits ahead of origin/main) | **Build Status:** PASSING ✅ | **DB:** Migration `20260501_customer_survey_v2` applied to live DB
+
+---
+
+## MAY 1, 2026 (PT 2) — Customer Survey + Admin Photos + Vibrant Day-Complete UI + PDF Email
+
+User request was 4 things touching the customer-facing completion flow. Dispatched 3 parallel agents in isolated worktrees, audited each diff, then merged into `claude/nice-borg-4ffe67`.
+
+### What shipped
+
+**A — Operator photos visible to admin** (Agent A)
+- `app/api/admin/jobs/[id]/summary/route.ts` — additively returns `photos` array (`job_orders.photo_urls`).
+- `app/dashboard/admin/jobs/[id]/page.tsx` — new "Job Photos" panel rendered between Daily Progress and Activity Log. Responsive 2/3/4-col grid of `<a target=_blank>` thumbnails with hover ring shift, scale, gradient overlay, count badge, empty-state.
+
+**B — Customer satisfaction survey infrastructure** (Agent B)
+- Migration `supabase/migrations/20260501_customer_survey_v2.sql` (applied via MCP, verified live): adds `operator_feedback_notes`, `likely_to_use_again_rating` (1-10 NPS w/ CHECK), `customer_email`, `delivered_to` to `customer_surveys`.
+- New `components/CustomerSatisfactionSurvey.tsx` — shared between on-site and remote flows. Two 5-star widgets (cleanliness, communication), NPS 1-10 chip selector (rose 1-6 / amber 7-8 / emerald 9-10), free-text operator notes, radio toggle "send to contact-on-site phone (default)" vs "send to my email", security disclaimer pill, purple→indigo submit. Variant prop `'light' | 'public'`.
+- New `app/api/job-orders/[id]/customer-survey/route.ts` — POST for on-site flow. Auth + tenant scope. Inserts row, computes `overall_rating` as round(avg). Fire-and-forget SMS to `site_contact_phone` OR email if `send_to_email`. Updates operator running averages.
+- `app/api/public/signature/[token]/route.ts` — survey block extended additively to accept new v2 fields. Same SMS/email dispatch.
+- `app/sign/[token]/page.tsx` — replaced inline survey block with `<CustomerSatisfactionSurvey variant="public" />`. Removed legacy `surveyClean/surveyComm/surveyOverall/wouldRecommend/feedbackText` state and inline `StarRating` helper.
+
+**SECURITY note (Agent B):** business rule explicitly enforced — survey results **always** go to the job's `site_contact_phone` OR the customer's own email (radio choice). NEVER the operator's device. Prevents operators from filling out their own surveys to inflate ratings. Visible disclaimer pill in the UI.
+
+**C — Day-complete UI overhaul + PDF email** (Agent C)
+- `app/dashboard/job-schedule/[id]/day-complete/page.tsx`:
+  - Vibrant CTA gradients replace pale tints: amber→orange (Done for Today), emerald→teal (Complete Job — Get Signature On Site), indigo→violet→purple (Send Completion Link). White text + white/translucent icon circles + colored shadow rings.
+  - New Customer Email field on signature view (Mail icon, optional, sends PDF receipt).
+  - New violet→indigo branded "Thank you for choosing Patriot Concrete Cutting" callout above the existing PDF notice.
+  - New survey screen between signature submission and Job Complete success card. Survey only fires on the on-site Complete Job path; Done-for-Today and Send Completion Link paths unchanged. Skip-survey link bypasses save.
+  - Success card now shows "Thanks for your feedback ✓" violet badge when survey was submitted.
+- `app/api/job-orders/[id]/generate-completion-pdf/route.ts` — accepts new optional `customer_email` and `reference_photo_urls`. After PDF upload, fire-and-forget thank-you email via Resend with PDF attached as base64 + branded HTML body featuring up to 6 inline reference photos in a 3-col grid.
+- `lib/email.ts` — backwards-compatible: added optional `attachments?: EmailAttachment[]` to `EmailOptions`. Passed through to Resend payload only when present.
+
+### Merge ordering
+Agent A merged manually (Edit tool — line numbers had drifted between agent's main-based worktree and parent session). Agents B + C patches applied via `git apply` after Agent A's edits stabilized line numbers. Conflict-free.
+
+### Commits on `main` (LOCAL — pushed to origin/claude/nice-borg-4ffe67, NOT to origin/main)
+```
+3e80a747  feat: customer survey + admin photos + vibrant CTAs + PDF email
+```
+
+### Database migration applied
+`20260501_customer_survey_v2` — verified live via `information_schema.columns` query. All 4 new columns present.
+
+### Verification
+- `npm run build` PASS, 0 errors. Both `/api/job-orders/[id]/customer-survey` and `/api/admin/jobs/[id]/summary` rebuilt.
+- Migration applied to live DB.
+- Pre-commit type-check passed.
+
+### Known issues — still acknowledged (NOT blocking demo)
+- Cross-tab session bleed → wrong-dashboard redirects (multi-tab Supabase auth). Workaround: one role per browser/tab during demo.
+- Start-In-Route latency (cosmetic).
+
+### Pending follow-ups for next session
+- Survey results — currently dispatched fire-and-forget; consider an admin "view all surveys" page once data accumulates.
+- Survey UI on the public sign page hasn't been hand-tested in browser yet — variant="public" path needs eyes during demo.
+- Operator-uploaded photos lightbox — currently opens in new tab; could be upgraded to inline modal viewer if desired.
+- Apply same vibrant gradient style to other operator workflow pages (in-route, jobsite, work-performed CTAs) for consistency.
+
+---
+
+## MAY 1, 2026 — Demo-Day Bug Fixes: Data-Flow Bridges (Operator → Admin Visibility)
+
+User is running through the demo flow live. Issues surface, get fixed in flight. New rule from user this session: **after each task completed, update CLAUDE_HANDOFF.md (and CLAUDE.md sprint backlog if relevant)**. Going forward this is the persistent workflow.
+
+### Bugs fixed this session
+
+**CRITICAL data-integrity (operator submissions invisible to admin):**
+
+1. **Operator's Work Performed → admin's Job Scope & Progress** — operator submissions via `work_items` table were not appearing in admin's Daily Activity / Job Scope & Progress. `/api/admin/jobs/[id]/summary` only read from `job_progress_entries`. Fix: route now reads BOTH tables, merges by date into `progress.by_date`, tags work_items entries with `source: 'work_items'`. Quantity intelligently picks `core_quantity` (cores) → `linear_feet_cut` (LF) → `quantity` (raw) so admin sees the meaningful number. Scope-progress percentages still driven only by `job_progress_entries` to avoid inflating %.
+2. **Per-area overcut + cross-cut not on operator ticket** — sawing calculator inputs (overcut state, cross-cut spacing, total linear-ft) were not surfaced on the operator's ticket. Fixed in `components/ScopeDetailsDisplay.tsx` — each sawing area now renders an overcut state pill, cross-cut pill (if set), and total-linear-ft pill with breakdown subtitle "(perimeter X + cross-cuts Y)". Section grand-total LF appended below.
+3. **Custom-added equipment ("5000 DFS") missing from operator ticket** — `UnifiedEquipmentPanel`'s filter was dropping custom items added in `equipment_needed`. Fixed in `app/dashboard/my-jobs/[id]/page.tsx` — new sky-themed "Additional / Custom Equipment" sub-card surfaces custom entries below the unified list.
+4. **Material removal details (method + equipment used) not on operator ticket** — only method was rendering. `ScopeDetailsDisplay.tsx` now renders 2-column grid of every populated field from `scope_details._removal`: method, equipment list (forklift/skidsteer/lull/dingo/sherpa/mini_excavator), forward-compat `dumpster_size` / `responsible_party` / `what` slots.
+
+### Known issues — acknowledged, deferred (NOT blocking demo)
+
+- **Cross-tab session bleed → wrong-dashboard redirects.** When user clicks "Active Jobs" or "Arrived On Jobsite", clicking sometimes redirects to operator dashboard. Root cause: multi-tab Supabase auth — localStorage `sb-*-auth-token` is shared across tabs, so logging in as Operator in one tab silently flips the salesman/admin tab's session. `getCurrentUser()` reads stale `supabase-user` cache, role guards trigger redirect. Proper fix: `useAuthUser` retrofit on every role-guarded page (already exists at `lib/hooks/useAuthUser.ts` — partially adopted in April 27 session). Too risky to land mid-demo. **Workaround for demo:** one role per browser/tab.
+- **Start In Route → next-page latency.** User confirmed admin side reflects status correctly, just visual delay. Cosmetic.
+
+### Agents dispatched this session (both merged + pushed)
+
+| Agent | Scope | Outcome |
+|---|---|---|
+| Agent A — work_items bridge | `app/api/admin/jobs/[id]/summary/route.ts` only — merge `work_items` into `progress.by_date` | Single file, additive only. Merged. |
+| Agent B — operator ticket display | `components/ScopeDetailsDisplay.tsx` + `app/dashboard/my-jobs/[id]/page.tsx` — overcut/cross-cut pills, custom equipment sub-card, material removal grid | Two frontend files, no API/auth/lib changes. Merged. |
+
+Both agents received guardrails: no `app/api/**` (except the explicitly named summary route), no `lib/supabase*`, no `lib/api-auth*`, no `middleware.ts`, no `package.json`, no migrations. Diffs audited before merge.
+
+### Commits on `main` (LOCAL — verify push state before next session)
+
+```
+f55150ea  Merge: data-flow fixes (work_items bridge, overcut + custom equipment + removal details on ticket)
+ac96a221  Merge: surface overcut + custom equipment + material removal details on operator ticket
+d5af99e6  fix: surface overcut/cross-cut, custom equipment, and removal details on operator ticket
+be09c997  Merge: bridge operator work_items into admin Job Scope & Progress
+9ee95310  Merge: bridge work_items into admin Job Scope & Progress summary
+29d8ca82  fix: bridge operator work_items into admin Job Scope & Progress summary
+```
+
+### Pending follow-ups (from this session)
+
+- **Cross-tab session bleed fix** — retrofit remaining role-guarded admin pages onto `useAuthUser` hook (pages still using legacy `getCurrentUser()` localStorage path). Post-demo priority.
+- **Start In Route latency** — investigate why operator-side transition feels slow despite admin reflecting status correctly. Likely a router push timing issue.
+- **Apply same per-area cross-cut calculator to operator's Work Performed page** (carryover from Apr 30 — still admin-side only).
 
 ---
 
