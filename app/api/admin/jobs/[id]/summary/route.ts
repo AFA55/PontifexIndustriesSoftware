@@ -58,7 +58,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
         utility_waiver_signed,
         utility_waiver_signer_name,
         utility_waiver_signed_at,
-        commission_rate
+        commission_rate,
+        photo_urls
       `)
       .eq('id', jobId);
     if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
@@ -379,6 +380,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
               review_notes: completionRequest.review_notes,
             }
           : null,
+        photos: Array.isArray((job as any).photo_urls) ? (job as any).photo_urls : [],
         is_last_day: isLastDay,
       },
     });

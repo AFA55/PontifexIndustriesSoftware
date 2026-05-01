@@ -25,9 +25,13 @@ import {
   Wrench,
   ClipboardList,
   MessageSquarePlus,
+  Mail,
+  Heart,
+  Sparkles,
 } from 'lucide-react';
 import PhotoUploader from '@/components/PhotoUploader';
 import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
+import CustomerSatisfactionSurvey from '@/components/CustomerSatisfactionSurvey';
 
 export default function DayCompletePage() {
   const router = useRouter();
@@ -41,6 +45,10 @@ export default function DayCompletePage() {
   const [showSignature, setShowSignature] = useState(false);
   const [signerName, setSignerName] = useState('');
   const [signatureData, setSignatureData] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [surveyMode, setSurveyMode] = useState(false);
+  const [surveySubmitting, setSurveySubmitting] = useState(false);
+  const [surveySubmitted, setSurveySubmitted] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [completionPhotos, setCompletionPhotos] = useState<string[]>([]);
   const [esignConsented, setEsignConsented] = useState(false);
@@ -313,6 +321,8 @@ export default function DayCompletePage() {
             signerName: signerName || null,
             signatureDataUrl: signatureData || null,
             workPerformed,
+            customer_email: customerEmail.trim() || undefined,
+            reference_photo_urls: completionPhotos,
           }),
         });
         if (pdfRes.ok) {
@@ -360,7 +370,8 @@ export default function DayCompletePage() {
 
       if (statusRes.ok) {
         localStorage.removeItem(`work-performed-${jobId}`);
-        setSuccessMode('complete');
+        // Route through customer satisfaction survey before showing success card
+        setSurveyMode(true);
       } else {
         const data = await statusRes.json();
         showNotif(data.error || 'Failed to complete job', 'error');
@@ -371,6 +382,41 @@ export default function DayCompletePage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // ─── CUSTOMER SATISFACTION SURVEY HANDLERS ───────────────────────────────
+  const handleSurveySubmit = async (data: {
+    cleanliness_rating: number;
+    communication_rating: number;
+    operator_feedback_notes?: string;
+    likely_to_use_again_rating: number;
+    send_to_email?: string;
+  }) => {
+    setSurveySubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`/api/job-orders/${jobId}/customer-survey`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(data),
+      }).catch(() => {});
+      setSurveySubmitted(true);
+    } catch (err) {
+      console.error('Survey submit error (non-fatal):', err);
+    } finally {
+      setSurveySubmitting(false);
+      setSurveyMode(false);
+      setSuccessMode('complete');
+    }
+  };
+
+  const handleSkipSurvey = () => {
+    setSurveyMode(false);
+    setSuccessMode('complete');
   };
 
   // ─── REMOTE SIGNATURE — Send link & finish ────────────────────────────────
@@ -546,6 +592,47 @@ export default function DayCompletePage() {
     setSignatureData('');
   };
 
+  // ─── Customer satisfaction survey screen (after signature, before success) ─
+  if (surveyMode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-indigo-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0f0a1e] py-8 px-4">
+        <div className="max-w-lg mx-auto space-y-5">
+          {/* Branded header */}
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/30 mb-3">
+              <Sparkles className="w-7 h-7 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              How did we do?
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Your sign-off has been saved. Help us improve with a quick survey.
+            </p>
+          </div>
+
+          <CustomerSatisfactionSurvey
+            initialEmail={customerEmail}
+            contactPhoneOnSite={job?.site_contact_phone || null}
+            onSubmit={handleSurveySubmit}
+            submitting={surveySubmitting}
+            variant="light"
+          />
+
+          {/* Skip survey */}
+          <div className="text-center">
+            <button
+              onClick={handleSkipSurvey}
+              disabled={surveySubmitting}
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline underline-offset-2 disabled:opacity-40 transition-colors"
+            >
+              Skip survey
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ─── Post-submission success screen ──────────────────────────────────────
   if (successMode) {
     const isDoneForDay = successMode === 'done_for_day';
@@ -574,6 +661,14 @@ export default function DayCompletePage() {
               : 'Great work! This job has been completed.'
             }
           </p>
+
+          {/* Survey thanks */}
+          {surveySubmitted && successMode === 'complete' && (
+            <div className="flex items-center justify-center gap-2 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/40 rounded-xl px-4 py-3 mb-3">
+              <Heart className="w-4 h-4 text-violet-600 dark:text-violet-400 flex-shrink-0" />
+              <p className="text-sm font-medium text-violet-800 dark:text-violet-300">Thanks for your feedback ✓</p>
+            </div>
+          )}
 
           {/* Note sent confirmation */}
           {supervisorNoteSent && (
@@ -817,16 +912,16 @@ export default function DayCompletePage() {
               <button
                 onClick={handleDoneForToday}
                 disabled={submitting}
-                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 text-left transition-all hover:scale-[1.01] active:scale-[0.99] hover:border-amber-300 dark:hover:border-amber-700 disabled:opacity-50"
+                className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-500 to-orange-500 text-left shadow-lg shadow-amber-500/30 ring-1 ring-amber-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-amber-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-500/20 dark:bg-amber-500/10">
-                  <Sun className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
+                  <Sun className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-bold text-gray-900 dark:text-white">Done for Today</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Job continues tomorrow. Progress saved.</p>
+                  <p className="font-bold text-white text-base">Done for Today</p>
+                  <p className="text-sm text-white/85 mt-0.5">Job continues tomorrow. Progress saved.</p>
                 </div>
-                {submitting && <Loader2 className="w-5 h-5 animate-spin text-amber-500 dark:text-amber-400" />}
+                {submitting && <Loader2 className="w-5 h-5 animate-spin text-white" />}
               </button>
             )}
 
@@ -834,14 +929,14 @@ export default function DayCompletePage() {
             <button
               onClick={() => setShowSignature(true)}
               disabled={submitting}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-900/20 text-left transition-all hover:scale-[1.01] active:scale-[0.99] hover:border-emerald-300 dark:hover:border-emerald-700 disabled:opacity-50"
+              className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 text-left shadow-lg shadow-emerald-500/30 ring-1 ring-emerald-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20 dark:bg-emerald-500/10">
-                <Trophy className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
+                <Trophy className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-bold text-gray-900 dark:text-white">Complete Job — Get Signature On Site</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Customer is here — get their signature to complete the job.</p>
+                <p className="font-bold text-white text-base">Complete Job — Get Signature On Site</p>
+                <p className="text-sm text-white/85 mt-0.5">Customer is here — get their signature to complete the job.</p>
               </div>
             </button>
 
@@ -849,14 +944,14 @@ export default function DayCompletePage() {
             <button
               onClick={() => setShowRemotePanel(true)}
               disabled={submitting}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/20 text-left transition-all hover:scale-[1.01] active:scale-[0.99] hover:border-indigo-300 dark:hover:border-indigo-700 disabled:opacity-50"
+              className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-left shadow-lg shadow-violet-500/30 ring-1 ring-violet-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-violet-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-indigo-500/20 dark:bg-indigo-500/10">
-                <Send className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
+                <Send className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-bold text-gray-900 dark:text-white">Send Completion Link &amp; Finish Job</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Customer isn&apos;t here — send them a signature link via SMS.</p>
+                <p className="font-bold text-white text-base">Send Completion Link &amp; Finish Job</p>
+                <p className="text-sm text-white/85 mt-0.5">Customer isn&apos;t here — send them a signature link via SMS.</p>
               </div>
             </button>
           </div>
@@ -1013,6 +1108,27 @@ export default function DayCompletePage() {
                 />
               </div>
 
+              {/* Customer Email — sends PDF receipt */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  Customer Email <span className="text-gray-400 dark:text-gray-500 font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                  <input
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    placeholder="customer@example.com"
+                    autoComplete="email"
+                    className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07] placeholder:text-gray-400 dark:placeholder:text-white/30"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  We&apos;ll send a copy of the sign-off PDF to this address.
+                </p>
+              </div>
+
               {/* Signature Pad */}
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -1057,6 +1173,23 @@ export default function DayCompletePage() {
                 onConsentChange={setEsignConsented}
                 consented={esignConsented}
               />
+
+              {/* Thank-you callout */}
+              <div className="rounded-2xl p-4 bg-gradient-to-br from-violet-500 via-violet-600 to-indigo-600 shadow-md shadow-violet-500/25 ring-1 ring-violet-400/30">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white/20 backdrop-blur-sm ring-1 ring-white/30">
+                    <Heart className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white leading-tight">
+                      Thank you for choosing Patriot Concrete Cutting
+                    </p>
+                    <p className="text-xs text-white/85 mt-1 leading-relaxed">
+                      Once you sign, your work is complete. We&apos;d love to hear how we did — a brief survey will follow your signature.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               {/* PDF notice */}
               <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-800/40">

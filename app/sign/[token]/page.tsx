@@ -6,9 +6,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import {
   CheckCircle2, Loader2, AlertTriangle, PenTool, Shield,
-  FileText, Star, ThumbsUp, ThumbsDown, X, MapPin,
+  FileText, MapPin,
   ClipboardCheck,
 } from 'lucide-react';
+import CustomerSatisfactionSurvey, { type SurveyData } from '@/components/CustomerSatisfactionSurvey';
 
 type RequestType = 'utility_waiver' | 'completion' | 'custom';
 type PageState = 'loading' | 'form' | 'survey' | 'success' | 'error';
@@ -51,6 +52,7 @@ interface SignatureData {
     address: string;
     description: string;
     customer_contact: string;
+    site_contact_phone?: string | null;
     in_route_at?: string;
     arrived_at_jobsite_at?: string;
     work_started_at?: string;
@@ -86,12 +88,7 @@ export default function PublicSignPage() {
   const [workConfirmed, setWorkConfirmed] = useState(false);
   const [exceptionNotes, setExceptionNotes] = useState('');
 
-  // Survey state
-  const [surveyClean, setSurveyClean] = useState(0);
-  const [surveyComm, setSurveyComm] = useState(0);
-  const [surveyOverall, setSurveyOverall] = useState(0);
-  const [wouldRecommend, setWouldRecommend] = useState<boolean | null>(null);
-  const [feedbackText, setFeedbackText] = useState('');
+  // Survey state — now driven by <CustomerSatisfactionSurvey/> when it submits
 
   useEffect(() => {
     fetchSignatureRequest();
@@ -188,7 +185,10 @@ export default function PublicSignPage() {
     setSignatureDataState('');
   };
 
-  const handleSubmit = async (skipSurvey = false) => {
+  const handleSubmit = async (
+    options: { skipSurvey?: boolean; surveyPayload?: SurveyData | null } = {}
+  ) => {
+    const { skipSurvey = false, surveyPayload = null } = options;
     if (!signatureData) return;
     setSubmitting(true);
 
@@ -217,13 +217,13 @@ export default function PublicSignPage() {
       }
 
       // Add survey data if completion type and not skipping
-      if (data?.request_type === 'completion' && !skipSurvey && pageState === 'survey') {
+      if (data?.request_type === 'completion' && !skipSurvey && surveyPayload) {
         payload.survey = {
-          cleanliness_rating: surveyClean || undefined,
-          communication_rating: surveyComm || undefined,
-          overall_rating: surveyOverall || undefined,
-          would_recommend: wouldRecommend,
-          feedback_text: feedbackText || undefined,
+          cleanliness_rating: surveyPayload.cleanliness_rating || undefined,
+          communication_rating: surveyPayload.communication_rating || undefined,
+          operator_feedback_notes: surveyPayload.operator_feedback_notes || undefined,
+          likely_to_use_again_rating: surveyPayload.likely_to_use_again_rating || undefined,
+          customer_email: surveyPayload.send_to_email || undefined,
         };
       }
 
@@ -251,28 +251,9 @@ export default function PublicSignPage() {
     if (data?.request_type === 'completion') {
       setPageState('survey');
     } else {
-      handleSubmit(true);
+      handleSubmit({ skipSurvey: true });
     }
   };
-
-  // Star rating component
-  const StarRating = ({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) => (
-    <div>
-      <p className="text-sm font-medium text-slate-700 mb-1.5">{label}</p>
-      <div className="flex gap-1.5">
-        {[1, 2, 3, 4, 5].map(n => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(n)}
-            className="p-1 transition-all"
-          >
-            <Star className={`w-7 h-7 ${n <= value ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 
   // Render dynamic field for custom forms
   const renderDynamicField = (field: FormField) => {
@@ -397,80 +378,23 @@ export default function PublicSignPage() {
   if (pageState === 'survey') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <div className="container mx-auto px-4 py-8 max-w-md">
-          <div className="bg-white rounded-2xl shadow-lg p-6 space-y-5">
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
-                <Star className="w-6 h-6 text-amber-500" />
-              </div>
-              <h2 className="text-lg font-bold text-slate-900">Quick Feedback</h2>
-              <p className="text-sm text-slate-500">How was your experience? (Optional)</p>
-            </div>
+        <div className="container mx-auto px-4 py-8 max-w-md space-y-4">
+          <CustomerSatisfactionSurvey
+            variant="public"
+            contactPhoneOnSite={data?.job?.site_contact_phone || data?.job?.customer_contact || null}
+            submitting={submitting}
+            onSubmit={async (surveyPayload) => {
+              await handleSubmit({ surveyPayload });
+            }}
+          />
 
-            <div className="space-y-4">
-              <StarRating value={surveyClean} onChange={setSurveyClean} label="Cleanliness" />
-              <StarRating value={surveyComm} onChange={setSurveyComm} label="Communication" />
-              <StarRating value={surveyOverall} onChange={setSurveyOverall} label="Overall Experience" />
-
-              <div>
-                <p className="text-sm font-medium text-slate-700 mb-1.5">Would you recommend us?</p>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setWouldRecommend(true)}
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                      wouldRecommend === true
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                    }`}
-                  >
-                    <ThumbsUp className="w-4 h-4" />
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setWouldRecommend(false)}
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                      wouldRecommend === false
-                        ? 'bg-red-50 border-red-500 text-red-700'
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                    }`}
-                  >
-                    <ThumbsDown className="w-4 h-4" />
-                    No
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Additional Feedback</label>
-                <textarea
-                  value={feedbackText}
-                  onChange={e => setFeedbackText(e.target.value)}
-                  placeholder="Any additional comments..."
-                  rows={3}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 resize-none"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={() => handleSubmit(false)}
-              disabled={submitting}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl py-3.5 font-semibold text-sm shadow-lg hover:shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              {submitting ? 'Submitting...' : 'Submit Feedback'}
-            </button>
-
-            <button
-              onClick={() => handleSubmit(true)}
-              disabled={submitting}
-              className="w-full text-slate-400 text-sm hover:text-slate-600 py-2"
-            >
-              Skip Survey
-            </button>
-          </div>
+          <button
+            onClick={() => handleSubmit({ skipSurvey: true })}
+            disabled={submitting}
+            className="w-full text-slate-400 text-sm hover:text-slate-600 py-2"
+          >
+            Skip Survey
+          </button>
         </div>
       </div>
     );

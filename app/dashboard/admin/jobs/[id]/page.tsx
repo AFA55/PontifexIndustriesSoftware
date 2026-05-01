@@ -35,6 +35,7 @@ import {
   StickyNote,
   Radio,
   Wifi,
+  Camera,
   Pencil,
   ChevronDown,
 } from 'lucide-react';
@@ -399,6 +400,9 @@ export default function AdminJobDetailPage({
   const [liveStatus, setLiveStatus] = useState<LiveStatusData | null>(null);
   const [liveStatusFetchedAt, setLiveStatusFetchedAt] = useState<Date | null>(null);
 
+  // Photos uploaded by the operator
+  const [photos, setPhotos] = useState<string[]>([]);
+
   // Edit timestamp modal
   const [editTimestampField, setEditTimestampField] = useState<{
     field: EditableTimestampField;
@@ -493,6 +497,7 @@ export default function AdminJobDetailPage({
       }
       const json = await res.json();
       setJob(json.data.job);
+      setPhotos(Array.isArray(json.data?.photos) ? json.data.photos : []);
     } catch {
       setPageError({ message: 'Network error loading job.' });
     }
@@ -1483,6 +1488,65 @@ export default function AdminJobDetailPage({
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+
+            {/* ── Job Photos Section ── */}
+            <div className="
+              relative overflow-hidden rounded-2xl p-6 shadow-sm
+              bg-white border border-slate-200
+              dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+              dark:border-white/10 dark:backdrop-blur
+            ">
+              <span
+                className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"
+                aria-hidden
+              />
+              <div className="flex items-center gap-2 mb-5">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                  <Camera className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+                  Job Photos
+                  {photos.length > 0 && (
+                    <span className="ml-1.5 text-slate-400 dark:text-white/45 font-normal">({photos.length})</span>
+                  )}
+                </h2>
+              </div>
+
+              {photos.length === 0 ? (
+                <div className="text-center py-8">
+                  <Camera className="w-10 h-10 text-slate-200 dark:text-white/15 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500 dark:text-white/50">No photos uploaded yet.</p>
+                  <p className="text-xs text-slate-400 dark:text-white/35 mt-1">
+                    Photos uploaded by the operator on site will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {photos.map((url, idx) => (
+                    <a
+                      key={`${url}-${idx}`}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group relative block aspect-square overflow-hidden rounded-xl ring-1 ring-slate-200 dark:ring-white/10 bg-slate-100 dark:bg-white/5 hover:ring-violet-400 dark:hover:ring-violet-400/60 transition-all"
+                      title={`Open photo ${idx + 1} in new tab`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Job photo ${idx + 1}`}
+                        loading="lazy"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                      <span className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <span className="absolute bottom-1.5 left-1.5 text-[10px] font-mono text-white/90 opacity-0 group-hover:opacity-100 transition-opacity">
+                        #{idx + 1}
+                      </span>
+                    </a>
+                  ))}
                 </div>
               )}
             </div>
