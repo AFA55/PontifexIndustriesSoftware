@@ -93,7 +93,7 @@ function NpsChips({
         How likely are you to use Patriot Concrete Cutting again?
       </p>
       <p className="text-xs text-slate-500 mb-2">1 = not likely &nbsp;·&nbsp; 10 = absolutely</p>
-      <div className="grid grid-cols-10 gap-1.5">
+      <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
           const selected = value === n;
           return (
@@ -101,7 +101,7 @@ function NpsChips({
               key={n}
               type="button"
               onClick={() => onChange(n)}
-              className={`h-10 rounded-lg border-2 text-sm font-bold transition-all ${colorFor(
+              className={`h-12 sm:h-10 rounded-lg border-2 text-base sm:text-sm font-bold transition-all ${colorFor(
                 n,
                 selected
               )}`}
