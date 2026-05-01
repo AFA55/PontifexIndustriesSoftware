@@ -207,6 +207,56 @@ function getCoreBitItems(scopeData: Record<string, string>): EquipItem[] {
   }));
 }
 
+// ── Sawing Linear-Ft Calculator (DFS / EFS / HHS/PS Areas mode) ──
+// Computes total linear feet for a single area:
+//   perimeter = 2 * (length + width), doubled if overcut not allowed
+//   plus interior cross-cuts at the given spacing
+// Verified: 10×10 @ 2×2 cross-cuts, overcut allowed → 120 lf
+interface SawingAreaLF {
+  perimeterLF: number;       // perimeter contribution (already x2 if no overcut)
+  crossCutLF: number;        // interior cross-cut contribution
+  totalLF: number;           // (perimeter + cross-cuts) * qty
+  doubled: boolean;          // whether perimeter was doubled
+}
+function computeSawingAreaLinearFt(area: {
+  length?: string | number;
+  width?: string | number;
+  qty?: string | number;
+  cross_cut_lengthwise_ft?: string | number;
+  cross_cut_widthwise_ft?: string | number;
+  overcut_allowed?: boolean;
+}): SawingAreaLF | null {
+  const length = typeof area.length === 'number' ? area.length : parseFloat(String(area.length ?? ''));
+  const width = typeof area.width === 'number' ? area.width : parseFloat(String(area.width ?? ''));
+  const qtyRaw = typeof area.qty === 'number' ? area.qty : parseInt(String(area.qty ?? ''), 10);
+  if (!isFinite(length) || !isFinite(width) || length <= 0 || width <= 0) return null;
+  const qty = isFinite(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
+
+  const lengthSpacing = typeof area.cross_cut_lengthwise_ft === 'number'
+    ? area.cross_cut_lengthwise_ft
+    : parseFloat(String(area.cross_cut_lengthwise_ft ?? '')) || 0;
+  const widthSpacing = typeof area.cross_cut_widthwise_ft === 'number'
+    ? area.cross_cut_widthwise_ft
+    : parseFloat(String(area.cross_cut_widthwise_ft ?? '')) || 0;
+
+  const perimeter = 2 * (length + width);
+  const lengthwiseCuts = lengthSpacing > 0 ? Math.max(0, Math.floor(length / lengthSpacing) - 1) : 0;
+  const widthwiseCuts = widthSpacing > 0 ? Math.max(0, Math.floor(width / widthSpacing) - 1) : 0;
+  const crossCutPerUnit = (lengthwiseCuts * width) + (widthwiseCuts * length);
+
+  const doubled = area.overcut_allowed === false;
+  const perimeterPerUnit = perimeter * (doubled ? 2 : 1);
+
+  const perimeterLF = perimeterPerUnit * qty;
+  const crossCutLF = crossCutPerUnit * qty;
+  return {
+    perimeterLF,
+    crossCutLF,
+    totalLF: perimeterLF + crossCutLF,
+    doubled,
+  };
+}
+
 const SERVICE_EQUIPMENT: Record<string, ServiceEquipConfig> = {
   'ECD': {
     items: [
@@ -2370,12 +2420,23 @@ export default function ScheduleFormPage() {
                       ) : config.hasDynamicAreas && (isFlexible ? currentMode === 'areas' : true) ? (
                         // ── Dynamic Areas Builder (L × W × Thickness × Qty) ──
                         (() => {
+                          // Sawing-specific calculator only for floor/handheld saws
+                          const isSawingScope = code === 'DFS' || code === 'EFS' || code === 'HHS/PS';
+                          type AreaRow = {
+                            length: string;
+                            width: string;
+                            thickness: string;
+                            qty: string;
+                            overcut_allowed?: boolean;
+                            cross_cut_lengthwise_ft?: string;
+                            cross_cut_widthwise_ft?: string;
+                          };
                           const areasRaw = form.scope_details[code]?.areas;
-                          const areas: { length: string; width: string; thickness: string; qty: string }[] = areasRaw
+                          const areas: AreaRow[] = areasRaw
                             ? (() => { try { return JSON.parse(areasRaw); } catch { return [{ length: '', width: '', thickness: '', qty: '' }]; } })()
                             : [{ length: '', width: '', thickness: '', qty: '' }];
 
-                          const updateAreas = (newAreas: { length: string; width: string; thickness: string; qty: string }[]) => {
+                          const updateAreas = (newAreas: AreaRow[]) => {
                             updateScopeDetail(code, 'areas', JSON.stringify(newAreas));
                           };
 
@@ -2386,6 +2447,23 @@ export default function ScheduleFormPage() {
                             return sum + (l * w * q);
                           }, 0);
                           const totalAreaCount = areas.reduce((sum, a) => sum + (parseInt(a.qty) || 0), 0);
+
+                          // Resolve per-area overcut: explicit boolean wins, else fall back to top-level form default
+                          const resolveOvercut = (a: AreaRow): boolean =>
+                            typeof a.overcut_allowed === 'boolean' ? a.overcut_allowed : form.overcutting_allowed;
+                          const grandTotalLinearFt = isSawingScope
+                            ? areas.reduce((sum, a) => {
+                                const r = computeSawingAreaLinearFt({
+                                  length: a.length,
+                                  width: a.width,
+                                  qty: a.qty,
+                                  cross_cut_lengthwise_ft: a.cross_cut_lengthwise_ft,
+                                  cross_cut_widthwise_ft: a.cross_cut_widthwise_ft,
+                                  overcut_allowed: resolveOvercut(a),
+                                });
+                                return sum + (r ? r.totalLF : 0);
+                              }, 0)
+                            : 0;
 
                           return (
                             <div className="space-y-3">
@@ -2474,6 +2552,118 @@ export default function ScheduleFormPage() {
                                       </span>
                                     </div>
                                   )}
+
+                                  {/* ── Sawing-specific: overcut + cross-cuts + per-area linear ft ── */}
+                                  {isSawingScope && (() => {
+                                    const overcut = resolveOvercut(area);
+                                    const lf = computeSawingAreaLinearFt({
+                                      length: area.length,
+                                      width: area.width,
+                                      qty: area.qty,
+                                      cross_cut_lengthwise_ft: area.cross_cut_lengthwise_ft,
+                                      cross_cut_widthwise_ft: area.cross_cut_widthwise_ft,
+                                      overcut_allowed: overcut,
+                                    });
+                                    const breakdownTitle = lf
+                                      ? `Perimeter ${lf.perimeterLF.toFixed(1)} ft${lf.doubled ? ' (doubled — no overcut)' : ''} + Cross-cuts ${lf.crossCutLF.toFixed(1)} ft`
+                                      : 'Enter length, width, and qty to calculate';
+                                    return (
+                                      <div className="mt-3 rounded-xl border border-violet-200 dark:border-violet-500/20 bg-gradient-to-br from-violet-50/60 to-sky-50/60 dark:from-violet-500/5 dark:to-sky-500/5 p-3 space-y-3">
+                                        {/* Overcut toggle */}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const updated = [...areas];
+                                            updated[idx] = { ...updated[idx], overcut_allowed: !overcut };
+                                            updateAreas(updated);
+                                          }}
+                                          className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg border transition-all text-left ${
+                                            overcut
+                                              ? 'bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/30 text-sky-800 dark:text-sky-200'
+                                              : 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30 text-rose-800 dark:text-rose-200'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <Scissors size={14} className="shrink-0" />
+                                            <span className="text-xs font-semibold truncate">
+                                              {overcut
+                                                ? 'Overcut allowed (perimeter cut once)'
+                                                : 'No overcut — double-cut perimeter (×2)'}
+                                            </span>
+                                          </div>
+                                          <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${overcut ? 'bg-sky-500' : 'bg-rose-400'}`}>
+                                            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${overcut ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                          </span>
+                                        </button>
+
+                                        {/* Cross-cut spacing inputs */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                          <div>
+                                            <label
+                                              className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-1 block"
+                                              title="Spacing between cuts running across the width."
+                                            >
+                                              Cross-cut length-wise (ft)
+                                            </label>
+                                            <div className="relative">
+                                              <input
+                                                type="number"
+                                                step="0.5"
+                                                min="0"
+                                                placeholder="e.g., 2 = cut every 2 ft along length"
+                                                value={area.cross_cut_lengthwise_ft ?? ''}
+                                                onChange={e => {
+                                                  const updated = [...areas];
+                                                  updated[idx] = { ...updated[idx], cross_cut_lengthwise_ft: e.target.value };
+                                                  updateAreas(updated);
+                                                }}
+                                                className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                                              />
+                                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label
+                                              className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-1 block"
+                                              title="Spacing between cuts running along the length."
+                                            >
+                                              Cross-cut width-wise (ft)
+                                            </label>
+                                            <div className="relative">
+                                              <input
+                                                type="number"
+                                                step="0.5"
+                                                min="0"
+                                                placeholder="e.g., 2 = cut every 2 ft along width"
+                                                value={area.cross_cut_widthwise_ft ?? ''}
+                                                onChange={e => {
+                                                  const updated = [...areas];
+                                                  updated[idx] = { ...updated[idx], cross_cut_widthwise_ft: e.target.value };
+                                                  updateAreas(updated);
+                                                }}
+                                                className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                                              />
+                                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Per-area linear-ft pill */}
+                                        <div
+                                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 dark:bg-white/5 border border-violet-200 dark:border-violet-500/30 text-violet-800 dark:text-violet-200 cursor-help"
+                                          title={breakdownTitle}
+                                        >
+                                          <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Total</span>
+                                          <span className="text-sm font-bold">
+                                            {lf ? `${lf.totalLF.toLocaleString(undefined, { maximumFractionDigits: 1 })} linear ft` : '— linear ft'}
+                                          </span>
+                                          {lf && lf.doubled && (
+                                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-200">×2 perimeter</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               ))}
 
@@ -2491,6 +2681,15 @@ export default function ScheduleFormPage() {
                                   <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-wider">Total:</span>
                                   <span className="text-sm font-bold text-slate-800 dark:text-white">{totalSqFt.toLocaleString()} sq ft</span>
                                   {totalAreaCount > 0 && <span className="text-xs text-slate-400 dark:text-white/30">({totalAreaCount} area{totalAreaCount !== 1 ? 's' : ''})</span>}
+                                </div>
+                              )}
+
+                              {isSawingScope && grandTotalLinearFt > 0 && (
+                                <div className="flex items-center gap-3 px-3 py-2 bg-gradient-to-r from-violet-50 to-sky-50 dark:from-violet-500/10 dark:to-sky-500/10 rounded-xl border border-violet-200 dark:border-violet-500/30">
+                                  <span className="text-xs font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider">Total Linear Feet:</span>
+                                  <span className="text-sm font-bold text-violet-900 dark:text-white">
+                                    {grandTotalLinearFt.toLocaleString(undefined, { maximumFractionDigits: 1 })} ft
+                                  </span>
                                 </div>
                               )}
                             </div>
