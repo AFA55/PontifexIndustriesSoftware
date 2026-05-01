@@ -52,6 +52,7 @@ interface Invoice {
   sent_at: string | null;
   paid_date: string | null;
   created_at: string;
+  created_by: string | null;
 }
 
 interface InvoiceDetail extends Invoice {
@@ -69,6 +70,41 @@ interface CompletedJob {
   status: string;
   billing_type: string | null;
   has_invoice: boolean;
+  created_by: string | null;
+}
+
+interface PreviewLineItem {
+  line_number: number;
+  description: string;
+  billing_type?: string;
+  quantity: number;
+  unit: string;
+  unit_rate: number;
+  taxable?: boolean;
+}
+
+interface PreviewData {
+  job: {
+    id: string;
+    job_number: string;
+    customer_name: string;
+    address: string | null;
+    location: string | null;
+    billing_type: string | null;
+    scope_of_work: string | null;
+    description: string | null;
+    title: string | null;
+    job_type: string | null;
+    po_number: string | null;
+    estimated_cost: number | null;
+  };
+  operator_name: string;
+  work_performed_summary: string;
+  line_items: PreviewLineItem[];
+  subtotal: number;
+  default_due_date: string;
+  default_po_number: string | null;
+  default_notes: string;
 }
 
 // Status pill hues. Light: `bg-{hue}-100 text-{hue}-700 ring-{hue}-200`.
@@ -139,6 +175,18 @@ export default function BillingPage() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [confirmVoid, setConfirmVoid] = useState<string | null>(null);
 
+  // Cache: created_by uuid -> full_name (for "Submitted by" chips)
+  const [profilesById, setProfilesById] = useState<Record<string, string>>({});
+
+  // Review & Confirm modal state
+  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewData, setReviewData] = useState<PreviewData | null>(null);
+  const [editLineItems, setEditLineItems] = useState<PreviewLineItem[]>([]);
+  const [editingDescIdx, setEditingDescIdx] = useState<Set<number>>(new Set());
+  const [submittingReview, setSubmittingReview] = useState(false);
+
   // Mark Paid modal state
   const [markPaidInvoice, setMarkPaidInvoice] = useState<Invoice | null>(null);
   const [markPaidAmount, setMarkPaidAmount] = useState<string>('');
@@ -199,7 +247,7 @@ export default function BillingPage() {
     const guard = async () => {
       const currentUser = getCurrentUser();
       if (!currentUser) { router.push('/login'); return; }
-      const allowedRoles = ['admin', 'super_admin', 'operations_manager'];
+      const allowedRoles = ['admin', 'super_admin', 'operations_manager', 'salesman'];
       const bypassRoles = ['super_admin', 'operations_manager'];
       if (!allowedRoles.includes(currentUser.role)) {
         const getTokenLocal = async (): Promise<string | null> => {
@@ -249,22 +297,33 @@ export default function BillingPage() {
     setError(null);
     try {
       const invoiceRes = await apiFetch('/api/admin/invoices');
+      let invoicesArr: Invoice[] = [];
       if (invoiceRes.ok) {
         const invoiceData = await invoiceRes.json();
-        setInvoices(invoiceData.data || []);
+        invoicesArr = invoiceData.data || [];
+        setInvoices(invoicesArr);
         setStats(invoiceData.stats || {});
       } else {
         setError('Failed to load invoices.');
       }
 
-      const { data: completed } = await supabase
+      let completedQuery = supabase
         .from('job_orders')
-        .select('id, job_number, title, customer_name, estimated_cost, work_completed_at, status, billing_type')
+        .select('id, job_number, title, customer_name, estimated_cost, work_completed_at, status, billing_type, created_by')
         .eq('status', 'completed')
         .is('deleted_at', null)
         .order('work_completed_at', { ascending: false })
         .limit(50);
 
+      // RBAC: salesman only sees their own ready-to-bill jobs.
+      const cu = getCurrentUser();
+      if (cu?.role === 'salesman' && cu.id) {
+        completedQuery = completedQuery.eq('created_by', cu.id);
+      }
+
+      const { data: completed } = await completedQuery;
+
+      let completedArr: CompletedJob[] = [];
       if (completed) {
         const { data: existingLineItems } = await supabase
           .from('invoice_line_items')
@@ -273,10 +332,36 @@ export default function BillingPage() {
 
         const invoicedJobIds = new Set((existingLineItems || []).map(li => li.job_order_id));
 
-        setCompletedJobs(completed.map(j => ({
+        completedArr = completed.map(j => ({
           ...j,
           has_invoice: invoicedJobIds.has(j.id),
-        })));
+        })) as CompletedJob[];
+        setCompletedJobs(completedArr);
+      }
+
+      // Bulk-resolve "Submitted by" full names for the chips.
+      const ids = new Set<string>();
+      for (const inv of invoicesArr) if (inv.created_by) ids.add(inv.created_by);
+      for (const j of completedArr) if (j.created_by) ids.add(j.created_by);
+      const missing = Array.from(ids).filter(id => !(id in profilesById));
+      if (missing.length > 0) {
+        try {
+          const { data: profs } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', missing);
+          if (profs && profs.length > 0) {
+            setProfilesById(prev => {
+              const next = { ...prev };
+              for (const p of profs as any[]) {
+                if (p?.id) next[p.id] = p.full_name || '';
+              }
+              return next;
+            });
+          }
+        } catch {
+          // best-effort; chips will simply not render for unresolved ids
+        }
       }
     } catch (err) {
       console.error('Error fetching billing data:', err);
@@ -313,6 +398,122 @@ export default function BillingPage() {
       setCreating(null);
     }
   };
+
+  const openReviewInvoice = async (jobOrderId: string) => {
+    setReviewJobId(jobOrderId);
+    setReviewLoading(true);
+    setReviewError(null);
+    setReviewData(null);
+    setEditLineItems([]);
+    setEditingDescIdx(new Set());
+    try {
+      const res = await apiFetch('/api/admin/invoices/preview', {
+        method: 'POST',
+        body: JSON.stringify({ jobOrderId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const pd = data.data as PreviewData;
+        setReviewData(pd);
+        setEditLineItems(pd.line_items.map(li => ({ ...li })));
+      } else if (res.status === 409) {
+        setReviewError('An invoice already exists for this job.');
+      } else {
+        setReviewError(data.error || 'Failed to load invoice preview.');
+      }
+    } catch (err) {
+      console.error('Error loading invoice preview:', err);
+      setReviewError('Failed to load invoice preview.');
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const closeReviewModal = () => {
+    if (submittingReview) return;
+    setReviewJobId(null);
+    setReviewData(null);
+    setReviewError(null);
+    setEditLineItems([]);
+    setEditingDescIdx(new Set());
+  };
+
+  const updateEditLineItem = (idx: number, patch: Partial<PreviewLineItem>) => {
+    setEditLineItems(prev => prev.map((li, i) => (i === idx ? { ...li, ...patch } : li)));
+  };
+
+  const toggleEditDesc = (idx: number) => {
+    setEditingDescIdx(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const useOperatorDescription = () => {
+    if (!reviewData) return;
+    if (editLineItems.length === 0) return;
+    const summary = reviewData.work_performed_summary || '';
+    if (!summary.trim()) return;
+    setEditLineItems(prev => prev.map((li, i) => (i === 0 ? { ...li, description: summary } : li)));
+    setEditingDescIdx(prev => {
+      const next = new Set(prev);
+      next.add(0);
+      return next;
+    });
+  };
+
+  const submitReviewedInvoice = async () => {
+    if (!reviewJobId || !reviewData) return;
+    setSubmittingReview(true);
+    setReviewError(null);
+    try {
+      const payload = {
+        jobOrderId: reviewJobId,
+        line_items_override: editLineItems.map((li, i) => ({
+          line_number: i + 1,
+          description: li.description,
+          quantity: Number(li.quantity),
+          unit: li.unit,
+          unit_rate: Number(li.unit_rate),
+          billing_type: li.billing_type || 'flat_rate',
+          taxable: li.taxable !== false,
+        })),
+      };
+      const res = await apiFetch('/api/admin/invoices', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(`Invoice ${data.data?.invoice_number || ''} created successfully.`);
+        setReviewJobId(null);
+        setReviewData(null);
+        setEditLineItems([]);
+        setEditingDescIdx(new Set());
+        setActiveTab('invoices');
+        fetchData();
+      } else if (res.status === 409) {
+        setReviewError('An invoice already exists for this job.');
+      } else {
+        setReviewError(data.error || 'Failed to create invoice.');
+      }
+    } catch (err) {
+      console.error('Error submitting reviewed invoice:', err);
+      setReviewError('Failed to create invoice. Please try again.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // Live subtotal for the editable line items (auto-recomputes on edit)
+  const editSubtotal = editLineItems.reduce((sum, li) => {
+    const q = Number(li.quantity);
+    const r = Number(li.unit_rate);
+    if (Number.isFinite(q) && Number.isFinite(r)) return sum + q * r;
+    return sum;
+  }, 0);
 
   const viewInvoice = async (invoiceId: string) => {
     try {
@@ -771,13 +972,21 @@ export default function BillingPage() {
                 {filteredInvoices.map((inv) => {
                   const accent = STATUS_ACCENT[inv.status] ?? STATUS_ACCENT.draft;
                   return (
-                    <button
+                    <div
                       key={inv.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => viewInvoice(inv.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          viewInvoice(inv.id);
+                        }
+                      }}
                       className="
-                        group relative block w-full overflow-hidden rounded-2xl p-4 pt-5 text-left transition-all
+                        group relative block w-full overflow-hidden rounded-2xl p-4 pt-5 text-left transition-all cursor-pointer
                         bg-white/90 ring-1 ring-slate-200 hover:ring-slate-300 shadow-sm hover:shadow-md
+                        focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500
                         dark:bg-white/[0.04] dark:ring-white/10 dark:hover:ring-white/20
                       "
                     >
@@ -797,6 +1006,15 @@ export default function BillingPage() {
                             {inv.po_number && (
                               <span className="text-xs text-slate-500 dark:text-white/50">
                                 PO: {inv.po_number}
+                              </span>
+                            )}
+                            {inv.created_by && profilesById[inv.created_by] && (
+                              <span className="
+                                inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium
+                                bg-slate-100 text-slate-600 ring-1 ring-slate-200
+                                dark:bg-white/5 dark:text-white/60 dark:ring-white/10
+                              ">
+                                Submitted by: {profilesById[inv.created_by]}
                               </span>
                             )}
                           </div>
@@ -868,7 +1086,7 @@ export default function BillingPage() {
                           </div>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -942,6 +1160,15 @@ export default function BillingPage() {
                               Completed {new Date(job.work_completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             </span>
                           )}
+                          {job.created_by && profilesById[job.created_by] && (
+                            <span className="
+                              inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium
+                              bg-slate-100 text-slate-600 ring-1 ring-slate-200
+                              dark:bg-white/5 dark:text-white/60 dark:ring-white/10
+                            ">
+                              Submitted by: {profilesById[job.created_by]}
+                            </span>
+                          )}
                         </div>
                         <h3 className="text-slate-900 dark:text-white font-semibold truncate">
                           {job.customer_name}
@@ -962,15 +1189,15 @@ export default function BillingPage() {
                           )}
                         </div>
                         <button
-                          onClick={() => createInvoice(job.id)}
-                          disabled={creating === job.id}
+                          onClick={() => openReviewInvoice(job.id)}
+                          disabled={creating === job.id || (reviewJobId === job.id && reviewLoading)}
                           className="
                             inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50
                             bg-gradient-to-r from-emerald-500 to-teal-500 text-white
                             shadow-sm shadow-emerald-500/20 hover:shadow-md hover:shadow-emerald-500/30
                           "
                         >
-                          {creating === job.id ? (
+                          {(reviewJobId === job.id && reviewLoading) ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           ) : (
                             <Plus className="w-3.5 h-3.5" />
@@ -1384,6 +1611,283 @@ export default function BillingPage() {
                 >
                   {markPaidSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Review & Confirm Invoice Modal */}
+        {reviewJobId && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto py-8">
+            <div className="
+              w-full max-w-2xl mx-2 sm:mx-4 rounded-2xl shadow-2xl ring-1
+              bg-white ring-slate-200
+              dark:bg-[#120826] dark:ring-white/10
+            ">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-white/10">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Receipt className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    Review &amp; Confirm Invoice
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-white/60">
+                    {reviewData
+                      ? `${reviewData.job.job_number} — ${reviewData.job.customer_name}`
+                      : 'Loading preview…'}
+                  </p>
+                </div>
+                <button
+                  onClick={closeReviewModal}
+                  disabled={submittingReview}
+                  className="
+                    p-2 rounded-lg transition-colors disabled:opacity-50
+                    hover:bg-slate-100 text-slate-500
+                    dark:hover:bg-white/10 dark:text-white/70
+                  "
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 sm:p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+                {reviewLoading && (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+                  </div>
+                )}
+
+                {reviewError && (
+                  <div className="
+                    p-3 rounded-xl flex items-center gap-3
+                    bg-rose-50 ring-1 ring-rose-200
+                    dark:bg-rose-500/10 dark:ring-rose-400/30
+                  ">
+                    <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-300 flex-shrink-0" />
+                    <p className="text-sm text-rose-700 dark:text-rose-200 flex-1">{reviewError}</p>
+                  </div>
+                )}
+
+                {!reviewLoading && reviewData && (
+                  <>
+                    {/* Job summary grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Customer</p>
+                        <p className="text-slate-900 dark:text-white font-medium truncate">{reviewData.job.customer_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Job #</p>
+                        <p className="text-slate-900 dark:text-white font-mono font-medium">{reviewData.job.job_number}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Billing</p>
+                        <p className="text-slate-900 dark:text-white font-medium capitalize">
+                          {(reviewData.job.billing_type || 'fixed').replace('_', ' ')}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Default Due</p>
+                        <p className="text-slate-900 dark:text-white font-medium">{formatDate(reviewData.default_due_date)}</p>
+                      </div>
+                      {(reviewData.job.location || reviewData.job.address) && (
+                        <div className="col-span-2 sm:col-span-4">
+                          <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1">Location</p>
+                          <p className="text-slate-900 dark:text-white font-medium text-sm truncate">
+                            {reviewData.job.location || reviewData.job.address}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Work Performed by Operator panel */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider">
+                          Work Performed by Operator ({reviewData.operator_name})
+                        </p>
+                        <button
+                          type="button"
+                          onClick={useOperatorDescription}
+                          disabled={!reviewData.work_performed_summary?.trim() || editLineItems.length === 0}
+                          className="
+                            inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                            bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700 hover:bg-emerald-100
+                            dark:bg-emerald-500/15 dark:ring-emerald-400/30 dark:text-emerald-200 dark:hover:bg-emerald-500/25
+                          "
+                          title="Copy this text into the first line item description"
+                        >
+                          Use Operator&apos;s Description
+                        </button>
+                      </div>
+                      <div className="
+                        rounded-xl p-3 ring-1 font-mono text-xs whitespace-pre-wrap
+                        bg-slate-50 ring-slate-200 text-slate-700
+                        dark:bg-white/[0.03] dark:ring-white/10 dark:text-white/80
+                      ">
+                        {reviewData.work_performed_summary?.trim()
+                          ? reviewData.work_performed_summary
+                          : 'No work performed details available.'}
+                      </div>
+                    </div>
+
+                    {/* Editable line items */}
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-2">Proposed Line Items</p>
+                      <div className="rounded-xl ring-1 ring-slate-200 dark:ring-white/10 overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-slate-50 dark:bg-white/[0.03] border-b border-slate-200 dark:border-white/10">
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider">Description</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider w-20">Qty</th>
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider w-20">Unit</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider w-24">Rate</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider w-24">Amount</th>
+                              <th className="px-3 py-2 w-20"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {editLineItems.map((li, i) => {
+                              const editing = editingDescIdx.has(i);
+                              const amount = (Number(li.quantity) || 0) * (Number(li.unit_rate) || 0);
+                              return (
+                                <tr key={i} className={i % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''}>
+                                  <td className="px-3 py-2 align-top">
+                                    {editing ? (
+                                      <textarea
+                                        value={li.description}
+                                        onChange={(e) => updateEditLineItem(i, { description: e.target.value })}
+                                        rows={Math.min(6, Math.max(2, li.description.split('\n').length))}
+                                        className="
+                                          w-full px-2 py-1.5 rounded-lg text-sm
+                                          bg-white border border-slate-200 text-slate-900
+                                          focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200
+                                          dark:bg-white/5 dark:border-white/10 dark:text-white
+                                          dark:focus:border-emerald-400 dark:focus:ring-emerald-500/30
+                                        "
+                                      />
+                                    ) : (
+                                      <div className="text-slate-900 dark:text-white whitespace-pre-wrap break-words">
+                                        {li.description}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right align-top">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={li.quantity}
+                                      onChange={(e) => updateEditLineItem(i, { quantity: Number(e.target.value) })}
+                                      className="
+                                        w-full px-2 py-1.5 rounded-lg text-sm text-right tabular-nums
+                                        bg-white border border-slate-200 text-slate-900
+                                        focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200
+                                        dark:bg-white/5 dark:border-white/10 dark:text-white
+                                        dark:focus:border-emerald-400 dark:focus:ring-emerald-500/30
+                                      "
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 align-top">
+                                    <input
+                                      type="text"
+                                      value={li.unit}
+                                      onChange={(e) => updateEditLineItem(i, { unit: e.target.value })}
+                                      className="
+                                        w-full px-2 py-1.5 rounded-lg text-sm
+                                        bg-white border border-slate-200 text-slate-900
+                                        focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200
+                                        dark:bg-white/5 dark:border-white/10 dark:text-white
+                                        dark:focus:border-emerald-400 dark:focus:ring-emerald-500/30
+                                      "
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 text-right align-top">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={li.unit_rate}
+                                      onChange={(e) => updateEditLineItem(i, { unit_rate: Number(e.target.value) })}
+                                      className="
+                                        w-full px-2 py-1.5 rounded-lg text-sm text-right tabular-nums
+                                        bg-white border border-slate-200 text-slate-900
+                                        focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200
+                                        dark:bg-white/5 dark:border-white/10 dark:text-white
+                                        dark:focus:border-emerald-400 dark:focus:ring-emerald-500/30
+                                      "
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 text-right align-top text-slate-900 dark:text-white font-medium tabular-nums">
+                                    ${amount.toFixed(2)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleEditDesc(i)}
+                                      className={`
+                                        text-[11px] font-semibold px-2 py-1 rounded-lg transition-colors
+                                        ${editing
+                                          ? 'bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:ring-emerald-400/30 dark:text-emerald-200'
+                                          : 'bg-slate-100 ring-1 ring-slate-200 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:ring-white/10 dark:text-white/70 dark:hover:bg-white/15'
+                                        }
+                                      `}
+                                    >
+                                      {editing ? 'Use as-is' : 'Edit Description'}
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {editLineItems.length === 0 && (
+                              <tr>
+                                <td colSpan={6} className="px-4 py-6 text-center text-slate-400 dark:text-white/40 text-sm">
+                                  No line items proposed.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t border-slate-200 dark:border-white/10">
+                              <td colSpan={4} className="px-3 py-2 text-right text-sm font-semibold text-slate-500 dark:text-white/60">Subtotal</td>
+                              <td className="px-3 py-2 text-right text-sm font-bold text-slate-900 dark:text-white tabular-nums">
+                                ${editSubtotal.toFixed(2)}
+                              </td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="px-4 sm:px-6 py-4 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeReviewModal}
+                  disabled={submittingReview}
+                  className="
+                    px-3 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50
+                    bg-slate-100 text-slate-700 hover:bg-slate-200
+                    dark:bg-white/10 dark:text-white/80 dark:hover:bg-white/15
+                  "
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitReviewedInvoice}
+                  disabled={submittingReview || reviewLoading || !reviewData || editLineItems.length === 0}
+                  className="
+                    inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50
+                    bg-gradient-to-r from-emerald-500 to-teal-500 text-white
+                    shadow-sm shadow-emerald-500/20 hover:shadow-md hover:shadow-emerald-500/30
+                  "
+                >
+                  {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Submit Invoice
                 </button>
               </div>
             </div>

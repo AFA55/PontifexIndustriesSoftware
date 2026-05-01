@@ -21,6 +21,10 @@ import {
   Trash2,
   Loader2,
   StickyNote,
+  Camera,
+  ExternalLink,
+  Eye,
+  HardHat,
 } from 'lucide-react';
 
 interface CompletedJob {
@@ -56,11 +60,16 @@ interface CompletedJob {
   total_days_worked: number | null;
   total_hours_worked: number | null;
   work_completed_at: string | null;
+  // Sign-off PDF + photos + helper
+  completion_pdf_url: string | null;
+  photo_urls: string[] | null;
+  helper_assigned_to: string | null;
 }
 
 interface JobDetails {
   job: CompletedJob;
   operatorName: string;
+  helperName: string | null;
   workPerformed: any[];
   standbyLogs: any[];
   totalStandbyHours: number;
@@ -212,6 +221,18 @@ export default function CompletedJobsArchivePage() {
         operatorName = profile?.full_name || 'Unknown';
       } catch (_) {}
 
+      let helperName: string | null = null;
+      if (job.helper_assigned_to) {
+        try {
+          const { data: helperProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', job.helper_assigned_to)
+            .single();
+          helperName = helperProfile?.full_name || null;
+        } catch (_) {}
+      }
+
       let standbyLogs: any[] = [];
       try {
         const { data } = await supabase
@@ -291,6 +312,7 @@ export default function CompletedJobsArchivePage() {
       setSelectedJobDetails({
         job,
         operatorName,
+        helperName,
         workPerformed,
         standbyLogs,
         totalStandbyHours,
@@ -602,7 +624,6 @@ export default function CompletedJobsArchivePage() {
                             selectedJobDetails.job.job_location ||
                               selectedJobDetails.job.location,
                           ],
-                          ['Operator', selectedJobDetails.operatorName],
                           [
                             'Scheduled Date',
                             new Date(
@@ -626,6 +647,49 @@ export default function CompletedJobsArchivePage() {
                             </p>
                           </div>
                         ))}
+
+                        {/* Operator with timecard link */}
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-1">
+                            Operator
+                          </p>
+                          <p className="text-sm text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                            <User className="w-3.5 h-3.5 text-violet-500 dark:text-violet-300" />
+                            <span>{selectedJobDetails.operatorName || '—'}</span>
+                            {selectedJobDetails.job.assigned_to && (
+                              <Link
+                                href={`/dashboard/admin/timecards/operator/${selectedJobDetails.job.assigned_to}`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-violet-700 bg-violet-50 ring-1 ring-violet-200 hover:bg-violet-100 hover:text-violet-800 transition-colors dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30 dark:hover:bg-violet-500/25"
+                              >
+                                <Clock className="w-3 h-3" />
+                                View timecard
+                              </Link>
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Helper row (only if assigned) */}
+                        {selectedJobDetails.job.helper_assigned_to && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-1">
+                              Helper
+                            </p>
+                            <p className="text-sm text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                              <HardHat className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
+                              <span>
+                                {selectedJobDetails.helperName ||
+                                  `Helper (${selectedJobDetails.job.helper_assigned_to.slice(0, 8)})`}
+                              </span>
+                              <Link
+                                href={`/dashboard/admin/timecards/operator/${selectedJobDetails.job.helper_assigned_to}`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-indigo-700 bg-indigo-50 ring-1 ring-indigo-200 hover:bg-indigo-100 hover:text-indigo-800 transition-colors dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-400/30 dark:hover:bg-indigo-500/25"
+                              >
+                                <Clock className="w-3 h-3" />
+                                View timecard
+                              </Link>
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Metrics */}
@@ -635,7 +699,7 @@ export default function CompletedJobsArchivePage() {
                             icon: Calendar,
                             label: 'Days Worked',
                             value: `${selectedJobDetails.totalDaysWorked}`,
-                            tile: 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-400/30',
+                            tile: 'bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/30 ring-violet-400/30',
                           },
                           {
                             icon: Clock,
@@ -643,30 +707,34 @@ export default function CompletedJobsArchivePage() {
                             value: `${selectedJobDetails.totalHoursWorked > 0
                               ? selectedJobDetails.totalHoursWorked.toFixed(1)
                               : selectedJobDetails.totalJobHours.toFixed(1)}h`,
-                            tile: 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-400/30',
+                            tile: 'bg-gradient-to-br from-cyan-500 to-sky-600 shadow-lg shadow-sky-500/30 ring-sky-400/30',
                           },
                           {
                             icon: Clock,
                             label: 'Standby Time',
                             value: `${selectedJobDetails.totalStandbyHours.toFixed(1)}h`,
-                            tile: 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30',
+                            tile: 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/30 ring-amber-400/30',
                           },
                           {
                             icon: DollarSign,
                             label: 'Labor Cost',
                             value: `$${selectedJobDetails.laborCost.toFixed(0)}`,
-                            tile: 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/30',
+                            tile: 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30 ring-emerald-400/30',
                           },
                         ].map((m) => (
                           <div
                             key={m.label}
-                            className={`rounded-xl p-4 ring-1 ${m.tile}`}
+                            className={`rounded-xl p-4 ring-1 text-white ${m.tile}`}
                           >
-                            <div className="flex items-center gap-2 mb-1">
-                              <m.icon className="w-4 h-4" />
-                              <span className="text-xs font-semibold">{m.label}</span>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-white/85 text-xs font-semibold uppercase tracking-wide">
+                                {m.label}
+                              </span>
+                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm ring-1 ring-white/30">
+                                <m.icon className="w-4 h-4 text-white" />
+                              </span>
                             </div>
-                            <p className="text-2xl font-bold tabular-nums">{m.value}</p>
+                            <p className="text-3xl font-bold tabular-nums text-white">{m.value}</p>
                           </div>
                         ))}
                       </div>
@@ -798,9 +866,15 @@ export default function CompletedJobsArchivePage() {
                     </div>
 
                     {/* Documents */}
-                    <div className="rounded-2xl p-6 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
+                    <div className="relative overflow-hidden rounded-2xl p-6 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
+                      <span
+                        className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"
+                        aria-hidden
+                      />
                       <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-violet-50 text-violet-600 ring-1 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30">
+                          <FileText className="w-4 h-4" />
+                        </span>
                         Job Documents &amp; Attachments
                       </h2>
                       <div className="space-y-3">
@@ -853,10 +927,10 @@ export default function CompletedJobsArchivePage() {
                           )}
                         {selectedJobDetails.job.completion_signed_at &&
                           !selectedJobDetails.job.contact_not_on_site && (
-                            <div className="rounded-xl p-4 bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30 flex items-start justify-between gap-3">
-                              <div className="flex items-start gap-3">
-                                <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5" />
-                                <div>
+                            <div className="rounded-xl p-4 bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30 flex items-start justify-between gap-3 flex-wrap">
+                              <div className="flex items-start gap-3 min-w-0">
+                                <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5 flex-shrink-0" />
+                                <div className="min-w-0">
                                   <p className="font-semibold text-emerald-900 dark:text-emerald-200">
                                     Service Completion Signature
                                   </p>
@@ -871,17 +945,47 @@ export default function CompletedJobsArchivePage() {
                                   </p>
                                 </div>
                               </div>
-                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/30 flex items-center gap-1">
-                                <CheckCircle className="w-3 h-3" />
-                                Signed
-                              </span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/30 flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" />
+                                  Signed
+                                </span>
+                                {selectedJobDetails.job.completion_pdf_url ? (
+                                  <>
+                                    <a
+                                      href={selectedJobDetails.job.completion_pdf_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 shadow-sm shadow-emerald-500/30 transition-colors"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      View
+                                    </a>
+                                    <a
+                                      href={selectedJobDetails.job.completion_pdf_url}
+                                      download={`SignOff_${selectedJobDetails.job.job_number}.pdf`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/30 transition-colors"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                      Download
+                                    </a>
+                                  </>
+                                ) : (
+                                  <span className="text-[11px] italic text-emerald-700/70 dark:text-emerald-300/60">
+                                    PDF not available
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           )}
 
                         {!selectedJobDetails.job.agreement_pdf &&
                           !selectedJobDetails.job.liability_release_pdf &&
                           !selectedJobDetails.job.silica_form_pdf &&
-                          !selectedJobDetails.job.completion_signed_at && (
+                          !selectedJobDetails.job.completion_signed_at &&
+                          !selectedJobDetails.job.completion_pdf_url && (
                             <div className="rounded-xl p-6 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
                               <FileText className="w-10 h-10 text-slate-300 dark:text-white/20 mx-auto mb-2" />
                               <p className="text-slate-600 dark:text-white/70 font-medium text-sm">
@@ -894,7 +998,11 @@ export default function CompletedJobsArchivePage() {
                           )}
 
                         {/* Operator Notes */}
-                        <div className="mt-4 rounded-xl p-4 bg-sky-50 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:ring-sky-400/30">
+                        <div className="relative overflow-hidden mt-4 rounded-xl p-4 bg-sky-50 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:ring-sky-400/30">
+                          <span
+                            className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-400 via-cyan-400 to-blue-500"
+                            aria-hidden
+                          />
                           <h3 className="font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2 text-sm">
                             <StickyNote className="w-4 h-4 text-sky-600 dark:text-sky-300" />
                             Operator Notes
@@ -986,6 +1094,71 @@ export default function CompletedJobsArchivePage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Completion Photos */}
+                    {(() => {
+                      const photos = Array.isArray(selectedJobDetails.job.photo_urls)
+                        ? selectedJobDetails.job.photo_urls.filter((p): p is string => typeof p === 'string' && p.length > 0)
+                        : [];
+                      return (
+                        <div className="relative overflow-hidden rounded-2xl p-6 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
+                          <span
+                            className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"
+                            aria-hidden
+                          />
+                          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-violet-50 text-violet-600 ring-1 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30">
+                              <Camera className="w-4 h-4" />
+                            </span>
+                            Completion Photos
+                            {photos.length > 0 && (
+                              <span className="ml-auto px-2 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-700 dark:bg-violet-500/25 dark:text-violet-200">
+                                {photos.length}
+                              </span>
+                            )}
+                          </h2>
+                          {photos.length === 0 ? (
+                            <div className="rounded-xl p-6 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                              <Camera className="w-10 h-10 text-slate-300 dark:text-white/20 mx-auto mb-2" />
+                              <p className="text-slate-600 dark:text-white/70 font-medium text-sm">
+                                No photos uploaded yet
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-white/50 mt-1">
+                                Operator photos from the work-performed and day-complete pages will appear here
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                              {photos.map((url, idx) => (
+                                <a
+                                  key={`${url}-${idx}`}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="group relative aspect-square rounded-xl overflow-hidden ring-1 ring-slate-200 hover:ring-2 hover:ring-violet-400 dark:ring-white/10 dark:hover:ring-violet-400/70 transition-all bg-slate-100 dark:bg-white/[0.05]"
+                                >
+                                  <img
+                                    src={url}
+                                    loading="lazy"
+                                    alt={`Completion photo ${idx + 1}`}
+                                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between">
+                                    <span className="text-white text-[11px] font-bold">
+                                      #{idx + 1}
+                                    </span>
+                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/20 backdrop-blur-sm ring-1 ring-white/30">
+                                      <ExternalLink className="w-3 h-3 text-white" />
+                                    </span>
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <div className="rounded-2xl p-12 text-center shadow-sm bg-white border border-slate-200 dark:bg-white/5 dark:border-white/10">

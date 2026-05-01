@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { notifySalesperson } from '@/lib/notify-salesperson';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -284,6 +285,35 @@ async function updateJobStatus(
     if (historyUpsertError) {
       // operator_status_history is optional — log but never block
       console.log('Operator status history skipped (table may not exist):', historyUpsertError.message || historyUpsertError.code || 'unknown');
+    }
+
+    // Fire-and-forget salesperson notifications on key status transitions.
+    try {
+      const oldStatus = existingJob.status;
+      const salespersonId = existingJob.created_by;
+      if (salespersonId) {
+        if (status === 'in_progress' && oldStatus !== 'in_progress') {
+          notifySalesperson({
+            event: 'job_active',
+            jobOrderId: jobId,
+            recipientUserId: salespersonId,
+            tenantId: existingJob.tenant_id || null,
+            subjectName: existingJob.job_number || jobId,
+            customerName: existingJob.customer_name || undefined,
+          }).catch(() => {});
+        } else if (status === 'completed' && oldStatus !== 'completed') {
+          notifySalesperson({
+            event: 'job_completed',
+            jobOrderId: jobId,
+            recipientUserId: salespersonId,
+            tenantId: existingJob.tenant_id || null,
+            subjectName: existingJob.job_number || jobId,
+            customerName: existingJob.customer_name || undefined,
+          }).catch(() => {});
+        }
+      }
+    } catch {
+      // never block on notification dispatch
     }
 
     return NextResponse.json(

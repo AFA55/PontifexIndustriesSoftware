@@ -22,6 +22,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { notifySalesperson } from '@/lib/notify-salesperson';
 
 export async function PATCH(
   request: NextRequest,
@@ -123,6 +124,51 @@ export async function PATCH(
         },
       })
     ).then(() => {}).catch(() => {});
+
+    // Fire-and-forget salesperson notification when fully paid.
+    if (newStatus === 'paid') {
+      (async () => {
+        try {
+          const { data: lineItem } = await supabaseAdmin
+            .from('invoice_line_items')
+            .select('job_order_id')
+            .eq('invoice_id', invoiceId)
+            .not('job_order_id', 'is', null)
+            .limit(1)
+            .maybeSingle();
+
+          let recipientUserId: string | null = null;
+          let jobOrderId: string | null = null;
+          if (lineItem?.job_order_id) {
+            jobOrderId = lineItem.job_order_id;
+            const { data: job } = await supabaseAdmin
+              .from('job_orders')
+              .select('created_by')
+              .eq('id', lineItem.job_order_id)
+              .maybeSingle();
+            if (job?.created_by) recipientUserId = job.created_by;
+          }
+          if (!recipientUserId) {
+            const { data: inv } = await supabaseAdmin
+              .from('invoices')
+              .select('created_by')
+              .eq('id', invoiceId)
+              .maybeSingle();
+            if (inv?.created_by) recipientUserId = inv.created_by;
+          }
+          if (recipientUserId) {
+            await notifySalesperson({
+              event: 'invoice_paid',
+              invoiceId,
+              jobOrderId: jobOrderId || undefined,
+              recipientUserId,
+              tenantId: invoice.tenant_id,
+              subjectName: invoice.invoice_number,
+            });
+          }
+        } catch {}
+      })().catch(() => {});
+    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (err: any) {
