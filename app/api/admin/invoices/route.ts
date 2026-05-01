@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { notifySalesperson } from '@/lib/notify-salesperson';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +42,12 @@ export async function GET(request: NextRequest) {
       .limit(limit);
 
     query = query.eq('tenant_id', tenantId);
+
+    // RBAC: salesman sees only invoices they created; admin/super_admin/
+    // operations_manager/supervisor see everything in their tenant.
+    if (auth.role === 'salesman') {
+      query = query.eq('created_by', auth.userId);
+    }
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
@@ -104,7 +111,23 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
-    const { jobOrderId } = body;
+    const {
+      jobOrderId,
+      description_override,
+      line_items_override,
+    }: {
+      jobOrderId?: string;
+      description_override?: string;
+      line_items_override?: Array<{
+        line_number?: number;
+        description: string;
+        quantity: number | string;
+        unit?: string;
+        unit_rate: number | string;
+        billing_type?: string;
+        taxable?: boolean;
+      }>;
+    } = body || {};
 
     if (!jobOrderId) {
       return NextResponse.json({ error: 'jobOrderId is required' }, { status: 400 });
@@ -324,6 +347,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ──────────────────────────────────────────────────────────────────
+    // Apply optional overrides from the Review & Confirm step.
+    //   - line_items_override: replaces the entire auto-built list and
+    //     recomputes the subtotal.
+    //   - description_override: when no line_items_override is supplied,
+    //     replaces the FIRST auto-built line item's description only.
+    // ──────────────────────────────────────────────────────────────────
+    if (Array.isArray(line_items_override) && line_items_override.length > 0) {
+      const overridden: any[] = [];
+      let subtotalOverride = 0;
+      let lineNo = 1;
+      for (const li of line_items_override) {
+        const qty = Number(li.quantity);
+        const rate = Number(li.unit_rate);
+        if (!Number.isFinite(qty) || !Number.isFinite(rate)) {
+          return NextResponse.json(
+            { error: 'Invalid line item: quantity and unit_rate must be numeric' },
+            { status: 400 }
+          );
+        }
+        if (!li.description || !String(li.description).trim()) {
+          return NextResponse.json(
+            { error: 'Invalid line item: description is required' },
+            { status: 400 }
+          );
+        }
+        overridden.push({
+          line_number: typeof li.line_number === 'number' ? li.line_number : lineNo++,
+          description: String(li.description),
+          billing_type: li.billing_type || 'flat_rate',
+          quantity: qty,
+          unit: li.unit || 'each',
+          unit_rate: rate,
+          job_order_id: jobOrderId,
+          taxable: li.taxable !== false,
+        });
+        subtotalOverride += qty * rate;
+      }
+      lineItems.length = 0;
+      for (const o of overridden) lineItems.push(o);
+      subtotal = subtotalOverride;
+    } else if (typeof description_override === 'string' && description_override.trim() && lineItems.length > 0) {
+      lineItems[0] = { ...lineItems[0], description: description_override.trim() };
+    }
+
     const tenantIdForInsert = callerTenantId;
 
     // Create the invoice
@@ -372,6 +440,21 @@ export async function POST(request: NextRequest) {
         // Invoice was created but line items failed - don't fail the whole request
       }
     }
+
+    // Fire-and-forget: notify the salesperson (job creator) that the invoice is ready.
+    try {
+      if (job?.created_by) {
+        notifySalesperson({
+          event: 'invoice_ready',
+          jobOrderId: job.id,
+          invoiceId: invoice.id,
+          recipientUserId: job.created_by,
+          tenantId: tenantIdForInsert || null,
+          subjectName: invoice.invoice_number,
+          customerName: job.customer_name || undefined,
+        }).catch(() => {});
+      }
+    } catch {}
 
     return NextResponse.json({
       success: true,
