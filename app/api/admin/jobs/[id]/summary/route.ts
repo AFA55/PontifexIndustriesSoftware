@@ -106,6 +106,46 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (tenantId) progressQuery = progressQuery.eq('tenant_id', tenantId);
     const { data: progressEntries } = await progressQuery.order('date', { ascending: false });
 
+    // ── 3b. Fetch operator-submitted work_items (bridges Work Performed flow) ─
+    // Operators POST to /api/job-orders/[id]/work-items which writes to the
+    // `work_items` table — separate from `job_progress_entries`. We merge them
+    // into progress.by_date so admins can see them in the Job Scope & Progress
+    // panel. Scope rollup math stays based on job_progress_entries only because
+    // work_items have no scope_item_id linkage.
+    let workItemsQuery = supabaseAdmin
+      .from('work_items')
+      .select(`
+        id,
+        operator_id,
+        work_type,
+        quantity,
+        notes,
+        day_number,
+        core_quantity,
+        linear_feet_cut,
+        details_json,
+        created_at
+      `)
+      .eq('job_order_id', jobId);
+    if (tenantId) workItemsQuery = workItemsQuery.eq('tenant_id', tenantId);
+    const { data: workItems } = await workItemsQuery.order('created_at', { ascending: false });
+
+    // Resolve operator names for any work_items.operator_id values not already
+    // present in the progressEntries operator profile join.
+    const workItemOperatorIds = Array.from(
+      new Set((workItems || []).map((wi: any) => wi.operator_id).filter(Boolean))
+    );
+    const workItemOperatorMap: Record<string, string> = {};
+    if (workItemOperatorIds.length > 0) {
+      const { data: opProfiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', workItemOperatorIds);
+      for (const p of opProfiles || []) {
+        workItemOperatorMap[(p as any).id] = (p as any).full_name;
+      }
+    }
+
     // ── 4. Fetch the latest completion request ──────────────────────────────
     let completionRequest: {
       id: string;
@@ -188,6 +228,47 @@ export async function GET(request: NextRequest, context: RouteContext) {
         quantity_completed: Number(entry.quantity_completed),
         operator_name: (entry.profiles as any)?.full_name ?? 'Unknown',
         notes: entry.notes ?? null,
+      });
+    }
+
+    // Merge operator-submitted work_items into byDate. work_items have no
+    // explicit `date` column, so we derive the YYYY-MM-DD date key from
+    // created_at. They have no scope_item_id, so we surface the work_type as
+    // both the description and work_type, and infer a unit hint from the
+    // detail fields when present (cores / LF).
+    for (const wi of workItems || []) {
+      const created = (wi as any).created_at;
+      if (!created) continue;
+      const dateKey =
+        typeof created === 'string'
+          ? created.slice(0, 10)
+          : new Date(created).toISOString().slice(0, 10);
+      if (!byDate[dateKey]) byDate[dateKey] = [];
+
+      const workType = (wi as any).work_type ?? null;
+      let unit: string | null = null;
+      let quantity = Number((wi as any).quantity ?? 0);
+      if ((wi as any).core_quantity != null && Number((wi as any).core_quantity) > 0) {
+        unit = 'cores';
+        quantity = Number((wi as any).core_quantity);
+      } else if ((wi as any).linear_feet_cut != null && Number((wi as any).linear_feet_cut) > 0) {
+        unit = 'LF';
+        quantity = Number((wi as any).linear_feet_cut);
+      }
+
+      byDate[dateKey].push({
+        id: (wi as any).id,
+        scope_item_id: null,
+        scope_item_description: workType ?? 'Operator-submitted work',
+        work_type: workType,
+        unit,
+        quantity_completed: quantity,
+        operator_name:
+          workItemOperatorMap[(wi as any).operator_id] ??
+          (operatorProfile?.full_name ?? 'Unknown'),
+        notes: (wi as any).notes ?? null,
+        source: 'work_items',
+        day_number: (wi as any).day_number ?? null,
       });
     }
 
