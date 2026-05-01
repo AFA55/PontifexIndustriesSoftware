@@ -65,6 +65,76 @@ const REMOVAL_METHOD_LABELS: Record<string, string> = {
 interface ScopeDetailsDisplayProps {
   scopeDetails: Record<string, Record<string, string>> | null | undefined;
   compact?: boolean;
+  /**
+   * Job-level fallback for overcut allowance — used when a per-area
+   * `area.overcut_allowed` flag is not explicitly set. Defaults to false
+   * (i.e., perimeter must be double-cut).
+   */
+  fallbackOvercutAllowed?: boolean;
+}
+
+/**
+ * Pure helper: computes total linear feet of cutting for a single area.
+ * Mirrors the formula used in the schedule form so admin and operator
+ * see identical totals.
+ *
+ * Inputs (any string-coerced number is fine):
+ *   - length (ft), width (ft), qty (count)
+ *   - cross_cut_lengthwise_ft (spacing between length-wise cuts)
+ *   - cross_cut_widthwise_ft  (spacing between width-wise cuts)
+ *   - overcut_allowed (per-area override; falls back to job-level)
+ *
+ * Returns null when length/width are not parsable / non-positive.
+ */
+export function computeAreaLinearFt(
+  area: { length?: string | number; width?: string | number; qty?: string | number; overcut_allowed?: boolean; cross_cut_lengthwise_ft?: string | number; cross_cut_widthwise_ft?: string | number } | null | undefined,
+  fallbackOvercut: boolean,
+): number | null {
+  if (!area) return null;
+  const length = parseFloat(String(area.length ?? ''));
+  const width = parseFloat(String(area.width ?? ''));
+  const qtyN = parseInt(String(area.qty ?? ''), 10);
+  if (!isFinite(length) || !isFinite(width) || length <= 0 || width <= 0) return null;
+  const qty = isFinite(qtyN) && qtyN > 0 ? qtyN : 1;
+  const lengthSpacing = parseFloat(String(area.cross_cut_lengthwise_ft ?? '')) || 0;
+  const widthSpacing = parseFloat(String(area.cross_cut_widthwise_ft ?? '')) || 0;
+  const perimeter = 2 * (length + width);
+  const lengthwiseCuts = lengthSpacing > 0 ? Math.max(0, Math.floor(length / lengthSpacing) - 1) : 0;
+  const widthwiseCuts = widthSpacing > 0 ? Math.max(0, Math.floor(width / widthSpacing) - 1) : 0;
+  const crossCutPerUnit = (lengthwiseCuts * width) + (widthwiseCuts * length);
+  const overcut = typeof area.overcut_allowed === 'boolean' ? area.overcut_allowed : fallbackOvercut;
+  const perimeterPerUnit = perimeter * (overcut ? 1 : 2);
+  return (perimeterPerUnit + crossCutPerUnit) * qty;
+}
+
+/**
+ * Returns the perimeter and cross-cut LF components separately,
+ * so the UI can render a "perimeter X + cross-cuts Y" subtitle.
+ */
+export function computeAreaLinearFtParts(
+  area: { length?: string | number; width?: string | number; qty?: string | number; overcut_allowed?: boolean; cross_cut_lengthwise_ft?: string | number; cross_cut_widthwise_ft?: string | number } | null | undefined,
+  fallbackOvercut: boolean,
+): { perimeterLf: number; crossCutLf: number; total: number; overcut: boolean } | null {
+  if (!area) return null;
+  const length = parseFloat(String(area.length ?? ''));
+  const width = parseFloat(String(area.width ?? ''));
+  const qtyN = parseInt(String(area.qty ?? ''), 10);
+  if (!isFinite(length) || !isFinite(width) || length <= 0 || width <= 0) return null;
+  const qty = isFinite(qtyN) && qtyN > 0 ? qtyN : 1;
+  const lengthSpacing = parseFloat(String(area.cross_cut_lengthwise_ft ?? '')) || 0;
+  const widthSpacing = parseFloat(String(area.cross_cut_widthwise_ft ?? '')) || 0;
+  const perimeter = 2 * (length + width);
+  const lengthwiseCuts = lengthSpacing > 0 ? Math.max(0, Math.floor(length / lengthSpacing) - 1) : 0;
+  const widthwiseCuts = widthSpacing > 0 ? Math.max(0, Math.floor(width / widthSpacing) - 1) : 0;
+  const crossCutPerUnit = (lengthwiseCuts * width) + (widthwiseCuts * length);
+  const overcut = typeof area.overcut_allowed === 'boolean' ? area.overcut_allowed : fallbackOvercut;
+  const perimeterPerUnit = perimeter * (overcut ? 1 : 2);
+  return {
+    perimeterLf: perimeterPerUnit * qty,
+    crossCutLf: crossCutPerUnit * qty,
+    total: (perimeterPerUnit + crossCutPerUnit) * qty,
+    overcut,
+  };
 }
 
 // Equipment labels for removal
@@ -145,9 +215,21 @@ function renderCuts(cutsJson: string) {
   );
 }
 
-// Render dynamic areas (L x W x Thickness x Qty)
-function renderAreas(areasJson: string) {
-  const areas = parseJsonArray<{ length: string; width: string; thickness?: string; qty?: string }>(areasJson, []);
+// Per-area cutting metadata type (extends the basic L×W×T×Q with overcut + cross-cut info).
+type AreaRow = {
+  length: string;
+  width: string;
+  thickness?: string;
+  qty?: string;
+  overcut_allowed?: boolean;
+  cross_cut_lengthwise_ft?: string | number;
+  cross_cut_widthwise_ft?: string | number;
+};
+
+// Render dynamic areas (L x W x Thickness x Qty) — plus per-area overcut + cross-cut
+// info and computed total linear feet.
+function renderAreas(areasJson: string, fallbackOvercut: boolean) {
+  const areas = parseJsonArray<AreaRow>(areasJson, []);
   if (areas.length === 0) return null;
   const totalSqFt = areas.reduce((sum, a) => {
     const l = parseFloat(a.length) || 0;
@@ -158,34 +240,91 @@ function renderAreas(areasJson: string) {
   const hasThickness = areas.some(a => a.thickness);
   const hasQty = areas.some(a => a.qty && parseInt(a.qty) > 1);
   const cols = 2 + (hasThickness ? 1 : 0) + (hasQty ? 1 : 0);
+
+  // Aggregate per-section grand total of linear feet.
+  let grandTotalLf = 0;
+  for (const a of areas) {
+    const lf = computeAreaLinearFt(a, fallbackOvercut);
+    if (lf != null) grandTotalLf += lf;
+  }
+
   return (
-    <div className="col-span-full space-y-1.5">
+    <div className="col-span-full space-y-2">
       <div className={`grid gap-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         <span>Length</span><span>Width</span>{hasThickness && <span>Thickness</span>}{hasQty && <span>Qty</span>}
       </div>
-      {areas.map((a, i) => (
-        <div key={i} className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-          <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-            <span className="text-base font-bold text-slate-800">{a.length || '-'}<span className="text-xs text-slate-400 ml-0.5">ft</span></span>
-          </div>
-          <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-            <span className="text-base font-bold text-slate-800">{a.width || '-'}<span className="text-xs text-slate-400 ml-0.5">ft</span></span>
-          </div>
-          {hasThickness && (
-            <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-              <span className="text-base font-bold text-slate-800">{a.thickness || '-'}<span className="text-xs text-slate-400 ml-0.5">in.</span></span>
+      {areas.map((a, i) => {
+        const parts = computeAreaLinearFtParts(a, fallbackOvercut);
+        const lengthSpacing = parseFloat(String(a.cross_cut_lengthwise_ft ?? '')) || 0;
+        const widthSpacing = parseFloat(String(a.cross_cut_widthwise_ft ?? '')) || 0;
+        const hasCrossCut = lengthSpacing > 0 || widthSpacing > 0;
+        const overcutResolved = typeof a.overcut_allowed === 'boolean' ? a.overcut_allowed : fallbackOvercut;
+        return (
+          <div key={i} className="space-y-1.5">
+            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+              <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+                <span className="text-base font-bold text-slate-800 dark:text-white">{a.length || '-'}<span className="text-xs text-slate-400 dark:text-white/40 ml-0.5">ft</span></span>
+              </div>
+              <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+                <span className="text-base font-bold text-slate-800 dark:text-white">{a.width || '-'}<span className="text-xs text-slate-400 dark:text-white/40 ml-0.5">ft</span></span>
+              </div>
+              {hasThickness && (
+                <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+                  <span className="text-base font-bold text-slate-800 dark:text-white">{a.thickness || '-'}<span className="text-xs text-slate-400 dark:text-white/40 ml-0.5">in.</span></span>
+                </div>
+              )}
+              {hasQty && (
+                <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+                  <span className="text-base font-bold text-slate-800 dark:text-white">{a.qty || '1'}</span>
+                </div>
+              )}
             </div>
-          )}
-          {hasQty && (
-            <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-              <span className="text-base font-bold text-slate-800">{a.qty || '1'}</span>
-            </div>
-          )}
-        </div>
-      ))}
-      {totalSqFt > 0 && (
-        <p className="text-xs font-semibold text-blue-600 px-1">{totalSqFt.toLocaleString()} total sq ft</p>
-      )}
+
+            {/* Per-area cutting info row: overcut + optional cross-cut + total LF */}
+            {parts && (
+              <div className="flex flex-wrap items-center gap-1.5 px-1">
+                {/* Overcut state */}
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    overcutResolved
+                      ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
+                      : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
+                  }`}
+                >
+                  {overcutResolved ? 'Overcut allowed' : 'No overcut — double-cut perimeter'}
+                </span>
+
+                {/* Cross-cut spacings (only when set) */}
+                {hasCrossCut && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-500/30">
+                    Cross-cut:{lengthSpacing > 0 ? ` every ${lengthSpacing}ft length-wise` : ''}{lengthSpacing > 0 && widthSpacing > 0 ? ',' : ''}{widthSpacing > 0 ? ` ${widthSpacing}ft width-wise` : ''}
+                  </span>
+                )}
+
+                {/* Computed total linear feet for this area */}
+                <span className="inline-flex flex-col items-start px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30">
+                  <span>Total: {parts.total.toLocaleString(undefined, { maximumFractionDigits: 1 })} linear ft</span>
+                  {parts.crossCutLf > 0 && (
+                    <span className="text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-400/70">
+                      (perimeter {parts.perimeterLf.toLocaleString(undefined, { maximumFractionDigits: 1 })} + cross-cuts {parts.crossCutLf.toLocaleString(undefined, { maximumFractionDigits: 1 })})
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div className="flex flex-wrap items-center gap-3 px-1">
+        {totalSqFt > 0 && (
+          <p className="text-xs font-semibold text-blue-600 dark:text-blue-300">{totalSqFt.toLocaleString()} total sq ft</p>
+        )}
+        {grandTotalLf > 0 && (
+          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+            {grandTotalLf.toLocaleString(undefined, { maximumFractionDigits: 1 })} total linear ft
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -193,7 +332,7 @@ function renderAreas(areasJson: string) {
 // JSON field keys that have special renderers
 const JSON_FIELD_KEYS = new Set(['holes', 'cuts', 'areas']);
 
-export default function ScopeDetailsDisplay({ scopeDetails, compact = false }: ScopeDetailsDisplayProps) {
+export default function ScopeDetailsDisplay({ scopeDetails, compact = false, fallbackOvercutAllowed = false }: ScopeDetailsDisplayProps) {
   if (!scopeDetails || typeof scopeDetails !== 'object') return null;
 
   // Separate _removal from scope service entries
@@ -272,7 +411,7 @@ export default function ScopeDetailsDisplay({ scopeDetails, compact = false }: S
               {/* Render JSON-based structured data */}
               {fields.holes && renderHoles(fields.holes)}
               {fields.cuts && renderCuts(fields.cuts)}
-              {fields.areas && renderAreas(fields.areas)}
+              {fields.areas && renderAreas(fields.areas, fallbackOvercutAllowed)}
 
               {/* Render regular fields */}
               {regularFields.length > 0 && (
@@ -300,36 +439,61 @@ export default function ScopeDetailsDisplay({ scopeDetails, compact = false }: S
           </div>
         );
       })}
-      {removalData?.needed === 'true' && (
-        <div className="bg-red-50/50 border border-red-100 rounded-xl p-3 sm:p-4">
-          <h4 className="text-xs font-bold text-red-700 uppercase tracking-wider mb-2">
-            Material Removal
-          </h4>
-          <div className="flex flex-wrap gap-2">
-            <div className="bg-white rounded-lg p-2.5 border border-red-100">
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Method</p>
-              <p className="text-lg font-bold text-slate-800 mt-0.5">
-                {REMOVAL_METHOD_LABELS[removalData.method] || removalData.method}
-              </p>
-            </div>
-            {removalData.equipment && (() => {
-              const equip: string[] = parseJsonArray(removalData.equipment, []);
-              return equip.length > 0 ? (
-                <div className="bg-white rounded-lg p-2.5 border border-red-100">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Equipment</p>
+      {removalData?.needed === 'true' && (() => {
+        const equip: string[] = removalData.equipment ? parseJsonArray<string>(removalData.equipment, []) : [];
+        const hasMethod = !!removalData.method;
+        const hasEquip = equip.length > 0;
+        const hasWhat = !!removalData.what;
+        const hasResponsible = !!removalData.responsible_party;
+        const hasDumpsterSize = !!removalData.dumpster_size;
+        return (
+          <div className="bg-red-50/50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl p-3 sm:p-4">
+            <h4 className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wider mb-2">
+              Material Removal
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {hasMethod && (
+                <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2.5 border border-red-100 dark:border-red-500/30">
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-white/50 uppercase tracking-wider">Method</p>
+                  <p className="text-lg font-bold text-slate-800 dark:text-white mt-0.5">
+                    {REMOVAL_METHOD_LABELS[removalData.method] || removalData.method}
+                  </p>
+                </div>
+              )}
+              {hasDumpsterSize && (
+                <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2.5 border border-red-100 dark:border-red-500/30">
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-white/50 uppercase tracking-wider">Dumpster Size</p>
+                  <p className="text-lg font-bold text-slate-800 dark:text-white mt-0.5">{removalData.dumpster_size}</p>
+                </div>
+              )}
+              {hasResponsible && (
+                <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2.5 border border-red-100 dark:border-red-500/30">
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-white/50 uppercase tracking-wider">Responsible Party</p>
+                  <p className="text-lg font-bold text-slate-800 dark:text-white mt-0.5">{removalData.responsible_party}</p>
+                </div>
+              )}
+              {hasWhat && (
+                <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2.5 border border-red-100 dark:border-red-500/30 sm:col-span-2">
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-white/50 uppercase tracking-wider">What is Being Removed</p>
+                  <p className="text-base font-semibold text-slate-800 dark:text-white mt-0.5 whitespace-pre-wrap">{removalData.what}</p>
+                </div>
+              )}
+              {hasEquip && (
+                <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2.5 border border-red-100 dark:border-red-500/30 sm:col-span-2">
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-white/50 uppercase tracking-wider">Equipment</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {equip.map(e => (
-                      <span key={e} className="px-2 py-0.5 bg-red-50 border border-red-200 rounded text-xs font-semibold text-red-700">
+                      <span key={e} className="px-2 py-0.5 bg-red-50 dark:bg-red-500/20 border border-red-200 dark:border-red-500/40 rounded text-xs font-semibold text-red-700 dark:text-red-300">
                         {REMOVAL_EQUIPMENT_LABELS[e] || e}
                       </span>
                     ))}
                   </div>
                 </div>
-              ) : null;
-            })()}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
