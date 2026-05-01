@@ -25,6 +25,14 @@ export default function GoogleAddressAutocomplete({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Escape hatch: disable Google Maps entirely (e.g. when Google Cloud billing
+    // isn't enabled and you don't want the script to load + error). Falls back
+    // to a plain text input with no warning. Set NEXT_PUBLIC_DISABLE_GOOGLE_MAPS=true
+    // in .env.local to activate.
+    if (process.env.NEXT_PUBLIC_DISABLE_GOOGLE_MAPS === 'true') {
+      return;
+    }
+
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
     if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
@@ -64,10 +72,11 @@ export default function GoogleAddressAutocomplete({
         setError('Google Maps APIs not enabled - see GOOGLE_MAPS_SETUP.md');
       };
 
-      // Global error handler for API authentication failures
+      // Global error handler for API authentication / billing failures
       (window as any).gm_authFailure = () => {
-        console.error('⚠️ Google Maps API not activated. Enable APIs in Google Cloud Console.');
-        setError('Google Maps APIs not enabled - see GOOGLE_MAPS_SETUP.md');
+        // Use console.warn (not console.error) so Next.js dev overlay doesn't pop
+        console.warn('⚠️ Google Maps unavailable. Enable billing on the Google Cloud project to activate address autocomplete. Manual entry still works.');
+        setError('Address autocomplete unavailable — enter address manually');
       };
 
       document.head.appendChild(script);
