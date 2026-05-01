@@ -3,6 +3,70 @@
 
 ---
 
+## MAY 1, 2026 (PT 5) — Unified GPS Bypass: One Code-Gated Mechanism, Legacy Switch Removed
+
+Cleanup pass. The previous session left two overlapping bypass mechanisms which was confusing — when both env vars were set, the legacy one fired first and the new code-entry UI was never reachable. Removed the legacy switch entirely.
+
+### Single bypass system (now)
+
+Two-factor activation, both required:
+1. **Build-time gate** — `NEXT_PUBLIC_LOCATION_BYPASS_CODE` env var must be set. Without it, the bypass UI is hidden and impossible to activate. This is what locks production.
+2. **Runtime gate** — operator must enter the matching code via the clock-in modal. On success, `sessionStorage['location_bypass_active'] = 'true'`. Tab close clears it.
+
+Both `process.env.NEXT_PUBLIC_LOCATION_BYPASS_CODE` AND the sessionStorage flag must be present for `isLocationBypassActive()` to return true.
+
+### Centralized in `lib/geolocation.ts`
+
+New exports:
+- `isLocationBypassActive(): boolean` — single check used by all 4 GPS callers
+- `activateLocationBypass(): void` — flips the sessionStorage flag
+
+`verifyShopLocation()` now reads via `isLocationBypassActive()` (was reading the legacy env var inline).
+
+### All 4 GPS code paths now honor the same flag
+- `lib/geolocation.ts` — `verifyShopLocation()` (dashboard clock-in/out + job-schedule shop-arrival)
+- `components/NfcClockInModal.tsx` — `getLocation()` (the main modal flow)
+- `components/NFCClockIn.tsx` — `getGPS()` (NFC scan UI)
+- `app/nfc-clock/page.tsx` — `getLocation()` (iOS NFC URL kiosk)
+
+Each was previously checking `process.env.NEXT_PUBLIC_BYPASS_LOCATION_CHECK === 'true'` independently. Now they all delegate to the central helper.
+
+### Removed
+- `NEXT_PUBLIC_BYPASS_LOCATION_CHECK` env var — gone from all 4 source files, `.env.example`, `CLAUDE_CONTEXT.md`, `DEPLOYMENT_CHECKLIST.md`.
+- Hardcoded local fallback coords (`34.76866 / -82.43563`) in `NFCClockIn.tsx` and `app/nfc-clock/page.tsx` — replaced with imports from `SHOP_LOCATION` for consistency.
+
+### How to test at home now (single workflow)
+1. Add to `.env.local`:
+   ```
+   NEXT_PUBLIC_LOCATION_BYPASS_CODE=4242
+   ```
+2. Restart dev server.
+3. Click Clock In. GPS will run. You're at home → you'll see "you're 2,847 ft away" outside-radius screen.
+4. Click "🔑 Testing bypass" link at the bottom.
+5. Numpad → enter `4242` → bypass activates for the rest of the tab session.
+6. Once active, all subsequent clock-in attempts (modal, NFC, kiosk, job-arrival) will silently bypass GPS until you close the tab.
+7. To re-test the geofence at home, close the tab to clear sessionStorage and start over.
+
+In production without the env var: the link doesn't render anywhere. Bypass impossible.
+
+### Files changed
+```
+lib/geolocation.ts                                        (centralized helpers)
+components/NfcClockInModal.tsx                            (call helpers, activate on code entry)
+components/NFCClockIn.tsx                                 (call helpers, drop legacy env)
+app/nfc-clock/page.tsx                                    (call helpers, drop legacy env)
+.env.example                                              (replaced legacy var with new one)
+CLAUDE_CONTEXT.md                                         (env var docs updated)
+DEPLOYMENT_CHECKLIST.md                                   (env var + verification steps updated)
+```
+
+### Commits on `main` (LOCAL)
+```
+e27d2e15  refactor: unify GPS bypass — single code-gated mechanism, drop legacy env switch
+```
+
+---
+
 ## MAY 1, 2026 (PT 4) — Tight 20ft Geofence on Clock-In + UI Test-Bypass Code
 
 ### What shipped
