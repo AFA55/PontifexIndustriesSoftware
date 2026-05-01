@@ -56,7 +56,7 @@ Enumerated by `grep -rEoh 'process\.env\.[A-Z_][A-Z0-9_]+' app/ lib/ middleware.
 | `TWILIO_ACCOUNT_SID` | optional | [lib/sms.ts:7](lib/sms.ts:7), [app/api/job-orders/[id]/send-completion-sms/route.ts:68](app/api/job-orders/[id]/send-completion-sms/route.ts:68) | Legacy fallback if Telnyx not configured. |
 | `TWILIO_AUTH_TOKEN` | optional | [lib/sms.ts:8](lib/sms.ts:8), [app/api/job-orders/[id]/send-completion-sms/route.ts:69](app/api/job-orders/[id]/send-completion-sms/route.ts:69) | Pair with SID. |
 | `TWILIO_PHONE_NUMBER` | optional | [lib/sms.ts:9](lib/sms.ts:9), [app/api/job-orders/[id]/send-completion-sms/route.ts:70](app/api/job-orders/[id]/send-completion-sms/route.ts:70) | E.164. |
-| `NEXT_PUBLIC_BYPASS_LOCATION_CHECK` | optional | [lib/geolocation.ts:150](lib/geolocation.ts:150), [app/nfc-clock/page.tsx:60](app/nfc-clock/page.tsx:60) | **MUST be `false` or unset in production.** Set to `true` only for dev/testing — disables GPS verification on NFC clock-in. |
+| `NEXT_PUBLIC_LOCATION_BYPASS_CODE` | optional | [lib/geolocation.ts](lib/geolocation.ts), [components/NfcClockInModal.tsx](components/NfcClockInModal.tsx) | **MUST be unset in production.** When set, exposes a "Testing bypass" button on the clock-in modal; operator must enter this exact code to skip GPS (sessionStorage-scoped). Without the env var, the bypass UI is hidden and impossible to activate. |
 | `NEXT_PUBLIC_CONTACT_EMAIL` | optional | [components/landing/brand-config.ts:11](components/landing/brand-config.ts:11) | Defaults to `info@pontifexplatform.com`. **Set to a Patriot-branded email for white-label.** Not in `.env.example` — undocumented. |
 | `VERCEL_DEPLOYMENT_ID` | auto | [app/api/health/route.ts:65](app/api/health/route.ts:65), [app/api/cron/health-check/route.ts:100](app/api/cron/health-check/route.ts:100) | Auto-injected by Vercel. Don't set manually. |
 | `NODE_ENV` | auto | [app/api/health/route.ts:64](app/api/health/route.ts:64), [app/api/create-offer-checkout/route.ts:18](app/api/create-offer-checkout/route.ts:18) | Auto-set by Next/Vercel. |
@@ -193,7 +193,7 @@ Run against the new custom domain immediately after the first prod deploy. Each 
 | 8 | `POST /api/demo-request` (rate-limit) | First 10 → 200, 11th → 429 | Validates middleware rate limiter works in prod (Edge runtime). |
 | 9 | `GET /api/cron/health-check` (no auth) | 401 | Should reject without `Authorization: Bearer $CRON_SECRET`. With correct header → 200. |
 | 10 | `GET /sign/<token>` (a real signature token) | 200 HTML | Public signature page loads. "Powered by …" footer matches white-label decision. |
-| 11 | `GET /nfc-clock?tag=<id>` | 200 HTML | NFC clock-in page loads. **Confirm `NEXT_PUBLIC_BYPASS_LOCATION_CHECK` is NOT `true`** — GPS check should run. |
+| 11 | `GET /nfc-clock?tag=<id>` | 200 HTML | NFC clock-in page loads. **Confirm `NEXT_PUBLIC_LOCATION_BYPASS_CODE` is NOT set** — GPS check should run. |
 | 12 | Send invoice email via admin UI | Email received | Resend `from` matches `RESEND_FROM_EMAIL`; links inside email use `https://<domain>` (not localhost or `*.vercel.app`). |
 
 Plus: open the deployed site in a logged-in admin tab and a logged-in operator tab in the same browser. Click around in both. **Confirm no role bleed** (April 27 fix — `getCurrentUser()` cross-validates against Supabase session). If the operator sees admin chrome, roll back immediately.

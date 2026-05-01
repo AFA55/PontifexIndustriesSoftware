@@ -134,6 +134,44 @@ export function getCurrentLocation(): Promise<Coordinates> {
 }
 
 /**
+ * Single source of truth for the testing bypass.
+ *
+ * Two-factor activation:
+ *   1. `NEXT_PUBLIC_LOCATION_BYPASS_CODE` env var must be set (build-time gate)
+ *   2. User must have entered the correct code via the clock-in modal,
+ *      which sets `sessionStorage['location_bypass_active'] = 'true'`
+ *
+ * If either is missing, the bypass returns false and GPS verification
+ * runs normally. This means:
+ *   - Production without the env var → bypass impossible
+ *   - Dev with env var but no code entered → GPS still enforced
+ *   - Dev with env var + code entered → bypass active for the tab session
+ *   - Tab close clears sessionStorage → has to re-enter code next time
+ */
+export function isLocationBypassActive(): boolean {
+  if (!process.env.NEXT_PUBLIC_LOCATION_BYPASS_CODE) return false;
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.sessionStorage.getItem('location_bypass_active') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Activate the testing bypass for the current tab session.
+ * Called by the clock-in modal after successful code entry.
+ */
+export function activateLocationBypass(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem('location_bypass_active', 'true');
+  } catch {
+    // sessionStorage may be disabled in some privacy modes — fail silently
+  }
+}
+
+/**
  * Verify user is at shop location before allowing clock in/out
  *
  * @returns Object with verification result and location data
@@ -145,12 +183,8 @@ export async function verifyShopLocation(): Promise<{
   distanceFormatted: string;
   error?: string;
 }> {
-  // TESTING MODE: Bypass location check for development
-  // ⚠️ This should NEVER be enabled in production!
-  const bypassLocationCheck = process.env.NEXT_PUBLIC_BYPASS_LOCATION_CHECK === 'true';
-
-  if (bypassLocationCheck) {
-    console.warn('⚠️ TESTING MODE: Location verification bypassed!');
+  if (isLocationBypassActive()) {
+    console.warn('⚠️ TESTING BYPASS ACTIVE — GPS verification skipped for this session');
     return {
       verified: true,
       location: {
@@ -159,7 +193,7 @@ export async function verifyShopLocation(): Promise<{
         accuracy: 0,
       },
       distance: 0,
-      distanceFormatted: '0m (bypassed for testing)',
+      distanceFormatted: '0m (testing bypass)',
     };
   }
 

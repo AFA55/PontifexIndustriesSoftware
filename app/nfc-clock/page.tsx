@@ -20,6 +20,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle, AlertTriangle, Loader2, Clock, LogOut, LogIn, Wifi } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { SHOP_LOCATION, isLocationBypassActive } from '@/lib/geolocation';
 
 type PageState =
   | 'loading'       // checking auth + verifying tag
@@ -57,8 +58,8 @@ function NfcClockContent() {
   }, [tagUid]);
 
   const getLocation = (): Promise<{ latitude: number; longitude: number; accuracy?: number }> => {
-    if (process.env.NEXT_PUBLIC_BYPASS_LOCATION_CHECK === 'true') {
-      return Promise.resolve({ latitude: 34.76866, longitude: -82.43563, accuracy: 0 });
+    if (isLocationBypassActive()) {
+      return Promise.resolve({ latitude: SHOP_LOCATION.latitude, longitude: SHOP_LOCATION.longitude, accuracy: 0 });
     }
     return new Promise((resolve) => {
       if (!navigator.geolocation) {

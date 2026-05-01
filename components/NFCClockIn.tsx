@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useNFCScan } from '@/hooks/useNFCScan';
 import { supabase } from '@/lib/supabase';
+import { SHOP_LOCATION, isLocationBypassActive } from '@/lib/geolocation';
 
 // ── Types ──────────────────────────────────────────────────────
 export type ClockInResult = {
@@ -54,8 +55,8 @@ const PIN_DIGITS = [
 
 // ── Helpers ────────────────────────────────────────────────────
 async function getGPS(): Promise<{ latitude: number; longitude: number; accuracy?: number }> {
-  if (process.env.NEXT_PUBLIC_BYPASS_LOCATION_CHECK === 'true') {
-    return { latitude: 34.76866, longitude: -82.43563, accuracy: 0 };
+  if (isLocationBypassActive()) {
+    return { latitude: SHOP_LOCATION.latitude, longitude: SHOP_LOCATION.longitude, accuracy: 0 };
   }
   return new Promise((resolve) => {
     if (!navigator.geolocation) {

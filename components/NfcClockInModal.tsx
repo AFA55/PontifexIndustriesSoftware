@@ -5,7 +5,7 @@ import {
   X, Building2, Car, MapPin, Camera, Loader2,
   CheckCircle, AlertTriangle, ChevronLeft, Delete, KeyRound,
 } from 'lucide-react';
-import { SHOP_LOCATION, ALLOWED_RADIUS_METERS, calculateDistance } from '@/lib/geolocation';
+import { SHOP_LOCATION, ALLOWED_RADIUS_METERS, calculateDistance, isLocationBypassActive, activateLocationBypass } from '@/lib/geolocation';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ type GpsStatus = 'idle' | 'acquiring' | 'ok' | 'outside' | 'error';
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function getLocation(): Promise<{ latitude: number; longitude: number; accuracy: number }> {
-  if (process.env.NEXT_PUBLIC_BYPASS_LOCATION_CHECK === 'true') {
+  if (isLocationBypassActive()) {
     return Promise.resolve({ latitude: SHOP_LAT, longitude: SHOP_LNG, accuracy: 0 });
   }
   return new Promise((resolve, reject) => {
@@ -681,8 +681,9 @@ export default function NfcClockInModal({
                       setTimeout(() => setBypassShake(false), 600);
                       return;
                     }
-                    // Treat as at-shop and proceed to confirm — uses the configured shop coords
-                    // so the timecard records something meaningful, plus a metadata flag.
+                    // Activate bypass for the rest of this tab session — verifyShopLocation,
+                    // jobsite GPS, NFC kiosk, and clock-out will all honor the flag.
+                    activateLocationBypass();
                     const fakeCoords = { latitude: SHOP_LAT, longitude: SHOP_LNG, accuracy: 0 };
                     setGpsCoords(fakeCoords);
                     setGpsStatus('ok');

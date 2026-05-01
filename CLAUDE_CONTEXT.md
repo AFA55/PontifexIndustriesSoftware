@@ -192,7 +192,7 @@ RESEND_FROM_EMAIL=Patriot Concrete Cutting <noreply@patriotconcretecutting.com>
 TWILIO_ACCOUNT_SID=    # SMS (legacy)
 TWILIO_AUTH_TOKEN=     # SMS (legacy)
 TWILIO_PHONE_NUMBER=   # SMS (legacy)
-NEXT_PUBLIC_BYPASS_LOCATION_CHECK=false  # GPS bypass for testing
+NEXT_PUBLIC_LOCATION_BYPASS_CODE=     # Testing bypass code; UNSET in production
 ```
 
 ## Build & Deploy
