@@ -1,5 +1,83 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** April 30, 2026 (LATE SESSION) | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~50 commits | **Build Status:** PASSING ✅ (0 errors, 9.2s) | **DB:** WIPED — clean slate, Patriot Test GC customer preserved
+**Date:** April 30, 2026 (DEMO-PREP SESSION) | **Branch:** `claude/sleepy-shannon-95c45b` (pushed) — local `main` ahead of origin by ~55 commits | **Build Status:** PASSING ✅ (0 errors, 8.2s) | **DB:** WIPED — clean slate, Patriot Test GC customer preserved
+
+---
+
+## APRIL 30, 2026 (PT 4) — Pre-Demo Hardening: 4 Bug Fixes + Sawing Cross-Cut Calculator
+
+User has a software demo tomorrow and is walking the full create-job → completion flow. Issues are surfacing in real time; this session shipped them as they came up.
+
+### Bug fixes shipped (5 total in this session)
+1. **React duplicate-key crash on contact picker** — when two records shared a display name (e.g., two "John Test"), `<li key={option.value}>` collided. Fixed at [components/SmartCombobox.tsx:293](components/SmartCombobox.tsx:293) — composite key `${value}-${idx}`.
+2. **`ContactCombobox` data-layer dedupe** — same component now collapses options by case-insensitive trimmed name BEFORE rendering. Most-informative entry wins (scored on phone+email+job_count). Eliminates the dup-name issue at the source.
+3. **Super admin / operations_manager bypass approval gate** — `/api/admin/schedule-form` now creates jobs with `status='scheduled'` directly for those roles. Salesmen and admins still go through `pending_approval`.
+4. **New Job button perceived latency** — `<button onClick=router.push>` → `<Link href prefetch>`. Next.js now prefetches the schedule-form chunk on hover/viewport so click feels instant.
+
+### Schedule form Sawing Calculator (DFS / EFS / HHS-PS)
+This is the genuine differentiator the user called out. Captures real-world cross-cut + overcut requirements and auto-computes total linear feet.
+
+**Per-area inputs added** (in "Areas + Thickness" mode for DFS, EFS, HHS/PS):
+- "Overcut allowed" toggle (per area, falls back to top-level `form.overcutting_allowed`)
+- "Cross-cut every X ft length-wise" (number)
+- "Cross-cut every Y ft width-wise" (number)
+
+**Pure helper** `computeSawingAreaLinearFt(area)` at [app/dashboard/admin/schedule-form/page.tsx:209-256](app/dashboard/admin/schedule-form/page.tsx:209) computes:
+```
+perimeter      = 2 × (length + width)
+lengthwiseCuts = max(0, floor(length / lengthSpacing) - 1)
+widthwiseCuts  = max(0, floor(width  / widthSpacing)  - 1)
+crossCutLength = (lengthwiseCuts × width) + (widthwiseCuts × length)
+linearFt       = (perimeter × (overcut ? 1 : 2) + crossCutLength) × qty
+```
+
+**Verified scenarios:**
+| Scenario | Inputs | Result |
+|---|---|---|
+| User example | 10×10, qty 1, 2/2 spacing, overcut=true | 40 + 80 = **120 lf** ✓ |
+| Plain perimeter | 20×8, qty 1, no spacing, overcut=true | **56 lf** |
+| No-overcut doubles perimeter | 20×8, qty 1, no spacing, overcut=false | **112 lf** |
+| Quantity scales | 12×6, qty 2, 3/3 spacing, overcut=true | (36 + 30) × 2 = **132 lf** |
+| Combined | 15×10, qty 1, 5/5 spacing, overcut=false | 100 + 35 = **135 lf** |
+| Empty fields | length blank | shows `— linear ft` (returns null, no error) |
+
+**Persistence**: new keys live inside the existing `scope_details[code].areas` JSONB array. No backend route or migration needed — Postgres jsonb absorbs them.
+
+**Per-area total** displayed inline as a sky pill (with breakdown tooltip). **Section grand total** appended below the existing "TOTAL: NNN sq ft" line.
+
+### Team manifest — agents dispatched this session
+Scope discipline: every agent received a strict guardrail list (no `app/api/**` for non-security work, no `lib/supabase*` / `lib/api-auth*` / `middleware.ts` / `package.json` / migrations). I independently audited each diff before merge.
+
+| Agent | Scope | Outcome |
+|---|---|---|
+| Track A (sales tiles) | Salesman dashboard 4 tiles → 3 (Active / Quoted MTD / Expected Commission); scoping audit | Merged |
+| Track B (admin invoicing UI) | Mark Paid button + modal, commission % chip on job detail, default rate input on team profiles | Merged |
+| Track C (workflow audit) | Read-only research → [WORKFLOW_AUDIT.md](WORKFLOW_AUDIT.md) (378 lines, 9 critical / 14 important / 7 polish) | Merged |
+| Track D (security fixes) | 9 critical findings from Track C — agent stalled mid-task; **completed manually** | Merged |
+| Track E (sawing calculator) | Per-area overcut + cross-cuts + auto linear-ft on DFS/EFS/HHS+PS | Merged |
+| (manual) | SmartCombobox composite key + dedupe; super_admin bypass approval; New Job prefetch | Merged |
+
+### Commits on `main` (LOCAL — NOT pushed to origin)
+```
+67ced6b1  feat: schedule form sawing calculator — per-area overcut, cross-cuts, auto linear-ft
+11d8f8dd  fix: dedupe ContactCombobox options at the data layer
+830f8d31  fix: 3 testing-blockers — duplicate React key, super_admin approval skip, New Job prefetch
+88c4de72  fix: 9 critical workflow audit findings (security + correctness)
+04b2880e  docs: end-to-end workflow + security audit
+dd1e4bcc  feat: admin Mark Paid + commission rate editors
+fbc36a27  feat: simplify salesman dashboard tiles
+```
+
+### Database state
+Wiped via Supabase MCP earlier this session. Single seed customer remaining: Patriot Test GC (id `a2cb81e6-790a-48f1-aba6-ac979c29de96`). 8 profiles preserved. All transactional tables zeroed.
+
+### Pending follow-ups (from WORKFLOW_AUDIT.md "Important")
+- Audit-log writes on status transitions, work-items, completion approvals, invoice events, signature submission
+- Wrap `work_items` delete-then-insert in transaction or UPSERT
+- Optimistic concurrency on payment recording (`.eq('balance_due', currentBalance)`)
+- DB-level `tenant_id NOT NULL` migration (API guards now in place; constraint is a future migration)
+- IP rate limit on `POST /api/public/signature/[token]`
+- Drop `'supervisor'` from inline admin role lists; align reject vs approve role guards
+- Apply the same per-area cross-cut calculator to operator's Work Performed page (currently schedule-form only — admin-side estimation)
 
 ---
 
