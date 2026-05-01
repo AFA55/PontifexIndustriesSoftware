@@ -5,8 +5,8 @@
 
 // Shop location configuration — Patriot Concrete Cutting
 export const SHOP_LOCATION = {
-  latitude: 34.76866501659961,   // Patriot Concrete Cutting
-  longitude: -82.4356361432207,  // Patriot Concrete Cutting
+  latitude: 34.76874307354808,   // Patriot Concrete Cutting
+  longitude: -82.43569623308949, // Patriot Concrete Cutting
   name: 'Patriot Concrete Cutting',
 };
 

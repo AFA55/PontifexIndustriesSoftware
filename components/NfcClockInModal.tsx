@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   X, Building2, Car, MapPin, Camera, Loader2,
-  CheckCircle, AlertTriangle, ChevronLeft, Delete,
+  CheckCircle, AlertTriangle, ChevronLeft, Delete, KeyRound,
 } from 'lucide-react';
+import { SHOP_LOCATION, ALLOWED_RADIUS_METERS, calculateDistance } from '@/lib/geolocation';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,12 +36,12 @@ interface NfcClockInModalProps {
   onClose: () => void;
 }
 
-// Shop coordinates (hardcoded fallback — Greenville SC)
-const SHOP_LAT = 34.76866;
-const SHOP_LNG = -82.43563;
-const SHOP_RADIUS_M = 200;
+// Shop coordinates + radius now sourced from lib/geolocation.ts (single source of truth).
+const SHOP_LAT = SHOP_LOCATION.latitude;
+const SHOP_LNG = SHOP_LOCATION.longitude;
+const SHOP_RADIUS_M = ALLOWED_RADIUS_METERS; // 6.1m ≈ 20ft
 
-type Flow = 'choose' | 'shop_pin' | 'shop_gps' | 'jobsite_camera' | 'processing' | 'success';
+type Flow = 'choose' | 'shop_pin' | 'shop_gps' | 'jobsite_camera' | 'processing' | 'success' | 'bypass_code';
 type GpsStatus = 'idle' | 'acquiring' | 'ok' | 'outside' | 'error';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -67,8 +68,12 @@ function getLocation(): Promise<{ latitude: number; longitude: number; accuracy:
 }
 
 function isNearShop(lat: number, lng: number): boolean {
-  const distM = Math.sqrt((lat - SHOP_LAT) ** 2 + (lng - SHOP_LNG) ** 2) * 111_000;
-  return distM < SHOP_RADIUS_M;
+  const distM = calculateDistance(lat, lng, SHOP_LAT, SHOP_LNG);
+  return distM <= SHOP_RADIUS_M;
+}
+
+function distanceFromShopFt(lat: number, lng: number): number {
+  return calculateDistance(lat, lng, SHOP_LAT, SHOP_LNG) * 3.28084;
 }
 
 function formatTime(d: Date) {
@@ -161,6 +166,12 @@ export default function NfcClockInModal({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [jobsiteGpsStatus, setJobsiteGpsStatus] = useState<GpsStatus>('idle');
   const [jobsiteCoords, setJobsiteCoords] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
+
+  // Testing bypass code (for verifying flow at home, etc.)
+  const [bypassCode, setBypassCode] = useState('');
+  const [bypassError, setBypassError] = useState<string | null>(null);
+  const [bypassShake, setBypassShake] = useState(false);
+  const expectedBypassCode = process.env.NEXT_PUBLIC_LOCATION_BYPASS_CODE || '';
 
   const [successTime, setSuccessTime] = useState('');
   const [requiresApproval, setRequiresApproval] = useState(false);
@@ -554,31 +565,46 @@ export default function NfcClockInModal({
 
                 {gpsStatus === 'outside' && gpsCoords && (
                   <div className="space-y-3 py-2">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                      <AlertTriangle className="w-9 h-9 text-amber-500" />
+                    <div className="w-16 h-16 mx-auto rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+                      <AlertTriangle className="w-9 h-9 text-rose-500" />
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900 dark:text-white">Away from shop</p>
+                      <p className="font-bold text-slate-900 dark:text-white">You&apos;re not at the shop</p>
                       <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">
-                        Your GPS signal places you outside the shop radius. Clock in anyway?
+                        GPS places you <span className="font-semibold text-rose-600 dark:text-rose-400">{Math.round(distanceFromShopFt(gpsCoords.latitude, gpsCoords.longitude))} ft</span> away. Shop clock-in requires you to be within {Math.round(SHOP_RADIUS_M * 3.28084)} ft of the pin.
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-white/50 mt-2">
+                        If you&apos;re heading straight to the jobsite, use that flow instead — your GPS + photo will be captured for admin review.
                       </p>
                     </div>
-                    {showOutsideWarning && (
-                      <div className="flex gap-2 pt-1">
+                    <div className="flex flex-col gap-2 pt-1">
+                      <button
+                        onClick={() => {
+                          setPhotoFile(null);
+                          setPhotoPreview(null);
+                          setJobsiteGpsStatus('idle');
+                          setJobsiteCoords(null);
+                          setFlow('jobsite_camera');
+                        }}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        <Car className="w-4 h-4" /> Switch to Direct-to-Jobsite
+                      </button>
+                      <button
+                        onClick={() => { setFlow('choose'); setGpsStatus('idle'); }}
+                        className="w-full py-3 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-white font-semibold text-sm hover:bg-slate-200 dark:hover:bg-white/15 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      {expectedBypassCode && (
                         <button
-                          onClick={() => { setFlow('choose'); setGpsStatus('idle'); }}
-                          className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-white font-semibold text-sm hover:bg-slate-200 dark:hover:bg-white/15 transition-colors"
+                          onClick={() => { setBypassCode(''); setBypassError(null); setFlow('bypass_code'); }}
+                          className="w-full py-2 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
                         >
-                          No, Cancel
+                          <KeyRound className="w-3 h-3" /> Testing bypass
                         </button>
-                        <button
-                          onClick={() => confirmShopClockIn(gpsCoords)}
-                          className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm active:scale-[0.98] transition-all"
-                        >
-                          Yes, Clock In
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -595,8 +621,79 @@ export default function NfcClockInModal({
                     >
                       Retry GPS
                     </button>
+                    {expectedBypassCode && (
+                      <button
+                        onClick={() => { setBypassCode(''); setBypassError(null); setFlow('bypass_code'); }}
+                        className="w-full py-2 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <KeyRound className="w-3 h-3" /> Testing bypass
+                      </button>
+                    )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ════════════════════════════════ TESTING BYPASS CODE ════════════════════════════════ */}
+            {flow === 'bypass_code' && (
+              <div>
+                <button
+                  onClick={() => { setFlow('shop_gps'); setBypassCode(''); setBypassError(null); }}
+                  className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 mb-3 transition-colors"
+                >
+                  <ChevronLeft className="w-3 h-3" /> Back
+                </button>
+
+                <div className="text-center mb-1">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Testing Bypass</h3>
+                  <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">
+                    Enter the testing code to skip GPS verification.
+                  </p>
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 font-semibold uppercase tracking-wide">
+                    Dev/Test Only — Use of this code is logged
+                  </p>
+                </div>
+
+                {/* dot display */}
+                <div className={bypassShake ? 'animate-shake' : ''}>
+                  <PinDots length={Math.max(4, expectedBypassCode.length || 4)} filled={bypassCode.length} />
+                </div>
+
+                {bypassError && (
+                  <p className="text-center text-xs text-red-500 dark:text-red-400 mb-2 font-semibold">{bypassError}</p>
+                )}
+
+                <NumPad
+                  onDigit={(d) => {
+                    if (bypassCode.length >= (expectedBypassCode.length || 8)) return;
+                    setBypassError(null);
+                    setBypassCode((p) => p + d);
+                  }}
+                  onBack={() => { setBypassError(null); setBypassCode((p) => p.slice(0, -1)); }}
+                />
+
+                <button
+                  onClick={() => {
+                    if (!expectedBypassCode || bypassCode !== expectedBypassCode) {
+                      setBypassShake(true);
+                      setBypassError('Invalid bypass code.');
+                      setBypassCode('');
+                      setTimeout(() => setBypassShake(false), 600);
+                      return;
+                    }
+                    // Treat as at-shop and proceed to confirm — uses the configured shop coords
+                    // so the timecard records something meaningful, plus a metadata flag.
+                    const fakeCoords = { latitude: SHOP_LAT, longitude: SHOP_LNG, accuracy: 0 };
+                    setGpsCoords(fakeCoords);
+                    setGpsStatus('ok');
+                    setShowOutsideWarning(false);
+                    confirmShopClockIn(fakeCoords);
+                  }}
+                  disabled={bypassCode.length === 0}
+                  className="w-full mt-4 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <KeyRound className="w-4 h-4" /> Verify Bypass Code
+                </button>
               </div>
             )}
 
