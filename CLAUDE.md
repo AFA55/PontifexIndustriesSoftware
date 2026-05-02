@@ -165,12 +165,20 @@ npm run build      # Production build check (must pass with 0 errors)
 - [x] Skill-match slash split — `split(/[,/]/)` handles "WS/TS" combined service codes
 
 ### Week 2 — Final Polish & Launch
-- [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice)
-- [ ] Mobile responsive audit on all operator pages
+- [ ] End-to-end workflow testing (schedule → dispatch → execute → complete → invoice) — demo passed May 1
+- [x] Mobile responsive audit on all operator pages — completed May 2 (login/offer/sign clean, NPS chips fixed)
 - [ ] Loading states & error handling audit across remaining pages
 - [ ] Patriot-specific visual assets (logos, custom colors)
-- [ ] Production deployment prep (env vars, custom domain, SSL)
+- [x] **Production deployment LIVE** — May 2, https://www.pontifexindustries.com (commit `0963259f`)
 - [ ] Apply pending migrations: `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql`
+- [ ] Set `CRON_SECRET` env var in Vercel dashboard (required for `/api/cron/invoice-30d-reminders`)
+
+### Session — May 2, 2026 — Post-Demo Refinement + Production Deploy
+- [x] Linear Ft + Cut Depth mode rebuilt with cross-cut calculator (length × width + cross-cut spacing + overcut → auto LF)
+- [x] Edit Scope button on schedule-board edit modal → opens schedule-form in edit mode at scope step (Option A redirect approach)
+- [x] Schedule-form supports `?editJobId=<uuid>&jumpTo=scope` query params: prefills from job, shows "Editing existing job" badge, PATCHes on submit
+- [x] Mobile audit: NPS chips collapse to 5x2 on phones (was unusably tight at 10-col)
+- [x] **Pushed 97 commits to origin/main → production live**
 
 ### Ongoing / As-Needed
 - [ ] SMS integration for signature request delivery

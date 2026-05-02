@@ -1,4 +1,59 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
+**Date:** May 2, 2026 (POST-DEMO REFINEMENT SESSION) | **Branch:** `claude/nice-borg-4ffe67` (pushed) → `main` pushed to origin | **Production:** 🚀 **LIVE** at https://www.pontifexindustries.com (commit `0963259f`, deploy `dpl_Bqh64vehL9qyntJoPbriaB9wWGCZ` READY) | **Build:** PASSING ✅ | **DB:** Migrations `20260501_customer_survey_v2` and `20260501_notifications_invoice_metadata_idx` applied
+
+---
+
+## MAY 2, 2026 — Post-Demo Refinement: Linear Ft Calculator + Edit Scope Button + Production Deploy
+
+Demo went well. User shifted to refinement mode + production push.
+
+### Production deploy 🚀
+- Local main was 97 commits ahead of origin/main (entire week's worth of work).
+- Pushed `git push origin main` → Vercel auto-deployed.
+- Build took 98 seconds.
+- All production aliases respond 200: `pontifexindustries.com`, `www.pontifexindustries.com`, project Vercel URL.
+- Apex domain redirects to `www.` (correct config).
+- This is the URL the trial customer will use.
+
+### Refinements shipped this session
+
+**1. Linear Ft + Cut Depth mode now uses the cross-cut calculator** — previously it asked for total linear feet + # of cuts (manual computation). Now asks for Length × Width × Cut Depth + cross-cut spacing in both directions + overcut toggle, auto-computes total LF using the existing `computeSawingAreaLinearFt` helper. Per-row total chip + grand total. Same calculator already in Areas + Thickness mode — now both modes share it. Backward compat: legacy entries with `linear_feet` set fall through.
+
+**2. Edit Scope button (Option A — redirect)** — schedule-board's edit modal had a simplified inline `ScopeEditor` (just # cuts / linear feet / depth manual). User wanted the full schedule-form scope-step UI for editing. Implemented as a redirect:
+- Added violet "Edit Scope" button on `JobDetailView.tsx` (above the existing inline editor) → links to `/dashboard/admin/schedule-form?editJobId={job.id}&jumpTo=scope`.
+- Schedule-form now reads `?editJobId` + `?jumpTo` query params via `useSearchParams`. On mount in edit mode: GETs `/api/admin/jobs/{id}/summary`, prefills form fields (customer, address, scope_details, equipment, etc.), jumps directly to step 3 (scope).
+- Form header shows "Edit Scope" + violet "Editing existing job" badge.
+- Submit button reads "Save Scope Changes" instead of "Submit Schedule Form".
+- On submit, PATCHes `/api/admin/job-orders/{id}` with the scope-relevant fields (description, job_type, scope_details, scope_photo_urls, equipment_*, ppe_required) instead of POSTing a new job. Redirects back to schedule-board.
+- This reuses 100% of the rich scope UI (calculator, areas, photos, custom equipment, etc.) for edits. Single-page UX trade-off: user navigates to a new page rather than staying in the modal. Acceptable for now.
+
+**3. Mobile audit pass + survey NPS fix** — `/login`, `/offer`, `/sign/[token]` all clean at 375px (no horizontal overflow). Customer satisfaction survey NPS chips were `grid-cols-10` with gap-1.5 → ~29px chips on phones (too tight to tap). Fixed to `grid-cols-5 sm:grid-cols-10` + `h-12 sm:h-10` so phones get a 5×2 grid with native-app-tappable chips. Admin tables already had `overflow-x-auto` parents.
+
+### Files changed this session
+- `app/dashboard/admin/schedule-form/page.tsx` — Linear Ft calculator UI + edit-mode load + edit-mode PATCH on submit + header banner.
+- `app/dashboard/admin/schedule-board/_components/JobDetailView.tsx` — "Edit Scope" button.
+- `components/CustomerSatisfactionSurvey.tsx` — mobile NPS grid.
+
+### Commits added since the last deploy
+```
+a9f69f4e  feat(schedule): Linear Ft + Cut Depth mode now uses the cross-cut calculator
+d974ec57  fix(survey): NPS chips collapse to 5x2 grid on mobile
+0963259f  Merge: Linear Ft calculator                                  ← DEPLOYED to prod
+(pending) feat(schedule): Edit Scope flow — schedule-form ?editJobId + JobDetailView button
+```
+
+### Pending follow-ups for next session
+- Edit Scope flow is committed but NOT YET on `origin/main` — user can re-deploy when ready, or roll forward with the next batch.
+- Eventually consider Option B (extract scope step into shared component, embed in modal directly). Current Option A's redirect-based UX is acceptable; not urgent.
+- The edit-load mapper does best-effort prefill but may miss some niche fields (compliance attachments, permits array, etc.). Test the round-trip end-to-end and patch any gaps.
+- Vercel Cron `invoice-30d-reminders` requires `CRON_SECRET` env var to be set in Vercel dashboard — check if that's configured.
+
+---
+
+## MAY 1, 2026 (PT 5) — Unified GPS Bypass: One Code-Gated Mechanism, Legacy Switch Removed
+
+(Date header above superseded by the May 2 entry — original date below was while the deploy was still pending)
+
 **Date:** May 1, 2026 (DEMO-DAY SESSION — IN PROGRESS) | **Branch:** `claude/nice-borg-4ffe67` (pushed to origin) → merged to local `main` (~72 commits ahead of origin/main) | **Build Status:** PASSING ✅ | **DB:** Migrations `20260501_customer_survey_v2` and `20260501_notifications_invoice_metadata_idx` applied
 
 ---

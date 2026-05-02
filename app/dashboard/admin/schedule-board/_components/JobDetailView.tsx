@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, lazy, Suspense } from 'react';
+import Link from 'next/link';
 import {
   X, Printer, Edit3, MapPin, Wrench, Clock, Calendar, Users, FileText,
   Droplets, Zap, Shield, HardHat, Wind, Scissors, Package, ClipboardList,
@@ -686,6 +687,23 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                     onToggle={() => toggleSection('scope')}
                   >
                     <>
+                      {/* Full Scope Editor — opens the schedule-form's scope step with calculator, areas, etc. */}
+                      <div className="mb-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Edit3 className="w-3.5 h-3.5 text-violet-600 flex-shrink-0" />
+                          <p className="text-xs text-violet-800 truncate">
+                            <span className="font-semibold">Need more detail?</span> Open the full scope editor with calculator, areas, photos.
+                          </p>
+                        </div>
+                        <Link
+                          href={`/dashboard/admin/schedule-form?editJobId=${job.id}&jumpTo=scope`}
+                          className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 active:scale-[0.98] transition-all whitespace-nowrap"
+                        >
+                          Edit Scope
+                          <span aria-hidden>→</span>
+                        </Link>
+                      </div>
+
                       {isEditing ? (
                         <ScopeEditor
                           description={editFields.description || ''}

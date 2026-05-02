@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import nextDynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -779,6 +779,18 @@ export default function ScheduleFormPage() {
   const [submitted, setSubmitted] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState('');
   const [error, setError] = useState('');
+
+  // ── Edit-existing-job mode ────────────────────────────────────
+  // When the user hits this page with ?editJobId=<uuid>&jumpTo=scope from
+  // the schedule-board's "Edit Scope" button, we load the job's data into
+  // the form and PATCH on submit instead of POSTing a new job. Lets the
+  // admin re-use the full scope UI (with calculator, areas, photos) for
+  // editing existing jobs.
+  const searchParams = useSearchParams();
+  const editJobId = searchParams?.get('editJobId') || null;
+  const jumpToParam = searchParams?.get('jumpTo') || null;
+  const isEditMode = !!editJobId;
+  const [editLoadAttempted, setEditLoadAttempted] = useState(false);
   // Customer/contact autocomplete state
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
   const [contactSuggestions, setContactSuggestions] = useState<{ contact_name: string; contact_phone: string; role?: string; is_primary?: boolean }[]>([]);
@@ -869,6 +881,83 @@ export default function ScheduleFormPage() {
     setUser(currentUser);
     // Auto-fill submitted_by with logged-in user's name
     setForm(f => ({ ...f, submitted_by: currentUser.name }));
+
+    // Edit mode — load existing job data and prefill the form
+    if (editJobId && !editLoadAttempted) {
+      setEditLoadAttempted(true);
+      (async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) return;
+          const res = await fetch(`/api/admin/jobs/${editJobId}/summary`, {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          if (!res.ok) {
+            setError('Could not load job for editing.');
+            return;
+          }
+          const json = await res.json();
+          const j = json?.data?.job;
+          if (!j) {
+            setError('Job data missing.');
+            return;
+          }
+          // Best-effort map job_orders → form fields
+          const sd = j.scope_details || {};
+          const sched = j.scheduling_flexibility || {};
+          const compl = j.site_compliance || {};
+          const jc = j.jobsite_conditions || {};
+          const removalBlock = sd._removal || {};
+          const cleanScope: Record<string, any> = {};
+          for (const [k, v] of Object.entries(sd)) {
+            if (k === '_removal') continue;
+            cleanScope[k] = v;
+          }
+          // Service types: prefer the scope_details keys, fallback to job_type CSV
+          const serviceTypes: string[] = Object.keys(cleanScope).length > 0
+            ? Object.keys(cleanScope)
+            : (j.job_type || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+          setForm(f => ({
+            ...f,
+            contractor_name: j.customer_name || '',
+            customer_id: j.customer_id || null,
+            site_address: j.address || '',
+            location_name: j.location_name || '',
+            project_name: j.project_name || '',
+            site_contact: j.site_contact || '',
+            contact_phone: j.contact_phone || '',
+            po_number: j.po_number || '',
+            description: j.description || '',
+            estimated_cost: j.estimated_cost ? String(j.estimated_cost) : '',
+            service_types: serviceTypes,
+            scope_details: cleanScope,
+            removal_needed: !!(removalBlock as any).needed || (removalBlock as any).needed === 'true',
+            removal_method: (removalBlock as any).method || '',
+            removal_equipment: (removalBlock as any).equipment || [],
+            equipment_needed: j.equipment_needed || [],
+            equipment_rental_flags: j.equipment_rental_flags || {},
+            equipment_details: j.equipment_details || {},
+            equipment_selections: j.equipment_selections || {},
+            ppe_required: j.ppe_required || [],
+            jobsite_photo_urls: j.jobsite_photo_urls || [],
+            scope_photo_urls: j.scope_photo_urls || [],
+            start_date: j.scheduled_date || '',
+            end_date: j.end_date || '',
+            difficulty_rating: j.difficulty_rating || (f as any).difficulty_rating,
+            additional_notes: j.additional_notes || '',
+            // Booleans / nested
+            overcutting_allowed: typeof jc.overcutting_allowed === 'boolean' ? jc.overcutting_allowed : (f as any).overcutting_allowed,
+          }));
+          // Jump to the scope step (3) when requested
+          if (jumpToParam === 'scope') {
+            setCurrentStep(3);
+          }
+        } catch (err) {
+          console.error('Edit-load error:', err);
+          setError('Network error loading job.');
+        }
+      })();
+    }
 
     // Load all customer names for autocomplete
     const loadCustomers = async () => {
@@ -1589,7 +1678,42 @@ export default function ScheduleFormPage() {
         },
       };
 
-      const res = await fetch('/api/admin/schedule-form', {
+      // Edit-mode: PATCH the existing job instead of creating a new one.
+      // Send only the fields that map cleanly onto job_orders columns; the
+      // PATCH route will ignore anything it doesn't recognize.
+      let res: Response;
+      let result: any;
+      if (isEditMode && editJobId) {
+        res = await fetch(`/api/admin/job-orders/${editJobId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({
+            description: payload.description,
+            job_type: payload.job_type,
+            scope_details: payload.scope_details,
+            scope_photo_urls: payload.scope_photo_urls,
+            equipment_needed: payload.equipment_needed,
+            equipment_rental_flags: payload.equipment_rental_flags,
+            equipment_details: payload.equipment_details,
+            equipment_selections: payload.equipment_selections,
+            special_equipment: payload.special_equipment,
+            ppe_required: payload.ppe_required,
+          }),
+        });
+        result = await res.json();
+        if (!res.ok) {
+          setError(result.error || 'Failed to update job');
+          return;
+        }
+        // Bounce back to the schedule board
+        router.push('/dashboard/admin/schedule-board');
+        return;
+      }
+
+      res = await fetch('/api/admin/schedule-form', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1598,7 +1722,7 @@ export default function ScheduleFormPage() {
         body: JSON.stringify(payload),
       });
 
-      const result = await res.json();
+      result = await res.json();
       if (!res.ok) {
         setError(result.error || 'Failed to create job');
         return;
@@ -4135,8 +4259,13 @@ export default function ScheduleFormPage() {
               <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${currentStepData.color} flex items-center justify-center shadow-sm transition-all duration-300`}>
                 <ClipboardList size={16} className="text-white" />
               </div>
-              <span className="hidden sm:inline">Schedule Form</span>
+              <span className="hidden sm:inline">{isEditMode ? 'Edit Scope' : 'Schedule Form'}</span>
             </h1>
+            {isEditMode && (
+              <span className="ml-2 hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200">
+                Editing existing job
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Link href="/dashboard/admin/schedule-form-history"
@@ -4268,12 +4397,12 @@ export default function ScheduleFormPage() {
                 {submitting ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Creating Job...
+                    {isEditMode ? 'Saving Changes...' : 'Creating Job...'}
                   </>
                 ) : (
                   <>
                     <Check size={18} />
-                    Submit Schedule Form
+                    {isEditMode ? 'Save Scope Changes' : 'Submit Schedule Form'}
                   </>
                 )}
               </button>
