@@ -38,6 +38,9 @@ import CommissionsCard from '@/components/CommissionsCard';
 // Heavy demo-only walkthrough — only renders when showWalkthrough && isDemoAdmin
 const AdminOnboardingTour = nextDynamic(() => import('@/components/AdminOnboardingTour'), { ssr: false, loading: () => null });
 
+// Supervisor dashboard branch — clock-in widget + site visit reports
+const SupervisorDashboard = nextDynamic(() => import('./_components/SupervisorDashboard'), { ssr: false, loading: () => null });
+
 // ─── API response types ───────────────────────────────────────────────────────
 
 interface JobToday {
@@ -435,8 +438,8 @@ export default function AdminDashboard() {
   // ── dashboard data (full admins) ──────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    // Salesmen use a dedicated endpoint — skip the admin summary entirely.
-    if (user.role === 'salesman') {
+    // Salesmen + supervisors use dedicated branches — skip the admin summary entirely.
+    if (user.role === 'salesman' || user.role === 'supervisor') {
       setDashLoading(false);
       return;
     }
@@ -519,8 +522,8 @@ export default function AdminDashboard() {
   // ── active jobs fetch ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    // Salesmen get their active count from /api/sales/dashboard.
-    if (user.role === 'salesman') {
+    // Salesmen and supervisors fetch their own active jobs in their branch.
+    if (user.role === 'salesman' || user.role === 'supervisor') {
       setActiveJobsLoading(false);
       return;
     }
@@ -607,6 +610,11 @@ export default function AdminDashboard() {
     : 0;
 
   const isSeniorRole = user?.role === 'super_admin' || user?.role === 'operations_manager';
+
+  // ── Supervisor render branch (clock-in + site visits) ─────────────────────
+  if (user?.role === 'supervisor') {
+    return <SupervisorDashboard user={user} />;
+  }
 
   // ── Salesman render branch (separate layout) ──────────────────────────────
   if (isSalesman) {
