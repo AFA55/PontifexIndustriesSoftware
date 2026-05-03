@@ -1,5 +1,79 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 2, 2026 (POST-DEMO REFINEMENT SESSION) | **Branch:** `claude/nice-borg-4ffe67` (pushed) → `main` pushed to origin | **Production:** 🚀 **LIVE** at https://www.pontifexindustries.com (commit `0963259f`, deploy `dpl_Bqh64vehL9qyntJoPbriaB9wWGCZ` READY) | **Build:** PASSING ✅ | **DB:** Migrations `20260501_customer_survey_v2` and `20260501_notifications_invoice_metadata_idx` applied
+**Date:** May 3, 2026 (SUPERVISOR DASHBOARD SESSION) | **Branch:** `claude/inspiring-swanson-31ba74` (pushed to origin) → merged to local `main` (NOT yet pushed to origin/main) | **Production:** 🚀 LIVE at https://www.pontifexindustries.com (last deploy commit `0963259f`) | **Build:** PASSING ✅ | **DB:** Migration `20260502_supervisor_visits` applied
+
+---
+
+## MAY 3, 2026 — Supervisor Dashboard: Clock-in + Site Visit Reports
+
+User asked for a supervisor dashboard. Supervisor was already a defined role with salesman parity (schedule_form submit, schedule_board view, customer_profiles view, completed_jobs view) plus timecards view. New work: add clock-in/out (paid hourly like operators) and site visit reports (similar to schedule-form but for supervisor visits to operators in the field).
+
+### What shipped this session
+
+**1. Supervisor render branch on `/dashboard/admin`** — `app/dashboard/admin/page.tsx` now early-returns `<SupervisorDashboard user={user} />` for `role === 'supervisor'`. Skips dashboard-summary + active-jobs-summary fetches that the default branch fires.
+
+**2. `app/dashboard/admin/_components/SupervisorDashboard.tsx`** — lazy-loaded, self-contained:
+- Clock-in/out widget with live hours timer (uses `NfcClockInModal` + `/api/timecard/clock-in` + `/api/timecard/clock-out`). Modal handles GPS/NFC/remote/PIN methods automatically since the supervisor uses the same `requireAuth` clock-in API.
+- 4 KPI tiles: My Hours This Week, Visits This Week, Open Follow-ups, Active Jobs.
+- Recent Site Visits panel (last 5).
+- My Active Jobs panel (last 5 — submitted by this supervisor; uses `/api/admin/active-jobs-summary` which already scopes by `created_by` for non-admin roles).
+- Quick Actions row: New Visit, New Quote, Schedule, Timecards.
+
+**3. Site Visit Report system**
+- New table `supervisor_visits` (migration `20260502_supervisor_visits.sql` applied). Columns: supervisor_id+name, operator_id+name, optional job_order_id+job_number+customer_name, visit_date, arrival/departure timestamps, latitude/longitude, observations, issues_flagged, follow_up_required + notes, performance/safety/cleanliness ratings (1-5), photo_urls jsonb, status. RLS: supervisor sees own; admin/ops/super see all-in-tenant; operator can read visits about themselves.
+- API: `app/api/admin/supervisor-visits/route.ts` — GET (scoped to own for supervisor; tenant for admins) + POST (validates operator + job in tenant, looks up names). `app/api/admin/supervisor-visits/[id]/route.ts` — GET + PATCH (author or admin).
+- API: `app/api/admin/operators/[id]/active-jobs/route.ts` — operator's active jobs for a date. Filters: `assigned_to OR helper_assigned_to == operatorId`, status in (scheduled, in_progress, en_route), date covered by [scheduled_date, end_date|scheduled_date]. Used by the form to populate the job-select after operator pick.
+- Form: `app/dashboard/admin/site-visits/new/page.tsx`. Single-page form: operator select (operators + helpers from `/api/admin/schedule-board/operators`) → date → auto-populated active-jobs list (auto-selects when 1 result; tap to choose; "no jobs" message when empty + report still allowed) → arrival/departure time → observations → issues → ratings (3× 5-star) → follow-up checkbox + notes → submit. Posts to `/api/admin/supervisor-visits`.
+- List: `app/dashboard/admin/site-visits/page.tsx`. Search + follow-up filter. Cards show date chip, operator chip, job chip, follow-up chip, observations + issues blocks, ratings.
+
+**4. Timecard plumbing**
+- `app/api/admin/timecards/team-summary/route.ts` — `supervisor` added to the `.in('role', [...])` profiles filter so supervisor punches appear in Timecard Management.
+- `app/dashboard/admin/timecards/page.tsx` — `supervisor: { label: 'SUP', color: 'bg-violet-100 text-violet-700 border-violet-200' }` added to `getRoleBadge` map.
+
+**5. RBAC**
+- `lib/rbac.ts` — new `site_visits` card (violet/indigo gradient, ClipboardCheck icon).
+- Supervisor preset adds `site_visits: 'submit'`.
+- Admin preset adds `site_visits: 'view'`.
+
+### Files changed
+```
+app/api/admin/operators/[id]/active-jobs/route.ts        (new)
+app/api/admin/supervisor-visits/route.ts                 (new)
+app/api/admin/supervisor-visits/[id]/route.ts            (new)
+app/api/admin/timecards/team-summary/route.ts            (role filter)
+app/dashboard/admin/_components/SupervisorDashboard.tsx  (new)
+app/dashboard/admin/page.tsx                             (supervisor branch)
+app/dashboard/admin/site-visits/page.tsx                 (new)
+app/dashboard/admin/site-visits/new/page.tsx             (new)
+app/dashboard/admin/timecards/page.tsx                   (badge)
+lib/rbac.ts                                              (card + preset)
+supabase/migrations/20260502_supervisor_visits.sql       (new)
+```
+
+### Verification
+- `npm run build` PASS (0 errors). New routes in manifest: `/dashboard/admin/site-visits` (4.75 kB), `/dashboard/admin/site-visits/new` (6.01 kB).
+- Pre-commit type-check passed.
+- Migration applied + columns verified via `information_schema`.
+- Smoke-tested in preview as `admin@pontifex.com`: list page renders empty-state correctly, form page renders all sections, operator dropdown populates with 5 operators + 1 helper, picking "Demo Operator" fires `/api/admin/operators/{id}/active-jobs` and renders "No active jobs" panel correctly.
+- **NOT smoke-tested**: the supervisor render branch itself — there is currently no `supervisor`-role account in the DB. To exercise: create one (or temporarily promote a test user) and navigate to `/dashboard/admin`. Default URL stays the same; the page early-returns the supervisor view.
+
+### Commits (LOCAL — pushed to origin/claude/inspiring-swanson-31ba74; NOT pushed to origin/main yet)
+```
+8eeb01cb  feat(supervisor): supervisor dashboard with clock-in + site visit reports
+2190b010  Merge: Supervisor dashboard + site visit reports + clock-in (on local main)
+```
+
+### How to make a supervisor account for testing
+Either:
+- In Team Management, change a test user's role to `supervisor` and re-login (auth role is cached in localStorage), OR
+- Direct DB: `UPDATE public.profiles SET role = 'supervisor' WHERE email = 'sales@pontifex.com';` (will repurpose the salesman demo account; revert after).
+
+### Known gaps / next iteration ideas
+- Supervisor visit form has no photo uploader (intentional MVP — easy to add via existing `PhotoUploader` component).
+- Visit detail view — currently only the list shows visits. A `/dashboard/admin/site-visits/[id]/page.tsx` detail page is a natural next step (PATCH endpoint already exists).
+- Operator-side: operators can read visits about themselves (RLS policy in place) but no UI surfaces them yet. If/when supervisor performance gets factored into operator reviews, build a "Recent supervisor reports" panel on operator profile.
+- "My Active Jobs" tile on supervisor dashboard uses the existing salesman/supervisor scope (`created_by = self`). If a supervisor wants to see ALL active jobs (not just ones they bid), would need a toggle.
+- Notifications: when a supervisor flags follow-up, no notification fires to the operator's manager today. Consider adding a `notifySalesperson`-style helper for supervisor visits.
+- Clock-in: supervisor uses the same `NfcClockInModal` as operators. The modal's "shop_pin" / "shop_gps" / "jobsite_camera" / "remote" flows all work for any role — but if NFC is required by tenant settings, supervisor would need a bypass notification or a registered NFC tag. Not handled specifically; same path as any non-operator who tries to clock in.
 
 ---
 
