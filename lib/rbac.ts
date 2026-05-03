@@ -162,6 +162,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     iconBg: 'bg-gray-600',
     features: ['Schedule slots', 'Shop notes row', 'Capacity warnings', 'System config'],
   },
+  {
+    key: 'site_visits',
+    title: 'Site Visit Reports',
+    description: 'File supervisor visit reports on operators in the field',
+    icon: '🧭',
+    href: '/dashboard/admin/site-visits',
+    bgColor: 'from-violet-500 to-indigo-600',
+    iconBg: 'bg-violet-500',
+    features: ['Pick operator', 'Auto-pull active job', 'Observations & ratings', 'Follow-up flags'],
+  },
 ];
 
 // All card keys for iteration
@@ -237,6 +247,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     completed_jobs: 'view',
     billing: 'view',
     customer_profiles: 'full',
+    site_visits: 'view',
   }),
   supervisor: preset({
     schedule_form: 'submit',
@@ -244,6 +255,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     customer_profiles: 'view',
     completed_jobs: 'view',
     timecards: 'view',
+    site_visits: 'submit',
   }),
   salesman: preset({
     schedule_form: 'submit',

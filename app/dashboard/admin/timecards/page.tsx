@@ -87,6 +87,7 @@ function getRoleBadge(role: string) {
   const map: Record<string, { label: string; color: string }> = {
     operator: { label: 'OPR', color: 'bg-blue-100 text-blue-700 border-blue-200' },
     apprentice: { label: 'APR', color: 'bg-teal-100 text-teal-700 border-teal-200' },
+    supervisor: { label: 'SUP', color: 'bg-violet-100 text-violet-700 border-violet-200' },
     admin: { label: 'ADM', color: 'bg-purple-100 text-purple-700 border-purple-200' },
     shop_manager: { label: 'SHOP', color: 'bg-amber-100 text-amber-700 border-amber-200' },
     operations_manager: { label: 'OPS', color: 'bg-rose-100 text-rose-700 border-rose-200' },
