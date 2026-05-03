@@ -289,6 +289,18 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Supervisor Account */}
+            <div className="p-4 bg-gradient-to-br from-violet-50 to-indigo-50 rounded-xl border-2 border-violet-200 hover:border-violet-300 transition-all hover:shadow-md cursor-default">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse"></div>
+                <h4 className="text-violet-800 font-bold text-xs tracking-wider">SUPERVISOR DASHBOARD</h4>
+              </div>
+              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+                <div><span className="text-violet-700 font-bold">Email:</span> supervisor@pontifex.com</div>
+                <div><span className="text-violet-700 font-bold">Password:</span> Supervisor1234!</div>
+              </div>
+            </div>
+
             {/* Admin Account */}
             <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200 hover:border-orange-300 transition-all hover:shadow-md cursor-default">
               <div className="flex items-center gap-2 mb-2">

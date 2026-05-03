@@ -36,22 +36,33 @@ interface CurrentTimecard {
   clockInTime: string;
 }
 
+// Format a YYYY-MM-DD string as a local date (avoids UTC midnight off-by-one).
+function formatVisitDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// Local YYYY-MM-DD (avoids UTC midnight off-by-one when comparing date columns).
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+// ISO week: Monday → Sunday. JS getDay() returns 0 for Sunday — treat as 7
+// so Sunday correctly resolves to the END of the current week, not the next.
 function startOfWeekISO(): string {
-  const now = new Date();
-  const m = new Date(now);
-  m.setDate(m.getDate() - m.getDay() + 1); // Monday
-  m.setHours(0, 0, 0, 0);
-  return m.toISOString().split('T')[0];
+  const m = new Date();
+  const dow = m.getDay() || 7;
+  m.setDate(m.getDate() - dow + 1);
+  return localDateStr(m);
 }
 function endOfWeekISO(): string {
-  const now = new Date();
-  const m = new Date(now);
-  m.setDate(m.getDate() - m.getDay() + 1);
-  m.setHours(0, 0, 0, 0);
-  const s = new Date(m);
-  s.setDate(s.getDate() + 6);
-  s.setHours(23, 59, 59, 999);
-  return s.toISOString().split('T')[0];
+  const m = new Date();
+  const dow = m.getDay() || 7;
+  m.setDate(m.getDate() - dow + 7);
+  return localDateStr(m);
 }
 
 export default function SupervisorDashboard({ user }: { user: User }) {
@@ -181,6 +192,8 @@ export default function SupervisorDashboard({ user }: { user: User }) {
       setCard({ id: j.data.id, clockInTime: j.data.clockInTime });
       setShowModal(false);
       setClockMsg({ type: 'success', text: 'Clocked in.' });
+      // Re-sync from server (covers any race between modal close + state update)
+      fetchAll();
     } catch (err: any) {
       setClockMsg({ type: 'error', text: err.message || 'Failed to clock in' });
       throw err;
@@ -401,7 +414,7 @@ export default function SupervisorDashboard({ user }: { user: User }) {
                       )}
                     </p>
                     <span className="text-xs text-gray-400 dark:text-slate-500 whitespace-nowrap">
-                      {new Date(v.visit_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {formatVisitDate(v.visit_date)}
                     </span>
                   </div>
                   {v.observations && (
