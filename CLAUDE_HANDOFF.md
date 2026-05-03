@@ -3,6 +3,28 @@
 
 ---
 
+## MAY 3, 2026 — Three Claude Code subagents (Ruflo evaluation → custom alternative)
+
+User shared a YouTube short about Ruflo (`github.com/ruvnet/ruflo`, 37.6k stars, MIT) — a Claude Code orchestration plugin that ships 60+ specialist agents. After research the recommendation was **don't install it**:
+
+- Video's "50% token cut / 250% extension" claims are not in the README.
+- Repo is real but operational profile (data flow, auto-activation, telemetry, uninstall) is opaque.
+- We have live trial customer data in context — adding 60 unaudited agents with unclear phone-home behavior is wrong-shaped risk.
+- We already have a curated team in `.claude/agents/` (Alex/Dana/Morgan/Riley/Sam) — flooding with 60 generic agents would dilute it.
+- I can't run `/plugin install` myself (user-only slash command).
+
+Instead, added 3 high-value Claude Code subagents in the proper YAML-frontmatter format that fill REAL recurring gaps:
+
+- `.claude/agents/supabase-migration-author.md` — encodes our exact migration conventions (idempotent DDL, SECURITY DEFINER helpers, NEVER user_metadata, tenant_id, updated_at trigger).
+- `.claude/agents/rls-policy-auditor.md` — proactive RLS reviewer that catches the user_metadata bug class (CRITICAL) and missing tenant_id checks (cross-tenant leak). Graded CRITICAL/HIGH/MEDIUM/NIT.
+- `.claude/agents/mobile-responsive-auditor.md` — systematic 375px audit of operator pages with an inline preview_eval script that harvests overflow, sub-44px tap targets, sub-12px text. Closes the open mobile-audit follow-up from May 2.
+
+Zero telemetry, zero external services, fully audited (I wrote them), reversible. Captures the value of "specialist agents" tailored to our stack instead of importing a generic bundle.
+
+Commit: `6c4fa32a` (on branch + cherry-picked to local main, NOT yet pushed to origin/main).
+
+---
+
 ## MAY 3, 2026 — Supervisor Dashboard: Clock-in + Site Visit Reports
 
 User asked for a supervisor dashboard. Supervisor was already a defined role with salesman parity (schedule_form submit, schedule_board view, customer_profiles view, completed_jobs view) plus timecards view. New work: add clock-in/out (paid hourly like operators) and site visit reports (similar to schedule-form but for supervisor visits to operators in the field).
