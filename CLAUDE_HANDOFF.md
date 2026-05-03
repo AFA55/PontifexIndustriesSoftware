@@ -3,6 +3,52 @@
 
 ---
 
+## MAY 3, 2026 (PT 2) — Supervisor Dashboard: end-to-end verified + dev/staging/prod docs
+
+User priority: get the supervisor flow fully functional for trial customer testing, plus document how to iterate safely without disrupting prod.
+
+### Demo account created
+- `supervisor@pontifex.com` / `Supervisor1234!` (tenant: Patriot, role: supervisor, profile id `eca5fdc6-cbef-42a8-b15c-b743f0a0f2d6`).
+- Created via direct SQL into `auth.users` + `auth.identities` + `public.profiles`. **Gotcha** for future demo accounts: Supabase auth requires `confirmation_token`, `recovery_token`, `email_change_token_new`, `email_change`, `email_change_token_current`, `reauthentication_token` to be empty strings (`''`), NOT NULL. Login fails with "error querying schema" if these are NULL. Same applies to `profiles.email` (NOT NULL — must populate).
+- New violet "SUPERVISOR DASHBOARD" demo card added to `/login` page.
+
+### End-to-end verified in preview
+- Login as supervisor → redirects to `/dashboard/admin` → renders the dedicated SupervisorDashboard branch.
+- Clock-in: GPS bypass code `4242` (gated by `NEXT_PUBLIC_LOCATION_BYPASS_CODE` in `.env.local`) → `POST /api/timecard/clock-in` 201 → dashboard shows "YOU ARE CLOCKED IN", live timer, "Since 2:02 PM", emerald background, "Clock Out" button.
+- Site visit submission: pick operator → date defaults today → observations textarea → submit → redirects to `/dashboard/admin/site-visits` → new card visible with operator chip, date chip, supervisor attribution, observations preview.
+
+### Bugs found + fixed during verification
+- **Date display off-by-one** — `new Date('2026-05-03').toLocaleDateString(...)` parses as UTC midnight then renders in local TZ → off-by-one in Western timezones. Added `formatVisitDate(YYYY-MM-DD)` helper in both list page and SupervisorDashboard that explicitly constructs a local-date.
+- **Sunday-week-bounds bug** — `startOfWeekISO()` used `m.setDate(m.getDate() - m.getDay() + 1)` which on Sunday (`getDay()=0`) sets the week start to TOMORROW (Monday next week). Fixed with `const dow = m.getDay() || 7` so Sunday correctly anchors to the *current* Monday→Sunday week. Also switched to local-date string (`localDateStr` helper) to avoid UTC drift on the bounds.
+- **Clock-in dashboard didn't refresh** — modal closed but parent state didn't update from server. Added `fetchAll()` after the local state set so the dashboard re-syncs from `/api/timecard/current`. Belt-and-suspenders fix.
+
+### Files changed
+```
+CLAUDE.md                                                 (+ Platform Vision + Deployment & Testing Workflow sections)
+app/dashboard/admin/_components/SupervisorDashboard.tsx   (date helpers, week bounds, fetchAll on clock-in)
+app/dashboard/admin/site-visits/page.tsx                  (formatVisitDate helper)
+app/login/page.tsx                                        (Supervisor demo card)
+```
+
+### CLAUDE.md additions
+- **Platform Vision** — codifies the multi-tenant SaaS goal (Pontifex Industries hosting multiple companies, Patriot is tenant #1), the company-code login model (uses existing `tenants.company_code`), and the iOS/Android distribution path via Capacitor wrapping the Next.js app.
+- **Deployment & Testing Workflow** — three environments (production / Vercel preview per branch / local dev), discipline rules (never push main until preview verified, additive vs. risky migrations, when to use Supabase branches), and an optional staging-subdomain path for later.
+
+### How to test
+1. Run `npm run dev` locally.
+2. Open `/login` → click SUPERVISOR DASHBOARD card to see creds → log in.
+3. Clock in: GPS will fail in dev → click "Testing bypass" → enter `4242` → verify clocked-in state.
+4. Click "New Visit Report" → pick an operator → fill observations → submit → verify card appears on list.
+5. Reload — state persists.
+
+### Open follow-ups (not urgent)
+- "My Hours This Week" KPI tile only counts completed timecards (clocked-out). Active shift hours show in the live tile but don't roll into the weekly total until clock-out. If supervisors want a real-time "total this week" that includes the in-progress shift, sum `weeklyHours + (clocked ? hours : 0)` in the tile.
+- Operator dashboard `/dashboard/page.tsx` likely has the same Sunday-week-bounds bug (`setDate(getDate() - getDay() + 1)` pattern around line 167). Worth fixing when next touched.
+- Site visit detail page (`/dashboard/admin/site-visits/[id]`) doesn't exist yet — list view shows full content inline, but a detail view would be useful when comments/photos are added.
+- Photo uploader on the visit form (already noted in May 3 PT 1 follow-ups).
+
+---
+
 ## MAY 3, 2026 — Three Claude Code subagents (Ruflo evaluation → custom alternative)
 
 User shared a YouTube short about Ruflo (`github.com/ruvnet/ruflo`, 37.6k stars, MIT) — a Claude Code orchestration plugin that ships 60+ specialist agents. After research the recommendation was **don't install it**:

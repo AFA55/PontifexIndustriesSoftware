@@ -73,6 +73,77 @@ npm run build      # Production build check (must pass with 0 errors)
 
 ---
 
+## Platform Vision
+
+The end-state is a multi-tenant SaaS called **Pontifex Industries** that hosts multiple concrete-cutting / construction-services companies on a single platform. Tenant #1 is Patriot Concrete Cutting (currently in trial). Each tenant has its own brand, users, jobs, customers — fully isolated by `tenant_id` and RLS.
+
+### Login model (multi-tenant)
+- Every tenant has a `company_code` in `public.tenants` (Patriot's is `PATRIOT`).
+- Login UI takes **company code + email + password**. The company code disambiguates which tenant the user belongs to + drives the white-label branding (logo, primary color) on the login page itself.
+- One email = one tenant for now. (If a single user ever needs to belong to multiple tenants, that's a profiles refactor — punt until needed.)
+- White-label fields already in `tenants`: `name`, `slug`, `domain`, `logo_url`, `primary_color`, `plan`, `max_users`, `max_jobs_per_month`, `features` jsonb. `BrandingProvider` reads these client-side.
+
+### Distribution roadmap
+1. **Web (live now)** — `pontifexindustries.com` is the primary access point. Trial customer (Patriot) running here.
+2. **Mobile apps (planned)** — wrap the existing Next.js app with **Capacitor** (or Tauri for desktop). Same codebase, same APIs, ships to App Store + Google Play. No React Native rewrite. Why Capacitor: zero refactor, native plugins (NFC, geolocation, camera, push) available, fast to ship.
+3. **Per-tenant subdomain (longer-term, optional)** — `patriot.pontifexindustries.com` with tenant-aware routing. Useful when multiple tenants are live and we want to brand the URL.
+
+### Non-negotiables
+- Every new table has `tenant_id` and tenant-scoped RLS. Use the SECURITY DEFINER helpers (`current_user_tenant_id()`, etc.) — never `auth.jwt() -> 'user_metadata'`.
+- Every new feature works for any tenant out of the box — no Patriot-specific branding hardcoded. Use `BrandingProvider` / `tenants.primary_color` / `tenants.logo_url`.
+- Mobile-first. Operators are on phones. Tap targets ≥ 44px, no horizontal overflow at 375px. Use the `mobile-responsive-auditor` subagent before merging operator-page changes.
+
+---
+
+## Deployment & Testing Workflow
+
+We have **production live on Vercel + a single Supabase project**. Trial customer using prod. The discipline is to make changes safely without disrupting their data.
+
+### Three environments (no extra hosting cost)
+
+| Environment | URL | Branch | Supabase | When to use |
+|---|---|---|---|---|
+| **Production** | `pontifexindustries.com` | `main` (origin) | Production project `klatddoyncxidgqtcjnu` | Customer-facing. Push only after verification. |
+| **Vercel preview** | `pontifex-industries-software-awja-git-<branch>-...vercel.app` | Any non-main branch on origin | Same prod project (read/write — careful) | Test UI / client-only changes against real data on a sharable URL. Auto-created by Vercel on every branch push. |
+| **Local dev** | `localhost:3000` | Whatever you have checked out | Same prod project via `.env.local` | Active iteration. Hot reload, fast cycle. |
+
+### Rules of the road
+
+1. **Never `git push origin main` until you've verified** — preview URL is green, build passes, you've eyeballed the change. The trial is using `main`.
+2. **Code-only changes** (UI, API routes, business logic) — push branch → use the auto-generated Vercel preview URL → verify → THEN merge to main.
+3. **Schema changes (migrations)** — these hit the live DB regardless of which branch the code is on. Two options:
+   - **Risky migration** (drops a column, alters a heavily-used table, backfills data): create a Supabase Database Branch first via the Supabase MCP `create_branch` tool. Apply + test against the branch DB. When green, apply to production.
+   - **Additive migration** (new table, new column with default, new index): apply directly to prod via MCP `apply_migration`. The convention is idempotent DDL (`CREATE TABLE IF NOT EXISTS`, `CREATE POLICY ... EXCEPTION WHEN duplicate_object`) so re-runs are no-ops.
+4. **Cron jobs** (`/api/cron/*`) — defined in `vercel.json` and run only against production. Don't expect them to fire on previews. The `CRON_SECRET` env var must be set in Vercel for the route to authorize.
+
+### Quick reference
+
+```bash
+# Local dev (touches prod DB unless you swap .env.local)
+npm run dev
+
+# Push to branch — Vercel auto-creates a preview URL
+git push origin <branch>
+
+# Find the preview URL after pushing
+gh pr view --json url   # if a PR is open
+# or check Vercel dashboard
+
+# Promote to prod (only after preview is verified)
+git checkout main && git merge <branch> && git push origin main
+```
+
+### When you want a fully-isolated staging URL
+
+Optional — not set up by default. To add later:
+1. Create a `staging` branch in git.
+2. In the Vercel dashboard, alias the staging branch's deployment to `staging.pontifexindustries.com`.
+3. Optionally configure separate "Preview" env vars in Vercel that point at a second Supabase project (creating one is free on hobby tier — but data sync becomes a chore).
+
+For now, the auto-preview URL per branch is enough.
+
+---
+
 ## Sprint Backlog (Target: April 2, 2026)
 
 ### Week 1 — Core Feature Completion (March 19–25) ✅ COMPLETE

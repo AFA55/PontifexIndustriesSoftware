@@ -30,6 +30,13 @@ interface VisitRow {
 
 const ALLOWED_ROLES = ['supervisor', 'admin', 'super_admin', 'operations_manager'];
 
+// Format YYYY-MM-DD as a local date (avoids UTC midnight off-by-one).
+function formatVisitDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export default function SiteVisitsListPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -183,7 +190,7 @@ export default function SiteVisitsListPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/20 px-2 py-1 rounded-full">
                       <Calendar className="w-3 h-3" />
-                      {new Date(v.visit_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {formatVisitDate(v.visit_date)}
                     </span>
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded-full">
                       <UserIcon className="w-3 h-3" />
