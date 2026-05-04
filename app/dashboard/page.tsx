@@ -11,6 +11,7 @@ import NfcClockInModal from '@/components/NfcClockInModal';
 import NotificationBell from '@/components/NotificationBell';
 import { useBranding } from '@/lib/branding-context';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
+import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 
 // Dynamic Logo Component — uses branding if available
 function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: string; logoUrl?: string | null; companyName?: string }) {
@@ -138,13 +139,6 @@ export default function Dashboard() {
     checkOnboardingStatus(currentUser);
 
     setLoading(false);
-
-    // Refresh active jobs count every 30 seconds to stay in sync with admin changes
-    const refreshInterval = setInterval(() => {
-      fetchActiveJobs();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(refreshInterval);
   }, [router]);
 
   // Check if user should see onboarding tour
@@ -287,6 +281,9 @@ export default function Dashboard() {
       console.error('Error fetching active jobs:', error);
     }
   };
+
+  // Refresh active jobs while the tab is visible. Paused when hidden — saves Vercel function invocations.
+  useVisiblePoll(fetchActiveJobs, { intervalMs: 60_000 });
 
   // Update operator status
   const updateStatus = async (newStatus: OperatorStatus) => {

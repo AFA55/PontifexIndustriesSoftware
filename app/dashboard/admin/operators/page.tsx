@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MapPin, Clock, User as UserIcon, Activity, Navigation, CheckCircle } from 'lucide-react';
+import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 
 interface OperatorStatus {
   id: string;
@@ -69,17 +70,6 @@ export default function OperatorsMonitoringPage() {
     fetchActiveOperators();
   }, [router]);
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    if (!autoRefresh) return;
-
-    const interval = setInterval(() => {
-      fetchActiveOperators();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
   const fetchActiveOperators = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -109,6 +99,9 @@ export default function OperatorsMonitoringPage() {
       setLoading(false);
     }
   };
+
+  // Auto-refresh every 60s while tab is visible (paused when hidden — saves Vercel function invocations).
+  useVisiblePoll(fetchActiveOperators, { intervalMs: 60_000, enabled: autoRefresh });
 
   const getGoogleMapsLink = (lat: number | null, lng: number | null) => {
     if (!lat || !lng) return '#';

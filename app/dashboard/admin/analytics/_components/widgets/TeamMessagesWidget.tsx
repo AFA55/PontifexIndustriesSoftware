@@ -5,6 +5,7 @@ import { Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { WidgetProps } from '../types';
 import { LoadingSkeleton } from './LoadingSkeleton';
+import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 
 interface Message {
   id: string;
@@ -69,11 +70,10 @@ export default function TeamMessagesWidget({ isLoading }: WidgetProps) {
     }
   }, [getToken]);
 
-  useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 15000);
-    return () => clearInterval(interval);
-  }, [fetchMessages]);
+  // Was 15s polling — 4x more aggressive than every other widget for no real
+  // reason (chat doesn't need <60s). Now 60s + paused when tab hidden.
+  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+  useVisiblePoll(fetchMessages, { intervalMs: 60_000 });
 
   useEffect(() => {
     if (scrollRef.current) {
