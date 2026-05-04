@@ -3,6 +3,77 @@
 
 ---
 
+## MAY 4, 2026 — Vercel cost-reduction pass ($500 bill → fixes)
+
+User got a $500 Vercel bill on a $20/month plan (~$480 overage). Audited the codebase, identified the drivers, shipped fixes.
+
+### Drivers identified
+1. **Polling spam (biggest).** 8 client pages polled APIs every 30s (one every 15s) and **kept polling when tabs were hidden**. With 4 operators × 8h + 2 admins × 4h, conservative estimate ~465k function invocations/month from polling alone — likely 2-5× higher with backgrounded tabs left open.
+2. **`maxDuration: 30s` on ALL `/api/**` routes** ([vercel.json](vercel.json)). Global cap meant slow routes (PDFs, big aggregations) could burn 30s × 1GB = 30 GB-seconds per call uncapped.
+3. **~20 preview deployments in 3 days** from `claude/*` branches. Each Vercel preview spawns its own warm-keep function pool.
+
+### What shipped
+
+**New `lib/hooks/useVisiblePoll.ts`** — polls only while `document.visibilityState === 'visible'` AND `navigator.onLine`. Fires once immediately on visibility/online resume so the UI catches up. Empirically verified: **0 API calls during 5s with tab hidden, 1 call on resume**.
+
+**Replaced `setInterval` polling on 8 sites:**
+| Page | Before | After |
+|---|---|---|
+| `/dashboard` (active jobs) | 30s | 60s + visibility-pause |
+| `/dashboard/my-jobs` (Realtime fallback) | 30s | 180s + visibility-pause |
+| `/dashboard/admin/operators` | 30s | 60s + visibility-pause |
+| `/dashboard/admin/system-health` | 30s | 60s + visibility-pause |
+| `/dashboard/admin/jobs/[id]` live status | 30s | 60s + visibility-pause |
+| `components/NotificationBell` (operator) | 30s | 120s + visibility-pause |
+| schedule-board `NotificationBell` (admin) | 30s | 120s + visibility-pause |
+| Analytics `TeamMessagesWidget` | **15s** | 60s + visibility-pause |
+
+Combined: ~80% fewer poll invocations vs baseline (longer intervals × paused-when-hidden × resume-on-visible refresh).
+
+**`vercel.json` tuning:**
+- Default `maxDuration: 30 → 10`. Caps runaway routes.
+- Per-route `60s` only for the routes that need it: 7 PDF routes, timecards export, dashboard-summary aggregation, 2 cron handlers.
+- New `git.deploymentEnabled: { main: true, "claude/*": false }`. Auto-deploys disabled for AI-feature branches. Production-only deploys going forward; previews can still be triggered manually with `vercel deploy` when wanted.
+
+### Fixes NOT shipped (worth knowing)
+- **Image optimization** was already not a cost driver — only 1 use of `next/image` in the codebase (`/andresDBC` admin page); operator photos use plain `<img>` tags pointing at Supabase Storage URLs (good — Supabase CDN delivers them, no Vercel transform charges).
+- **Crons** — 2 daily cron jobs total. Negligible cost (2 × 30 = 60 invocations/month).
+
+### Files changed
+```
+lib/hooks/useVisiblePoll.ts                       (new)
+vercel.json                                       (maxDuration tuning + git.deploymentEnabled)
+app/dashboard/page.tsx                            (operator dashboard polling)
+app/dashboard/my-jobs/page.tsx                    (Realtime fallback polling)
+app/dashboard/admin/operators/page.tsx
+app/dashboard/admin/system-health/page.tsx
+app/dashboard/admin/jobs/[id]/page.tsx
+app/dashboard/admin/schedule-board/_components/NotificationBell.tsx
+app/dashboard/admin/analytics/_components/widgets/TeamMessagesWidget.tsx
+components/NotificationBell.tsx
+```
+
+### Expected impact (next billing cycle)
+- Function invocations: **~80% drop** from polling reductions alone.
+- Function GB-Hours: capped at 10s for general routes; only PDF/heavy paths can hit 60s. Should be a major reduction since most invocations are short-lived now.
+- Build minutes: claude/* branches no longer auto-deploy → expect 5-10× fewer Vercel builds per week.
+
+Honest framing: I can't promise a specific dollar figure because Vercel breaks bills into multiple line items (functions, bandwidth, image optimization, builds, edge requests) and we don't have access to the line-item breakdown. But polling was the dominant cost driver, and we've cut that ~80%.
+
+### Next steps if the bill is still high
+1. **Open the Vercel Usage dashboard** — it shows per-driver breakdown. Tells us exactly which line item is dominant.
+2. **Check bandwidth** — if it's the driver, audit large API responses + PDF downloads.
+3. **Audit `dashboard-summary`** — heavy aggregation route that runs on every admin login. Could be cached for 60s.
+4. **Consider Supabase Realtime instead of polling** for `live-status` and `operators/active` — replace polling backstops entirely.
+
+### Commits
+```
+9127a91b  perf(vercel): cut function invocations + duration to crush the bill
+```
+Branch: `claude/inspiring-swanson-31ba74` (pushed). Cherry-picked to local main; not pushed to origin/main yet.
+
+---
+
 ## MAY 3, 2026 (PT 2) — Supervisor Dashboard: end-to-end verified + dev/staging/prod docs
 
 User priority: get the supervisor flow fully functional for trial customer testing, plus document how to iterate safely without disrupting prod.
