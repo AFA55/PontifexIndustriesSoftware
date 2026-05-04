@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Bell, X, AlertCircle, CheckCircle, Info, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 
 interface Notification {
   id: string;
@@ -44,12 +45,11 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
     }
   }, []);
 
-  useEffect(() => {
-    fetchNotifications();
-    // Poll every 30s for new notifications
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  // Fetch on mount + every 2 min while tab is visible. Was 30s — paused-when-hidden
+  // saves the bulk of Vercel function invocations (this bell is rendered on every
+  // admin page).
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+  useVisiblePoll(fetchNotifications, { intervalMs: 120_000 });
 
   // Close dropdown on outside click
   useEffect(() => {

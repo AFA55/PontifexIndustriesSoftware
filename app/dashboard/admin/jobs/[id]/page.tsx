@@ -42,6 +42,7 @@ import {
 import EditTimestampModal from '@/components/admin/EditTimestampModal';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import type { ScopeItem } from '@/components/JobScopePanel';
 
 const JobScopePanel = dynamicImport(() => import('@/components/JobScopePanel'), {
@@ -601,12 +602,10 @@ export default function AdminJobDetailPage({
     } catch { /* ignore — non-critical */ }
   }, [jobId]);
 
-  // Poll live status every 30 seconds
-  useEffect(() => {
-    fetchLiveStatus();
-    const timer = setInterval(fetchLiveStatus, 30000);
-    return () => clearInterval(timer);
-  }, [fetchLiveStatus]);
+  // Live status: fetch once on mount; poll every 60s while tab is visible.
+  // Was 30s — halved + paused when tab hidden saves ~80% of Vercel function calls.
+  useEffect(() => { fetchLiveStatus(); }, [fetchLiveStatus]);
+  useVisiblePoll(fetchLiveStatus, { intervalMs: 60_000 });
 
   // 1-second ticker — only runs while standby is active so we don't waste cycles
   useEffect(() => {

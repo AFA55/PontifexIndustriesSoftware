@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Bell, X, AlertCircle, CheckCircle, Clock, MessageSquare, Send, ChevronRight, BellOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 
 interface Notification {
   id: string;
@@ -52,11 +53,11 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
     }
   }, []);
 
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  // Initial fetch + visibility-aware polling (2 min). The hook re-fetches
+  // immediately when the user returns to the tab, so they see fresh
+  // notifications without us burning function calls in the background.
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+  useVisiblePoll(fetchNotifications, { intervalMs: 120_000 });
 
   // Close dropdown on outside click
   useEffect(() => {

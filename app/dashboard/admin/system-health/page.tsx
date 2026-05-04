@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import {
   Activity, Server, Database, Shield, HardDrive, Users, Briefcase,
   AlertTriangle, CheckCircle, XCircle, RefreshCw, Clock, Wifi,
@@ -116,12 +117,9 @@ export default function SystemHealthPage() {
     fetchHealth();
   }, [router, fetchHealth]);
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const interval = setInterval(fetchHealth, 30000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, fetchHealth]);
+  // Auto-refresh every 60s while tab is visible. Paused when hidden — system-health
+  // is rarely watched live, so background polling was burning Vercel functions.
+  useVisiblePoll(fetchHealth, { intervalMs: 60_000, enabled: autoRefresh });
 
   const StatusIcon = ({ status }: { status: string }) => {
     if (status === 'ok' || status === 'healthy') return <CheckCircle className="w-5 h-5 text-green-500" />;

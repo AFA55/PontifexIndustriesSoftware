@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import DayNavigator from './_components/DayNavigator';
 import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
 import NotificationBanner from './_components/NotificationBanner';
+import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 
 function toDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -348,16 +349,17 @@ export default function MyJobsPage() {
       )
       .subscribe();
 
-    // 2. Polling fallback every 30 seconds — catches any missed realtime events
-    const pollInterval = setInterval(() => {
-      fetchJobs(selectedDate);
-    }, 30000);
-
+    // Realtime is the primary path. Polling fallback now lives in the
+    // useVisiblePoll hook below — paused when the tab is hidden + longer
+    // interval (3 min) since Realtime should catch most updates.
     return () => {
       supabase.removeChannel(channel);
-      clearInterval(pollInterval);
     };
   }, [userId, selectedDate, fetchJobs]);
+
+  // Polling fallback (2 min) — only fires while the tab is visible.
+  // Backstop for missed Realtime events; not the primary refresh path.
+  useVisiblePoll(() => fetchJobs(selectedDate), { intervalMs: 180_000 });
 
   if (loading && jobs.length === 0) {
     return (
