@@ -98,8 +98,9 @@ export default function Dashboard() {
       return;
     }
 
-    // Redirect management roles to their admin dashboard
-    const ADMIN_ROLES = ['super_admin', 'admin', 'operations_manager', 'salesman', 'shop_manager', 'inventory_manager'];
+    // Redirect management roles to their admin dashboard.
+    // Keep this in sync with ADMIN_DASHBOARD_ROLES in lib/rbac.ts.
+    const ADMIN_ROLES = ['super_admin', 'admin', 'operations_manager', 'salesman', 'supervisor', 'shop_manager', 'inventory_manager'];
     if (ADMIN_ROLES.includes(currentUser.role)) {
       router.push('/dashboard/admin');
       return;

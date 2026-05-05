@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, ClipboardCheck } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import NotificationBell from '@/components/NotificationBell';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
@@ -126,14 +126,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* Supervisor-only: New Visit Report. Sits next to + New Job.
+                min-h-[44px] for tap-target compliance on mobile. */}
+            {user?.role === 'supervisor' && (
+              <Link
+                href="/dashboard/admin/site-visits/new"
+                prefetch
+                className="flex items-center justify-center gap-1.5 min-w-[44px] min-h-[44px] px-3 sm:px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 transition-all shadow-sm shadow-violet-500/30"
+                aria-label="New Visit Report"
+              >
+                <ClipboardCheck className="w-5 h-5" />
+                <span className="hidden sm:inline">New Visit</span>
+              </Link>
+            )}
+
             {/* + New Job — Link prefetches the schedule-form chunk on hover/viewport
                 so the click feels instant instead of waiting for the JS to load. */}
             <Link
               href="/dashboard/admin/schedule-form"
               prefetch
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all shadow-sm"
+              className="flex items-center justify-center gap-1.5 min-w-[44px] min-h-[44px] px-3 sm:px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all shadow-sm"
+              aria-label="New Job"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-5 h-5" />
               <span className="hidden sm:inline">New Job</span>
             </Link>
 

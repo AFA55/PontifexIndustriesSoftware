@@ -223,25 +223,26 @@ export default function NewSiteVisitPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard/admin/site-visits"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Link>
-        </div>
+      <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
+        {/* Back link */}
+        <Link
+          href="/dashboard/admin/site-visits"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Visit Reports
+        </Link>
 
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-            <ClipboardCheck className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">New Site Visit Report</h1>
-            <p className="text-sm text-gray-500 dark:text-slate-400">Record what you saw on your visit.</p>
+        {/* Vibrant gradient hero header */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 via-indigo-600 to-purple-700 p-5 sm:p-7 shadow-xl shadow-violet-500/30 text-white">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/30 flex-shrink-0">
+              <ClipboardCheck className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">New Site Visit Report</h1>
+              <p className="text-sm text-white/80 mt-0.5">Record what you saw on your visit.</p>
+            </div>
           </div>
         </div>
 
@@ -460,21 +461,21 @@ function RatingRow({
 }: { label: string; value: number | null; onChange: (n: number | null) => void }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-sm text-gray-700 dark:text-slate-200">{label}</span>
-      <div className="flex items-center gap-1">
+      <span className="text-sm font-medium text-gray-700 dark:text-slate-200">{label}</span>
+      <div className="flex items-center gap-0.5">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => onChange(value === n ? null : n)}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition active:scale-95 ${
               value && n <= value
                 ? 'text-amber-500'
                 : 'text-gray-300 dark:text-slate-600 hover:text-amber-300'
             }`}
             aria-label={`${label} ${n} star${n > 1 ? 's' : ''}`}
           >
-            <Star className="w-5 h-5" fill={value && n <= value ? 'currentColor' : 'none'} />
+            <Star className="w-6 h-6" fill={value && n <= value ? 'currentColor' : 'none'} />
           </button>
         ))}
       </div>

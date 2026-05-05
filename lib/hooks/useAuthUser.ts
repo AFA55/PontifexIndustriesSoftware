@@ -71,7 +71,7 @@ export function useAuthUser(options: UseAuthUserOptions = {}) {
           if (!cancelled) {
             setState('unauthorized');
             // Send to their appropriate home
-            const ADMIN_ROLES = ['super_admin', 'admin', 'operations_manager', 'salesman', 'shop_manager', 'inventory_manager'];
+            const ADMIN_ROLES = ['super_admin', 'admin', 'operations_manager', 'salesman', 'supervisor', 'shop_manager', 'inventory_manager'];
             router.push(ADMIN_ROLES.includes(userObj.role) ? '/dashboard/admin' : '/dashboard');
           }
           return;

@@ -26,6 +26,8 @@ import {
   ArrowLeft,
   Menu,
   X,
+  ClipboardCheck,
+  ClipboardList,
 } from 'lucide-react';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -46,6 +48,8 @@ interface NavItem {
   flagKey?: keyof UserFeatureFlags;
   /** If true, only super_admin can see this item */
   superAdminOnly?: boolean;
+  /** If set, ONLY users with one of these roles see this item (in addition to flag check). */
+  roles?: string[];
 }
 
 interface NavSection {
@@ -67,6 +71,14 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar, flagKey: 'can_view_schedule_board' },
       { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase, flagKey: 'can_view_active_jobs' },
       { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms' },
+    ],
+  },
+  {
+    label: 'VISIT REPORTS',
+    accent: 'text-violet-400',
+    items: [
+      { label: 'New Visit Report', href: '/dashboard/admin/site-visits/new', icon: ClipboardCheck, roles: ['supervisor', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'Previous Visits', href: '/dashboard/admin/site-visits', icon: ClipboardList, roles: ['supervisor', 'admin', 'super_admin', 'operations_manager'] },
     ],
   },
   {
@@ -344,9 +356,14 @@ function SidebarContent({
           // While flags are loading, show all items so there's no flash-hide.
           // Once loaded, filter items whose flagKey is false.
           const visibleItems = flagsLoading
-            ? section.items.filter(item => !item.superAdminOnly || userRole === 'super_admin')
+            ? section.items.filter(item => {
+                if (item.superAdminOnly && userRole !== 'super_admin') return false;
+                if (item.roles && (!userRole || !item.roles.includes(userRole))) return false;
+                return true;
+              })
             : section.items.filter(item => {
                 if (item.superAdminOnly && userRole !== 'super_admin') return false;
+                if (item.roles && (!userRole || !item.roles.includes(userRole))) return false;
                 if (!item.flagKey) return true; // no flag = always visible
                 return flags[item.flagKey] !== false;
               });
