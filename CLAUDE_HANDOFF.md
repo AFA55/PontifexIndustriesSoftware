@@ -3,6 +3,57 @@
 
 ---
 
+## MAY 5, 2026 (PT 3) — Visit wizard + equipment issues bridge
+
+User reviewed the supervisor work and requested:
+1. Convert visit form to a 3-step wizard for better mobile UX
+2. Add an Equipment Issues section that routes problems to shop manager (maintenance request OR replace)
+3. Voice equipment checkout — confirmed for Phase 3 with smart abbreviation learning
+4. Equipment inventory needs an `aliases` field for alternative names
+
+### Phase 0 (visit wizard equipment-issue capture) — SHIPPED
+
+- **Migration**: `supervisor_visits.equipment_issues jsonb DEFAULT '[]'::jsonb` applied. Stores each captured issue with `equipment_name`, optional `equipment_id` (nullable until shop manager Phase 1), `whats_wrong`, `action: 'maintenance' | 'replace'`, `photo_urls`, `status: 'open'`.
+- **API**: POST `/api/admin/supervisor-visits` accepts + sanitizes the array.
+- **Wizard UI**: 3 steps — Visit Details (violet→indigo) / What You Saw (indigo→purple) / Equipment Issues (purple→fuchsia). Progress indicator (3 dots, tap completed dots to jump back). Sticky bottom action bar with Back / Continue / Submit Report. Per-step validation auto-jumps back to failing step on error.
+- **Equipment Issues step UX**: toggle "I saw equipment issues today" → if on, dynamic list of issue cards. Each card has equipment name (free-text placeholder for now), what's wrong, and a 2-button action picker (Repair/Maintenance amber vs Replace this Unit rose). Add/remove issues freely.
+- **Mobile-tested at 375px**: clean. All inputs ≥ 44×44 tap target. Sticky bar always reachable.
+
+### Phase 2 conversion plan (built when shop manager system lands)
+A nightly hook (or trigger) will scan `supervisor_visits.equipment_issues` for entries where `status='open'`, create real `maintenance_requests` rows (action='maintenance') or `shop_tasks` rows (action='replace'), and flip the entry's `status` to `'converted'`. **No data is lost between phases.**
+
+### SHOP_MANAGER_PLAN.md major updates
+
+- **Equipment schema**: added `short_name` + `aliases jsonb` for alternative names (so "DFS-5" or "5000 slab saw" can map to "Husqvarna FS5000 #5"). Shop manager fills these at create time.
+- **New `voice_recognition_corrections` table**: every successful voice-driven equipment match logs the spoken phrase → resolved equipment. Future calls hit this cache first (fuzzy match on normalized text). After N (e.g. 3) successful matches of the same phrase, shop manager gets a one-tap prompt to add it to the equipment's aliases. Result: system learns abbreviations over time without per-alias data entry.
+- **Voice flow rewritten**: 4-strategy parser (cached corrections → aliases → pg_trgm similarity → fallback selectors). Pending-tray pattern — supervisor speaks as they walk past gear, all checkouts queue up as drafts, confirm in batch at the end. High-confidence auto-saves; low-confidence gets a 3-suggestion picker. Audio recording stored on the checkout for audit.
+- **Phase 0 documented as shipped.**
+
+### 7 questions for the user (Phase 1 starts when answered)
+
+1. **Asset tag format** — proposed `PTRT-0001` per-tenant prefix.
+2. **Shop helper count today**.
+3. **Equipment count ballpark** (50? 100? 300?).
+4. **Vehicle count** (drives whether Fleet gets dedicated nav).
+5. **Operator's "Report Issue" entry point** — dashboard, my-jobs ticket, or both.
+6. **Pre-use check default assignee + lead time** — named helper or unassigned, and how many hours before dispatch.
+7. **Equipment alias seeding + voice auto-confirm default** — pre-seed pattern aliases or learn-only, and high-confidence auto-save vs always-tap-confirm.
+
+### Files changed
+```
+supabase/migrations/20260505_supervisor_visits_equipment_issues.sql (new — applied)
+app/api/admin/supervisor-visits/route.ts                            (sanitize equipment_issues)
+app/dashboard/admin/site-visits/new/page.tsx                        (3-step wizard rewrite)
+SHOP_MANAGER_PLAN.md                                                (Phase 0 done, voice/aliases section, 7 questions)
+```
+
+### Commits (pushed to origin/claude/inspiring-swanson-31ba74; NOT origin/main)
+```
+5260dbb7  feat(visit): 3-step wizard + equipment issues bridge to shop manager
+```
+
+---
+
 ## MAY 5, 2026 (PT 2) — Supervisor polish + Shop Manager build plan
 
 ### Supervisor (shipped this session)
