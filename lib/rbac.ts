@@ -172,6 +172,77 @@ export const ADMIN_CARDS: AdminCard[] = [
     iconBg: 'bg-violet-500',
     features: ['Pick operator', 'Auto-pull active job', 'Observations & ratings', 'Follow-up flags'],
   },
+  // ── Shop manager / shop help cards (Phase 1A foundation) ─────────────
+  {
+    key: 'equipment',
+    title: 'Equipment Inventory',
+    description: 'All saws, drills, generators, hand tools — searchable, taggable, trackable',
+    icon: '🛠️',
+    href: '/dashboard/admin/equipment',
+    bgColor: 'from-cyan-500 to-sky-600',
+    iconBg: 'bg-cyan-500',
+    features: ['Asset tags + QR codes', 'Status + custodian tracking', 'Maintenance schedules', 'Aliases for voice'],
+  },
+  {
+    key: 'fleet',
+    title: 'Fleet',
+    description: 'Trucks, trailers — registration, insurance, odometer',
+    icon: '🚚',
+    href: '/dashboard/admin/fleet',
+    bgColor: 'from-blue-500 to-indigo-600',
+    iconBg: 'bg-blue-500',
+    features: ['Vehicle records', 'Registration expiry alerts', 'Maintenance schedules', 'Insurance tracking'],
+  },
+  {
+    key: 'pull_equipment',
+    title: 'Pull Equipment',
+    description: 'Generate pre-use checks for upcoming jobs (1+ days ahead)',
+    icon: '📦',
+    href: '/dashboard/admin/equipment/pull',
+    bgColor: 'from-amber-500 to-orange-600',
+    iconBg: 'bg-amber-500',
+    features: ['Date picker', 'Multi-day ahead', 'Auto-generate checks', 'Reserve equipment'],
+  },
+  {
+    key: 'voice_checkout',
+    title: 'Voice Check-Out',
+    description: 'Voice-driven equipment checkout + check-in',
+    icon: '🎤',
+    href: '/dashboard/admin/equipment/voice',
+    bgColor: 'from-rose-500 to-pink-600',
+    iconBg: 'bg-rose-500',
+    features: ['Hands-free checkout', 'Voice check-in', 'Smart aliases', 'Audio audit log'],
+  },
+  {
+    key: 'returned_equipment',
+    title: 'Returned Equipment',
+    description: 'Items checked back in — needs put-away',
+    icon: '🔁',
+    href: '/dashboard/admin/equipment/returned',
+    bgColor: 'from-teal-500 to-emerald-600',
+    iconBg: 'bg-teal-500',
+    features: ['Pending put-away queue', 'Mark as available', 'Flag for maintenance', 'Last custodian'],
+  },
+  {
+    key: 'maintenance',
+    title: 'Maintenance Inbox',
+    description: 'Triage operator-submitted equipment issues',
+    icon: '🔧',
+    href: '/dashboard/admin/maintenance',
+    bgColor: 'from-purple-500 to-violet-600',
+    iconBg: 'bg-purple-500',
+    features: ['Inbox / Active / Closed', 'Priority + assignee', 'Photo + voice attachments', 'Equipment history'],
+  },
+  {
+    key: 'shop_tasks',
+    title: 'Shop Tasks',
+    description: 'Pre-use checks + delegated tasks for shop helpers',
+    icon: '📋',
+    href: '/dashboard/admin/shop-tasks',
+    bgColor: 'from-indigo-500 to-purple-600',
+    iconBg: 'bg-indigo-500',
+    features: ['Pre-use checklists', 'Delegate to shop help', 'Status tracking', 'Critical-fail flagging'],
+  },
 ];
 
 // All card keys for iteration
@@ -190,8 +261,10 @@ export interface RoleOption {
 export const ROLES_WITH_LABELS: RoleOption[] = [
   { value: 'apprentice', label: 'Team Member', description: 'Field helper with basic access and simple dashboard', tier: 'worker' },
   { value: 'operator', label: 'Operator', description: 'Equipment operator with field dashboard', tier: 'worker' },
+  { value: 'shop_help', label: 'Shop Helper', description: 'Permanent shop helper — clock in, complete pre-use checks + delegated tasks', tier: 'worker' },
   { value: 'salesman', label: 'Project Manager', description: 'Can request jobs, submit forms, view assigned jobs', tier: 'office' },
   { value: 'supervisor', label: 'Supervisor', description: 'View schedule, leave notes, fill forms, view assigned jobs', tier: 'office' },
+  { value: 'shop_manager', label: 'Shop Manager', description: 'Owns equipment + fleet. Triages maintenance. Pulls equipment for upcoming jobs.', tier: 'office' },
   { value: 'inventory_manager', label: 'Office Admin', description: 'View-only schedule, timecards, customers, invoicing', tier: 'office' },
   { value: 'admin', label: 'Admin', description: 'Customizable admin dashboard access', tier: 'office' },
   { value: 'operations_manager', label: 'Operations Manager', description: 'Full system access with diagnostics', tier: 'management' },
@@ -199,7 +272,7 @@ export const ROLES_WITH_LABELS: RoleOption[] = [
 ];
 
 // Roles that can access the admin dashboard
-export const ADMIN_DASHBOARD_ROLES = ['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor', 'inventory_manager'];
+export const ADMIN_DASHBOARD_ROLES = ['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'];
 
 // Roles that bypass all permission checks (always full access)
 export const BYPASS_ROLES = ['super_admin', 'operations_manager'];
@@ -256,6 +329,27 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     completed_jobs: 'view',
     timecards: 'view',
     site_visits: 'submit',
+    equipment: 'view',
+    fleet: 'view',
+    voice_checkout: 'submit',
+  }),
+  shop_manager: preset({
+    timecards: 'view',
+    schedule_board: 'view',
+    completed_jobs: 'view',
+    equipment: 'full',
+    fleet: 'full',
+    pull_equipment: 'submit',
+    voice_checkout: 'submit',
+    returned_equipment: 'full',
+    maintenance: 'full',
+    shop_tasks: 'full',
+  }),
+  shop_help: preset({
+    completed_jobs: 'view',
+    shop_tasks: 'submit',
+    maintenance: 'submit',
+    voice_checkout: 'submit',
   }),
   salesman: preset({
     schedule_form: 'submit',

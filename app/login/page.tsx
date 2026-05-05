@@ -76,10 +76,12 @@ export default function LoginPage() {
       }));
       console.log('💾 User stored in localStorage');
 
-      // Redirect based on user role
-      if (['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor'].includes(result.user.role)) {
+      // Redirect based on user role.
+      // Office + shop roles land on the admin dashboard (which then renders a
+      // role-specific branch). Operators + apprentices land on the field dashboard.
+      if (['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(result.user.role)) {
         router.push('/dashboard/admin');
-      } else if (['operator', 'apprentice', 'shop_manager', 'inventory_manager'].includes(result.user.role)) {
+      } else if (['operator', 'apprentice'].includes(result.user.role)) {
         router.push('/dashboard');
       } else {
         setError('Invalid user role');
@@ -298,6 +300,30 @@ export default function LoginPage() {
               <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
                 <div><span className="text-violet-700 font-bold">Email:</span> supervisor@pontifex.com</div>
                 <div><span className="text-violet-700 font-bold">Password:</span> Supervisor1234!</div>
+              </div>
+            </div>
+
+            {/* Shop Manager Account */}
+            <div className="p-4 bg-gradient-to-br from-cyan-50 to-sky-50 rounded-xl border-2 border-cyan-200 hover:border-cyan-300 transition-all hover:shadow-md cursor-default">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></div>
+                <h4 className="text-cyan-800 font-bold text-xs tracking-wider">SHOP MANAGER DASHBOARD</h4>
+              </div>
+              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+                <div><span className="text-cyan-700 font-bold">Email:</span> shopmanager@pontifex.com</div>
+                <div><span className="text-cyan-700 font-bold">Password:</span> Shop1234!</div>
+              </div>
+            </div>
+
+            {/* Shop Helper Account */}
+            <div className="p-4 bg-gradient-to-br from-teal-50 to-emerald-50 rounded-xl border-2 border-teal-200 hover:border-teal-300 transition-all hover:shadow-md cursor-default">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>
+                <h4 className="text-teal-800 font-bold text-xs tracking-wider">SHOP HELPER DASHBOARD</h4>
+              </div>
+              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
+                <div><span className="text-teal-700 font-bold">Email:</span> shophelp@pontifex.com</div>
+                <div><span className="text-teal-700 font-bold">Password:</span> Help1234!</div>
               </div>
             </div>
 

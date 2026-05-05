@@ -82,6 +82,9 @@ export default function Dashboard() {
   const [isDemoOperator, setIsDemoOperator] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isShopHours, setIsShopHours] = useState(false);
+  // Field vs Shop work location for the day. Apprentices + operators rotating
+  // to the shop pick "shop" before clocking in; choice persists on the timecard.
+  const [workLocation, setWorkLocation] = useState<'field' | 'shop'>('field');
   const [showNfcClockInModal, setShowNfcClockInModal] = useState(false);
   const [clockOutBlock, setClockOutBlock] = useState<{
     show: boolean;
@@ -100,7 +103,7 @@ export default function Dashboard() {
 
     // Redirect management roles to their admin dashboard.
     // Keep this in sync with ADMIN_DASHBOARD_ROLES in lib/rbac.ts.
-    const ADMIN_ROLES = ['super_admin', 'admin', 'operations_manager', 'salesman', 'supervisor', 'shop_manager', 'inventory_manager'];
+    const ADMIN_ROLES = ['super_admin', 'admin', 'operations_manager', 'salesman', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'];
     if (ADMIN_ROLES.includes(currentUser.role)) {
       router.push('/dashboard/admin');
       return;
@@ -410,6 +413,7 @@ export default function Dashboard() {
           longitude: data.longitude,
           accuracy: data.accuracy,
           is_shop_hours: isShopHours,
+          work_location: workLocation,
           clock_in_method: data.method,
           nfc_tag_id: data.nfc_tag_id,
           nfc_tag_uid: data.nfc_tag_uid,
@@ -931,6 +935,39 @@ export default function Dashboard() {
               </div>
 
               <div className="flex flex-col items-end gap-3 w-full sm:w-auto">
+                {/* Field / Shop picker — only visible when NOT clocked in. Apprentices
+                    rotating to the shop pick "Shop"; their dashboard then renders the
+                    shop-help view. Persisted on the timecard via work_location. */}
+                {!isClockedIn && (user?.role === 'apprentice' || user?.role === 'operator') && (
+                  <div className="w-full sm:w-auto">
+                    <p className="text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Working today at:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setWorkLocation('field')}
+                        className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border-2 ${
+                          workLocation === 'field'
+                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white border-blue-500 shadow-lg shadow-blue-500/30'
+                            : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300'
+                        }`}
+                      >
+                        🏗️ Field
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWorkLocation('shop')}
+                        className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border-2 ${
+                          workLocation === 'shop'
+                            ? 'bg-gradient-to-br from-teal-500 to-emerald-600 text-white border-teal-500 shadow-lg shadow-teal-500/30'
+                            : 'bg-white border-gray-200 text-gray-600 hover:border-teal-300'
+                        }`}
+                      >
+                        🏭 Shop
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Shop Hours Checkbox — only visible when NOT clocked in (for re-clock-in) */}
                 {!isClockedIn && (
                   <label className="flex items-center gap-3 px-4 py-3 bg-amber-50 border-2 border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100 transition-colors w-full sm:w-auto">
@@ -1065,6 +1102,36 @@ export default function Dashboard() {
               </p>
               <div className="mt-5 flex items-center text-purple-600 dark:text-purple-400 group-hover:text-white font-bold transition-colors duration-300">
                 <span>Request Leave</span>
+                <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </div>
+            </div>
+          </Link>
+
+          {/* Report Equipment Issue — Premium Orange/Amber Card */}
+          <Link
+            href="/dashboard/maintenance/new"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-orange-50 dark:from-white/[0.05] dark:to-orange-900/10 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 text-left animate-fade-in-up delay-400 hover:scale-[1.03]"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-amber-500 to-rose-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+            <div className="relative bg-white/95 dark:bg-white/[0.05] backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 via-amber-500 to-rose-500 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-orange-100 dark:ring-orange-500/20 group-hover:ring-white/30">
+                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2 transition-colors duration-300">
+                Report Equipment Issue
+              </h3>
+              <p className="text-gray-700 dark:text-white/70 group-hover:text-white/95 font-semibold transition-colors duration-300">
+                Submit a request for the shop manager
+              </p>
+              <div className="mt-5 flex items-center text-orange-600 dark:text-orange-400 group-hover:text-white font-bold transition-colors duration-300">
+                <span>Submit Request</span>
                 <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>

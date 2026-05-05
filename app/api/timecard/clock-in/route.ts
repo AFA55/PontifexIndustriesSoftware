@@ -39,6 +39,9 @@ export async function POST(request: NextRequest) {
       longitude,
       accuracy,
       is_shop_hours,
+      // Work location for the day — 'field' (default) or 'shop'.
+      // Drives whether the user sees operator-style or shop-help dashboard.
+      work_location: rawWorkLocation,
       // NFC fields
       clock_in_method = 'gps',   // 'nfc' | 'gps' | 'remote' | 'gps_remote' | 'pin'
       nfc_tag_id,                 // UUID of the verified NFC tag
@@ -48,6 +51,9 @@ export async function POST(request: NextRequest) {
       remote_photo_url,           // selfie URL for remote clock-in
       requires_approval,          // boolean — true for gps_remote clock-ins
     } = body;
+
+    const work_location: 'field' | 'shop' =
+      rawWorkLocation === 'shop' ? 'shop' : 'field';
 
     // Validate clock_in_method to prevent injection of unexpected values
     const VALID_CLOCK_METHODS = ['nfc', 'gps', 'remote', 'gps_remote', 'pin'] as const;
@@ -258,6 +264,7 @@ export async function POST(request: NextRequest) {
       nfc_tag_serial: nfc_tag_serial || null,
       remote_photo_url: remote_photo_url || null,
       requires_approval: needsApproval,
+      work_location,
     };
 
     if (clock_in_method === 'remote' || clock_in_method === 'gps_remote') {

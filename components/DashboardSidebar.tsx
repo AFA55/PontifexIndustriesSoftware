@@ -28,6 +28,11 @@ import {
   X,
   ClipboardCheck,
   ClipboardList,
+  Package,
+  Truck,
+  Mic,
+  RotateCcw,
+  Wrench,
 } from 'lucide-react';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -79,6 +84,19 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'New Visit Report', href: '/dashboard/admin/site-visits/new', icon: ClipboardCheck, roles: ['supervisor', 'admin', 'super_admin', 'operations_manager'] },
       { label: 'Previous Visits', href: '/dashboard/admin/site-visits', icon: ClipboardList, roles: ['supervisor', 'admin', 'super_admin', 'operations_manager'] },
+    ],
+  },
+  {
+    label: 'SHOP',
+    accent: 'text-cyan-400',
+    items: [
+      { label: 'Equipment', href: '/dashboard/admin/equipment', icon: Package, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'Fleet', href: '/dashboard/admin/fleet', icon: Truck, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'Pull Equipment', href: '/dashboard/admin/equipment/pull', icon: Package, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'Voice Check-Out', href: '/dashboard/admin/equipment/voice', icon: Mic, roles: ['shop_manager', 'supervisor', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'Returned Equipment', href: '/dashboard/admin/equipment/returned', icon: RotateCcw, roles: ['shop_manager', 'shop_help', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'Maintenance Inbox', href: '/dashboard/admin/maintenance', icon: Wrench, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'Shop Tasks', href: '/dashboard/admin/shop-tasks', icon: ClipboardList, roles: ['shop_manager', 'shop_help', 'admin', 'super_admin', 'operations_manager'] },
     ],
   },
   {

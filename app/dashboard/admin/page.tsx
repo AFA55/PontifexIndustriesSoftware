@@ -41,6 +41,10 @@ const AdminOnboardingTour = nextDynamic(() => import('@/components/AdminOnboardi
 // Supervisor dashboard branch — clock-in widget + site visit reports
 const SupervisorDashboard = nextDynamic(() => import('./_components/SupervisorDashboard'), { ssr: false, loading: () => null });
 
+// Shop Manager + Shop Helper dashboards (Phase 1A skeletons)
+const ShopManagerDashboard = nextDynamic(() => import('./_components/ShopManagerDashboard'), { ssr: false, loading: () => null });
+const ShopHelpDashboard = nextDynamic(() => import('./_components/ShopHelpDashboard'), { ssr: false, loading: () => null });
+
 // ─── API response types ───────────────────────────────────────────────────────
 
 interface JobToday {
@@ -438,8 +442,8 @@ export default function AdminDashboard() {
   // ── dashboard data (full admins) ──────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    // Salesmen + supervisors use dedicated branches — skip the admin summary entirely.
-    if (user.role === 'salesman' || user.role === 'supervisor') {
+    // Salesmen + supervisors + shop_manager + shop_help use dedicated branches — skip the admin summary entirely.
+    if (['salesman', 'supervisor', 'shop_manager', 'shop_help'].includes(user.role)) {
       setDashLoading(false);
       return;
     }
@@ -522,8 +526,8 @@ export default function AdminDashboard() {
   // ── active jobs fetch ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    // Salesmen and supervisors fetch their own active jobs in their branch.
-    if (user.role === 'salesman' || user.role === 'supervisor') {
+    // Salesmen, supervisors, shop_manager, shop_help fetch (or skip) their own data in dedicated branches.
+    if (['salesman', 'supervisor', 'shop_manager', 'shop_help'].includes(user.role)) {
       setActiveJobsLoading(false);
       return;
     }
@@ -614,6 +618,16 @@ export default function AdminDashboard() {
   // ── Supervisor render branch (clock-in + site visits) ─────────────────────
   if (user?.role === 'supervisor') {
     return <SupervisorDashboard user={user} />;
+  }
+
+  // ── Shop Manager render branch (Phase 1A skeleton) ────────────────────────
+  if (user?.role === 'shop_manager') {
+    return <ShopManagerDashboard user={user} />;
+  }
+
+  // ── Shop Helper render branch (Phase 1A skeleton) ─────────────────────────
+  if (user?.role === 'shop_help') {
+    return <ShopHelpDashboard user={user} />;
   }
 
   // ── Salesman render branch (separate layout) ──────────────────────────────
