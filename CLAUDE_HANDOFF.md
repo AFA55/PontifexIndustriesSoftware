@@ -3,6 +3,62 @@
 
 ---
 
+## MAY 5, 2026 (PT 2) — Supervisor polish + Shop Manager build plan
+
+### Supervisor (shipped this session)
+- **Bug fixed**: supervisor landing on `/dashboard` was getting served the OPERATOR dashboard. Cause: `supervisor` was missing from the `ADMIN_ROLES` redirect list in both `app/dashboard/page.tsx` and `lib/hooks/useAuthUser.ts`. Now redirects properly to `/dashboard/admin`.
+- **Header**: New violet→indigo gradient "New Visit Report" button next to the green "New Job" button. Visible to supervisors only. Both buttons bumped to min 44×44 tap target.
+- **Sidebar**: New `VISIT REPORTS` section between OPERATIONS and MANAGEMENT. Items: "New Visit Report" + "Previous Visits". Gated to supervisor/admin/super_admin/ops_manager via new optional `roles` field on `NavItem` in `DashboardSidebar.tsx`.
+- **UI brightening**: KPI tiles now use vibrant gradient backgrounds with white text + ring + shadow (emerald, violet, amber, sky) — match operator dashboard's energy. Clock-in widget rebuilt as a slate gradient when off, emerald→teal when clocked in. Site visit form gets a violet→indigo→purple gradient hero header.
+- **Mobile**: tap-target audit at 375px clean. Star rating buttons in the visit form bumped 32→44px. No horizontal overflow on any supervisor page.
+
+### Shop Manager / Shop Help PLAN (not built — research-driven, ready for Phase 1)
+
+User asked for a major new system: equipment inventory + fleet management + maintenance requests + equipment checkout + shop help task delegation. Two parallel research agents studied Hilti On!Track, Samsara Fleet, Fleetio, EZOfficeInventory, plus CMMS systems (UpKeep, Limble, MaintainX) and DOT pre-trip inspection patterns.
+
+Output: **`SHOP_MANAGER_PLAN.md`** — comprehensive design doc covering:
+- 6-table schema (equipment, vehicles, equipment_checkouts, maintenance_requests, maintenance_schedules, shop_tasks) with idempotent migration patterns and SECURITY DEFINER RLS
+- Page structure for shop manager + shop help dashboards
+- Maintenance request state machine (open → triaged → assigned → in_progress → done → verified, with role-gated transitions)
+- QR-driven equipment checkout flow + voice checkout layer (Phase 3)
+- Pre-use inspection pattern that auto-blocks dispatch on critical fail
+- **5-phase rollout** — Phase 1 = inventory foundation, Phase 2 = field-to-shop maintenance loop, Phase 3 = checkout + schedule integration, Phase 4 = pre-use inspections, Phase 5 = polish
+- What NOT to build (telematics, full DVIR, parts inventory module, custom field framework, vendor lock-in QR)
+- Risk + rollback discipline
+- 7 open questions for the user before Phase 1 (asset tag format, shop help count, equipment count, voice priority, etc.)
+
+Plan is **plan-only**. No new DB tables. No new APIs. No new UI. Trial customer's experience is unchanged. Plan exists so next sessions execute precisely without re-deriving the architecture.
+
+### Files changed
+```
+app/dashboard/page.tsx                                (supervisor in ADMIN_ROLES)
+lib/hooks/useAuthUser.ts                              (supervisor in ADMIN_ROLES)
+app/dashboard/admin/layout.tsx                        (header New Visit btn + 44px tap targets)
+components/DashboardSidebar.tsx                       (VISIT REPORTS section + roles field on NavItem)
+app/dashboard/admin/_components/SupervisorDashboard.tsx (vibrant gradients on KPI tiles + clock-in)
+app/dashboard/admin/site-visits/new/page.tsx          (gradient hero + 44px star rating)
+SHOP_MANAGER_PLAN.md                                  (new — research-driven roadmap)
+```
+
+### Commits (LOCAL — pushed to origin/claude/inspiring-swanson-31ba74; NOT origin/main)
+```
+dfa5e995  feat(supervisor): UI polish + nav fixes + shop manager plan
+```
+
+### Next session — Phase 1 of shop manager
+Before building Phase 1, user should answer the 7 open questions in `SHOP_MANAGER_PLAN.md`:
+1. Asset tag format (suggested `PTRT-0001`)
+2. Shop help count today
+3. Equipment count ballpark
+4. Vehicle count
+5. Voice priority (build now vs later)
+6. "Operator submits maintenance request" trigger UX
+7. Pre-use check default assignee
+
+Once answered, Phase 1 starts: `equipment` + `vehicles` + `equipment_checkouts` migrations, shop_help role added to RBAC, shop manager dashboard skeleton, equipment list/detail/new pages, demo accounts (`shopmanager@pontifex.com`, `shophelp@pontifex.com`).
+
+---
+
 ## MAY 5, 2026 — Real cost-driver identified: Build Minutes (86% of bill)
 
 User shared the actual Vercel invoice. Yesterday's analysis was wrong about the dominant driver — let the record reflect:
