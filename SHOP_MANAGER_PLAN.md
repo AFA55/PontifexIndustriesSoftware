@@ -1,10 +1,24 @@
 # Shop Manager + Shop Help — Build Plan
 
 **Owner:** Pontifex Platform
-**Status:** Plan only — not built yet. Built in phases over 3-4 sessions.
+**Status:** Plan only — Phase 0 (visit wizard's equipment-issue capture) shipped. Phase 1 (foundation) waiting on user answers to 7 questions below.
 **Driven by:** May 5, 2026 user request. Research from two parallel agents (fleet management UX and maintenance workflow patterns).
 
 This is a substantial new module. The goal of this doc is to make sure we build it right the first time — solid schema, solid UX patterns, no regressions on the trial customer's existing experience. Read end-to-end before any code change touches any of this.
+
+---
+
+## Phase 0 — SHIPPED (May 5, 2026)
+
+**Supervisor visit form converted to a 3-step wizard with equipment-issue capture as a placeholder bridge to the future shop manager system.**
+
+- Migration: `supervisor_visits.equipment_issues jsonb DEFAULT '[]'::jsonb` — applied.
+- Wizard steps: (1) Visit Details (operator + date + job + times), (2) What You Saw (observations + issues + ratings + follow-up), (3) Equipment Issues (toggle + dynamic rows).
+- Each equipment issue captures: `equipment_name` (free-text for now), `whats_wrong`, `action: 'maintenance' | 'replace'`, `photo_urls`, `status: 'open'`.
+- API POST handler validates + persists. Sticky bottom action bar for mobile (Back / Continue / Submit Report).
+- All steps mobile-responsive at 375px. 44×44 tap targets throughout.
+
+**Phase 2 will add a hook**: when the shop manager system has equipment + a maintenance_requests table, an upsert hook converts each visit's equipment_issues entries into real `maintenance_requests` (action='maintenance') or `shop_tasks` (action='replace') and flips the entry's `status` to `'converted'`. That data is held safely until then — no data loss.
 
 ---
 
@@ -66,6 +80,8 @@ asset_tag text UNIQUE                  -- printed on the QR sticker, e.g. "PTRT-
 kind text NOT NULL CHECK (kind IN ('saw','drill','generator','compressor','vac','vehicle','trailer','other'))
 category text                          -- e.g. "slab saw", "core drill" — drives schedule-form filtering
 name text NOT NULL                     -- "Husqvarna FS5000"
+short_name text                        -- "FS5000" — shown in compact lists
+aliases jsonb NOT NULL DEFAULT '[]'::jsonb   -- alternative names ["5000 slab saw", "Husq 5000", "DFS-5"]; supplied by shop mgr at create time + auto-extended by voice corrections
 make text
 model text
 serial_number text
@@ -166,6 +182,28 @@ next_due_meter numeric
 created_at timestamptz DEFAULT now()
 updated_at timestamptz DEFAULT now()
 ```
+
+### `voice_recognition_corrections` (the learning loop)
+
+Every time a user speaks something the system has to disambiguate or correct, we log the spoken phrase → resolved equipment mapping. Over time the matcher gets faster + more accurate without anyone re-typing aliases.
+
+```sql
+id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+tenant_id uuid REFERENCES public.tenants(id) ON DELETE CASCADE NOT NULL
+spoken_text text NOT NULL              -- raw transcript: "DFS number 5"
+normalized text NOT NULL               -- lowercase, punct stripped: "dfs number 5"
+resolved_equipment_id uuid REFERENCES public.equipment(id) ON DELETE CASCADE NOT NULL
+confidence numeric                     -- 0-1; how confident was the match
+was_corrected boolean NOT NULL DEFAULT false  -- true if user corrected the auto-match
+created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+created_at timestamptz DEFAULT now()
+```
+
+Indexes: `(tenant_id, normalized)` for lookup. Optional FTS index on `normalized`.
+
+Phase 3 voice flow uses this in two ways:
+- **Read path**: when matching a transcript, query `voice_recognition_corrections` where `tenant_id=...` AND `normalized` matches via fuzzy/trigram similarity. Direct hit → high confidence, skip equipment table search.
+- **Write path**: every successful checkout (auto-confirmed OR user-corrected) inserts a row. The `aliases` column on `equipment` can also auto-extend after N successful matches of the same phrase (with user permission, opt-in).
 
 ### `shop_tasks`
 Things shop manager assigns to shop help. Pre-use checks, deliveries, "go pick up X from vendor", etc.
@@ -331,14 +369,45 @@ No notification on every comment. No SMS unless priority=critical.
 - Optionally picks truck equipment.
 - Submits → `equipment_checkouts` row inserted, `equipment.status = 'in_use'`, `current_custodian_id` set, `current_job_order_id` set.
 
-### Voice flow (Phase 3, layered on top)
-- Tap mic button.
-- Speak: "Husqvarna 5000 slab saw, item PTRT-0042, going with Carlos to JOB-2026-309251 on truck 3."
-- Browser `SpeechRecognition` API transcribes → app parses (regex + Supabase fuzzy match) → confirmation card → tap confirm.
-- Failure mode: if parse fails, show recognized text + manual selectors prefilled with best matches.
-- Voice file is also stored on the checkout row for audit.
+### Voice flow (Phase 3, layered on top — designed for speed)
 
-This is achievable but layered. Voice is enhancement, not foundation.
+**The reality**: shop manager + supervisor is moving fast, often without looking at the screen. They speak as they walk past gear. The system has to be tolerant: hear it, infer it, save it, let them keep going.
+
+**Sequence per checkout** (configurable order, this is the default):
+1. Equipment name (with aliases) — "5000 slab saw number 2" or "DFS-5" or "Husqvarna FS5000 #2"
+2. Item number — "PTRT-0042" (optional if equipment name uniquely resolves)
+3. Truck OR operator — "truck 3" or "going with Carlos"
+
+**Design**:
+- Tap mic. Speak in any order. Tap mic again to add another piece (no need to confirm between items — they queue up as draft checkouts).
+- Browser `SpeechRecognition` API transcribes inline. Each transcript hits the parser:
+  1. Look up in `voice_recognition_corrections` (fuzzy match on `normalized` text). If high-confidence hit → use the cached `resolved_equipment_id`.
+  2. Else search `equipment.aliases` jsonb (case-insensitive contains).
+  3. Else search `equipment.short_name` + `equipment.name` with trigram/Levenshtein similarity (Postgres `pg_trgm` extension — already enabled).
+  4. Disambiguate operator/truck the same way against profiles + vehicles.
+- Each parsed checkout becomes a draft row in a "Pending Confirmation" tray (top of page). The supervisor can keep speaking; the tray fills up.
+- When they're done (or before leaving), they review the tray:
+  - Green check on each row that auto-resolved with high confidence
+  - Amber warning on rows where confidence < threshold — show top 3 suggestions, one tap to pick
+  - Red on rows where nothing matched — show free-text edit
+- Tap "Confirm All" → all drafts become real `equipment_checkouts` rows.
+
+**Learning loop**:
+- Every confirmed row writes to `voice_recognition_corrections` with the original spoken phrase, the resolved equipment, and a `was_corrected` flag (true if the user picked something other than the top suggestion).
+- After N (e.g. 3) successful matches of the same normalized phrase, prompt the shop manager: "Want to add 'DFS-5' as an alias for Husqvarna FS5000 #5?" — one-tap confirm extends `equipment.aliases`.
+- Audio recording is stored on the checkout row (`equipment_checkouts.voice_note_url`) for audit when something goes wrong.
+
+**Failure modes**:
+- Parser confidence too low → row goes to amber state in the tray, supervisor picks from top 3.
+- Background noise / no speech detected → friendly nudge, retry.
+- No browser SpeechRecognition (rare on iOS Safari without HTTPS in dev) → graceful fallback to manual selectors with autocomplete.
+
+**Offline support (Phase 3.5, optional)**:
+- Queue draft checkouts in IndexedDB when offline. Sync on reconnect.
+
+**Permissions**: voice checkout permission is toggleable per role. Defaults: shop_manager + supervisor + admin can use it. Ops_manager + super_admin always. Everyone else off.
+
+This is achievable in Phase 3, after manual checkout (Phase 2) ships. Voice is enhancement, not foundation — but it's a real productivity win once the inventory exists.
 
 ---
 
@@ -482,17 +551,39 @@ If we hit gaps, I'll write specialized subagents for them (e.g., a `pre-use-insp
 
 ---
 
-## Open questions for the user
+## 7 questions to answer before Phase 1 starts
 
-These shape Phase 1 — answer before we start building:
+Answer these and I can kick off Phase 1 the next session.
 
-1. **Asset tag format**: I propose `PTRT-0001`, `PTRT-0002`, ... padded to 4 digits, prefix per tenant (Patriot's prefix is `PTRT`). Sound right?
-2. **Shop Help count**: how many shop helpers exist today at Patriot? One? Three? Affects the "default assignee" UX.
-3. **Equipment count ballpark**: 50? 100? 300? Affects whether we need pagination on the equipment list day 1.
-4. **Vehicle count**: how many trucks/trailers? Determines if Fleet gets its own dedicated nav or stays a filtered view of Equipment.
-5. **Voice priority**: critical for go-live, or layer-on later? The research suggests it's a true productivity win for shop checkouts — but Phase 1-2 work without it.
-6. **"Operator submits maintenance request" UX trigger**: wrench icon on operator dashboard? In the my-jobs ticket? Both? Both is fine but adds two entry points to maintain.
-7. **Pre-use check assignment default**: when a pre-use check is auto-created the night before, who's the default assignee? A specific shop helper, or unassigned and shop_manager grabs it?
+**1. Asset tag format**
+Proposal: `PTRT-0001`, `PTRT-0002`, ..., 4-digit padded, prefix derives from tenant slug (Patriot → `PTRT`). Each tenant gets its own series.
+→ Approve, or specify a different format?
+
+**2. How many shop helpers does Patriot have today?**
+Affects the "default assignee" UX — if there's just one, pre-use checks auto-assign to them. If multiple, shop manager assigns each task manually.
+
+**3. Equipment count ballpark**
+50? 100? 300? Affects whether we need pagination + heavy filtering on the equipment list page from day 1.
+
+**4. Vehicle count + structure**
+How many trucks + trailers? Determines whether Fleet gets its own dedicated nav (worth it at 5+ vehicles) or stays a filtered view of Equipment.
+
+**5. Operator's "Report Issue" entry point**
+Where should the wrench icon live for operators?
+  (a) Operator dashboard only (one place to learn)
+  (b) On each job ticket in my-jobs (in-context — equipment is pre-filled)
+  (c) Both (slight maintenance cost; arguably best UX)
+→ Pick (a), (b), or (c).
+
+**6. Pre-use check default assignee + lead time**
+Two parts:
+  - When a pre-use check auto-generates the night before a job, who's the default assignee? A named shop helper, or unassigned (shop_manager grabs from inbox)?
+  - How many hours before dispatch should the check be created? Default proposed: 18:00 the night before (gives ~14 hours of lead time for a 8 AM dispatch).
+
+**7. Equipment alias seeding (voice readiness)**
+When you add equipment in inventory, you'll be able to type alternative names ("DFS-5", "5000 slab saw", "Husq #5") in an `aliases` field. The system also auto-learns from voice corrections over time.
+  - Do you want me to **pre-seed common aliases** in the schema (e.g. "DFS-N" auto-maps to all `category='floor saw'` equipment with item_number ending in N)? Or should every alias be manually entered or learned?
+  - For the voice flow: on auto-confirm with high confidence, just save and let them keep going. **Confirm or cancel that default behavior** — alternative is always require a tap-confirm even on high confidence (slower but safer).
 
 ---
 
