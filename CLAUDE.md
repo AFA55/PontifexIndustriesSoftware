@@ -70,6 +70,7 @@ npm run build      # Production build check (must pass with 0 errors)
 - `CLAUDE_CONTEXT.md` — Full project architecture reference
 - `CLAUDE_SESSION_CONTEXT.md` — Detailed schema, patterns, business rules
 - `CLAUDE_HANDOFF.md` — Latest session handoff with pending work (ALWAYS update at end of session)
+- `DEPLOYMENT_COST.md` — Vercel cost discipline. Read before changing deploy behavior. **86% of last month's bill was build minutes — every push to main costs money.**
 
 ---
 
@@ -98,6 +99,8 @@ The end-state is a multi-tenant SaaS called **Pontifex Industries** that hosts m
 ## Deployment & Testing Workflow
 
 We have **production live on Vercel + a single Supabase project**. Trial customer using prod. The discipline is to make changes safely without disrupting their data.
+
+> **Cost note:** Vercel charges per build minute, and builds are ~86% of our bill. **Every `git push origin main` triggers a billed build (~60-120s wall-clock + multi-vCPU).** Branches in `claude/*` no longer auto-deploy (configured in `vercel.json`). See [`DEPLOYMENT_COST.md`](DEPLOYMENT_COST.md) for the rules and the actual line-item breakdown of why this matters.
 
 ### Three environments (no extra hosting cost)
 
