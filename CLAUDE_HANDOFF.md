@@ -3,6 +3,61 @@
 
 ---
 
+## MAY 5, 2026 — Real cost-driver identified: Build Minutes (86% of bill)
+
+User shared the actual Vercel invoice. Yesterday's analysis was wrong about the dominant driver — let the record reflect:
+
+| Line item | Cost | % of bill |
+|---|---:|---:|
+| **Build Minutes (2d 8h 12m)** | **$418.82** | **86%** |
+| **Build CPU Minutes (13d 8h)** | **$67.20** | **14%** |
+| Function Invocations (40,793) | $0.60 | 0.1% |
+| Everything else | <$0.20 | — |
+
+Yesterday's polling fixes saved cents, not dollars. Yesterday's `git.deploymentEnabled: { main: true, "claude/*": false }` change WAS the right fix for this bill (just not for the reason I gave at the time).
+
+### What shipped today
+
+**1. `next.config.js` — skip lint + type-check during Vercel builds**
+```js
+typescript: { ignoreBuildErrors: true },
+eslint: { ignoreDuringBuilds: true },
+```
+Saves ~30-60s per build. Safe because `husky` pre-commit hook runs `npx tsc --noEmit` locally; TS errors are caught before any commit. Verified locally: `npm run build` clean rebuild went from 60-90s to **29s wall-clock**.
+
+**2. New `DEPLOYMENT_COST.md`** — comprehensive cost discipline doc with:
+- Actual line-item breakdown of the $487 bill
+- Why builds are expensive (build × multi-vCPU × per-commit triggers)
+- Rules of the road (push to main deliberately, use `vercel deploy` for one-off previews, don't push to fix typos)
+- Long-term escape hatches (Cloudflare Pages, Render, self-host) — not migrating, just noted
+
+**3. CLAUDE.md updates**
+- Context Files section now lists `DEPLOYMENT_COST.md` with a one-line warning about the bill.
+- Deployment & Testing Workflow section now opens with a cost note pointing at the doc.
+
+### Files changed
+```
+next.config.js                        (skip TS + lint on Vercel builds)
+DEPLOYMENT_COST.md                    (new)
+CLAUDE.md                             (point at the new doc)
+```
+
+### Expected impact
+- ~30-60s shorter builds → if we still do, say, 50 builds/month, that's ~50 min less = roughly **$5-10/mo savings just from the build skip**.
+- Bigger savings come from the discipline of `claude/*` no-auto-deploy + don't-push-trivially-to-main rules. If we'd been at 100 deploys/month and dropped to 20 deploys/month, that's **~$300/mo savings**.
+
+### Open follow-ups (not urgent)
+- If next month's bill is still high, open Vercel Usage dashboard → see top driver → triage from there per `DEPLOYMENT_COST.md`.
+- Consider squashing the `claude/inspiring-swanson-31ba74` branch into a single merge commit before merging to main, so it counts as one push rather than many.
+- Long-term: evaluate Cloudflare Pages (free tier covers most of our needs). NOT urgent — Vercel works fine, just expensive.
+
+### Commits
+```
+TBD — about to commit the next.config + doc changes
+```
+
+---
+
 ## MAY 4, 2026 — Vercel cost-reduction pass ($500 bill → fixes)
 
 User got a $500 Vercel bill on a $20/month plan (~$480 overage). Audited the codebase, identified the drivers, shipped fixes.

@@ -1,5 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Skip type-check + lint during `next build`. We catch both locally:
+  //   - TypeScript: husky pre-commit hook runs `npx tsc --noEmit` and blocks bad commits.
+  //   - ESLint:     `npm run lint` available; not enforced (lint warnings shouldn't block deploys).
+  // Skipping these on Vercel cuts ~30-60s off every production build, which was
+  // the dominant line item in our cloud bill (build minutes >85% of cost).
+  // If the pre-commit hook is bypassed (`--no-verify`), TS errors won't be caught
+  // until runtime — keep the hook in place.
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
+
   // Image optimization for Supabase Storage
   images: {
     remotePatterns: [
