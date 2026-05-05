@@ -239,26 +239,26 @@ export default function SupervisorDashboard({ user }: { user: User }) {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 bg-gray-50 dark:bg-slate-900 min-h-full">
+    <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 bg-gray-50 dark:bg-slate-900 min-h-full">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Supervisor Dashboard</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
-            {today} · Hi {user.name?.split(' ')[0] ?? 'there'}
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
+            Welcome back, {user.name?.split(' ')[0] ?? 'Supervisor'}!
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{today}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Link
             href="/dashboard/admin/site-visits/new"
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white text-sm font-semibold shadow-lg shadow-violet-500/30 transition-all hover:-translate-y-0.5"
           >
             <ClipboardCheck className="w-4 h-4" />
             New Visit Report
           </Link>
           <Link
             href="/dashboard/admin/schedule-form"
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-sm font-semibold shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5"
           >
             <Plus className="w-4 h-4" />
             New Quote
@@ -266,34 +266,28 @@ export default function SupervisorDashboard({ user }: { user: User }) {
         </div>
       </div>
 
-      {/* Clock-in widget */}
+      {/* Clock-in widget — vibrant gradient like operator dashboard */}
       <div
-        className={`rounded-2xl shadow-sm border p-5 ${
+        className={`relative overflow-hidden rounded-2xl shadow-lg p-5 sm:p-6 transition-all ${
           clocked
-            ? 'bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/10 border-emerald-200 dark:border-emerald-800/40'
-            : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700'
+            ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/30 text-white'
+            : 'bg-gradient-to-br from-slate-800 to-slate-900 dark:from-slate-800 dark:to-slate-900 text-white shadow-slate-900/30'
         }`}
       >
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                clocked
-                  ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30'
-                  : 'bg-gray-200 dark:bg-slate-700'
-              }`}
-            >
-              <Clock className={`w-6 h-6 ${clocked ? 'text-white' : 'text-gray-500 dark:text-slate-400'}`} />
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/30 flex-shrink-0">
+              <Clock className="w-7 h-7 text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide font-semibold text-gray-500 dark:text-slate-400">
-                {clocked ? 'You are clocked in' : 'Clock-in'}
+              <p className="text-xs uppercase tracking-widest font-semibold text-white/75">
+                {clocked ? 'You are clocked in' : 'Start your shift'}
               </p>
-              <p className="text-xl font-bold text-gray-900 dark:text-white tabular-nums">
+              <p className="text-2xl sm:text-3xl font-bold tabular-nums leading-tight">
                 {clocked ? `${hours.toFixed(2)} hrs today` : 'Not clocked in'}
               </p>
               {clocked && card && (
-                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-white/70 mt-0.5">
                   Since {new Date(card.clockInTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </p>
               )}
@@ -302,10 +296,10 @@ export default function SupervisorDashboard({ user }: { user: User }) {
           <button
             onClick={() => setShowModal(true)}
             disabled={clockBusy}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm shadow-md transition disabled:opacity-50 ${
+            className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm shadow-md transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${
               clocked
-                ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/30'
-                : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30'
+                ? 'bg-white text-rose-600 hover:bg-rose-50'
+                : 'bg-white text-emerald-700 hover:bg-emerald-50'
             }`}
           >
             {clockBusy ? (
@@ -319,47 +313,45 @@ export default function SupervisorDashboard({ user }: { user: User }) {
         </div>
 
         {clockMsg && (
-          <p
-            className={`mt-3 text-sm ${
-              clockMsg.type === 'success'
-                ? 'text-emerald-700 dark:text-emerald-400'
-                : 'text-rose-700 dark:text-rose-400'
-            }`}
-          >
+          <p className="mt-3 text-sm text-white/95 font-medium">
             {clockMsg.text}
           </p>
         )}
       </div>
 
-      {/* KPI tiles */}
+      {/* KPI tiles — vibrant gradients to match operator dashboard energy */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiTile
-          icon={<Clock className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />}
-          accent="bg-emerald-100 dark:bg-emerald-900/40"
+          icon={<Clock className="w-6 h-6 text-white" />}
+          gradient="from-emerald-500 to-teal-600"
+          shadow="shadow-emerald-500/30"
           value={weeklyHours.toFixed(1)}
           unit="hrs"
           label="My Hours This Week"
           loading={loading}
         />
         <KpiTile
-          icon={<ClipboardCheck className="w-5 h-5 text-violet-600 dark:text-violet-400" />}
-          accent="bg-violet-100 dark:bg-violet-900/40"
+          icon={<ClipboardCheck className="w-6 h-6 text-white" />}
+          gradient="from-violet-500 to-indigo-600"
+          shadow="shadow-violet-500/30"
           value={visitsThisWeek}
           label="Visits This Week"
           loading={loading}
           href="/dashboard/admin/site-visits"
         />
         <KpiTile
-          icon={<AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />}
-          accent="bg-amber-100 dark:bg-amber-900/40"
+          icon={<AlertTriangle className="w-6 h-6 text-white" />}
+          gradient="from-amber-500 to-orange-600"
+          shadow="shadow-amber-500/30"
           value={followUps}
           label="Open Follow-ups"
           loading={loading}
           href="/dashboard/admin/site-visits"
         />
         <KpiTile
-          icon={<Briefcase className="w-5 h-5 text-sky-600 dark:text-sky-400" />}
-          accent="bg-sky-100 dark:bg-sky-900/40"
+          icon={<Briefcase className="w-6 h-6 text-white" />}
+          gradient="from-sky-500 to-blue-600"
+          shadow="shadow-sky-500/30"
           value={activeJobs.length}
           label="Active Jobs"
           loading={loading}
@@ -531,10 +523,11 @@ export default function SupervisorDashboard({ user }: { user: User }) {
 }
 
 function KpiTile({
-  icon, accent, value, unit, label, loading, href,
+  icon, gradient, shadow, value, unit, label, loading, href,
 }: {
   icon: React.ReactNode;
-  accent: string;
+  gradient: string;
+  shadow: string;
   value: string | number;
   unit?: string;
   label: string;
@@ -542,25 +535,35 @@ function KpiTile({
   href?: string;
 }) {
   const inner = (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 hover:shadow-md transition h-full">
+    <div
+      className={`relative overflow-hidden rounded-2xl p-5 sm:p-6 bg-gradient-to-br ${gradient} ${shadow} shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 h-full text-white group`}
+    >
       <div className="flex items-start justify-between mb-3">
-        <div className={`w-9 h-9 ${accent} rounded-full flex items-center justify-center`}>
+        <div className="w-11 h-11 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/30">
           {icon}
         </div>
-        {href && <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600" />}
+        {href && (
+          <ChevronRight className="w-5 h-5 text-white/60 group-hover:text-white group-hover:translate-x-0.5 transition" />
+        )}
       </div>
       {loading ? (
-        <div className="h-7 w-16 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" />
+        <div className="h-8 w-20 bg-white/20 rounded animate-pulse" />
       ) : (
-        <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tabular-nums">
+        <p className="text-3xl sm:text-4xl font-bold tabular-nums leading-none">
           {value}
-          {unit && <span className="text-sm font-normal text-gray-500 dark:text-slate-400 ml-1">{unit}</span>}
+          {unit && <span className="text-sm font-medium text-white/75 ml-1.5">{unit}</span>}
         </p>
       )}
-      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">{label}</p>
+      <p className="text-xs sm:text-sm text-white/80 mt-2 font-medium">{label}</p>
     </div>
   );
-  return href ? <Link href={href}>{inner}</Link> : inner;
+  return href ? (
+    <Link href={href} className="block h-full">
+      {inner}
+    </Link>
+  ) : (
+    inner
+  );
 }
 
 const TONE_MAP: Record<string, string> = {
