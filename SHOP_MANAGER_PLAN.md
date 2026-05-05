@@ -551,39 +551,61 @@ If we hit gaps, I'll write specialized subagents for them (e.g., a `pre-use-insp
 
 ---
 
-## 7 questions to answer before Phase 1 starts
+## Locked-in answers from user (May 5, 2026)
+
+These are settled. Do not re-derive.
+
+**1. Asset tag format:** `PTRT-0001`, 4-digit padded, prefix derives from tenant slug. ✅
+
+**2. Shop helper count:** 1 permanent helper at Patriot. Plus team members (apprentices) sometimes work at the shop and need to see the shop help dashboard view when they do. **Design implication:**
+- New column on `timecards`: `work_location text DEFAULT 'field' CHECK (work_location IN ('field','shop'))`.
+- At clock-in, team members + operators get a 2-button picker: **Field** (default) or **Shop**.
+- The dashboard renders shop-help cards when `work_location='shop'` instead of operator-style "My Jobs" cards.
+- Shop manager can see "who's at the shop today" by querying timecards where `date=today AND work_location='shop'`.
+- Toggle is also reachable from a sidebar item ("Switch to Shop View" / "Switch to Field View") so they can flip mid-day if needed without re-clocking.
+
+**3. Equipment count + taxonomy:** ~200 items spanning: diesel/gas-powered, hydraulic, electric motor, hand tools, accessories (dollys, chains, hoses). **Schema refinement** (replaces the simpler `kind` enum from earlier in this doc):
+- `kind text NOT NULL CHECK (kind IN ('powered','hand_tool','accessory','vehicle','trailer'))`
+- `power_source text CHECK (power_source IN ('diesel','gas','hydraulic','electric','pneumatic',NULL))` — null for non-powered
+- `category text` — specific class: `'slab_saw' | 'core_drill' | 'wall_saw' | 'wire_saw' | 'generator' | 'compressor' | 'dolly' | 'chain' | 'hose' | 'extension_cord' | ...`
+- `requires_maintenance_schedule boolean NOT NULL DEFAULT false` — default true for kind in (powered, vehicle); false for hand_tool + accessory. Drives whether the maintenance schedule UI shows up for that asset.
+- Equipment list page gets filter chips by `kind`, `power_source`, `category`, `status`. Pagination at 50/page (200 items total = 4 pages).
+
+**4. Vehicle count:** ~15 (9 operator trucks + shop trucks + spare work trucks). At 15+, **Fleet gets its own dedicated nav item**: `/dashboard/admin/fleet`. Shows vehicles only with vehicle-specific columns (plate, registration expiry, odometer). Equipment page filters out vehicles by default.
+
+**5. "Report Issue" trigger UX:** Full card on the operator dashboard (not a small icon). Card sits alongside "My Schedule" and "View Timecard" cards. Wrench icon, label "Report Equipment Issue", description "Submit a request for the shop". Links to `/dashboard/maintenance/new` (the 3-tap mobile-first form).
+
+## 7 questions — Q6 and Q7 still need answers before Phase 1 starts
+
+**Q6 — Pre-use check defaults (rephrased plain-English)**
+
+When an operator has a job tomorrow that needs, e.g., Generator #3, the system should auto-create a "pre-use inspection" task the night before (oil, fluids, tires, lights checklist). Two parts:
+
+- **Part A — Default assignee:**
+  - Option 1: Auto-assign to the 1 permanent shop helper.
+  - Option 2: Unassigned; shop manager grabs in the morning and assigns to whoever's at shop that day.
+- **Part B — When to create it:** Default proposal `18:00 (6 PM)` the night before — gives ~14h lead time. Override if a different time fits Patriot's workday better (4 PM, 5 PM, etc.).
+
+**Q7 — Aliases + voice auto-confirm — RECOMMENDATION (awaiting confirmation)**
+
+User said "go with what's best for our application, then let me confirm." Recommendation:
+
+- **Aliases auto-seeded**: when equipment is added, asset_tag (`PTRT-0042`) + short_name (`FS5000 #2`) auto-populate as aliases. No manual entry required for those.
+- **Aliases manually extensible**: shop manager can type more comma-separated aliases when adding/editing equipment.
+- **Aliases auto-learned**: after 3 successful voice matches of the same normalized phrase, system prompts shop manager to add it as a permanent alias.
+- **No pre-seeded pattern aliases** (e.g. "DFS-N" → all DFS equipment). Risk of mis-mapping is too high. Let actual usage drive aliases.
+- **Voice confidence thresholds:**
+  - ≥ 85% → auto-save to pending tray (green ✓). Supervisor keeps speaking. Editable.
+  - 60–85% → tray row with amber warning + top 3 suggestions. One tap to pick.
+  - < 60% → red row, free-text edit needed.
+- **"Undo last" button** prominent at the top of the tray.
+- **Audio recording** on every checkout for audit replay.
+
+This trades a small risk of wrong auto-saves for meaningful speed when right. The undo + tray review + audio backup catches mistakes.
 
 Answer these and I can kick off Phase 1 the next session.
 
-**1. Asset tag format**
-Proposal: `PTRT-0001`, `PTRT-0002`, ..., 4-digit padded, prefix derives from tenant slug (Patriot → `PTRT`). Each tenant gets its own series.
-→ Approve, or specify a different format?
-
-**2. How many shop helpers does Patriot have today?**
-Affects the "default assignee" UX — if there's just one, pre-use checks auto-assign to them. If multiple, shop manager assigns each task manually.
-
-**3. Equipment count ballpark**
-50? 100? 300? Affects whether we need pagination + heavy filtering on the equipment list page from day 1.
-
-**4. Vehicle count + structure**
-How many trucks + trailers? Determines whether Fleet gets its own dedicated nav (worth it at 5+ vehicles) or stays a filtered view of Equipment.
-
-**5. Operator's "Report Issue" entry point**
-Where should the wrench icon live for operators?
-  (a) Operator dashboard only (one place to learn)
-  (b) On each job ticket in my-jobs (in-context — equipment is pre-filled)
-  (c) Both (slight maintenance cost; arguably best UX)
-→ Pick (a), (b), or (c).
-
-**6. Pre-use check default assignee + lead time**
-Two parts:
-  - When a pre-use check auto-generates the night before a job, who's the default assignee? A named shop helper, or unassigned (shop_manager grabs from inbox)?
-  - How many hours before dispatch should the check be created? Default proposed: 18:00 the night before (gives ~14 hours of lead time for a 8 AM dispatch).
-
-**7. Equipment alias seeding (voice readiness)**
-When you add equipment in inventory, you'll be able to type alternative names ("DFS-5", "5000 slab saw", "Husq #5") in an `aliases` field. The system also auto-learns from voice corrections over time.
-  - Do you want me to **pre-seed common aliases** in the schema (e.g. "DFS-N" auto-maps to all `category='floor saw'` equipment with item_number ending in N)? Or should every alias be manually entered or learned?
-  - For the voice flow: on auto-confirm with high confidence, just save and let them keep going. **Confirm or cancel that default behavior** — alternative is always require a tap-confirm even on high confidence (slower but safer).
+_(Resolved — see "Locked-in answers" section above. Q6 + Q7 still pending user confirmation.)_
 
 ---
 
