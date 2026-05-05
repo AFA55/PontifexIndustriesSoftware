@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
     safety_rating: clampRating(body.safety_rating),
     cleanliness_rating: clampRating(body.cleanliness_rating),
     photo_urls: Array.isArray(body.photo_urls) ? body.photo_urls : [],
+    equipment_issues: sanitizeEquipmentIssues(body.equipment_issues),
     status: body.status === 'draft' ? 'draft' : 'submitted',
   };
 
@@ -162,4 +163,31 @@ function clampRating(v: unknown): number | null {
   const n = Math.round(v);
   if (n < 1 || n > 5) return null;
   return n;
+}
+
+// Validate + normalize the equipment_issues array supplied by the client.
+// Each entry must have an equipment_name, whats_wrong, and a recognized action.
+// Once shop manager Phase 2 lands, a hook converts each entry into a real
+// maintenance_request (action='maintenance') or shop_task (action='replace').
+function sanitizeEquipmentIssues(v: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(v)) return [];
+  const out: Array<Record<string, unknown>> = [];
+  for (const raw of v) {
+    if (!raw || typeof raw !== 'object') continue;
+    const o = raw as Record<string, unknown>;
+    const equipment_name = typeof o.equipment_name === 'string' ? o.equipment_name.trim() : '';
+    const whats_wrong = typeof o.whats_wrong === 'string' ? o.whats_wrong.trim() : '';
+    const action = o.action === 'replace' ? 'replace' : 'maintenance';
+    if (!equipment_name && !whats_wrong) continue; // ignore empty rows
+    out.push({
+      equipment_name,
+      equipment_id: typeof o.equipment_id === 'string' ? o.equipment_id : null,
+      whats_wrong,
+      action,
+      photo_urls: Array.isArray(o.photo_urls) ? o.photo_urls.filter((u) => typeof u === 'string') : [],
+      status: 'open', // 'converted' once Phase 2 hook fires
+      created_at: new Date().toISOString(),
+    });
+  }
+  return out;
 }
