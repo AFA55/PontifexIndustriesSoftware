@@ -77,15 +77,20 @@ The central asset table. Every saw, drill, generator. Vehicles use this table to
 id uuid PRIMARY KEY DEFAULT gen_random_uuid()
 tenant_id uuid REFERENCES public.tenants(id) ON DELETE CASCADE NOT NULL
 asset_tag text UNIQUE                  -- printed on the QR sticker, e.g. "PTRT-0042"
-kind text NOT NULL CHECK (kind IN ('saw','drill','generator','compressor','vac','vehicle','trailer','other'))
-category text                          -- e.g. "slab saw", "core drill" — drives schedule-form filtering
+kind text NOT NULL CHECK (kind IN ('powered','hand_tool','accessory','vehicle','trailer'))
+category text                          -- specific class: 'slab_saw', 'core_drill', 'wall_saw', 'wire_saw', 'generator', 'compressor', 'dolly', 'chain', 'hose', etc. — drives schedule-form filtering
 name text NOT NULL                     -- "Husqvarna FS5000"
 short_name text                        -- "FS5000" — shown in compact lists
-aliases jsonb NOT NULL DEFAULT '[]'::jsonb   -- alternative names ["5000 slab saw", "Husq 5000", "DFS-5"]; supplied by shop mgr at create time + auto-extended by voice corrections
+unit_number text                       -- "5" or "12" — what operators say; system displays as "FS5000 #5"
+aliases jsonb NOT NULL DEFAULT '[]'::jsonb   -- voice-matchable alternative names ["5000 slab saw", "Husq 5000", "DFS-5"]; auto-seeded from asset_tag + short_name; user-extensible; auto-extended by voice_recognition_corrections after 3+ matches
 make text
 model text
 serial_number text
-status text NOT NULL DEFAULT 'available' CHECK (status IN ('available','in_use','in_maintenance','out_of_service','retired'))
+power_source text CHECK (power_source IS NULL OR power_source IN ('diesel','gas','hydraulic','electric','pneumatic'))
+requires_maintenance_schedule boolean NOT NULL DEFAULT false
+reserved_for_job_id uuid REFERENCES public.job_orders(id) ON DELETE SET NULL
+reserved_until timestamptz             -- auto-release reservation after this time if not checked out
+status text NOT NULL DEFAULT 'available' CHECK (status IN ('available','reserved','in_use','pending_putaway','in_maintenance','out_of_service','retired'))
 current_custodian_id uuid REFERENCES auth.users(id) ON DELETE SET NULL
 current_job_order_id uuid REFERENCES public.job_orders(id) ON DELETE SET NULL
 home_location text                     -- "Main Shop", "Truck #3"
@@ -445,24 +450,66 @@ Critical fail auto-creates a `maintenance_requests` row linked to the equipment.
 
 Each phase is one focused session, ~2-3 days of work, ends with a working slice.
 
-### Phase 1 — Inventory + Visibility (foundation)
-**Goal:** Shop manager can answer "where is everything?" — even if maintenance/checkout flows aren't built yet.
+### Phase 1A — Foundation (this session, ~3 hours)
 
-- DB migration: `equipment`, `vehicles`, `equipment_checkouts` (table created but no UI yet).
-- Roles: define `shop_help` in `lib/rbac.ts`. Confirm `shop_manager` already exists. Add presets.
-- Shop Manager dashboard skeleton (welcome + 4 KPI tiles, even if KPIs are all "0" at first).
-- Equipment list page (`/admin/equipment`) — grid view, search, filters.
-- Equipment detail page — read-only.
-- New Equipment form (`/admin/equipment/new`) — basic CRUD.
-- Sidebar items for shop_manager: Dashboard, Equipment, Fleet, Schedule Board.
-- QR sticker generation (server-side, returns PNG) — but printing UX is Phase 2.
+**Goal:** Roles + dashboards + clock-in toggle work end-to-end. No equipment data yet.
 
-**Done when:** Shop manager logs in, sees their dashboard, can browse equipment list, click into a piece of equipment.
+- DB migrations:
+  - `equipment` table (with all the new columns: `unit_number`, `aliases`, `power_source`, `requires_maintenance_schedule`, `reserved_for_job_id`, expanded status enum)
+  - `vehicles` table (1:1 with equipment for kind='vehicle')
+  - `equipment_checkouts` table (no UI yet)
+  - `timecards.work_location text DEFAULT 'field' CHECK (work_location IN ('field','shop'))`
+  - All RLS policies via SECURITY DEFINER helpers (no `user_metadata`)
+- RBAC:
+  - `shop_help` role added to `lib/rbac.ts`
+  - `shop_manager` preset filled in (was empty)
+  - New cards in `ADMIN_CARDS`: `equipment`, `fleet`, `pull_equipment`, `voice_checkout`, `returned_equipment`
+- Demo accounts:
+  - `shopmanager@pontifex.com` / `Shop1234!`
+  - `shophelp@pontifex.com` / `Help1234!`
+  - Both in Patriot tenant
+  - Demo cards on login page
+- Shop Manager dashboard skeleton (vibrant gradient KPIs all reading 0 at first):
+  - Maintenance Inbox (will populate Phase 2)
+  - Pending Pre-Use Checks (will populate Phase 2/3)
+  - Returned Equipment (will populate Phase 3)
+  - Vehicles Out of Service
+  - Hourly clock-in widget (same as supervisor)
+  - "Pull Equipment List" CTA card
+- Shop Help dashboard skeleton:
+  - Operator-style: clock-in widget, today's tasks list (empty until Phase 2/3 generates them), request time-off link
+- Field/Shop toggle at clock-in:
+  - 2-button picker after GPS verification: "Field" (default) or "Shop"
+  - Apprentices + operators see this; shop_help users default to Shop and don't need to pick
+  - Choice writes to `timecards.work_location`
+- Sidebar reflects role + work_location:
+  - `shop_manager`: Dashboard, Schedule Board, Pull Equipment, Equipment, Fleet, Maintenance Inbox, Returned Queue, Yard Readiness, Timecards
+  - `shop_help`: Dashboard (today's tasks), Request Time Off, Submit Maintenance Request
+  - Apprentice in Field mode: existing operator sidebar
+  - Apprentice in Shop mode: same items as `shop_help`
+- Operator dashboard gets a new "Report Equipment Issue" card (links to `/dashboard/maintenance/new` — page is a placeholder until Phase 2)
 
-**Demo accounts:**
-- `shopmanager@pontifex.com` / `Shop1234!`
-- `shophelp@pontifex.com` / `Help1234!`
-- Both linked to Patriot tenant, just like the supervisor demo account.
+**Done when:** Both demo accounts log in, see their dashboards, the clock-in toggle works for apprentices, and the report-issue card is on operator dashboard. Trial customer's experience unchanged.
+
+### Phase 1B — Equipment + Fleet CRUD (next session, ~3 hours)
+
+**Goal:** Shop manager can populate the inventory.
+
+- Equipment list page (`/admin/equipment`):
+  - Grid view, filter chips (kind, power_source, category, status), search
+  - Pagination (50/page; 200 items = 4 pages)
+  - Quick actions per row (View / Edit / Mark Out of Service)
+- Equipment detail page (`/admin/equipment/[id]`):
+  - Full record + photo + maintenance history (empty until Phase 2)
+  - QR sticker preview + print button
+- New Equipment form (`/admin/equipment/new`):
+  - Name (required) / Short name / **Unit number (required)** / Aliases / Kind / Power source / Category / Maintenance-schedule-required toggle
+  - Asset tag auto-generated `PTRT-NNNN` server-side
+- Fleet list (`/admin/fleet`) — same pattern but kind='vehicle' with vehicle-specific columns (plate, registration expiry, odometer)
+- Fleet detail + New Vehicle form
+- Once data exists: dashboard KPIs start showing real numbers.
+
+**Done when:** Shop manager has populated ~10 equipment + 2 vehicles as a smoke test. List/detail pages render. Mobile audit clean.
 
 ### Phase 2 — Maintenance Requests (the field-to-shop loop)
 **Goal:** Operator submits → shop manager triages → shop help fixes → closed.
@@ -575,33 +622,92 @@ These are settled. Do not re-derive.
 
 **5. "Report Issue" trigger UX:** Full card on the operator dashboard (not a small icon). Card sits alongside "My Schedule" and "View Timecard" cards. Wrench icon, label "Report Equipment Issue", description "Submit a request for the shop". Links to `/dashboard/maintenance/new` (the 3-tap mobile-first form).
 
-## 7 questions — Q6 and Q7 still need answers before Phase 1 starts
+## All 7 questions — RESOLVED (May 5, 2026)
 
-**Q6 — Pre-use check defaults (rephrased plain-English)**
+**Q6 — Pre-use check defaults**
+- **Part A:** Unassigned. Shop manager delegates from inbox.
+- **Part B:** **No auto-cron.** Replaced with a manual "Pull Equipment List" feature on the shop manager dashboard — see new section below.
 
-When an operator has a job tomorrow that needs, e.g., Generator #3, the system should auto-create a "pre-use inspection" task the night before (oil, fluids, tires, lights checklist). Two parts:
+**Q7 — Aliases + voice auto-confirm thresholds** — confirmed as proposed.
+- Aliases: auto-seed `asset_tag` + `short_name`, manual extensions, learn from 3+ voice corrections, no pattern pre-seeding.
+- Voice: ≥85% auto-save to pending tray (green ✓); 60-85% amber + top 3 suggestions; <60% red free-text. Undo Last button prominent. Audio recording for audit.
 
-- **Part A — Default assignee:**
-  - Option 1: Auto-assign to the 1 permanent shop helper.
-  - Option 2: Unassigned; shop manager grabs in the morning and assigns to whoever's at shop that day.
-- **Part B — When to create it:** Default proposal `18:00 (6 PM)` the night before — gives ~14h lead time. Override if a different time fits Patriot's workday better (4 PM, 5 PM, etc.).
+## NEW: "Pull Equipment List" feature (replaces auto-cron)
 
-**Q7 — Aliases + voice auto-confirm — RECOMMENDATION (awaiting confirmation)**
+Inspired by the existing "Push Tickets" button on the schedule board. Manual control + days-ahead support so shop manager can prep when they have bandwidth.
 
-User said "go with what's best for our application, then let me confirm." Recommendation:
+**Page:** `/dashboard/admin/equipment/pull`
 
-- **Aliases auto-seeded**: when equipment is added, asset_tag (`PTRT-0042`) + short_name (`FS5000 #2`) auto-populate as aliases. No manual entry required for those.
-- **Aliases manually extensible**: shop manager can type more comma-separated aliases when adding/editing equipment.
-- **Aliases auto-learned**: after 3 successful voice matches of the same normalized phrase, system prompts shop manager to add it as a permanent alias.
-- **No pre-seeded pattern aliases** (e.g. "DFS-N" → all DFS equipment). Risk of mis-mapping is too high. Let actual usage drive aliases.
-- **Voice confidence thresholds:**
-  - ≥ 85% → auto-save to pending tray (green ✓). Supervisor keeps speaking. Editable.
-  - 60–85% → tray row with amber warning + top 3 suggestions. One tap to pick.
-  - < 60% → red row, free-text edit needed.
-- **"Undo last" button** prominent at the top of the tray.
-- **Audio recording** on every checkout for audit replay.
+**Flow:**
+1. Shop manager opens the Pull page.
+2. Date picker — defaults to tomorrow. Buttons for "+1 day", "+2 days", "+3 days", "Custom date".
+3. System lists all jobs scheduled in that range with their assigned equipment.
+4. Checkbox per job (default all checked) — shop manager can deselect any job they don't want to pull yet.
+5. **"Pull Equipment for Selected"** button:
+   - For each selected job, generates `shop_tasks` rows of type `pre_use_check`, one per equipment unit, **unassigned**.
+   - Marks each piece of equipment as `reserved_for_job_id` (so the schedule form sees them as unavailable for double-booking).
+   - Equipment status stays `available` (it hasn't moved physically yet) but the reserved flag prevents conflicts.
+6. Returns shop manager to a "Pulled Today" view showing what was just generated, with a delegate-tasks shortcut.
 
-This trades a small risk of wrong auto-saves for meaningful speed when right. The undo + tray review + audio backup catches mistakes.
+**Data:**
+- New column `equipment.reserved_for_job_id uuid REFERENCES public.job_orders(id) ON DELETE SET NULL`
+- New column `equipment.reserved_until timestamptz` — releases the reservation on or after this date if not checked out yet.
+
+**When equipment moves from reserved → in_use:** at checkout time on the dispatch day. The voice/manual checkout flow flips status, clears reservation, fills `current_custodian_id` + `current_job_order_id`.
+
+## NEW: Voice Check-In + Returned Equipment queue
+
+Same voice infrastructure as checkout, opposite direction. Page has a top toggle: **Check Out** ⇄ **Check In**.
+
+**Voice phrase examples (check-in mode):** "FS5000 number 5 back", "Return DFS-5", "Generator 3 returned"
+
+**Flow:**
+1. Tap mic, speak equipment identifier.
+2. System finds the open `equipment_checkouts` row (where `checked_in_at IS NULL`) for that unit. If multiple matches, asks supervisor to disambiguate.
+3. Sets `checked_in_at = now()`, `checked_in_by = auth.uid()`.
+4. Equipment status flips to `'pending_putaway'` (NEW state — see status enum below).
+5. Equipment shows up in the "Returned Equipment — Needs Put-Away" queue on shop helper + shop manager dashboards.
+
+**Returned Equipment queue:** `/dashboard/admin/equipment/returned`
+- Lists all equipment with `status='pending_putaway'`, ordered by `checked_in_at DESC`.
+- Each row: equipment thumb + name + last custodian + checked-in time.
+- Click row → full record + "Mark put away" button + "Mark needs maintenance" link (creates a maintenance request).
+- Marking put-away flips status to `'available'` and clears `current_custodian_id` + `current_job_order_id`.
+
+**Updated equipment.status enum:**
+```
+'available' | 'reserved' | 'in_use' | 'pending_putaway' | 'in_maintenance' | 'out_of_service' | 'retired'
+```
+
+## NEW: equipment.unit_number field
+
+Operators say equipment by unit number ("FS5000 number 5"), not asset tag (`PTRT-0042`). The asset tag is the printed-on-the-sticker QR ID, internally unique. The unit number is the human-friendly identifier within a model line.
+
+**Schema additions:**
+```sql
+unit_number text                       -- "5", "12", "3A" — what operators speak
+short_name text                        -- "FS5000" — compact model name shown in lists
+display_name text GENERATED ALWAYS AS (
+  COALESCE(short_name, name) || ' #' || COALESCE(unit_number, '?')
+) STORED                               -- e.g. "FS5000 #5"
+```
+
+**Add Equipment form fields (Phase 1B):**
+- Name (full; required) — "Husqvarna FS5000"
+- Short name (optional) — "FS5000"
+- **Unit number (required)** — "5"
+- Asset tag (auto-generated `PTRT-NNNN`)
+- Aliases (optional, comma-separated) — "5000 slab saw, big saw"
+- Kind / power_source / category / requires_maintenance_schedule (per Q3 taxonomy)
+
+**Voice matching priority:**
+1. Cached `voice_recognition_corrections` row matches normalized phrase
+2. `aliases` jsonb contains the phrase
+3. `short_name + " " + unit_number` (or "number" + unit_number) trigram match
+4. `asset_tag` exact match
+5. `name` trigram fallback
+
+---
 
 Answer these and I can kick off Phase 1 the next session.
 
