@@ -44,8 +44,12 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
       if (!session) return;
       const headers = { Authorization: `Bearer ${session.access_token}` };
 
-      const [curRes] = await Promise.all([
+      // Run in parallel: current timecard + equipment counts (status filtered).
+      const [curRes, oosRes, returnedRes, vehiclesOosRes] = await Promise.all([
         fetch('/api/timecard/current', { headers }),
+        fetch('/api/admin/equipment?status=out_of_service&limit=200', { headers }),
+        fetch('/api/admin/equipment?status=pending_putaway&limit=200', { headers }),
+        fetch('/api/admin/equipment?kind=vehicle&status=out_of_service&limit=200', { headers }),
       ]);
 
       if (curRes.ok) {
@@ -59,11 +63,18 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
         }
       }
 
-      // Phase 1B+ will populate these from real APIs.
+      // Maintenance Inbox + Pending Pre-Use Checks populate in Phase 2/3.
       setMaintenanceInbox(0);
       setPendingChecks(0);
-      setReturnedQueue(0);
-      setVehiclesOos(0);
+
+      if (returnedRes.ok) {
+        const j = await returnedRes.json();
+        setReturnedQueue(j.pagination?.total ?? (j.data?.length ?? 0));
+      }
+      if (vehiclesOosRes.ok) {
+        const j = await vehiclesOosRes.json();
+        setVehiclesOos(j.pagination?.total ?? (j.data?.length ?? 0));
+      }
     } catch {
       // silent
     } finally {
