@@ -145,3 +145,28 @@ CREATE INDEX IF NOT EXISTS idx_timecards_date_location ON public.timecards(date,
 
 COMMENT ON COLUMN public.timecards.work_location IS
   'Where the user was working that day. Set at clock-in; team members rotating to shop pick "shop". Drives whether they see operator or shop-help dashboard.';
+
+-- ──── Patch: add columns the legacy schema didn't have ────────────────────────
+-- These were discovered + applied during Phase 1B smoke-testing.
+
+-- `category` — separate from legacy `equipment_category` varchar. Used by Phase
+-- 1B for filtering ('slab_saw', 'core_drill', etc.).
+ALTER TABLE public.equipment ADD COLUMN IF NOT EXISTS category text;
+CREATE INDEX IF NOT EXISTS idx_equipment_category_v2 ON public.equipment(category);
+
+-- `make` — legacy schema has `brand`; the Phase 1B API uses `make`. Coexist
+-- additively. Future cleanup can backfill brand → make and drop brand.
+ALTER TABLE public.equipment ADD COLUMN IF NOT EXISTS make text;
+
+-- `current_custodian_id` — legacy schema has `assigned_to`; the Phase 1B API
+-- uses `current_custodian_id` for clearer "who has this RIGHT NOW" semantics.
+-- Coexist additively.
+ALTER TABLE public.equipment ADD COLUMN IF NOT EXISTS current_custodian_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_equipment_custodian ON public.equipment(current_custodian_id) WHERE current_custodian_id IS NOT NULL;
+
+-- `serial_number` was NOT NULL in legacy. Real-world equipment doesn't always
+-- have a known serial. Phase 1B treats it as optional.
+ALTER TABLE public.equipment ALTER COLUMN serial_number DROP NOT NULL;
+
+-- Force PostgREST schema cache reload after ALTERs.
+NOTIFY pgrst, 'reload schema';
