@@ -1,7 +1,7 @@
 # Shop Manager + Shop Help — Build Plan
 
 **Owner:** Pontifex Platform
-**Status:** Plan only — Phase 0 (visit wizard's equipment-issue capture) shipped. Phase 1 (foundation) waiting on user answers to 7 questions below.
+**Status:** Phase 0, 1A, 1B all SHIPPED to feature branch (NOT main). Phase 2 starts when user signals.
 **Driven by:** May 5, 2026 user request. Research from two parallel agents (fleet management UX and maintenance workflow patterns).
 
 This is a substantial new module. The goal of this doc is to make sure we build it right the first time — solid schema, solid UX patterns, no regressions on the trial customer's existing experience. Read end-to-end before any code change touches any of this.
@@ -450,7 +450,7 @@ Critical fail auto-creates a `maintenance_requests` row linked to the equipment.
 
 Each phase is one focused session, ~2-3 days of work, ends with a working slice.
 
-### Phase 1A — Foundation (this session, ~3 hours)
+### Phase 1A — Foundation — ✅ SHIPPED May 5, 2026 (commit `f42bd372`)
 
 **Goal:** Roles + dashboards + clock-in toggle work end-to-end. No equipment data yet.
 
@@ -491,7 +491,7 @@ Each phase is one focused session, ~2-3 days of work, ends with a working slice.
 
 **Done when:** Both demo accounts log in, see their dashboards, the clock-in toggle works for apprentices, and the report-issue card is on operator dashboard. Trial customer's experience unchanged.
 
-### Phase 1B — Equipment + Fleet CRUD (next session, ~3 hours)
+### Phase 1B — Equipment + Fleet CRUD — ✅ SHIPPED May 5, 2026 (commit `934e8055`)
 
 **Goal:** Shop manager can populate the inventory.
 
@@ -510,6 +510,17 @@ Each phase is one focused session, ~2-3 days of work, ends with a working slice.
 - Once data exists: dashboard KPIs start showing real numbers.
 
 **Done when:** Shop manager has populated ~10 equipment + 2 vehicles as a smoke test. List/detail pages render. Mobile audit clean.
+
+**Phase 1B post-mortem (smoke-test discoveries that turned into migration patches):**
+The legacy `equipment` table had several columns the API expected but legacy schema lacked. All patched additively:
+- `category text` (legacy had `equipment_category varchar` with different values)
+- `make text` (legacy had `brand`)
+- `current_custodian_id uuid` (legacy had `assigned_to`)
+- `serial_number` was `NOT NULL` — relaxed to nullable
+
+PostgREST schema cache had to be reloaded after each ALTER (`NOTIFY pgrst, 'reload schema'`).
+
+**Phase 1B verification:** end-to-end test on mobile 375px as `shopmanager@pontifex.com` — login → New Equipment → fill form → submit → asset tag `PTRT-0001` returned → list page shows the new piece. Equipment detail page renders + edit mode works. Fleet pages mirror equipment patterns. Dashboard KPIs query real counts.
 
 ### Phase 2 — Maintenance Requests (the field-to-shop loop)
 **Goal:** Operator submits → shop manager triages → shop help fixes → closed.
