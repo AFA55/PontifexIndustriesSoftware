@@ -3,6 +3,186 @@
 
 ---
 
+## MAY 5, 2026 (PT 5) — Phase 1B: Equipment + Fleet CRUD shipped
+
+### What shipped
+The Shop Manager can now populate the inventory. ~200 pieces of equipment + ~15 vehicles can be added, browsed, edited, retired. **Branch:** `claude/inspiring-swanson-31ba74`. **Commit:** `934e8055`. **NOT pushed to main** — preview/localhost only until verified.
+
+**APIs (4 routes):**
+- `GET/POST /api/admin/equipment` — list (filter + paginate) + create. Auto-generates asset tag.
+- `GET/PATCH/DELETE /api/admin/equipment/[id]` — single record + soft-retire (status='retired').
+- `GET/POST /api/admin/fleet` — vehicles (joined equipment + vehicles tables).
+- `GET/PATCH /api/admin/fleet/[id]` — single vehicle.
+
+**Pages (6 pages):**
+- `/dashboard/admin/equipment` — searchable, filterable grid (kind / power_source / status filters, search, pagination at 50/page, "include vehicles" toggle).
+- `/dashboard/admin/equipment/new` — full form: Name (required) / Short name / Unit number (required) / Aliases / Kind (4 picker cards) / Power source (when powered) / Category w/ datalist suggestions / Manufacturer / Storage / Notes. Sticky bottom Save bar.
+- `/dashboard/admin/equipment/[id]` — read view + inline edit + retire button. Phase 2/3 placeholders for maintenance + checkout history.
+- `/dashboard/admin/fleet` — vehicle grid with plate + 30-day reg/insurance expiry warning chips.
+- `/dashboard/admin/fleet/new` — vehicle form with VIN/plate/fuel/odometer/3 compliance dates.
+- `/dashboard/admin/fleet/[id]` — vehicle read + edit + expiring-soon banner.
+
+**Asset tag auto-generation:**
+- Prefix derives from `tenants.company_code` with vowels removed: PATRIOT → P A T R I O T → PTRT.
+- Suffix is the next-available 4-digit padded integer scoped to the tenant.
+- First Patriot equipment got `PTRT-0001`. Next will be `PTRT-0002`. Per-tenant series — won't collide when more tenants come online.
+
+**Voice alias auto-seeding (Phase 3 prep):**
+On equipment create, the API auto-adds these to `aliases`:
+- The asset tag itself (`PTRT-0042`)
+- The short name (`FS5000`)
+- `{short_name} #{unit_number}` ("FS5000 #5")
+- `{short_name} {unit_number}` ("FS5000 5")
+Plus any user-entered aliases from the comma-separated input. So when the voice checkout layer ships in Phase 3, every piece of equipment is already voice-matchable from day 1 — no manual prep needed.
+
+**Shop Manager dashboard KPIs wired to real counts:**
+- Returned Queue ← `COUNT(equipment WHERE status='pending_putaway')`
+- Vehicles Out of Service ← `COUNT(equipment WHERE kind='vehicle' AND status='out_of_service')`
+- Maintenance Inbox stays 0 (Phase 2 will populate)
+- Pending Pre-Use Checks stays 0 (Phase 4 will populate)
+
+### How — design decisions
+
+**Migration strategy was additive-only.** The `equipment` table already existed from a prior feature with 4 rows of test data ("husqvarna pro 3000 20" blades). Rather than rewrite the schema, we ALTER + ADD COLUMN IF NOT EXISTS for everything new. Legacy columns (`type`, `brand`, `equipment_category`, `assigned_to`, `qr_code`) are preserved untouched. New columns (`kind`, `make`, `category`, `current_custodian_id`, `unit_number`, `aliases`, etc.) coexist alongside. Future cleanup can backfill + drop legacy.
+
+**Why I chose this migration approach:** the trial customer is on prod. Dropping/renaming columns is the kind of thing that breaks production at midnight. Additive-only means worst case is "extra columns sit there unused."
+
+**API + UI consistency: separate `make` from legacy `brand`, `category` from legacy `equipment_category`.** The new APIs use the cleaner names. If a future API or page needs to read legacy data, both columns are queryable. No data migration required.
+
+**Soft-delete instead of hard-delete on retire.** Setting `status='retired'` keeps history (checkouts, maintenance) intact. Retired equipment falls out of normal status filters but is still queryable.
+
+### Why — fits the larger plan
+
+This is the foundation that Phase 2 (maintenance requests) needs. Without an equipment row, you can't link a maintenance request to "the saw that's broken." Without a fleet row, you can't track vehicle service intervals.
+
+Phase 1B also unblocks Phase 3's voice checkout — the matcher reads `aliases` jsonb to resolve spoken phrases, and we've now seeded those automatically.
+
+The visit wizard's `equipment_issues` jsonb (shipped in Phase 0) eventually links to specific `equipment.id` records once shop manager populates inventory. That bridge is built — the API just needs the lookup wired in Phase 2.
+
+### Smoke-test discoveries → migration patches
+
+While testing, the legacy schema rejected several columns the API wanted. All patched in the same migration file (additive only):
+1. `category text` — legacy had `equipment_category varchar` (different values, can't reuse).
+2. `make text` — legacy had `brand`.
+3. `current_custodian_id uuid REFERENCES auth.users(id)` — legacy had `assigned_to`.
+4. `serial_number` was `NOT NULL` — relaxed to nullable. Real-world equipment doesn't always have a known serial.
+
+Each was discovered by running an actual end-to-end test (login → fill form → submit → see what error PostgREST returned) and then applying a `NOTIFY pgrst, 'reload schema'` after the ALTER to force the cache to pick up the new column.
+
+### Agents used + reused
+
+- **Phase 0-1 research (May 4)**: dispatched two parallel `general-purpose` agents to study fleet management software (Hilti On!Track, Samsara, Fleetio, EZOfficeInventory) and maintenance request workflows (UpKeep, Limble, MaintainX, DOT DVIR). Their findings drove the schema design — particularly QR-driven checkout (steal from EZOfficeInventory), Service Reminders dashboard (Fleetio), pre-use-blocks-dispatch (Samsara DVIR), and 3-tap mobile request submission (MaintainX). Transcripts captured in earlier session.
+- **Custom subagents available** (from May 3 session, in `.claude/agents/`): `supabase-migration-author`, `rls-policy-auditor`, `mobile-responsive-auditor`. **Not used this session** — the migration was small enough to write inline + smoke-test catches the issues. Worth using next session when Phase 2's `maintenance_requests` schema needs more rigor.
+
+### Files changed
+```
+app/api/admin/equipment/route.ts                                (new)
+app/api/admin/equipment/[id]/route.ts                           (new)
+app/api/admin/fleet/route.ts                                    (new)
+app/api/admin/fleet/[id]/route.ts                               (new)
+app/dashboard/admin/equipment/page.tsx                          (new)
+app/dashboard/admin/equipment/new/page.tsx                      (new)
+app/dashboard/admin/equipment/[id]/page.tsx                     (new)
+app/dashboard/admin/fleet/page.tsx                              (new)
+app/dashboard/admin/fleet/new/page.tsx                          (new)
+app/dashboard/admin/fleet/[id]/page.tsx                         (new)
+app/dashboard/admin/_components/ShopManagerDashboard.tsx        (KPI fetch)
+supabase/migrations/20260505_shop_manager_phase_1a_foundation.sql  (appended additive patches)
+```
+
+### How to view + test
+```bash
+git fetch origin
+git checkout claude/inspiring-swanson-31ba74
+git pull
+npm run dev
+# Open http://localhost:3000 (or whatever port npm picked)
+# Login: shopmanager@pontifex.com / Shop1234!
+```
+Or click the live preview link Claude provides.
+
+### What's still placeholder
+
+- Maintenance + checkout history sections on equipment detail show "Coming Phase 2/3."
+- Sidebar items for Pull Equipment, Voice Check-Out, Returned Equipment, Maintenance Inbox, Shop Tasks → still 404 (Phase 2-4 work).
+- "Report Equipment Issue" card on operator dashboard → placeholder page.
+
+### Next session = Phase 2
+
+Operator-side maintenance request form (3-tap mobile, voice memo, photo). Shop manager Maintenance Inbox (triage queue). Hook to convert visit-wizard equipment issues into real maintenance requests.
+
+---
+
+## MAY 5, 2026 (PT 4) — Phase 1A: Shop Manager + Shop Help foundation
+
+### What shipped
+Two new roles + dashboards + work_location toggle + demo accounts. **No equipment data yet** (that landed in Phase 1B above). Branch: `claude/inspiring-swanson-31ba74`, commit `f42bd372`.
+
+**Migrations applied to live Supabase:**
+- `equipment` table extended with 12 new columns: `asset_tag`, `kind`, `short_name`, `unit_number`, `aliases jsonb`, `power_source`, `requires_maintenance_schedule`, `current_job_order_id`, `reserved_for_job_id`, `reserved_until`, `hour_meter`, `photo_url`. Status CHECK widened to allow `'reserved'`, `'pending_putaway'`, `'out_of_service'`. Kind CHECK constraint added.
+- `vehicles` table created (1:1 with equipment for kind='vehicle'). VIN, plate, registration/insurance/inspection expiry, odometer.
+- `equipment_checkouts` table created (transactional history; no UI yet, Phase 3 builds it).
+- `timecards.work_location` column added: `'field'` (default) | `'shop'`.
+- `profiles.role` CHECK widened to allow `shop_manager` + `shop_help`.
+
+**RBAC (`lib/rbac.ts`):**
+- New `shop_help` role added to `ROLES_WITH_LABELS`.
+- `shop_manager` + `shop_help` added to `ADMIN_DASHBOARD_ROLES`.
+- 7 new card keys: `equipment`, `fleet`, `pull_equipment`, `voice_checkout`, `returned_equipment`, `maintenance`, `shop_tasks`.
+- `shop_manager` preset filled in: full on equipment/fleet/maintenance/shop_tasks/returned_equipment, submit on pull_equipment + voice_checkout.
+- `shop_help` preset: submit on shop_tasks + maintenance + voice_checkout.
+- `supervisor` preset extended: view on equipment + fleet, submit on voice_checkout (so supervisors can do equipment checkout in field).
+
+**Demo accounts (created via SQL):**
+- `shopmanager@pontifex.com` / `Shop1234!` (role: shop_manager) — cyan card on `/login`.
+- `shophelp@pontifex.com` / `Help1234!` (role: shop_help) — teal card on `/login`.
+- Both in Patriot tenant.
+
+**Dashboards (`/dashboard/admin/_components/`):**
+- `ShopManagerDashboard.tsx` — vibrant gradient KPI tiles (cyan/violet/amber/teal/rose), slate clock-in widget, header CTAs (Pull Equipment + Voice Check-Out), 6 action cards linking to all planned pages.
+- `ShopHelpDashboard.tsx` — operator-style energy. Welcome heading + clock-in widget + 2 KPI tiles + empty task list placeholder + quick actions for Submit Maintenance + Request Time Off.
+- Both wired into `/dashboard/admin/page.tsx` role-branch. The dashboard-summary fetch is skipped for these roles (they have their own data sources).
+
+**Field/Shop clock-in toggle:**
+- Operator dashboard: 2-button picker (Field / Shop) shown to apprentice + operator roles before clock-in. Persists choice → `/api/timecard/clock-in` accepts `work_location` and stores it on the timecard row.
+- Shop manager + shop helper dashboards always pass `work_location: 'shop'`.
+
+**Sidebar:** new SHOP section (cyan accent) with 7 role-gated items via the `roles?: string[]` field on `NavItem` (introduced in May 3 supervisor session).
+
+**Operator dashboard:**
+- New "Report Equipment Issue" card (orange/amber gradient, settings icon) sits next to Request Time Off. Links to `/dashboard/maintenance/new`.
+- `app/dashboard/maintenance/new/page.tsx` — placeholder page with vibrant hero + "Coming in Phase 2" notice.
+
+**Login redirect fix:**
+- `/login` redirects shop_manager + shop_help (in addition to existing roles) to `/dashboard/admin`. Operators + apprentices stay on `/dashboard`.
+- `useAuthUser` hook + `app/dashboard/page.tsx` ADMIN_ROLES lists updated.
+
+### How
+Followed the additive-only migration pattern (no DROP column, no RENAME). RLS via the `public.current_user_*()` SECURITY DEFINER helpers — never `auth.jwt() -> 'user_metadata'` (per CLAUDE.md hard rule).
+
+### Why
+Foundation gates everything that comes after. Without `shop_manager` role + dashboard skeleton, there's nothing to point at and say "Phase 2 will fill this tile in." Without `equipment_checkouts` table, voice checkout has nowhere to write. Without `work_location` column, apprentices rotating to shop have no way for the system to know.
+
+### Agents used
+None this phase — pattern was copy-and-adapt from the supervisor session (May 3) which had already established the dashboard skeleton + sidebar role-gating + demo-account creation pattern.
+
+### Files changed
+```
+supabase/migrations/20260505_shop_manager_phase_1a_foundation.sql   (new)
+app/api/timecard/clock-in/route.ts                                  (work_location)
+app/dashboard/admin/page.tsx                                        (role-branch)
+app/dashboard/admin/_components/ShopManagerDashboard.tsx            (new)
+app/dashboard/admin/_components/ShopHelpDashboard.tsx               (new)
+app/dashboard/page.tsx                                              (Field/Shop picker)
+app/login/page.tsx                                                  (demo cards + redirects)
+components/DashboardSidebar.tsx                                     (SHOP section)
+lib/hooks/useAuthUser.ts                                            (admin roles)
+lib/rbac.ts                                                         (shop roles + cards)
+app/dashboard/maintenance/new/page.tsx                              (new placeholder)
+```
+
+---
+
 ## MAY 5, 2026 (PT 3) — Visit wizard + equipment issues bridge
 
 User reviewed the supervisor work and requested:
