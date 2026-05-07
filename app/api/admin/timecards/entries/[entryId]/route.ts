@@ -32,7 +32,21 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { clock_in, clock_out, pay_category, is_shop_time, admin_notes } = body;
+    const { clock_in, clock_out, pay_category, is_shop_time, admin_notes, lunch_duration_minutes, lunch_override_reason } = body;
+
+    // Validate lunch_duration_minutes if provided (admin-only field).
+    // 0 = no lunch deducted. Cap at 480 (8h) — anything more is a data-entry mistake.
+    let lunchMinutes: number | undefined = undefined;
+    if (lunch_duration_minutes !== undefined && lunch_duration_minutes !== null) {
+      const parsed = Number(lunch_duration_minutes);
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 480) {
+        return NextResponse.json(
+          { error: 'lunch_duration_minutes must be a number between 0 and 480' },
+          { status: 400 }
+        );
+      }
+      lunchMinutes = Math.round(parsed);
+    }
 
     // Validate pay category if provided
     if (pay_category !== undefined && !VALID_PAY_CATEGORIES.includes(pay_category)) {
@@ -64,16 +78,19 @@ export async function PATCH(
       if (pay_category !== undefined) updates.pay_category = pay_category;
       if (is_shop_time !== undefined) updates.is_shop_time = is_shop_time;
       if (admin_notes !== undefined) updates.admin_notes = admin_notes;
+      if (lunchMinutes !== undefined) updates.break_minutes = lunchMinutes;
 
-      // Recalculate total_hours if times changed
-      if (clock_in !== undefined || clock_out !== undefined) {
+      // Recalculate total_hours if times changed (or lunch changed)
+      if (clock_in !== undefined || clock_out !== undefined || lunchMinutes !== undefined) {
         const newIn = new Date(clock_in ?? entryRow.clock_in);
         const newOut = clock_out !== undefined
           ? (clock_out ? new Date(clock_out) : null)
           : (entryRow.clock_out ? new Date(entryRow.clock_out) : null);
         if (newOut) {
           const diffMs = newOut.getTime() - newIn.getTime();
-          updates.total_hours = parseFloat((diffMs / 3_600_000).toFixed(4));
+          const grossHours = diffMs / 3_600_000;
+          const lunchHrs = (lunchMinutes ?? 0) / 60;
+          updates.total_hours = parseFloat(Math.max(0, grossHours - lunchHrs).toFixed(4));
         }
       }
 
@@ -134,15 +151,42 @@ export async function PATCH(
     }
     if (admin_notes !== undefined) updates.admin_notes = admin_notes;
 
-    // Recalculate total_hours
-    if (clock_in !== undefined || clock_out !== undefined) {
+    // Lunch override: legacy timecards table has the full audit trail.
+    if (lunchMinutes !== undefined) {
+      updates.lunch_duration_minutes = lunchMinutes;
+      updates.break_minutes = lunchMinutes; // keep legacy column in sync
+      updates.auto_lunch_applied = lunchMinutes > 0;
+      updates.lunch_override_by = auth.userId;
+      updates.lunch_override_at = new Date().toISOString();
+      if (lunch_override_reason !== undefined) {
+        updates.lunch_override_reason = lunch_override_reason ? String(lunch_override_reason).trim() : null;
+      }
+    }
+
+    // Recalculate total_hours when times OR lunch change.
+    if (clock_in !== undefined || clock_out !== undefined || lunchMinutes !== undefined) {
+      // Need to fetch the existing lunch_duration_minutes if it wasn't part of this update.
+      let effectiveLunchMin: number;
+      if (lunchMinutes !== undefined) {
+        effectiveLunchMin = lunchMinutes;
+      } else {
+        const { data: existingLunch } = await supabaseAdmin
+          .from('timecards')
+          .select('lunch_duration_minutes, break_minutes')
+          .eq('id', entryId)
+          .single();
+        effectiveLunchMin = existingLunch?.lunch_duration_minutes ?? existingLunch?.break_minutes ?? 0;
+      }
+
       const newIn = new Date(clock_in ?? legacyRow.clock_in_time);
       const newOut = clock_out !== undefined
         ? (clock_out ? new Date(clock_out) : null)
         : (legacyRow.clock_out_time ? new Date(legacyRow.clock_out_time) : null);
       if (newOut) {
         const diffMs = newOut.getTime() - newIn.getTime();
-        updates.total_hours = parseFloat((diffMs / 3_600_000).toFixed(4));
+        const grossHours = diffMs / 3_600_000;
+        const lunchHrs = effectiveLunchMin / 60;
+        updates.total_hours = parseFloat(Math.max(0, grossHours - lunchHrs).toFixed(4));
       }
     }
 

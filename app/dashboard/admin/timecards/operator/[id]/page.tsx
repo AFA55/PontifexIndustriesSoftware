@@ -280,6 +280,8 @@ function OperatorTimecardDetailPageInner() {
     is_night_shift: false,
     pay_category: 'regular' as string,
     is_shop_time: false,
+    lunch_duration_minutes: 30,
+    lunch_override_reason: '',
   });
   const [editSaving, setEditSaving] = useState(false);
 
@@ -486,6 +488,10 @@ function OperatorTimecardDetailPageInner() {
       is_night_shift: entry.is_night_shift,
       pay_category: (entry as any).pay_category || 'regular',
       is_shop_time: (entry as any).is_shop_time || entry.is_shop_hours || false,
+      // Lunch field — defaults to existing lunch_duration_minutes (or break_minutes legacy fallback)
+      lunch_duration_minutes:
+        (entry as any).lunch_duration_minutes ?? (entry as any).break_minutes ?? 30,
+      lunch_override_reason: '',
     });
     setShowEditModal(true);
   };
@@ -504,6 +510,8 @@ function OperatorTimecardDetailPageInner() {
         admin_notes: editFormData.notes,
         pay_category: editFormData.pay_category,
         is_shop_time: editFormData.is_shop_time,
+        lunch_duration_minutes: editFormData.lunch_duration_minutes,
+        lunch_override_reason: editFormData.lunch_override_reason || undefined,
       };
       const newRes = await fetch(`/api/admin/timecards/entries/${selectedEntry.id}`, {
         method: 'PATCH',
@@ -1696,6 +1704,61 @@ function OperatorTimecardDetailPageInner() {
                   value={editFormData.clock_out_time ? new Date(editFormData.clock_out_time).toISOString().slice(0, 16) : ''}
                   onChange={(e) => setEditFormData({ ...editFormData, clock_out_time: e.target.value ? new Date(e.target.value).toISOString() : '' })}
                   className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-sm text-gray-900 transition-all"
+                />
+              </div>
+
+              {/* Lunch Deduction (admin-only override) */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Coffee size={14} className="text-amber-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Lunch Deduction (minutes)</p>
+                      <p className="text-[10px] text-gray-500">Auto-applied at 30 min when shift &gt; 6h. Set to 0 if no lunch was taken.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="480"
+                    step="5"
+                    value={editFormData.lunch_duration_minutes}
+                    onChange={(e) => setEditFormData({ ...editFormData, lunch_duration_minutes: parseInt(e.target.value, 10) || 0 })}
+                    className="w-24 px-3 py-2 bg-white border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 text-sm text-gray-900 tabular-nums"
+                  />
+                  <span className="text-xs text-gray-500">min</span>
+                  <div className="flex gap-1 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 0 })}
+                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
+                    >
+                      No lunch
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 30 })}
+                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
+                    >
+                      30 (default)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 60 })}
+                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
+                    >
+                      60
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Reason for override (optional, e.g. 'doctor appt')"
+                  value={editFormData.lunch_override_reason}
+                  onChange={(e) => setEditFormData({ ...editFormData, lunch_override_reason: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 text-xs text-gray-900"
                 />
               </div>
 

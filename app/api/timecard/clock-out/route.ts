@@ -255,7 +255,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update timecard with clock out data
+    // Update timecard with clock out data.
+    // Both `break_minutes` (legacy column) and `lunch_duration_minutes` /
+    // `auto_lunch_applied` (newer semantic columns) are populated. Admins can
+    // later override `lunch_duration_minutes` via the admin entries PATCH route
+    // — that path stamps lunch_override_by/at/reason for audit.
     const { data: updatedTimecard, error: updateError } = await supabaseAdmin
       .from('timecards')
       .update({
@@ -265,6 +269,8 @@ export async function POST(request: NextRequest) {
         clock_out_accuracy: accuracy || null,
         total_hours: parseFloat(totalHours.toFixed(2)),
         break_minutes: breakMinutesDeducted,
+        lunch_duration_minutes: breakMinutesDeducted,
+        auto_lunch_applied: breakMinutesDeducted > 0,
       })
       .eq('id', activeTimecard.id)
       .select()
