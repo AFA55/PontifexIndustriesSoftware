@@ -10,14 +10,16 @@ export const SHOP_LOCATION = {
   name: 'Patriot Concrete Cutting',
 };
 
-// Allowed radius for clock-IN — tight to prevent geofencing fraud
-// (operator can't clock in from home before driving in). 6.1m ≈ 20 feet.
-export const ALLOWED_RADIUS_METERS = 6.1;
+// Allowed radius for clock-IN/OUT — 30.48m ≈ 100 feet. Wide enough to
+// accommodate mobile GPS drift indoors (metal/concrete walls scatter the
+// signal). Still well below "from home" distance (which is miles), so
+// anti-fraud is preserved — operator can't clock in from anywhere but at
+// or directly outside the shop building.
+export const ALLOWED_RADIUS_METERS = 30.48;
 
-// Allowed radius for clock-OUT — wider because mobile GPS routinely drifts
-// 10-30m indoors. Clock-out fraud is much less of a concern than clock-in
-// (no incentive to fake "I'm leaving"). 15.24m ≈ 50 feet.
-export const ALLOWED_RADIUS_CLOCKOUT_METERS = 15.24;
+// Clock-out uses the same radius for now (no need for asymmetric — fraud
+// incentive on clock-out is low anyway).
+export const ALLOWED_RADIUS_CLOCKOUT_METERS = 30.48;
 
 /**
  * Same shape as isWithinShopRadius but uses the wider clock-out radius.

@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, AlertTriangle,
   Search, TrendingUp, Users, Loader2, Shield, Zap,
   Bell, DollarSign, Coffee, Eye, ChevronDown, Moon, Settings, Save, X,
-  Edit2, AlertCircle, Timer
+  Edit2, AlertCircle, Timer, Plus
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -123,6 +123,7 @@ export default function AdminTimecardsPage() {
   const [bulkApproving, setBulkApproving] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
+  const [showAddTimeModal, setShowAddTimeModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'no_entries'>('all');
   const [showNightShiftSettings, setShowNightShiftSettings] = useState(false);
   const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
@@ -462,6 +463,15 @@ export default function AdminTimecardsPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Add Time — admin manual entry (PTO, sick, holiday, manual hours) */}
+            <button
+              onClick={() => setShowAddTimeModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md shadow-emerald-500/30"
+              title="Add manual time entry (PTO, sick, holiday)"
+            >
+              <Plus size={14} />
+              <span className="hidden sm:inline">Add Time</span>
+            </button>
             <button
               onClick={handleExportCSV}
               disabled={exportingCSV || teamMembers.length === 0}
@@ -1154,6 +1164,205 @@ export default function AdminTimecardsPage() {
           </div>
         </div>
       )}
+
+      {showAddTimeModal && (
+        <AddTimeModal
+          teamMembers={teamMembers}
+          onClose={() => setShowAddTimeModal(false)}
+          onSuccess={() => {
+            setShowAddTimeModal(false);
+            void fetchTeamSummary();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Add Time modal ─────────────────────────────────────────────────────────
+function AddTimeModal({
+  teamMembers, onClose, onSuccess,
+}: {
+  teamMembers: TeamMember[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [userId, setUserId] = useState('');
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [entryType, setEntryType] = useState<'pto' | 'sick' | 'holiday' | 'manual' | 'admin_adjustment'>('pto');
+  const [hours, setHours] = useState('8');
+  const [startTime, setStartTime] = useState('08:00');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    setError(null);
+    if (!userId) { setError('Pick an employee.'); return; }
+    const hoursNum = parseFloat(hours);
+    if (!Number.isFinite(hoursNum) || hoursNum < 0.25 || hoursNum > 16) {
+      setError('Hours must be between 0.25 and 16.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError('Session expired.'); return; }
+      const res = await fetch('/api/admin/timecards/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          user_id: userId,
+          date,
+          entry_type: entryType,
+          hours: hoursNum,
+          start_time: startTime,
+          notes: notes.trim() || null,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(j.error || j.details || 'Failed to add entry.');
+        return;
+      }
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Failed to add entry.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const ENTRY_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+    pto:               { label: 'Paid Time Off (PTO)', color: 'from-emerald-500 to-teal-600' },
+    sick:              { label: 'Sick Day',            color: 'from-rose-500 to-pink-600' },
+    holiday:           { label: 'Paid Holiday',        color: 'from-amber-500 to-orange-600' },
+    manual:            { label: 'Worked (manual)',     color: 'from-blue-500 to-indigo-600' },
+    admin_adjustment:  { label: 'Adjustment',          color: 'from-violet-500 to-purple-600' },
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className={`px-5 py-4 bg-gradient-to-br ${ENTRY_TYPE_LABELS[entryType].color} text-white sticky top-0 flex items-center justify-between`}>
+          <div>
+            <h3 className="text-lg font-bold">Add Time</h3>
+            <p className="text-xs text-white/80 mt-0.5">For PTO, sick, holiday, or manual hours</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg" aria-label="Close">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5">Employee</label>
+            <select
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="">Select employee…</option>
+              {teamMembers.map((m) => (
+                <option key={m.userId} value={m.userId}>{m.fullName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5">Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(ENTRY_TYPE_LABELS) as Array<keyof typeof ENTRY_TYPE_LABELS>).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setEntryType(t as any)}
+                  className={`text-left px-3 py-2 rounded-lg border-2 text-xs font-semibold transition ${
+                    entryType === t
+                      ? `border-transparent text-white bg-gradient-to-br ${ENTRY_TYPE_LABELS[t].color}`
+                      : 'border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:border-emerald-300'
+                  }`}
+                >
+                  {ENTRY_TYPE_LABELS[t].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5">Hours</label>
+              <input
+                type="number"
+                step="0.25"
+                min="0.25"
+                max="16"
+                value={hours}
+                onChange={(e) => setHours(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm focus:ring-2 focus:ring-emerald-500 tabular-nums"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5">Start time (optional)</label>
+            <input
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm focus:ring-2 focus:ring-emerald-500"
+            />
+            <p className="text-[10px] text-gray-500 mt-1">Defaults to 08:00. Sets clock-in time on the entry.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5">Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Reason / context"
+              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          {entryType === 'pto' && (
+            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+              💡 PTO entries also bump <code className="font-mono">operator_pto_balance.pto_days_used</code> by {(parseFloat(hours) / 8).toFixed(2)} day(s).
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-sm text-rose-700">{error}</div>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-200 dark:border-slate-700 flex items-center justify-end gap-2 sticky bottom-0 bg-white dark:bg-slate-800">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-200 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || !userId}
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 shadow-md shadow-emerald-500/30"
+          >
+            {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Plus className="w-4 h-4" /> Add Entry</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
