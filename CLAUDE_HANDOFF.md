@@ -3,6 +3,93 @@
 
 ---
 
+## MAY 8, 2026 — Phase B(i): Smart equipment location + Unified Inventory Control
+
+### What shipped
+Per user request after the May 7 shop manager hands-on test: replace 3 separate sidebar items (Pull Equipment / Voice Check-Out / Returned Equipment) with ONE unified page. Plus equipment list now shows LIVE location ("with Carlos · truck #5") instead of static `home_location`. Branch `claude/inspiring-swanson-31ba74`, commit `e888f184`. **NOT pushed to main yet** — user wants to test on localhost first.
+
+### Sub-phasing
+Phase B is big — split it into 4 sub-phases so we ship working chunks:
+- ✅ **B(i) THIS SESSION**: smart location + unified Inventory Control page with 4 tabs (Inventory / Checkout / Check-In / History) — all manual workflows
+- ⏳ **B(ii) NEXT**: voice layer on Checkout + Check-In tabs (smart-alias matching, audio audit, learning loop via voice_recognition_corrections)
+- ⏳ **B(iii) NEXT**: Pull Equipment workflow (days-ahead picker, reserve equipment, generate pre-use checks when shop_tasks exists in Phase 4)
+- ⏳ **B(iv) NEXT**: Schedule board access for shop_manager + "Pull Equipment Requirements" button on schedule-board
+
+### APIs (new)
+- `GET /api/admin/equipment-checkouts` — list with filters (`open=true`, `operator_id`, `equipment_id`, `truck_id`, `search`). Hydrates equipment + truck + custodian + job. Search is client-side post-hydration to keep SQL simple. Pagination via `page` + `limit`.
+- `POST /api/admin/equipment-checkouts` — atomic checkout: insert checkout row + flip `equipment.status='in_use'` + set `current_custodian_id` + `current_job_order_id`. Validates equipment is in tenant, not already in_use, not retired. Rolls back on partial failure.
+- `PATCH /api/admin/equipment-checkouts/[id]` — mark checked-in. Stamps `checked_in_at` + `checked_in_by`. Default flips `equipment.status='pending_putaway'` (sends to helper queue). Shop manager can pass `status_after_checkin='available'` to skip queue.
+- `GET /api/admin/equipment` extended — hydrates `current_custodian`, `current_job`, `open_checkout` (with truck) so the equipment list smart-location renderer has everything it needs in one request.
+
+### Smart location formatter
+```typescript
+function smartLocation(eq: Equipment): string {
+  if (eq.status === 'in_use') {
+    const op = eq.current_custodian?.full_name?.split(' ')[0] ?? 'someone';
+    const truck = eq.open_checkout?.truck;
+    if (truck) return `with ${op} · ${truckLabel}`;
+    if (eq.current_job?.job_number) return `with ${op} · ${eq.current_job.job_number}`;
+    return `with ${op}`;
+  }
+  if (eq.status === 'reserved') return `reserved for ${eq.current_job?.job_number ?? 'job'}`;
+  if (eq.status === 'pending_putaway') return 'pending put-away';
+  if (eq.status === 'in_maintenance' || eq.status === 'maintenance') return 'in maintenance';
+  if (eq.status === 'out_of_service') return 'out of service';
+  return eq.location || 'in shop';
+}
+```
+Used in both the equipment list page and the Inventory Control inventory tab.
+
+### Unified Inventory Control page (`/dashboard/admin/inventory-control`)
+4 tabs sharing equipment + checkout + operator data via shared loader hooks. Tab gradient swaps in the hero based on active tab.
+
+- **Inventory** (cyan/sky) — 3 quantity tiles (Total / Available / In Use) + searchable equipment grid. Each card shows smart location as its primary subtitle. Search matches name, asset_tag, unit_number, operator name.
+- **Checkout** (rose/pink) — 3-step form (Equipment → Operator → Truck) + notes field. Submits to POST. Filters equipment list to status='available' or 'reserved' (can't check out something that's already in_use). Refreshes both inventory + open-checkouts on success.
+- **Check-In** (teal/emerald) — list of open checkouts (status badge in tab bar shows count). Each row: equipment + operator + truck + job + duration. Two action buttons per row: "Pending Put-Away" (amber, default — sends to helper queue) or "Mark Available" (teal gradient — skips queue when shop manager racked it themselves).
+- **History** (violet/indigo) — searchable log of ALL checkouts (open + closed). Search matches operator / equipment / truck / job / asset_tag. Each row shows OPEN or CLOSED chip + checked-out + checked-in timestamps + notes.
+
+URL param `?tab=` persists tab choice across page loads. Shop Manager dashboard CTAs deep-link via `?tab=checkout` and `?tab=checkin`.
+
+### Sidebar restructure
+- SHOP section: 7 items → 5 items
+- Removed: Pull Equipment, Voice Check-Out, Returned Equipment
+- Added: Inventory Control (single entry point)
+- Kept: Equipment, Fleet, Maintenance Inbox, Shop Tasks
+
+### Shop Manager dashboard updates
+- Header CTAs: "Pull Equipment" + "Voice Check-Out" replaced with "Check Out Equipment" (rose, → `?tab=checkout`) + "Check In" (teal, → `?tab=checkin`).
+- Returned-Queue KPI tile now points at `?tab=checkin`.
+- Action card grid: 3 old cards (Pull/Voice/Returned) replaced with 1 "Inventory Control" card.
+
+### Files changed
+```
+app/api/admin/equipment/route.ts                          (hydrate custodian/job/truck)
+app/api/admin/equipment-checkouts/route.ts                (new — GET list + POST create)
+app/api/admin/equipment-checkouts/[id]/route.ts           (new — PATCH check-in)
+app/dashboard/admin/equipment/page.tsx                    (smartLocation + render)
+app/dashboard/admin/inventory-control/page.tsx            (new — 4-tab unified page)
+app/dashboard/admin/_components/ShopManagerDashboard.tsx  (CTAs + tile + cards)
+components/DashboardSidebar.tsx                           (SHOP section collapsed)
+```
+
+### Smoke test note
+Dev preview eval kept racing the React form hydration tonight (login form submitted as GET, same flaky behavior as past sessions). Build passes (`npm run build` clean), routes compile, code is surgical. Real browser sessions work — user can test on localhost manually. Production push held until they verify.
+
+### What's still left (queued)
+
+**B(ii) — Voice layer.** Add a microphone button to the Checkout + Check-In tabs. On press: SpeechRecognition → fuzzy match against `equipment.aliases` → confidence-tiered confirm (≥85% auto, 60-85% pick from 3 suggestions, <60% free-text edit). Audio recorded to `equipment_checkouts.voice_note_url` for audit. Learning loop via `voice_recognition_corrections` table.
+
+**B(iii) — Pull Equipment.** Days-ahead date picker shows upcoming jobs with required equipment. "Pull selected" reserves equipment (`equipment.reserved_for_job_id` + `reserved_until`) and generates `shop_tasks` rows once that table exists.
+
+**B(iv) — Schedule board for shop_manager.** Already-allowed by RBAC preset; verify page-level role guard accepts shop_manager. Add "Pull Equipment Requirements" button on the schedule-board edit modal that lists equipment per job from `job_orders.equipment_*` fields.
+
+### Agents on standby (in `.claude/agents/`)
+- `supabase-migration-author` — for B(ii)'s `voice_recognition_corrections` table
+- `rls-policy-auditor` — for any new query patterns
+- `mobile-responsive-auditor` — sweep the new Inventory Control page on 375px before next push
+
+---
+
 ## MAY 7, 2026 (PT 2) — Shop manager hands-on feedback fixes + production deploy
 
 User had Demo Shop Manager actually test clock-in/clock-out. Three issues found, all fixed and deployed.
