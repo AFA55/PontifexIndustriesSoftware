@@ -3,6 +3,79 @@
 
 ---
 
+## MAY 8, 2026 (PT 2) — On-site fix: 100ft GPS radius + Admin manual time entry → PROD
+
+User on-site testing exposed two urgent gaps. Both shipped to production today.
+
+**Pushed to production.** Commit `cb919706`, deploy `dpl_CZZbU3vtKrjQDdzmVqbfEq12Jxo2`. Built in 76s. Aliased to `pontifexindustries.com` + `www.` — both responding 200. The previously-pushed Phase B(i) Inventory Control work also rode this commit chain (`64f1ad54`, `447b2387`).
+
+### Fix 1 — GPS radius widened to 100ft (clock-in AND clock-out)
+
+**Symptom:** Shop manager standing inside the shop couldn't clock in. App said "you must be at Patriot Concrete Cutting".
+
+**Root cause:** Radius was 20ft (clock-in) / 50ft (clock-out from yesterday's PT 2 fix). Indoor GPS drift on a typical phone is **10-30 meters** — metal/concrete walls scatter the signal. Standing in the shop reading as 30m+ "away" → reject.
+
+**Fix:** Both `ALLOWED_RADIUS_METERS` and `ALLOWED_RADIUS_CLOCKOUT_METERS` set to **30.48m (~100ft)** in `lib/geolocation.ts`. Anti-fraud preserved — home addresses are miles away, not 100ft.
+
+### Fix 2 — Admin manual time entry (PTO + sick + holiday + manual)
+
+**Why:** No way to enter hours for someone who didn't clock in. PTO, sick days, holiday — all needed manual creation, not just edits to existing rows.
+
+**Migration `20260508_timecards_entry_type_extend.sql`** (applied):
+The existing `timecards_entry_type_check` CHECK constraint allowed: regular, overtime, double_time, time_off, holiday, no_call_no_show, late. **Extended** to additionally allow: `pto`, `sick`, `manual`, `admin_adjustment`. Additive only — existing data preserved.
+
+**API `POST /api/admin/timecards/manual`** (new):
+- Body: `{ user_id, date, entry_type, hours, start_time?, notes? }`
+- Validates: `entry_type` ∈ {pto,sick,holiday,manual,admin_adjustment}, hours ∈ [0.25, 16], date YYYY-MM-DD, start_time HH:MM (default 08:00)
+- Inserts a timecard with computed clock_in_time + clock_out_time, `total_hours = gross = net = hours`, `is_approved=true`, `approval_status='manually_approved'`, `clock_in/out_method='manual'`, `timecard_source='manual'`
+- For `entry_type='pto'`: bumps `operator_pto_balance.pto_days_used` by `hours / 8`. Creates a 10-day allocation row if none exists for the year.
+- Audit logged to `audit_logs` (fire-and-forget)
+- Tenant-scoped via `requireAdmin`
+
+**UI on `/dashboard/admin/timecards`:**
+- New emerald gradient **"Add Time"** button next to CSV/PDF export.
+- Modal:
+  - Employee picker (from `teamMembers`)
+  - 5 type cards: PTO / Sick / Holiday / Manual / Adjustment — gradient swaps in modal header to match
+  - Date + Hours (number, step 0.25) + optional Start time + Notes
+  - Live "+0.X day(s) used" hint when type=PTO
+  - Mobile-friendly: bottom sheet on phones, centered modal on sm+
+  - On success: closes + refreshes team summary
+
+### Files changed
+```
+lib/geolocation.ts                                              (radius constants → 30.48m)
+app/api/admin/timecards/manual/route.ts                         (new — manual entry API)
+app/dashboard/admin/timecards/page.tsx                          (Add Time button + AddTimeModal)
+supabase/migrations/20260508_timecards_entry_type_extend.sql    (new — applied)
+```
+
+### Vercel usage observation
+
+Production deploys this billing period (May 1 - May 8, 2026):
+1. `0963259f` — May 2 (Linear Ft calculator)
+2. `11d938b9` — May 2 (Edit Scope)
+3. `0be04c59` — May 6 (lunch override)
+4. `f1d8b2df` — May 7 (50ft clock-out + per-user lunch + sidebar)
+5. `cb919706` — May 8 (100ft + manual entry — this one)
+
+**5 production deploys in 8 days.** Disciplined cadence vs. late April when ~20 preview deploys in 3 days drove the $500 bill. Per `vercel.json` the `claude/*` branch auto-deploys are blocked — only `main` triggers a billed build. Each main push ≈ 60-90s build minutes.
+
+The Vercel MCP exposes deployments + logs but **NOT billing endpoints**. Exact dollar usage requires the dashboard at `vercel.com/andres-altamiranos-projects/pontifex-industries-software-awja/usage`.
+
+### Phase B remaining (next sessions, in order)
+
+- **B(ii)** — Voice layer on Inventory Control Checkout + Check-In tabs (mic button, alias fuzzy match, ≥85% auto-confirm, audio audit trail, learning loop via `voice_recognition_corrections`)
+- **B(iii)** — Pull Equipment workflow (days-ahead picker, reserve equipment, generate pre-use checks)
+- **B(iv)** — Schedule board access for shop_manager + "Pull Equipment Requirements" button on schedule-board edit modal
+
+### Trial customer status
+- Shop manager can now clock in (100ft radius)
+- Admin can manually log PTO / sick / holiday hours via the team payroll page
+- Both Fix 1 + Fix 2 LIVE on `pontifexindustries.com`
+
+---
+
 ## MAY 8, 2026 — Phase B(i): Smart equipment location + Unified Inventory Control
 
 ### What shipped
