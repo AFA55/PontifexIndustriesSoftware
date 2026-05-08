@@ -11,7 +11,11 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
-import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS } from '@/lib/geolocation';
+import {
+  isWithinShopRadiusForClockout,
+  SHOP_LOCATION,
+  ALLOWED_RADIUS_CLOCKOUT_METERS,
+} from '@/lib/geolocation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +55,7 @@ export async function POST(request: NextRequest) {
     // NFC and remote clock-ins may be at jobsites, so we record location but don't block.
     const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
     const locationCheck = hasLocation
-      ? isWithinShopRadius({ latitude, longitude, accuracy })
+      ? isWithinShopRadiusForClockout({ latitude, longitude, accuracy })
       : { isWithinRange: false, distance: 0, distanceFormatted: 'unknown' };
 
     // Look up how this user clocked in to decide whether to enforce GPS radius
@@ -170,10 +174,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: `You must be at ${SHOP_LOCATION.name} to clock out.`,
-          details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(ALLOWED_RADIUS_METERS * 3.28084).toFixed(0)} feet (${ALLOWED_RADIUS_METERS}m).`,
+          details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(ALLOWED_RADIUS_CLOCKOUT_METERS * 3.28084).toFixed(0)} feet (${ALLOWED_RADIUS_CLOCKOUT_METERS}m).`,
           distance: locationCheck.distance,
           distanceFormatted: locationCheck.distanceFormatted,
-          allowedRadius: ALLOWED_RADIUS_METERS,
+          allowedRadius: ALLOWED_RADIUS_CLOCKOUT_METERS,
           shopLocation: {
             latitude: SHOP_LOCATION.latitude,
             longitude: SHOP_LOCATION.longitude,
@@ -191,40 +195,45 @@ export async function POST(request: NextRequest) {
     const milliseconds = now.getTime() - clockInTime.getTime();
     let totalHours = milliseconds / (1000 * 60 * 60); // Convert to hours
 
-    // Fetch tenant timecard settings for break auto-deduction
+    // Fetch lunch settings: per-user override first, fall back to tenant default.
+    // profiles.default_lunch_minutes (per-user) wins when non-null.
+    // Otherwise read timecard_settings_v2 (current) → timecard_settings (legacy) for tenant default.
     let breakMinutesDeducted = 0;
     try {
-      // Get tenant_id from user's profile
-      const { data: tenantProfile } = await supabaseAdmin
+      const { data: profileRow } = await supabaseAdmin
         .from('profiles')
-        .select('tenant_id')
+        .select('tenant_id, default_lunch_minutes')
         .eq('id', user.id)
         .single();
-      const tenantId = tenantProfile?.tenant_id;
+      const tenantId = profileRow?.tenant_id;
+      const userLunchOverride: number | null = profileRow?.default_lunch_minutes ?? null;
+
       let settingsQuery = supabaseAdmin
         .from('timecard_settings')
         .select('auto_deduct_break, break_duration_minutes, break_threshold_hours, break_is_paid');
-      if (tenantId) {
-        settingsQuery = settingsQuery.eq('tenant_id', tenantId);
-      }
+      if (tenantId) settingsQuery = settingsQuery.eq('tenant_id', tenantId);
       const { data: tcSettings } = await settingsQuery.limit(1).maybeSingle();
 
       const autoDeduct = tcSettings?.auto_deduct_break ?? true;
-      const breakDuration = tcSettings?.break_duration_minutes ?? 30;
+      const tenantBreakDuration = tcSettings?.break_duration_minutes ?? 30;
       const breakThreshold = tcSettings?.break_threshold_hours ?? 6;
       const breakIsPaid = tcSettings?.break_is_paid ?? false;
 
-      if (autoDeduct && totalHours > breakThreshold) {
-        breakMinutesDeducted = breakDuration;
+      // Per-user wins over tenant. 0 is a valid value ("no lunch by default").
+      const effectiveBreakDuration =
+        userLunchOverride !== null && userLunchOverride !== undefined
+          ? userLunchOverride
+          : tenantBreakDuration;
+
+      if (autoDeduct && totalHours > breakThreshold && effectiveBreakDuration > 0) {
+        breakMinutesDeducted = effectiveBreakDuration;
         if (!breakIsPaid) {
-          // Subtract break time from total hours
-          totalHours -= breakDuration / 60;
+          totalHours -= effectiveBreakDuration / 60;
           if (totalHours < 0) totalHours = 0;
         }
       }
     } catch {
-      // If settings table doesn't exist or query fails, skip break deduction
-      console.warn('Could not fetch timecard settings for break deduction');
+      console.warn('Could not fetch lunch settings; defaulting to no deduction');
     }
 
     // Auto-close any open helper work logs (started but not completed)
