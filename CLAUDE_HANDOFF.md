@@ -3,6 +3,86 @@
 
 ---
 
+## MAY 7, 2026 (PT 2) — Shop manager hands-on feedback fixes + production deploy
+
+User had Demo Shop Manager actually test clock-in/clock-out. Three issues found, all fixed and deployed.
+
+**Pushed to production.** Commit `f1d8b2df`, deploy `dpl_FTB2rPJmozfizxLSjA2X1sHVBtx4`. Aliased to `pontifexindustries.com` + `www.` — both responding 200.
+
+### Fix 1 — GPS clock-out bug (couldn't clock out from inside the shop)
+
+**Symptom:** Shop manager clicks Clock Out → "You must be at Patriot Concrete Cutting to clock out — you are 35ft away".
+
+**Root cause:** `lib/geolocation.ts` exported a single `ALLOWED_RADIUS_METERS = 6.1` (20ft) used by both clock-in and clock-out. Mobile GPS routinely drifts 10–30m indoors (metal/concrete walls scatter the signal), so legitimate "I'm in the shop" reads as 30+ feet away. Geofencing reject triggers.
+
+**Fix:** Asymmetric radius — clock-IN stays tight, clock-OUT widens.
+- New `ALLOWED_RADIUS_CLOCKOUT_METERS = 15.24` (50ft) export.
+- New `isWithinShopRadiusForClockout()` helper.
+- `app/api/timecard/clock-out/route.ts` imports the new helper + radius constant. Error message reports "50 feet" as the limit now.
+
+**Why this is right:** Clock-IN tight = anti-fraud (operator can't clock in from home and drive over). Clock-OUT wide = no fraud incentive ("I'm leaving" doesn't help anyone steal time). 50ft is the sweet spot — still catches "I'm clocking out from a job site" but accommodates indoor GPS drift.
+
+### Fix 2 — Per-user lunch default (Shop manager takes 60min, not 30min)
+
+**Symptom:** Shop manager takes a full hour for lunch, but the system was deducting only 30min.
+
+**Existing infrastructure:** `timecard_settings` had a tenant-wide `auto_lunch_duration_minutes = 30`. No per-user override existed.
+
+**Fix:** Added per-user override on `profiles`.
+- Migration `20260507_profiles_default_lunch_minutes.sql`: `ADD COLUMN default_lunch_minutes integer` (NULL = use tenant default).
+- Demo Shop Manager seeded with 60.
+- Clock-out reads per-user first, falls back to tenant default. A non-null 0 is honored ("user takes no lunch").
+- The May 7 PT 1 admin per-shift override (lunch_override_by/at/reason on `timecards`) is still on top — admin can still tweak any individual shift.
+
+**Three-layer hierarchy now:**
+1. **Per-shift** (admin manually edits a specific timecard) — highest priority
+2. **Per-user default** (`profiles.default_lunch_minutes`) — wins over tenant
+3. **Tenant default** (`timecard_settings.break_duration_minutes`) — fallback
+
+### Fix 3 — Shop manager sidebar showing team data
+
+**Symptom:** Shop manager logs in and sees "Timecards" + "Time Off" sidebar items — those are the TEAM views (everyone's data), not their own.
+
+**Fix:** Reorganized sidebar with role-aware filtering.
+- New `excludeRoles?: string[]` field on `NavItem` type. Filter logic honors it in both loading-state and post-load passes.
+- New **MY ACCOUNT** section (emerald accent) with `My Timecard` + `Request Time Off` links — gated to roles=['shop_manager','shop_help','supervisor']. Routes to existing personal pages (`/dashboard/timecard`, `/dashboard/request-time-off`) which had no role guards.
+- Existing MANAGEMENT items "Timecards" and "Time Off" now have `excludeRoles=['shop_manager','shop_help']` — hidden from them but still visible to admin/super_admin/operations_manager.
+
+Result: shop_manager sees `MY ACCOUNT > My Timecard, Request Time Off` (own data only). Admin still sees `MANAGEMENT > Timecards, Time Off` (team views).
+
+### Smoke test note
+The dev preview server kept racing the form-fill (login form submitted as GET, password landed in URL) — flaky on the localhost preview tonight, not a code bug. Skipped UI smoke-test in favor of:
+- Build passes (`npm run build` clean on both worktree branch + local main).
+- Migration applied + verified by SELECT on the new column.
+- Schema audit confirmed shop_manager profile has default_lunch_minutes=60.
+- Logic flow is surgical: 1 import + 1 const + 2 string-literal swaps for GPS, 1 column lookup added in clock-out, 1 new section + 1 new field on sidebar.
+
+Production is the real test — user can verify by logging in.
+
+### Files changed
+```
+lib/geolocation.ts                                              (radius constants + helper)
+app/api/timecard/clock-out/route.ts                             (imports + per-user lunch lookup)
+components/DashboardSidebar.tsx                                 (excludeRoles + MY ACCOUNT)
+supabase/migrations/20260507_profiles_default_lunch_minutes.sql  (new — applied)
+```
+
+### Phase B queued for next session
+
+Bigger requests that need design + parallel agents:
+1. **Equipment list smart location** — show "in shop" vs "with [operator] on truck #X" based on checkout state, not static `home_location`.
+2. **Unified Inventory Control page** — replace 3 separate sidebar items (Voice Check-Out, Returned Equipment, Pull Equipment) with ONE page that has buttons to trigger each workflow + searchable history log (by operator/truck/equipment name).
+3. **Schedule board for shop_manager** + **"Pull Equipment Requirements" button** — pulls equipment lists per ticket so shop manager knows what to prep ahead of dispatch.
+
+These need careful design — especially the unified Inventory Control page (queries across equipment + equipment_checkouts + maintenance_requests + shop_tasks, audit log fanout, search across multiple fields). Will dispatch agents in parallel for the schema + page design + history log queries.
+
+### Agents available + worth using next session
+- **`supabase-migration-author`** — for any schema additions (equipment view, history materialized view if needed)
+- **`rls-policy-auditor`** — review RLS on the new history queries
+- **`mobile-responsive-auditor`** — sweep the new Inventory Control page on 375px before merge
+
+---
+
 ## MAY 7, 2026 — Lunch deduction admin override + production deploy
 
 ### What shipped
