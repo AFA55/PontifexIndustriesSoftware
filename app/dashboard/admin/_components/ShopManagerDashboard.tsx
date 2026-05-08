@@ -179,18 +179,18 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Link
-            href="/dashboard/admin/equipment/pull"
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-sm font-semibold shadow-lg shadow-amber-500/30 transition-all hover:-translate-y-0.5"
-          >
-            <Package className="w-4 h-4" />
-            Pull Equipment
-          </Link>
-          <Link
-            href="/dashboard/admin/equipment/voice"
+            href="/dashboard/admin/inventory-control?tab=checkout"
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white text-sm font-semibold shadow-lg shadow-rose-500/30 transition-all hover:-translate-y-0.5"
           >
-            <Mic className="w-4 h-4" />
-            Voice Check-Out
+            <Package className="w-4 h-4" />
+            Check Out Equipment
+          </Link>
+          <Link
+            href="/dashboard/admin/inventory-control?tab=checkin"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white text-sm font-semibold shadow-lg shadow-teal-500/30 transition-all hover:-translate-y-0.5"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Check In
           </Link>
         </div>
       </div>
@@ -266,7 +266,7 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
           value={returnedQueue}
           label="Returned — Needs Put-Away"
           loading={loading}
-          href="/dashboard/admin/equipment/returned"
+          href="/dashboard/admin/inventory-control?tab=checkin"
         />
         <KpiTile
           icon={<Truck className="w-6 h-6 text-white" />}
@@ -282,6 +282,13 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
       {/* Action cards */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <ActionCard
+          href="/dashboard/admin/inventory-control"
+          icon={<RotateCcw className="w-5 h-5" />}
+          title="Inventory Control"
+          subtitle="Check out, check in, search history — one page"
+          tone="rose"
+        />
+        <ActionCard
           href="/dashboard/admin/equipment"
           icon={<Package className="w-5 h-5" />}
           title="Equipment Inventory"
@@ -294,27 +301,6 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
           title="Fleet"
           subtitle="Trucks, trailers, registration + insurance"
           tone="blue"
-        />
-        <ActionCard
-          href="/dashboard/admin/equipment/pull"
-          icon={<Package className="w-5 h-5" />}
-          title="Pull Equipment for Upcoming"
-          subtitle="Generate pre-use checks, multiple days ahead"
-          tone="amber"
-        />
-        <ActionCard
-          href="/dashboard/admin/equipment/voice"
-          icon={<Mic className="w-5 h-5" />}
-          title="Voice Check-Out / Check-In"
-          subtitle="Hands-free, smart aliases, audio audit"
-          tone="rose"
-        />
-        <ActionCard
-          href="/dashboard/admin/equipment/returned"
-          icon={<RotateCcw className="w-5 h-5" />}
-          title="Returned Equipment"
-          subtitle="Items checked back in, needs put-away"
-          tone="teal"
         />
         <ActionCard
           href="/dashboard/admin/maintenance"
