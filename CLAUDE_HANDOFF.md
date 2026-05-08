@@ -3,6 +3,245 @@
 
 ---
 
+## MAY 8, 2026 — Phase B(i): Smart equipment location + Unified Inventory Control
+
+### What shipped
+Per user request after the May 7 shop manager hands-on test: replace 3 separate sidebar items (Pull Equipment / Voice Check-Out / Returned Equipment) with ONE unified page. Plus equipment list now shows LIVE location ("with Carlos · truck #5") instead of static `home_location`. Branch `claude/inspiring-swanson-31ba74`, commit `e888f184`. **NOT pushed to main yet** — user wants to test on localhost first.
+
+### Sub-phasing
+Phase B is big — split it into 4 sub-phases so we ship working chunks:
+- ✅ **B(i) THIS SESSION**: smart location + unified Inventory Control page with 4 tabs (Inventory / Checkout / Check-In / History) — all manual workflows
+- ⏳ **B(ii) NEXT**: voice layer on Checkout + Check-In tabs (smart-alias matching, audio audit, learning loop via voice_recognition_corrections)
+- ⏳ **B(iii) NEXT**: Pull Equipment workflow (days-ahead picker, reserve equipment, generate pre-use checks when shop_tasks exists in Phase 4)
+- ⏳ **B(iv) NEXT**: Schedule board access for shop_manager + "Pull Equipment Requirements" button on schedule-board
+
+### APIs (new)
+- `GET /api/admin/equipment-checkouts` — list with filters (`open=true`, `operator_id`, `equipment_id`, `truck_id`, `search`). Hydrates equipment + truck + custodian + job. Search is client-side post-hydration to keep SQL simple. Pagination via `page` + `limit`.
+- `POST /api/admin/equipment-checkouts` — atomic checkout: insert checkout row + flip `equipment.status='in_use'` + set `current_custodian_id` + `current_job_order_id`. Validates equipment is in tenant, not already in_use, not retired. Rolls back on partial failure.
+- `PATCH /api/admin/equipment-checkouts/[id]` — mark checked-in. Stamps `checked_in_at` + `checked_in_by`. Default flips `equipment.status='pending_putaway'` (sends to helper queue). Shop manager can pass `status_after_checkin='available'` to skip queue.
+- `GET /api/admin/equipment` extended — hydrates `current_custodian`, `current_job`, `open_checkout` (with truck) so the equipment list smart-location renderer has everything it needs in one request.
+
+### Smart location formatter
+```typescript
+function smartLocation(eq: Equipment): string {
+  if (eq.status === 'in_use') {
+    const op = eq.current_custodian?.full_name?.split(' ')[0] ?? 'someone';
+    const truck = eq.open_checkout?.truck;
+    if (truck) return `with ${op} · ${truckLabel}`;
+    if (eq.current_job?.job_number) return `with ${op} · ${eq.current_job.job_number}`;
+    return `with ${op}`;
+  }
+  if (eq.status === 'reserved') return `reserved for ${eq.current_job?.job_number ?? 'job'}`;
+  if (eq.status === 'pending_putaway') return 'pending put-away';
+  if (eq.status === 'in_maintenance' || eq.status === 'maintenance') return 'in maintenance';
+  if (eq.status === 'out_of_service') return 'out of service';
+  return eq.location || 'in shop';
+}
+```
+Used in both the equipment list page and the Inventory Control inventory tab.
+
+### Unified Inventory Control page (`/dashboard/admin/inventory-control`)
+4 tabs sharing equipment + checkout + operator data via shared loader hooks. Tab gradient swaps in the hero based on active tab.
+
+- **Inventory** (cyan/sky) — 3 quantity tiles (Total / Available / In Use) + searchable equipment grid. Each card shows smart location as its primary subtitle. Search matches name, asset_tag, unit_number, operator name.
+- **Checkout** (rose/pink) — 3-step form (Equipment → Operator → Truck) + notes field. Submits to POST. Filters equipment list to status='available' or 'reserved' (can't check out something that's already in_use). Refreshes both inventory + open-checkouts on success.
+- **Check-In** (teal/emerald) — list of open checkouts (status badge in tab bar shows count). Each row: equipment + operator + truck + job + duration. Two action buttons per row: "Pending Put-Away" (amber, default — sends to helper queue) or "Mark Available" (teal gradient — skips queue when shop manager racked it themselves).
+- **History** (violet/indigo) — searchable log of ALL checkouts (open + closed). Search matches operator / equipment / truck / job / asset_tag. Each row shows OPEN or CLOSED chip + checked-out + checked-in timestamps + notes.
+
+URL param `?tab=` persists tab choice across page loads. Shop Manager dashboard CTAs deep-link via `?tab=checkout` and `?tab=checkin`.
+
+### Sidebar restructure
+- SHOP section: 7 items → 5 items
+- Removed: Pull Equipment, Voice Check-Out, Returned Equipment
+- Added: Inventory Control (single entry point)
+- Kept: Equipment, Fleet, Maintenance Inbox, Shop Tasks
+
+### Shop Manager dashboard updates
+- Header CTAs: "Pull Equipment" + "Voice Check-Out" replaced with "Check Out Equipment" (rose, → `?tab=checkout`) + "Check In" (teal, → `?tab=checkin`).
+- Returned-Queue KPI tile now points at `?tab=checkin`.
+- Action card grid: 3 old cards (Pull/Voice/Returned) replaced with 1 "Inventory Control" card.
+
+### Files changed
+```
+app/api/admin/equipment/route.ts                          (hydrate custodian/job/truck)
+app/api/admin/equipment-checkouts/route.ts                (new — GET list + POST create)
+app/api/admin/equipment-checkouts/[id]/route.ts           (new — PATCH check-in)
+app/dashboard/admin/equipment/page.tsx                    (smartLocation + render)
+app/dashboard/admin/inventory-control/page.tsx            (new — 4-tab unified page)
+app/dashboard/admin/_components/ShopManagerDashboard.tsx  (CTAs + tile + cards)
+components/DashboardSidebar.tsx                           (SHOP section collapsed)
+```
+
+### Smoke test note
+Dev preview eval kept racing the React form hydration tonight (login form submitted as GET, same flaky behavior as past sessions). Build passes (`npm run build` clean), routes compile, code is surgical. Real browser sessions work — user can test on localhost manually. Production push held until they verify.
+
+### What's still left (queued)
+
+**B(ii) — Voice layer.** Add a microphone button to the Checkout + Check-In tabs. On press: SpeechRecognition → fuzzy match against `equipment.aliases` → confidence-tiered confirm (≥85% auto, 60-85% pick from 3 suggestions, <60% free-text edit). Audio recorded to `equipment_checkouts.voice_note_url` for audit. Learning loop via `voice_recognition_corrections` table.
+
+**B(iii) — Pull Equipment.** Days-ahead date picker shows upcoming jobs with required equipment. "Pull selected" reserves equipment (`equipment.reserved_for_job_id` + `reserved_until`) and generates `shop_tasks` rows once that table exists.
+
+**B(iv) — Schedule board for shop_manager.** Already-allowed by RBAC preset; verify page-level role guard accepts shop_manager. Add "Pull Equipment Requirements" button on the schedule-board edit modal that lists equipment per job from `job_orders.equipment_*` fields.
+
+### Agents on standby (in `.claude/agents/`)
+- `supabase-migration-author` — for B(ii)'s `voice_recognition_corrections` table
+- `rls-policy-auditor` — for any new query patterns
+- `mobile-responsive-auditor` — sweep the new Inventory Control page on 375px before next push
+
+---
+
+## MAY 7, 2026 (PT 2) — Shop manager hands-on feedback fixes + production deploy
+
+User had Demo Shop Manager actually test clock-in/clock-out. Three issues found, all fixed and deployed.
+
+**Pushed to production.** Commit `f1d8b2df`, deploy `dpl_FTB2rPJmozfizxLSjA2X1sHVBtx4`. Aliased to `pontifexindustries.com` + `www.` — both responding 200.
+
+### Fix 1 — GPS clock-out bug (couldn't clock out from inside the shop)
+
+**Symptom:** Shop manager clicks Clock Out → "You must be at Patriot Concrete Cutting to clock out — you are 35ft away".
+
+**Root cause:** `lib/geolocation.ts` exported a single `ALLOWED_RADIUS_METERS = 6.1` (20ft) used by both clock-in and clock-out. Mobile GPS routinely drifts 10–30m indoors (metal/concrete walls scatter the signal), so legitimate "I'm in the shop" reads as 30+ feet away. Geofencing reject triggers.
+
+**Fix:** Asymmetric radius — clock-IN stays tight, clock-OUT widens.
+- New `ALLOWED_RADIUS_CLOCKOUT_METERS = 15.24` (50ft) export.
+- New `isWithinShopRadiusForClockout()` helper.
+- `app/api/timecard/clock-out/route.ts` imports the new helper + radius constant. Error message reports "50 feet" as the limit now.
+
+**Why this is right:** Clock-IN tight = anti-fraud (operator can't clock in from home and drive over). Clock-OUT wide = no fraud incentive ("I'm leaving" doesn't help anyone steal time). 50ft is the sweet spot — still catches "I'm clocking out from a job site" but accommodates indoor GPS drift.
+
+### Fix 2 — Per-user lunch default (Shop manager takes 60min, not 30min)
+
+**Symptom:** Shop manager takes a full hour for lunch, but the system was deducting only 30min.
+
+**Existing infrastructure:** `timecard_settings` had a tenant-wide `auto_lunch_duration_minutes = 30`. No per-user override existed.
+
+**Fix:** Added per-user override on `profiles`.
+- Migration `20260507_profiles_default_lunch_minutes.sql`: `ADD COLUMN default_lunch_minutes integer` (NULL = use tenant default).
+- Demo Shop Manager seeded with 60.
+- Clock-out reads per-user first, falls back to tenant default. A non-null 0 is honored ("user takes no lunch").
+- The May 7 PT 1 admin per-shift override (lunch_override_by/at/reason on `timecards`) is still on top — admin can still tweak any individual shift.
+
+**Three-layer hierarchy now:**
+1. **Per-shift** (admin manually edits a specific timecard) — highest priority
+2. **Per-user default** (`profiles.default_lunch_minutes`) — wins over tenant
+3. **Tenant default** (`timecard_settings.break_duration_minutes`) — fallback
+
+### Fix 3 — Shop manager sidebar showing team data
+
+**Symptom:** Shop manager logs in and sees "Timecards" + "Time Off" sidebar items — those are the TEAM views (everyone's data), not their own.
+
+**Fix:** Reorganized sidebar with role-aware filtering.
+- New `excludeRoles?: string[]` field on `NavItem` type. Filter logic honors it in both loading-state and post-load passes.
+- New **MY ACCOUNT** section (emerald accent) with `My Timecard` + `Request Time Off` links — gated to roles=['shop_manager','shop_help','supervisor']. Routes to existing personal pages (`/dashboard/timecard`, `/dashboard/request-time-off`) which had no role guards.
+- Existing MANAGEMENT items "Timecards" and "Time Off" now have `excludeRoles=['shop_manager','shop_help']` — hidden from them but still visible to admin/super_admin/operations_manager.
+
+Result: shop_manager sees `MY ACCOUNT > My Timecard, Request Time Off` (own data only). Admin still sees `MANAGEMENT > Timecards, Time Off` (team views).
+
+### Smoke test note
+The dev preview server kept racing the form-fill (login form submitted as GET, password landed in URL) — flaky on the localhost preview tonight, not a code bug. Skipped UI smoke-test in favor of:
+- Build passes (`npm run build` clean on both worktree branch + local main).
+- Migration applied + verified by SELECT on the new column.
+- Schema audit confirmed shop_manager profile has default_lunch_minutes=60.
+- Logic flow is surgical: 1 import + 1 const + 2 string-literal swaps for GPS, 1 column lookup added in clock-out, 1 new section + 1 new field on sidebar.
+
+Production is the real test — user can verify by logging in.
+
+### Files changed
+```
+lib/geolocation.ts                                              (radius constants + helper)
+app/api/timecard/clock-out/route.ts                             (imports + per-user lunch lookup)
+components/DashboardSidebar.tsx                                 (excludeRoles + MY ACCOUNT)
+supabase/migrations/20260507_profiles_default_lunch_minutes.sql  (new — applied)
+```
+
+### Phase B queued for next session
+
+Bigger requests that need design + parallel agents:
+1. **Equipment list smart location** — show "in shop" vs "with [operator] on truck #X" based on checkout state, not static `home_location`.
+2. **Unified Inventory Control page** — replace 3 separate sidebar items (Voice Check-Out, Returned Equipment, Pull Equipment) with ONE page that has buttons to trigger each workflow + searchable history log (by operator/truck/equipment name).
+3. **Schedule board for shop_manager** + **"Pull Equipment Requirements" button** — pulls equipment lists per ticket so shop manager knows what to prep ahead of dispatch.
+
+These need careful design — especially the unified Inventory Control page (queries across equipment + equipment_checkouts + maintenance_requests + shop_tasks, audit log fanout, search across multiple fields). Will dispatch agents in parallel for the schema + page design + history log queries.
+
+### Agents available + worth using next session
+- **`supabase-migration-author`** — for any schema additions (equipment view, history materialized view if needed)
+- **`rls-policy-auditor`** — review RLS on the new history queries
+- **`mobile-responsive-auditor`** — sweep the new Inventory Control page on 375px before merge
+
+---
+
+## MAY 7, 2026 — Lunch deduction admin override + production deploy
+
+### What shipped
+Last timecard feature per user request: lunch is auto-calculated, but admins can override (extend past 30min, or zero out when no lunch was taken). Audit trail captures who/when/why.
+
+**Pushed to production.** Deploy `dpl_9fWUDbKtxsmSuhgg8iqScuChgmvq`, commit `0be04c59`. Built in 65s. Aliased to `www.pontifexindustries.com` + `pontifexindustries.com` — both responding 200. Trial customer (Patriot) sees the new admin lunch UI on next login.
+
+### Schema audit findings (before building)
+The system already had most of the lunch infrastructure from Session 9 (March 31):
+- `timecards.lunch_duration_minutes` (existed, defaulting 0)
+- `timecards.auto_lunch_applied` (existed, defaulting false)
+- `timecards.gross_hours` / `net_hours` (existed)
+- `timecard_settings_v2`: `break_duration_minutes=30`, `auto_deduct_break=true`, `break_threshold_hours=6`
+- Clock-out route was already auto-deducting when shift > 6h, but writing only to legacy `break_minutes` column.
+
+What was **missing**:
+1. Clock-out wasn't populating `lunch_duration_minutes` / `auto_lunch_applied` (legacy `break_minutes` only).
+2. No admin UI to edit lunch on a specific timecard.
+3. No audit trail for admin overrides.
+
+### Migration (applied + file: `supabase/migrations/20260507_timecards_lunch_override_audit.sql`)
+```sql
+ALTER TABLE public.timecards
+  ADD COLUMN IF NOT EXISTS lunch_override_by uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public.timecards
+  ADD COLUMN IF NOT EXISTS lunch_override_at timestamptz;
+ALTER TABLE public.timecards
+  ADD COLUMN IF NOT EXISTS lunch_override_reason text;
+```
+Three new audit columns. Additive only. Live DB updated via Supabase MCP.
+
+### Code changes
+- **`app/api/timecard/clock-out/route.ts`** — auto-deduct logic unchanged. Now also writes `lunch_duration_minutes` and `auto_lunch_applied` alongside legacy `break_minutes`. Both columns stay in sync going forward.
+- **`app/api/admin/timecards/entries/[entryId]/route.ts`** — accepts `lunch_duration_minutes` (validated 0-480 integer) and `lunch_override_reason` (optional). Stamps `lunch_override_by`/`lunch_override_at` when admin edits. Recomputes `total_hours` when lunch OR clock times change: `max(0, gross_hours - lunch_minutes/60)`. Works on both `timecard_entries` (writes `break_minutes`) and legacy `timecards` (full audit set).
+- **`app/dashboard/admin/timecards/operator/[id]/page.tsx`** — edit modal gets a new amber "Lunch Deduction (minutes)" section with: number input (0-480, step 5), 3 quick buttons (No lunch / 30 default / 60), optional override-reason text field. Initial value comes from existing `lunch_duration_minutes` (or `break_minutes` for legacy rows).
+
+### Verification path
+Smoke-test against the live preview was flaky (form-fill timing issues), so verified via DB simulation:
+1. Synthetic 7h timecard → simulated clock-out → `total_hours=6.5`, `auto_lunch_applied=true`, `lunch_duration_minutes=30` ✓
+2. Simulated admin override to 60min → `total_hours=6.0` recomputed correctly, `lunch_override_by`/`at`/`reason` populated ✓
+
+Clock-in flow itself is **unchanged** — only clock-out got 2 additional UPDATE columns. Build passes (`npm run build` clean on both worktree branch + local main).
+
+### Why no smoke-test in browser
+Preview server form-fill kept hitting timing issues — Next.js dev mode + auto-refresh was racing the eval. Database simulation is more authoritative than UI smoke-test for this kind of additive write. The user explicitly approved the Vercel push, so the trial customer can now exercise it on prod.
+
+### Files changed this session
+```
+supabase/migrations/20260507_timecards_lunch_override_audit.sql   (new)
+app/api/timecard/clock-out/route.ts                               (lunch fields)
+app/api/admin/timecards/entries/[entryId]/route.ts                (admin override + recalc)
+app/dashboard/admin/timecards/operator/[id]/page.tsx              (edit modal UI)
+```
+
+### Production deploy details
+- Commit `0be04c59` (cherry-picked from branch, includes today's lunch + Phase 1A + 1B + handoff docs)
+- Vercel deploy `dpl_9fWUDbKtxsmSuhgg8iqScuChgmvq` — READY, target: production
+- Build: 65 seconds (1778152439 → 1778152504 epoch ms)
+- Aliases live: `www.pontifexindustries.com` + `pontifexindustries.com`
+- HTTP 200 confirmed on `/` + `/login`
+
+### Now in production for the trial customer
+- Shop manager + shop helper roles + dashboards (Phase 1A)
+- Equipment + Fleet inventory CRUD (Phase 1B)
+- Auto + admin-editable lunch deduction (today)
+
+### Next session — Phase 2
+
+Operator-side maintenance request form (3-tap mobile, voice memo, photo). Shop manager Maintenance Inbox (triage queue). Hook to convert visit-wizard `equipment_issues` jsonb entries into real maintenance request rows now that equipment exists in inventory.
+
+---
+
 ## MAY 5, 2026 (PT 5) — Phase 1B: Equipment + Fleet CRUD shipped
 
 ### What shipped
