@@ -10,8 +10,35 @@ export const SHOP_LOCATION = {
   name: 'Patriot Concrete Cutting',
 };
 
-// Allowed radius in meters (6.1m ≈ 20 feet)
+// Allowed radius for clock-IN — tight to prevent geofencing fraud
+// (operator can't clock in from home before driving in). 6.1m ≈ 20 feet.
 export const ALLOWED_RADIUS_METERS = 6.1;
+
+// Allowed radius for clock-OUT — wider because mobile GPS routinely drifts
+// 10-30m indoors. Clock-out fraud is much less of a concern than clock-in
+// (no incentive to fake "I'm leaving"). 15.24m ≈ 50 feet.
+export const ALLOWED_RADIUS_CLOCKOUT_METERS = 15.24;
+
+/**
+ * Same shape as isWithinShopRadius but uses the wider clock-out radius.
+ */
+export function isWithinShopRadiusForClockout(userLocation: Coordinates): {
+  isWithinRange: boolean;
+  distance: number;
+  distanceFormatted: string;
+} {
+  const distance = calculateDistance(
+    userLocation.latitude,
+    userLocation.longitude,
+    SHOP_LOCATION.latitude,
+    SHOP_LOCATION.longitude
+  );
+  const isWithinRange = distance <= ALLOWED_RADIUS_CLOCKOUT_METERS;
+  const distanceFormatted = distance < 1000
+    ? `${Math.round(distance)}m`
+    : `${(distance / 1000).toFixed(2)}km`;
+  return { isWithinRange, distance, distanceFormatted };
+}
 
 /**
  * Location coordinates interface

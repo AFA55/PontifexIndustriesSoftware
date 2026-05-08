@@ -55,6 +55,8 @@ interface NavItem {
   superAdminOnly?: boolean;
   /** If set, ONLY users with one of these roles see this item (in addition to flag check). */
   roles?: string[];
+  /** If set, users with one of these roles see this item HIDDEN even if they'd otherwise pass. */
+  excludeRoles?: string[];
 }
 
 interface NavSection {
@@ -100,11 +102,20 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'MY ACCOUNT',
+    accent: 'text-emerald-400',
+    items: [
+      { label: 'My Timecard', href: '/dashboard/timecard', icon: Clock, roles: ['shop_manager', 'shop_help', 'supervisor'] },
+      { label: 'Request Time Off', href: '/dashboard/request-time-off', icon: CalendarOff, roles: ['shop_manager', 'shop_help', 'supervisor'] },
+    ],
+  },
+  {
     label: 'MANAGEMENT',
     accent: 'text-purple-400',
     items: [
-      { label: 'Timecards', href: '/dashboard/admin/timecards', icon: Clock, badgeKey: 'timecards', flagKey: 'can_view_timecards' },
-      { label: 'Time Off', href: '/dashboard/admin/time-off', icon: CalendarOff, flagKey: 'can_view_timecards' },
+      // Timecards + Time Off here are TEAM-wide views — hide from shop_manager/shop_help so they only see their own (via MY ACCOUNT above).
+      { label: 'Timecards', href: '/dashboard/admin/timecards', icon: Clock, badgeKey: 'timecards', flagKey: 'can_view_timecards', excludeRoles: ['shop_manager', 'shop_help'] },
+      { label: 'Time Off', href: '/dashboard/admin/time-off', icon: CalendarOff, flagKey: 'can_view_timecards', excludeRoles: ['shop_manager', 'shop_help'] },
       { label: 'Team Profiles', href: '/dashboard/admin/team-profiles', icon: Users, flagKey: 'can_manage_team' },
       { label: 'Customers', href: '/dashboard/admin/customers', icon: UserCircle2, flagKey: 'can_view_customers' },
       { label: 'Invoicing', href: '/dashboard/admin/billing', icon: CreditCard, flagKey: 'can_view_invoicing' },
@@ -377,11 +388,13 @@ function SidebarContent({
             ? section.items.filter(item => {
                 if (item.superAdminOnly && userRole !== 'super_admin') return false;
                 if (item.roles && (!userRole || !item.roles.includes(userRole))) return false;
+                if (item.excludeRoles && userRole && item.excludeRoles.includes(userRole)) return false;
                 return true;
               })
             : section.items.filter(item => {
                 if (item.superAdminOnly && userRole !== 'super_admin') return false;
                 if (item.roles && (!userRole || !item.roles.includes(userRole))) return false;
+                if (item.excludeRoles && userRole && item.excludeRoles.includes(userRole)) return false;
                 if (!item.flagKey) return true; // no flag = always visible
                 return flags[item.flagKey] !== false;
               });
