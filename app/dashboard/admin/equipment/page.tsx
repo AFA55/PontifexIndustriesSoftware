@@ -25,6 +25,39 @@ interface Equipment {
   location: string | null;
   photo_url: string | null;
   hour_meter: number | null;
+  current_custodian: { id: string; full_name: string | null } | null;
+  current_job: { id: string; job_number: string | null; customer_name: string | null } | null;
+  open_checkout: { id: string; truck: { name: string | null; short_name: string | null; unit_number: string | null } | null } | null;
+}
+
+/**
+ * Smart location: shows where the equipment IS RIGHT NOW.
+ * - in_use → "with [operator] · truck #X" or "with [operator] · job JOB-..."
+ * - reserved → "reserved for JOB-..."
+ * - in_maintenance / out_of_service / pending_putaway → status reflects state
+ * - else → home location (e.g. "Main shop")
+ */
+function smartLocation(eq: Equipment): string {
+  if (eq.status === 'in_use') {
+    const op = eq.current_custodian?.full_name?.split(' ')[0] ?? 'someone';
+    const truck = eq.open_checkout?.truck;
+    if (truck) {
+      const truckLabel = truck.short_name && truck.unit_number
+        ? `${truck.short_name} #${truck.unit_number}`
+        : truck.name ?? 'truck';
+      return `with ${op} · ${truckLabel}`;
+    }
+    if (eq.current_job?.job_number) return `with ${op} · ${eq.current_job.job_number}`;
+    return `with ${op}`;
+  }
+  if (eq.status === 'reserved' && eq.current_job?.job_number) {
+    return `reserved for ${eq.current_job.job_number}`;
+  }
+  if (eq.status === 'pending_putaway') return 'pending put-away';
+  if (eq.status === 'in_maintenance' || eq.status === 'maintenance') return 'in maintenance';
+  if (eq.status === 'out_of_service') return 'out of service';
+  if (eq.status === 'retired') return 'retired';
+  return eq.location || 'in shop';
 }
 
 const ALLOWED_ROLES = ['shop_manager','admin','super_admin','operations_manager','supervisor','salesman'];
@@ -239,6 +272,10 @@ export default function EquipmentListPage() {
                         <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-cyan-500 group-hover:translate-x-0.5 transition flex-shrink-0" />
                       </div>
                       <p className="text-xs text-gray-500 dark:text-slate-400 truncate">{it.name}</p>
+                      {/* Smart location — live status, not static home_location */}
+                      <p className="text-[11px] font-medium text-cyan-700 dark:text-cyan-300 truncate mt-1">
+                        📍 {smartLocation(it)}
+                      </p>
                       <div className="flex items-center gap-1.5 flex-wrap mt-2">
                         {it.asset_tag && (
                           <span className="text-[10px] font-mono font-semibold text-gray-600 dark:text-slate-400 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">

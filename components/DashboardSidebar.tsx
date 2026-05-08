@@ -94,9 +94,9 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Equipment', href: '/dashboard/admin/equipment', icon: Package, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
       { label: 'Fleet', href: '/dashboard/admin/fleet', icon: Truck, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
-      { label: 'Pull Equipment', href: '/dashboard/admin/equipment/pull', icon: Package, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
-      { label: 'Voice Check-Out', href: '/dashboard/admin/equipment/voice', icon: Mic, roles: ['shop_manager', 'supervisor', 'admin', 'super_admin', 'operations_manager'] },
-      { label: 'Returned Equipment', href: '/dashboard/admin/equipment/returned', icon: RotateCcw, roles: ['shop_manager', 'shop_help', 'admin', 'super_admin', 'operations_manager'] },
+      // Unified Inventory Control replaces the 3 separate items: Pull Equipment, Voice Check-Out, Returned Equipment.
+      // One page with 4 tabs (Inventory / Checkout / Check-In / History) + voice layer (Phase B-ii) on top.
+      { label: 'Inventory Control', href: '/dashboard/admin/inventory-control', icon: RotateCcw, roles: ['shop_manager', 'supervisor', 'admin', 'super_admin', 'operations_manager'] },
       { label: 'Maintenance Inbox', href: '/dashboard/admin/maintenance', icon: Wrench, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
       { label: 'Shop Tasks', href: '/dashboard/admin/shop-tasks', icon: ClipboardList, roles: ['shop_manager', 'shop_help', 'admin', 'super_admin', 'operations_manager'] },
     ],

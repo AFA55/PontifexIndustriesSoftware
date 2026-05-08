@@ -103,9 +103,55 @@ export async function GET(request: NextRequest) {
     console.error('equipment GET error:', error);
     return NextResponse.json({ error: 'Failed to load equipment', details: error.message }, { status: 500 });
   }
+
+  // Hydrate current_custodian + current_job for the smart-location display.
+  const items = data ?? [];
+  const custodianIds = Array.from(new Set(items.map(e => e.current_custodian_id).filter(Boolean) as string[]));
+  const jobIds = Array.from(new Set(items.map(e => e.current_job_order_id).filter(Boolean) as string[]));
+
+  const [custRes, jobRes] = await Promise.all([
+    custodianIds.length > 0
+      ? supabaseAdmin.from('profiles').select('id, full_name').in('id', custodianIds)
+      : Promise.resolve({ data: [], error: null }),
+    jobIds.length > 0
+      ? supabaseAdmin.from('job_orders').select('id, job_number, customer_name').in('id', jobIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const custById = new Map((custRes.data ?? []).map(c => [c.id, c]));
+  const jobById = new Map((jobRes.data ?? []).map(j => [j.id, j]));
+
+  // Also hydrate the open checkout (truck) for items that are in_use.
+  const inUseIds = items.filter(e => e.status === 'in_use').map(e => e.id);
+  let openCheckoutByEqId = new Map<string, any>();
+  if (inUseIds.length > 0) {
+    const { data: openCheckouts } = await supabaseAdmin
+      .from('equipment_checkouts')
+      .select('id, equipment_id, truck_equipment_id, checked_out_at')
+      .in('equipment_id', inUseIds)
+      .is('checked_in_at', null);
+    const truckIds = Array.from(new Set((openCheckouts ?? []).map(c => c.truck_equipment_id).filter(Boolean) as string[]));
+    let truckById = new Map<string, any>();
+    if (truckIds.length > 0) {
+      const { data: trucks } = await supabaseAdmin
+        .from('equipment').select('id, name, short_name, unit_number').in('id', truckIds);
+      truckById = new Map((trucks ?? []).map(t => [t.id, t]));
+    }
+    openCheckoutByEqId = new Map((openCheckouts ?? []).map(c => [c.equipment_id, {
+      ...c,
+      truck: c.truck_equipment_id ? truckById.get(c.truck_equipment_id) ?? null : null,
+    }]));
+  }
+
+  const hydrated = items.map(e => ({
+    ...e,
+    current_custodian: e.current_custodian_id ? custById.get(e.current_custodian_id) ?? null : null,
+    current_job: e.current_job_order_id ? jobById.get(e.current_job_order_id) ?? null : null,
+    open_checkout: openCheckoutByEqId.get(e.id) ?? null,
+  }));
+
   return NextResponse.json({
     success: true,
-    data: data ?? [],
+    data: hydrated,
     pagination: { page, limit, total: count ?? 0, pages: Math.ceil((count ?? 0) / limit) || 1 },
   });
 }
