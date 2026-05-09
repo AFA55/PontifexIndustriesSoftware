@@ -3,10 +3,13 @@
  * Handles distance calculation and location verification
  */
 
-// Shop location configuration — Patriot Concrete Cutting
+// Shop location configuration — Patriot Concrete Cutting.
+// Updated May 8, 2026 (PT 3) to a more accurate center after on-site testing
+// found the prior pin was offset enough that the shop manager couldn't clock
+// in even at 100ft radius from certain spots in the building.
 export const SHOP_LOCATION = {
-  latitude: 34.76874307354808,   // Patriot Concrete Cutting
-  longitude: -82.43569623308949, // Patriot Concrete Cutting
+  latitude: 34.768775733693474,   // Patriot Concrete Cutting (recentered)
+  longitude: -82.43564252936702,  // Patriot Concrete Cutting (recentered)
   name: 'Patriot Concrete Cutting',
 };
 
