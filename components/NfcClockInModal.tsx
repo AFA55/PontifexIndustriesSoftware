@@ -39,7 +39,7 @@ interface NfcClockInModalProps {
 // Shop coordinates + radius now sourced from lib/geolocation.ts (single source of truth).
 const SHOP_LAT = SHOP_LOCATION.latitude;
 const SHOP_LNG = SHOP_LOCATION.longitude;
-const SHOP_RADIUS_M = ALLOWED_RADIUS_METERS; // 6.1m ≈ 20ft
+const SHOP_RADIUS_M = ALLOWED_RADIUS_METERS; // shared from lib/geolocation.ts (currently 30.48m ≈ 100ft)
 
 type Flow = 'choose' | 'shop_pin' | 'shop_gps' | 'jobsite_camera' | 'processing' | 'success' | 'bypass_code';
 type GpsStatus = 'idle' | 'acquiring' | 'ok' | 'outside' | 'error';
