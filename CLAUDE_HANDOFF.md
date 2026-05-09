@@ -3,6 +3,70 @@
 
 ---
 
+## MAY 8, 2026 (PT 4) — Operator timecard edit UX: split picker + empty-day PTO entry + balance card
+
+User found three problems while editing on the operator timecard detail page (`/dashboard/admin/timecards/operator/[id]`):
+1. Native datetime-local picker registered wrong clicks (tap 6 → got 10).
+2. Empty days had no editable affordance — couldn't log PTO/sick/holiday for someone who didn't clock in.
+3. No visible PTO balance per operator.
+
+**Branch only — NOT pushed to main** (user wants to test on localhost first). Branch `claude/inspiring-swanson-31ba74`, commit `9e0d2bca`. Localhost: http://localhost:55697.
+
+### Fix 1 — Split date/time picker
+- New `SplitDateTimePicker` component (file-local, in operator page).
+- Replaces `<input type="datetime-local">` with `<input type="date">` + `<input type="time" step={60}>`.
+- No more wheel-spinner mis-clicks. Reliable across Mac Safari + Chrome + mobile.
+- Composes back to ISO via local Date constructor — no silent UTC drift like the old `.toISOString().slice(0,16)` path did.
+- Accepts `allowEmpty` for clock-out (lets admin clear when still on shift).
+- Both clock-in and clock-out fields in the edit modal now use this picker.
+
+### Fix 2 — Empty-day quick actions + Manual Entry modal
+Each day cell with no entries renders 4 quick-action chips below the day header:
+- **+ PTO** (emerald)
+- **+ Sick** (rose)
+- **+ Holiday** (violet)
+- **+ Manual hrs** (amber)
+
+Click → opens Manual Entry modal pre-filled with that date and type. Modal:
+- Hero gradient swaps based on selected type.
+- Type chip row inside the modal lets admin change type (also exposes `admin_adjustment` as 5th option).
+- Hours: number input (0.25 step, 0.25-16 range) + 4h/8h shortcut buttons.
+- Optional notes field.
+- For PTO: shows "Will use X day(s) · Y day(s) remaining after" live hint using current balance.
+
+Submits to existing `POST /api/admin/timecards/manual` (built May 8 PT 2). That endpoint:
+- Validates entry_type ∈ {pto, sick, holiday, manual, admin_adjustment}.
+- Inserts manually-approved timecard row.
+- For PTO: bumps `operator_pto_balance.pto_days_used` by `hours / 8`.
+- Fire-and-forget audit log.
+
+### Fix 3 — PTO Balance card
+Emerald gradient card at top of operator detail page (above Daily Breakdown). Shows:
+- **Days remaining** (large, primary metric)
+- Allocated / Used / Callouts (3-column sub-stats)
+- Year scoped to current calendar year
+
+Fetched from existing `GET /api/admin/operators/pto-balance` — already tenant-scoped + role-gated. Fire-and-forget — non-blocking on the main timecard load. Card only renders if balance row exists.
+
+### Files changed
+```
+app/dashboard/admin/timecards/operator/[id]/page.tsx   (+343 lines, -11)
+```
+Single-file change. No migration needed — the `manual` API + `operator_pto_balance` table + entry_type CHECK already exist.
+
+### What's still NOT addressed (out of this session's scope)
+- Lunch deduction edit (already exists from May 7 PT 1).
+- "Edit existing entry" gradient styling polish — current edit modal is functional but visually plain. Could match the manual-entry modal's hero-gradient look in a follow-up.
+- PTO balance card on the team payroll page (`/dashboard/admin/timecards`) — only on the per-operator detail right now.
+
+### Next steps queued
+- User verifies on localhost → push to main → Vercel.
+- Phase B(ii) voice checkout still queued.
+- Phase B(iii) Pull Equipment days-ahead picker.
+- Phase B(iv) Schedule board access for shop_manager + Pull Equipment Requirements button.
+
+---
+
 ## MAY 8, 2026 (PT 3) — Recenter shop pin → PROD (clock-in actually works now)
 
 User reported shop manager STILL couldn't clock in even after PT 2's 100ft radius widening. Got user to drop a fresh pin on the building from on-site.
