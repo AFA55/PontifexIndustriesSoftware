@@ -3,6 +3,51 @@
 
 ---
 
+## MAY 8, 2026 (PT 3) — Recenter shop pin → PROD (clock-in actually works now)
+
+User reported shop manager STILL couldn't clock in even after PT 2's 100ft radius widening. Got user to drop a fresh pin on the building from on-site.
+
+**Pushed to production.** Commit `d08a8d1d`, deploy `dpl_3E579bAmp1zbj7kEuVRu4sq8ZVxo`. Aliased to `pontifexindustries.com` + `www.` — both responding 200.
+
+### Root cause
+The original SHOP_LOCATION pin (`34.76874308, -82.43569623`) was far enough off-center that even the 100ft (30.48m) radius didn't cover the whole building. From certain spots in the shop, the user's phone was reading >100ft from the OLD pin. Recentering on user-supplied accurate coordinates moves the geofence circle ~6m NE, and now the entire building footprint sits inside.
+
+### What changed
+- `lib/geolocation.ts` — `SHOP_LOCATION` lat/lng updated:
+  - **From**: `34.76874307354808, -82.43569623308949`
+  - **To**: `34.768775733693474, -82.43564252936702`
+- `components/NfcClockInModal.tsx` — stale comment "6.1m ≈ 20ft" updated to reflect current 30.48m ≈ 100ft (functional code already pulled from the central constant — this was just a comment cleanup).
+
+### Audit confirmed single source of truth
+Every clock-in code path reads from the central `SHOP_LOCATION` constant — no hardcoded coordinates anywhere. Updating one constant updates all flows:
+| Path | Used by |
+|---|---|
+| `/api/timecard/clock-in` | All dashboards (operator, supervisor, shop_manager, shop_help) |
+| `/api/timecard/clock-out` | All dashboards |
+| `components/NfcClockInModal.tsx` | The shared clock-in modal |
+| `components/NFCClockIn.tsx` | NFC scan flow |
+| `app/nfc-clock/page.tsx` | NFC kiosk page |
+| `components/DriveTimeFromShop.tsx` | Drive-time chip on schedule form |
+
+### Files changed
+```
+lib/geolocation.ts                 (SHOP_LOCATION recentered)
+components/NfcClockInModal.tsx     (stale comment fix)
+```
+
+### What this means for trial customer
+Shop manager (and every other role with clock-in) can now clock in from anywhere in the shop building. The 100ft radius around the new center comfortably covers Patriot's footprint.
+
+### Commit chain (May 8 in order)
+```
+d08a8d1d  fix(clockin): recenter shop pin to user-supplied accurate coordinates  ← THIS PT 3
+cb919706  fix(clockin): widen radius to 100ft + admin manual time entry (PTO)   ← PT 2
+447b2387  docs(handoff): Phase B(i) shipped — smart location + unified Inventory Control
+64f1ad54  feat(inventory): Phase B(i) — smart equipment location + unified Inventory Control page
+```
+
+---
+
 ## MAY 8, 2026 (PT 2) — On-site fix: 100ft GPS radius + Admin manual time entry → PROD
 
 User on-site testing exposed two urgent gaps. Both shipped to production today.
