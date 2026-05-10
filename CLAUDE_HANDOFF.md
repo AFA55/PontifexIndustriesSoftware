@@ -3,6 +3,48 @@
 
 ---
 
+## MAY 10, 2026 (PT 2) — shop_manager Forbidden bug fix + equipment storage dropdown + Phase C plan
+
+Big multi-task ask from user. Did the two ship-ready fixes and documented the four bigger features as Phase C in `SHOP_MANAGER_PLAN.md`. **Branch only** — not pushed to main. Commit `4e6f1244`.
+
+### Critical bug fixed: shop_manager couldn't load dashboard
+- Symptom: `Forbidden. Sales staff access required` console error on `/dashboard/admin` for shop_manager. Half-rendered page.
+- Cause: `/api/admin/schedule-board` was gated by `requireSalesStaff` (excludes shop_manager).
+- Fix: new `requireScheduleViewer` in `lib/api-auth.ts` — SALES_STAFF + shop_manager. Read-only. Applied to schedule-board root, active-jobs, active-jobs-summary. Write routes (schedule-form POST, job-orders PATCH, etc.) unchanged — shop_manager can SEE schedule but not CREATE jobs.
+
+### Equipment storage location → dropdown
+Free-text was creeping into noise ("shelf 3", "Carlos's truck"). Replaced with:
+- 🏭 Shop
+- 🚚 `<truck>` · `<operator first name>` (per truck, loaded from Fleet)
+
+Applied to New Equipment form + edit modal. Empty state hint if no trucks exist yet.
+
+### UI permission cleanups
+- "+ New Job" header button hidden for shop_manager + shop_help
+- shop_manager preset gained `active_jobs: 'view'` so sidebar passes flag check
+
+### Phase C plan (next sessions, in priority order)
+- **C(ii)** Voice-driven Inventory Control + truck-as-custodian (operator picker → truck picker; mic button; alias fuzzy match; audio audit; learning loop)
+- **C(iii)** Fleet maintenance history (vehicle_service_records table; oil/filter/repair tracking; tie to maintenance_requests)
+- **C(iv)** Operator/Helper Maintenance Request form (3-tap mobile + voice memo) + Maintenance Inbox triage UI
+- **C(v)** Visit-wizard equipment-issues → maintenance_requests conversion hook
+
+Each Phase C entry in the plan doc names which agents own which slice — `supabase-migration-author`, `rls-policy-auditor`, `mobile-responsive-auditor`, plus general-purpose for UI scaffolds. Next sessions will dispatch these in parallel where safe.
+
+### Files changed
+```
+lib/api-auth.ts                                    (new requireScheduleViewer guard)
+lib/rbac.ts                                        (shop_manager preset: active_jobs view)
+app/api/admin/active-jobs/route.ts                 (guard swap)
+app/api/admin/active-jobs-summary/route.ts         (guard swap)
+app/dashboard/admin/layout.tsx                     (hide New Job for shop_manager/help)
+app/dashboard/admin/equipment/[id]/page.tsx        (storage location dropdown)
+app/dashboard/admin/equipment/new/page.tsx         (storage location dropdown)
+SHOP_MANAGER_PLAN.md                               (Phase C added)
+```
+
+---
+
 ## MAY 10, 2026 — Per-role lunch default + cleaner edit affordances
 
 Quick polish session after user verified the May 8 PT 4 work on localhost. Three small fixes ready to ride to prod with the next push.
