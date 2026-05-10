@@ -2,13 +2,13 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, Package, Truck, Search, Loader2, ChevronRight, History,
   LogOut as CheckoutIcon, LogIn as CheckinIcon, Filter, CheckCircle2,
-  AlertTriangle, User as UserIcon, Briefcase, Wrench,
+  AlertTriangle, User as UserIcon, Briefcase, Wrench, Mic, MicOff, Sparkles,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
@@ -345,6 +345,28 @@ function CheckoutTab({
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Voice state — see VoiceMic component below for the full flow.
+  const [voiceResult, setVoiceResult] = useState<VoiceParseResult | null>(null);
+  // When voice resolves to amber-tier matches the user picks from, we let them
+  // override before the auto-fill commits.
+  function applyVoiceMatch(result: VoiceParseResult) {
+    setVoiceResult(result);
+    // Equipment: auto-fill if green tier (≥0.85).
+    if (result.equipment && result.equipment.score >= 0.85) {
+      setEquipmentId(result.equipment.id);
+    }
+    // Truck: auto-fill if green tier AND a truck was matched.
+    if (result.truck && result.truck.score >= 0.85) {
+      setTruckId(result.truck.id);
+      // If voice mentioned a truck, force truck mode.
+      setMode('truck');
+    } else if (result.operator && result.operator.score >= 0.85 && !result.truck) {
+      // No truck mentioned but operator was — handheld mode.
+      setMode('handheld');
+      setCustodianOverrideId(result.operator.id);
+    }
+  }
+
   // Derive operator from selected truck (if truck has a current driver).
   const selectedTruck = useMemo(() => trucks.find(t => t.id === truckId) || null, [trucks, truckId]);
   const truckCurrentOperator = selectedTruck?.current_custodian?.full_name || null;
@@ -401,6 +423,25 @@ function CheckoutTab({
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-4">
+      {/* Voice mic — hold to talk. Phone listens, transcript hits the parser,
+          form fields auto-fill on green-tier matches. Amber gets a picker.
+          Skipped silently if browser doesn't support Web Speech API. */}
+      <VoiceMic onResult={applyVoiceMatch} />
+
+      {/* Voice result feedback + amber-tier disambiguation pickers */}
+      {voiceResult && (
+        <VoiceMatchSummary
+          result={voiceResult}
+          equipmentId={equipmentId}
+          truckId={truckId}
+          custodianOverrideId={custodianOverrideId}
+          onPickEquipment={(id) => { setEquipmentId(id); setVoiceResult({ ...voiceResult, equipment: voiceResult.equipment ? { ...voiceResult.equipment, id, score: 1, exact_match: true } : null }); }}
+          onPickTruck={(id) => { setTruckId(id); setMode('truck'); setVoiceResult({ ...voiceResult, truck: voiceResult.truck ? { ...voiceResult.truck, id, score: 1, exact_match: true } : null }); }}
+          onPickOperator={(id) => { setCustodianOverrideId(id); }}
+          onDismiss={() => setVoiceResult(null)}
+        />
+      )}
+
       {/* Mode toggle: truck (default) vs handheld */}
       <div className="grid grid-cols-2 gap-2 bg-gray-50 dark:bg-slate-900 rounded-xl p-1 border border-gray-200 dark:border-slate-700">
         <button
@@ -866,3 +907,298 @@ function Empty({ icon: Icon, text, iconClassName }: { icon: React.ElementType; t
 
 const inputClass = 'w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500';
 const selectClass = inputClass;
+
+// ─── Voice types + components ──────────────────────────────────────────────
+
+interface VoiceMatch {
+  id: string;
+  display: string;
+  score: number;
+  exact_match: boolean;
+  source: string;
+}
+interface VoiceParseResult {
+  phrase: string;
+  normalized: string;
+  segments: { equipment_phrase: string; truck_phrase: string | null; operator_phrase: string | null };
+  equipment: VoiceMatch | null;
+  truck: VoiceMatch | null;
+  operator: VoiceMatch | null;
+  alternatives: { equipment: VoiceMatch[]; truck: VoiceMatch[]; operator: VoiceMatch[] };
+}
+
+/**
+ * VoiceMic — hold-to-talk button using the browser's Web Speech API.
+ *
+ * Flow:
+ *   1. User taps & holds mic button (or clicks once to toggle on/off)
+ *   2. SpeechRecognition transcribes inline
+ *   3. On stop, transcript is POSTed to /api/admin/equipment-checkouts/voice-parse
+ *   4. Parent receives the parsed result via onResult callback
+ *
+ * Browser support: Chrome, Edge, Safari (iOS 14.5+ with HTTPS or localhost).
+ * Firefox: not supported. We render a friendly message.
+ */
+function VoiceMic({ onResult }: { onResult: (r: VoiceParseResult) => void }) {
+  const [supported, setSupported] = useState<boolean | null>(null);
+  const [listening, setListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [parsing, setParsing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+  // Mirror transcript in a ref because the SpeechRecognition `onend` callback
+  // closes over the initial `transcript` value (stale-closure problem). Using
+  // a ref lets us read the latest text synchronously when the recognizer ends.
+  const transcriptRef = useRef('');
+
+  // Detect support once on mount.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setSupported(!!SpeechRecognition);
+  }, []);
+
+  function start() {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    setError(null);
+    setTranscript('');
+    transcriptRef.current = '';
+    const recog = new SpeechRecognition();
+    recog.continuous = false;          // one phrase per tap
+    recog.interimResults = true;
+    recog.lang = 'en-US';
+    recog.maxAlternatives = 1;
+
+    recog.onresult = (e: any) => {
+      let text = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        text += e.results[i][0].transcript;
+      }
+      transcriptRef.current = text;
+      setTranscript(text);
+    };
+    recog.onerror = (e: any) => {
+      setError(e.error === 'not-allowed' ? 'Microphone access denied. Allow it in browser settings.' : `Voice error: ${e.error}`);
+      setListening(false);
+    };
+    recog.onend = async () => {
+      setListening(false);
+      const finalText = transcriptRef.current.trim();
+      if (!finalText) return;
+      await parsePhrase(finalText);
+    };
+
+    recognitionRef.current = recog;
+    recog.start();
+    setListening(true);
+  }
+
+  function stop() {
+    try { recognitionRef.current?.stop(); } catch { /* */ }
+  }
+
+  async function parsePhrase(phrase: string) {
+    setParsing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError('Session expired'); return; }
+      const res = await fetch('/api/admin/equipment-checkouts/voice-parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ phrase }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error || 'Failed to parse voice input');
+        return;
+      }
+      const result = await res.json();
+      onResult(result);
+    } catch (err: any) {
+      setError(err.message || 'Voice parse failed');
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  if (supported === null) return null; // mounting
+  if (supported === false) {
+    return (
+      <div className="rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 p-3 text-xs text-gray-500 dark:text-slate-400 flex items-center gap-2">
+        <MicOff className="w-4 h-4" />
+        Voice checkout requires Chrome, Edge, or Safari. Firefox isn't supported yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl p-4 transition-all ${
+      listening
+        ? 'bg-gradient-to-br from-rose-500 to-pink-600 shadow-lg shadow-rose-500/40 text-white'
+        : 'bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-900/20 dark:to-pink-900/20 border-2 border-rose-200 dark:border-rose-900/50'
+    }`}>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => listening ? stop() : start()}
+          disabled={parsing}
+          className={`relative flex items-center justify-center w-14 h-14 rounded-full transition-all flex-shrink-0 ${
+            listening
+              ? 'bg-white text-rose-600 shadow-xl ring-4 ring-white/40'
+              : 'bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-lg shadow-rose-500/30 hover:scale-105'
+          } disabled:opacity-50`}
+          aria-label={listening ? 'Stop recording' : 'Start voice checkout'}
+        >
+          {parsing ? <Loader2 className="w-6 h-6 animate-spin" /> : listening ? <Mic className="w-6 h-6 animate-pulse" /> : <Mic className="w-6 h-6" />}
+          {listening && (
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+            </span>
+          )}
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-bold flex items-center gap-1 ${listening ? 'text-white' : 'text-rose-700 dark:text-rose-300'}`}>
+            <Sparkles className="w-3.5 h-3.5" />
+            {listening ? 'Listening…' : parsing ? 'Parsing…' : 'Voice checkout'}
+          </p>
+          {transcript ? (
+            <p className={`text-xs mt-0.5 italic truncate ${listening ? 'text-white/90' : 'text-rose-700/80 dark:text-rose-300/80'}`}>"{transcript}"</p>
+          ) : (
+            <p className={`text-[11px] mt-0.5 ${listening ? 'text-white/80' : 'text-rose-700/70 dark:text-rose-300/70'}`}>
+              Tap mic and say e.g. "FS5000 number 5 to truck 3" or "DFS-5 going with Carlos"
+            </p>
+          )}
+        </div>
+      </div>
+      {error && (
+        <p className="mt-2 text-xs text-rose-700 dark:text-rose-300 bg-white/80 dark:bg-slate-800/80 rounded p-2">⚠ {error}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * VoiceMatchSummary — shows the result of a voice parse.
+ *
+ * Three states per slot (equipment / truck / operator):
+ *   - Green (score ≥ 0.85): auto-filled, show ✓ chip
+ *   - Amber (0.60 ≤ score < 0.85): show top-3 alternatives picker
+ *   - Red / null (score < 0.60): not matched, show free-text fallback hint
+ */
+function VoiceMatchSummary({
+  result, equipmentId, truckId, custodianOverrideId,
+  onPickEquipment, onPickTruck, onPickOperator, onDismiss,
+}: {
+  result: VoiceParseResult;
+  equipmentId: string;
+  truckId: string;
+  custodianOverrideId: string;
+  onPickEquipment: (id: string) => void;
+  onPickTruck: (id: string) => void;
+  onPickOperator: (id: string) => void;
+  onDismiss: () => void;
+}) {
+  const slots: Array<{
+    label: string;
+    match: VoiceMatch | null;
+    alternatives: VoiceMatch[];
+    onPick: (id: string) => void;
+    fieldFilled: boolean;
+  }> = [
+    {
+      label: 'Equipment',
+      match: result.equipment,
+      alternatives: result.alternatives.equipment,
+      onPick: onPickEquipment,
+      fieldFilled: !!equipmentId,
+    },
+    {
+      label: 'Truck',
+      match: result.truck,
+      alternatives: result.alternatives.truck,
+      onPick: onPickTruck,
+      fieldFilled: !!truckId,
+    },
+    {
+      label: 'Operator',
+      match: result.operator,
+      alternatives: result.alternatives.operator,
+      onPick: onPickOperator,
+      fieldFilled: !!custodianOverrideId,
+    },
+  ];
+
+  return (
+    <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-900/10 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-rose-700 dark:text-rose-300">Voice match</p>
+        <button onClick={onDismiss} className="text-[11px] text-rose-700 dark:text-rose-300 hover:underline">Dismiss</button>
+      </div>
+      <p className="text-xs text-gray-600 dark:text-slate-400 italic">Heard: "{result.phrase}"</p>
+      {slots.map((slot) => {
+        const m = slot.match;
+        if (!m || m.score < 0.6) {
+          // Red tier — no confident match. Skip if no segment was even attempted.
+          if (!slot.alternatives.length) return null;
+          return (
+            <div key={slot.label} className="rounded-lg bg-white dark:bg-slate-800 border border-rose-200 p-2">
+              <p className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 mb-1.5">⚠ {slot.label} — no confident match. Pick one:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {slot.alternatives.slice(0, 3).map((alt) => (
+                  <button
+                    key={alt.id}
+                    type="button"
+                    onClick={() => slot.onPick(alt.id)}
+                    className="px-2 py-1 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-semibold border border-rose-200"
+                  >
+                    {alt.display} <span className="text-rose-500/70 ml-0.5">({Math.round(alt.score * 100)}%)</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        if (m.score >= 0.85) {
+          // Green — auto-filled.
+          return (
+            <div key={slot.label} className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 p-2 flex items-center justify-between gap-2">
+              <p className="text-xs text-emerald-800 dark:text-emerald-300">
+                <span className="font-bold">{slot.label}:</span> {m.display}
+                <span className="text-emerald-600/70 ml-1.5 text-[11px]">({Math.round(m.score * 100)}%, {m.source})</span>
+              </p>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            </div>
+          );
+        }
+        // Amber tier — show top-3 picker
+        return (
+          <div key={slot.label} className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-2">
+            <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 mb-1.5">
+              {slot.label} — uncertain ({Math.round(m.score * 100)}%). Pick one:
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {slot.alternatives.slice(0, 3).map((alt) => (
+                <button
+                  key={alt.id}
+                  type="button"
+                  onClick={() => slot.onPick(alt.id)}
+                  className={`px-2 py-1 rounded-md text-xs font-semibold border transition ${
+                    alt.id === m.id
+                      ? 'bg-amber-200 text-amber-900 border-amber-300'
+                      : 'bg-white hover:bg-amber-100 text-amber-800 border-amber-200'
+                  }`}
+                >
+                  {alt.display} <span className="text-amber-600/70 ml-0.5">({Math.round(alt.score * 100)}%)</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
