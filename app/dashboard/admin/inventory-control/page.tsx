@@ -335,32 +335,56 @@ function CheckoutTab({
   trucks: Equipment[];
   onSuccess: () => void;
 }) {
+  // Mode: 'truck' (default — pick truck, operator auto-derived) or
+  // 'handheld' (rare — pick operator directly, no truck).
+  const [mode, setMode] = useState<'truck' | 'handheld'>('truck');
   const [equipmentId, setEquipmentId] = useState('');
-  const [custodianId, setCustodianId] = useState('');
   const [truckId, setTruckId] = useState('');
+  const [custodianOverrideId, setCustodianOverrideId] = useState(''); // used when truck has no current driver, OR in handheld mode
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Derive operator from selected truck (if truck has a current driver).
+  const selectedTruck = useMemo(() => trucks.find(t => t.id === truckId) || null, [trucks, truckId]);
+  const truckCurrentOperator = selectedTruck?.current_custodian?.full_name || null;
+  const truckCurrentOperatorId = (selectedTruck as any)?.current_custodian?.id || null;
+  const truckHasNoDriver = !!truckId && !truckCurrentOperatorId;
+
+  // Effective custodian sent to API:
+  //   - truck mode + truck has driver → derived (server resolves from truck)
+  //   - truck mode + truck has no driver → custodianOverrideId (required from picker)
+  //   - handheld mode → custodianOverrideId
+  const effectiveCustodianValid = mode === 'handheld'
+    ? !!custodianOverrideId
+    : (!!truckId && (!truckHasNoDriver || !!custodianOverrideId));
+
   async function handleSubmit() {
     setMsg(null);
-    if (!equipmentId || !custodianId) {
-      setMsg({ type: 'error', text: 'Pick an equipment + an operator.' });
+    if (!equipmentId) { setMsg({ type: 'error', text: 'Pick a piece of equipment.' }); return; }
+    if (mode === 'truck' && !truckId) { setMsg({ type: 'error', text: 'Pick a truck.' }); return; }
+    if (!effectiveCustodianValid) {
+      setMsg({ type: 'error', text: mode === 'handheld' ? 'Pick an operator.' : 'Truck has no driver — pick an operator below.' });
       return;
     }
     setSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
+      const body: Record<string, unknown> = {
+        equipment_id: equipmentId,
+        notes: notes.trim() || null,
+      };
+      if (mode === 'truck') {
+        body.truck_equipment_id = truckId;
+        if (truckHasNoDriver) body.custodian_id = custodianOverrideId; // server requires it when truck has no driver
+      } else {
+        body.custodian_id = custodianOverrideId; // handheld
+      }
       const res = await fetch('/api/admin/equipment-checkouts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({
-          equipment_id: equipmentId,
-          custodian_id: custodianId,
-          truck_equipment_id: truckId || null,
-          notes: notes.trim() || null,
-        }),
+        body: JSON.stringify(body),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -368,7 +392,7 @@ function CheckoutTab({
         return;
       }
       setMsg({ type: 'success', text: 'Checked out.' });
-      setEquipmentId(''); setCustodianId(''); setTruckId(''); setNotes('');
+      setEquipmentId(''); setTruckId(''); setCustodianOverrideId(''); setNotes('');
       onSuccess();
     } finally {
       setSubmitting(false);
@@ -377,44 +401,103 @@ function CheckoutTab({
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-4">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-rose-600 dark:text-rose-400 mb-2">Step 1 — What's going out</p>
-        <select value={equipmentId} onChange={(e) => setEquipmentId(e.target.value)} className={selectClass}>
-          <option value="">Select equipment…</option>
-          {availableEquipment.map(e => (
-            <option key={e.id} value={e.id}>
-              {e.short_name && e.unit_number ? `${e.short_name} #${e.unit_number}` : e.name}
-              {e.asset_tag ? ` · ${e.asset_tag}` : ''}
-              {e.status !== 'available' ? ` (${e.status})` : ''}
-            </option>
-          ))}
-        </select>
-        <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1.5">{availableEquipment.length} available pieces</p>
+      {/* Mode toggle: truck (default) vs handheld */}
+      <div className="grid grid-cols-2 gap-2 bg-gray-50 dark:bg-slate-900 rounded-xl p-1 border border-gray-200 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={() => setMode('truck')}
+          className={`min-h-[40px] rounded-lg text-sm font-semibold transition ${
+            mode === 'truck'
+              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-md shadow-rose-500/30'
+              : 'text-gray-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800'
+          }`}
+        >
+          🚚 To Truck
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('handheld')}
+          className={`min-h-[40px] rounded-lg text-sm font-semibold transition ${
+            mode === 'handheld'
+              ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/30'
+              : 'text-gray-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800'
+          }`}
+        >
+          ✋ Handheld (to operator directly)
+        </button>
       </div>
 
+      {/* Step 1: Equipment combobox */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-rose-600 dark:text-rose-400 mb-2">Step 2 — Who's taking it</p>
-        <select value={custodianId} onChange={(e) => setCustodianId(e.target.value)} className={selectClass}>
-          <option value="">Select operator…</option>
-          {operators.map(o => (
-            <option key={o.id} value={o.id}>
-              {o.full_name} {o.role === 'apprentice' ? '(Helper)' : ''}
-            </option>
-          ))}
-        </select>
+        <p className="text-xs font-semibold uppercase tracking-widest text-rose-600 dark:text-rose-400 mb-2">
+          Step 1 — What's going out
+        </p>
+        <EquipmentCombobox
+          value={equipmentId}
+          onChange={setEquipmentId}
+          options={availableEquipment}
+        />
+        <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1.5">{availableEquipment.length} available pieces · type to search by name, asset tag, or unit number</p>
       </div>
 
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-rose-600 dark:text-rose-400 mb-2">Step 3 — Which truck (optional)</p>
-        <select value={truckId} onChange={(e) => setTruckId(e.target.value)} className={selectClass}>
-          <option value="">No truck / handheld</option>
-          {trucks.map(t => (
-            <option key={t.id} value={t.id}>
-              {t.short_name && t.unit_number ? `${t.short_name} #${t.unit_number}` : t.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Step 2: Truck OR direct operator */}
+      {mode === 'truck' ? (
+        <>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-rose-600 dark:text-rose-400 mb-2">Step 2 — Which truck</p>
+            <select value={truckId} onChange={(e) => { setTruckId(e.target.value); setCustodianOverrideId(''); }} className={selectClass}>
+              <option value="">Select truck…</option>
+              {trucks.map(t => {
+                const display = t.short_name && t.unit_number ? `${t.short_name} #${t.unit_number}` : t.name;
+                const op = (t as any).current_custodian?.full_name?.split(' ')[0];
+                return <option key={t.id} value={t.id}>{display}{op ? ` · ${op}` : ' · no driver assigned'}</option>;
+              })}
+            </select>
+            {trucks.length === 0 && (
+              <p className="text-[11px] text-amber-700 mt-1.5">No trucks added yet. Go to Fleet → New Vehicle to add one.</p>
+            )}
+          </div>
+
+          {/* Auto-derived operator preview, OR fallback picker if truck has no driver */}
+          {selectedTruck && truckCurrentOperator && (
+            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 p-3 text-sm text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+              <UserIcon className="w-4 h-4 flex-shrink-0" />
+              <div>
+                Going with <strong>{truckCurrentOperator}</strong> (truck's current driver)
+              </div>
+            </div>
+          )}
+          {selectedTruck && truckHasNoDriver && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">
+                Step 3 — Pick operator (truck has no driver assigned yet)
+              </p>
+              <select value={custodianOverrideId} onChange={(e) => setCustodianOverrideId(e.target.value)} className={selectClass}>
+                <option value="">Select operator…</option>
+                {operators.map(o => (
+                  <option key={o.id} value={o.id}>
+                    {o.full_name}{o.role === 'apprentice' ? ' (Helper)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </>
+      ) : (
+        // Handheld mode
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">Step 2 — Who's taking it</p>
+          <select value={custodianOverrideId} onChange={(e) => setCustodianOverrideId(e.target.value)} className={selectClass}>
+            <option value="">Select operator…</option>
+            {operators.map(o => (
+              <option key={o.id} value={o.id}>
+                {o.full_name}{o.role === 'apprentice' ? ' (Helper)' : ''}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1.5">Use this for hand tools / accessories that aren't going on a truck.</p>
+        </div>
+      )}
 
       <div>
         <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5 block">Notes (optional)</label>
@@ -430,11 +513,121 @@ function CheckoutTab({
       <button
         type="button"
         onClick={handleSubmit}
-        disabled={submitting || !equipmentId || !custodianId}
-        className="w-full inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold shadow-lg shadow-rose-500/30 transition"
+        disabled={submitting || !equipmentId || !effectiveCustodianValid}
+        className={`w-full inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl text-white font-semibold shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${
+          mode === 'truck'
+            ? 'bg-gradient-to-br from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 shadow-rose-500/30'
+            : 'bg-gradient-to-br from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-amber-500/30'
+        }`}
       >
         {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking out…</> : <><CheckoutIcon className="w-4 h-4" /> Check Out</>}
       </button>
+    </div>
+  );
+}
+
+// ─── Searchable Equipment Combobox ──────────────────────────────────────────
+// Replaces the plain <select> for equipment selection. At ~200 items the native
+// dropdown becomes unusable on mobile. This filters as you type, supports arrow
+// keys + Enter to select, and matches against name + short_name + unit_number +
+// asset_tag + aliases (so "5000" or "DFS-5" or "PTRT-0042" all find the same saw).
+function EquipmentCombobox({
+  value, onChange, options,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  options: Equipment[];
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(0);
+
+  // Sync query with the selected equipment label when value changes externally.
+  useEffect(() => {
+    if (!value) { setQuery(''); return; }
+    const eq = options.find(o => o.id === value);
+    if (eq) {
+      setQuery(eq.short_name && eq.unit_number ? `${eq.short_name} #${eq.unit_number}` : eq.name);
+    }
+  }, [value, options]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || (options.find(o => o.id === value) && query === (options.find(o => o.id === value)?.short_name + ' #' + options.find(o => o.id === value)?.unit_number || ''))) {
+      return options;
+    }
+    return options.filter(o => {
+      const fields: string[] = [
+        o.name,
+        o.short_name || '',
+        o.unit_number || '',
+        o.asset_tag || '',
+        // aliases not on the Equipment interface here, but matching against display still finds most cases
+      ].map(s => s.toLowerCase());
+      return fields.some(f => f.includes(q));
+    });
+  }, [options, query, value]);
+
+  function selectOption(eq: Equipment) {
+    onChange(eq.id);
+    setQuery(eq.short_name && eq.unit_number ? `${eq.short_name} #${eq.unit_number}` : eq.name);
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); setHighlighted(0); if (!e.target.value) onChange(''); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(h => Math.min(h + 1, filtered.length - 1)); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(h => Math.max(h - 1, 0)); }
+          else if (e.key === 'Enter') { e.preventDefault(); if (filtered[highlighted]) selectOption(filtered[highlighted]); }
+          else if (e.key === 'Escape') setOpen(false);
+        }}
+        placeholder="Type equipment name, asset tag, or unit number…"
+        className={inputClass}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute top-full mt-1 left-0 right-0 max-h-64 overflow-y-auto z-30 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl">
+          {filtered.slice(0, 50).map((eq, idx) => {
+            const display = eq.short_name && eq.unit_number ? `${eq.short_name} #${eq.unit_number}` : eq.name;
+            const isHighlighted = idx === highlighted;
+            const isSelected = eq.id === value;
+            return (
+              <button
+                key={eq.id}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); selectOption(eq); }}
+                onMouseEnter={() => setHighlighted(idx)}
+                className={`w-full text-left px-3 py-2 transition ${
+                  isHighlighted ? 'bg-rose-50 dark:bg-rose-900/20' : ''
+                } ${isSelected ? 'bg-rose-100 dark:bg-rose-900/40' : ''}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{display}</span>
+                  {eq.asset_tag && <span className="text-[10px] font-mono text-gray-500 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded shrink-0">{eq.asset_tag}</span>}
+                </div>
+                <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate">{eq.name}</p>
+              </button>
+            );
+          })}
+          {filtered.length > 50 && (
+            <div className="px-3 py-2 text-[11px] text-gray-500 border-t border-gray-100">
+              + {filtered.length - 50} more · keep typing to narrow
+            </div>
+          )}
+        </div>
+      )}
+      {open && filtered.length === 0 && (
+        <div className="absolute top-full mt-1 left-0 right-0 z-30 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl px-3 py-3 text-sm text-gray-500 dark:text-slate-400">
+          No equipment matches.
+        </div>
+      )}
     </div>
   );
 }
@@ -484,14 +677,15 @@ function CheckinTab({
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{display}</p>
                 <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                  {/* Truck first when present (it's the primary identity in the truck-as-custodian model) */}
+                  {truckLabel && (
+                    <span className="text-[11px] inline-flex items-center gap-1 font-semibold text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                      <Truck className="w-3 h-3" />{truckLabel}
+                    </span>
+                  )}
                   {co.custodian && (
                     <span className="text-[11px] inline-flex items-center gap-1 text-gray-600 dark:text-slate-400">
                       <UserIcon className="w-3 h-3" />{co.custodian.full_name}
-                    </span>
-                  )}
-                  {truckLabel && (
-                    <span className="text-[11px] inline-flex items-center gap-1 text-gray-600 dark:text-slate-400">
-                      <Truck className="w-3 h-3" />{truckLabel}
                     </span>
                   )}
                   {co.job?.job_number && (
@@ -558,14 +752,15 @@ function HistoryTab({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{display}</p>
                     <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      {/* Truck first when present (primary identity in truck-as-custodian model) */}
+                      {truckLabel && (
+                        <span className="text-[11px] inline-flex items-center gap-1 font-semibold text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                          <Truck className="w-3 h-3" />{truckLabel}
+                        </span>
+                      )}
                       {co.custodian && (
                         <span className="text-[11px] inline-flex items-center gap-1 text-gray-600 dark:text-slate-400">
                           <UserIcon className="w-3 h-3" />{co.custodian.full_name}
-                        </span>
-                      )}
-                      {truckLabel && (
-                        <span className="text-[11px] inline-flex items-center gap-1 text-gray-600 dark:text-slate-400">
-                          <Truck className="w-3 h-3" />{truckLabel}
                         </span>
                       )}
                       {co.job?.job_number && (

@@ -133,9 +133,47 @@ export async function POST(request: NextRequest) {
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
   const equipment_id = body.equipment_id;
-  const custodian_id = body.custodian_id;
-  if (!equipment_id || !custodian_id) {
-    return NextResponse.json({ error: 'equipment_id and custodian_id are required' }, { status: 400 });
+  const truck_equipment_id = body.truck_equipment_id || null;
+  let custodian_id: string | null = body.custodian_id || null;
+
+  if (!equipment_id) {
+    return NextResponse.json({ error: 'equipment_id is required' }, { status: 400 });
+  }
+
+  // Truck-as-custodian model: client passes a truck; we derive the operator
+  // from the truck's current_custodian_id (the driver). If the truck has no
+  // current driver, the client must explicitly pass custodian_id.
+  // Either truck OR custodian is required.
+  if (!truck_equipment_id && !custodian_id) {
+    return NextResponse.json({
+      error: 'Either truck_equipment_id or custodian_id is required',
+      details: 'Pick a truck (operator is derived from its current driver), or pass an explicit custodian_id for handheld checkouts.',
+    }, { status: 400 });
+  }
+
+  if (truck_equipment_id) {
+    const { data: truck, error: truckErr } = await supabaseAdmin
+      .from('equipment')
+      .select('id, tenant_id, kind, status, name, short_name, unit_number, current_custodian_id')
+      .eq('id', truck_equipment_id)
+      .single();
+    if (truckErr || !truck) return NextResponse.json({ error: 'Truck not found' }, { status: 404 });
+    if (truck.kind !== 'vehicle') return NextResponse.json({ error: 'truck_equipment_id must point to a vehicle' }, { status: 400 });
+    if (auth.role !== 'super_admin' && truck.tenant_id !== auth.tenantId) {
+      return NextResponse.json({ error: 'Truck not in your tenant' }, { status: 403 });
+    }
+    // If client didn't pass an explicit custodian, derive from the truck's
+    // current driver. If the truck has no driver assigned, fail loudly so
+    // the client knows to surface the operator picker.
+    if (!custodian_id) {
+      if (!truck.current_custodian_id) {
+        return NextResponse.json({
+          error: 'Truck has no operator assigned',
+          details: `${truck.short_name && truck.unit_number ? `${truck.short_name} #${truck.unit_number}` : truck.name} has no current driver. Either assign a driver to the truck first, or pass custodian_id explicitly.`,
+        }, { status: 400 });
+      }
+      custodian_id = truck.current_custodian_id;
+    }
   }
 
   // Verify equipment belongs to this tenant + isn't already checked out.
@@ -162,7 +200,8 @@ export async function POST(request: NextRequest) {
     }, { status: 409 });
   }
 
-  // Insert checkout row
+  // Insert checkout row. custodian_id was resolved above (either from the
+  // truck's current driver or an explicit body field).
   const { data: checkout, error: coError } = await supabaseAdmin
     .from('equipment_checkouts')
     .insert({
@@ -170,7 +209,7 @@ export async function POST(request: NextRequest) {
       equipment_id,
       custodian_id,
       job_order_id: body.job_order_id || null,
-      truck_equipment_id: body.truck_equipment_id || null,
+      truck_equipment_id,
       checked_out_by: auth.userId,
       hour_meter_out: typeof body.hour_meter_out === 'number' ? body.hour_meter_out : null,
       notes: body.notes?.trim() || null,
