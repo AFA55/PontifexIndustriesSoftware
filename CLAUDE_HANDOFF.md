@@ -3,6 +3,55 @@
 
 ---
 
+## MAY 10, 2026 (PT 3) — Phase C(ii)-b foundation: voice mic + parser + auto-fill
+
+Voice equipment checkout MVP. Hold mic, speak ("FS5000 number 5 to truck 3"), fields auto-fill. Multi-item pending tray + audio recording + learning-loop alias prompts queued for C(ii)-b polish.
+
+**Branch only — NOT main.** Commit `c175782e`.
+
+### What's live
+- **pg_trgm extension** enabled (was missing).
+- **`voice_recognition_corrections` table** — learning-loop foundation. Records every successful voice match → future calls hit cache before fuzzy search.
+- **Trigram GIN indexes** on `equipment.name` + `short_name` (filtered to active rows).
+- **`POST /api/admin/equipment-checkouts/voice-parse`** — 6-tier scoring: cache (0.98) > alias exact (1.00) > asset_tag (0.95) > short_name+unit (0.85-0.90) > partial (0.65-0.85) > trigram fallback. Returns top-3 alternatives per slot for the amber picker.
+- **Phrase segmentation** — "going with X" → operator; "to truck N" / "into X" → truck; rest → equipment. Normalization: lowercase, "number" → "#", strip punctuation.
+- **VoiceMic component** — hold-to-talk button with browser-feature detection (Chrome/Edge/Safari OK; Firefox shows friendly message). Inline transcript + permission-denied error handling. Stale-closure safe (transcript mirrored in ref).
+- **VoiceMatchSummary component** — confidence tiers visualized:
+  - ≥0.85 → green chip + auto-fill the field
+  - 0.60-0.84 → amber + top-3 alternatives picker
+  - <0.60 → red + free-text fallback hint
+
+### What's deliberately deferred (next session: C(ii)-b polish)
+- **Multi-item pending tray** — speak 5 things in a row, confirm-all at end
+- **Audio recording** (MediaRecorder API) + upload to Supabase Storage → save URL on `equipment_checkouts.voice_note_url` for audit replay
+- **Learning-loop alias prompt** — after 3 matches of same phrase, prompt shop_manager to add as permanent alias on equipment row
+- **Persistence** — actually insert into `voice_recognition_corrections` on every confirmed checkout (table exists; just need the write call wired in)
+
+### Files
+```
+supabase/migrations/20260510_voice_recognition_corrections.sql      (new — applied)
+app/api/admin/equipment-checkouts/voice-parse/route.ts              (new)
+app/dashboard/admin/inventory-control/page.tsx                      (VoiceMic, VoiceMatchSummary, integration)
+SHOP_MANAGER_PLAN.md                                                (C(ii) marked shipped + polish queued)
+```
+
+### Test path
+1. Refresh localhost (`http://localhost:51361`)
+2. Login as shopmanager@pontifex.com / Shop1234!
+3. Inventory Control → Checkout tab
+4. Pink mic banner at top — tap mic, allow microphone permission
+5. Say: "FS5000 number 5" (the equipment we created earlier)
+6. Stop talking → see transcript → parse fires → green chip + auto-fill the equipment field
+7. Variations to try: "PTRT-0001" (asset tag), "Husqvarna 5000" (partial name)
+8. With trucks: add a truck via Fleet first, then say "FS5000 number 5 to truck 3"
+
+### Known caveats
+- Web Speech API requires HTTPS or localhost. Production already on HTTPS, localhost works.
+- Permission prompt fires the first time. Once granted, subsequent uses skip the prompt.
+- Browser detection is honest — Firefox users get a clear "use Chrome/Edge/Safari" message instead of a broken button.
+
+---
+
 ## MAY 10, 2026 (PT 2) — shop_manager Forbidden bug fix + equipment storage dropdown + Phase C plan
 
 Big multi-task ask from user. Did the two ship-ready fixes and documented the four bigger features as Phase C in `SHOP_MANAGER_PLAN.md`. **Branch only** — not pushed to main. Commit `4e6f1244`.

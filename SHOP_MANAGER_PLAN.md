@@ -17,7 +17,23 @@ After Phase B(i) shipped to prod and the shop manager started using it, user fed
 - **shop_manager sidebar gains Schedule Board + Active Jobs** (read-only access). Hidden the "+ New Job" header button for shop_manager + shop_help since they can't create jobs.
 - **Equipment storage location → dropdown** with two option groups: `🏭 Shop` or `🚚 <truck display> · <operator first name>`. Applied to both the New Equipment form and the edit modal. Trucks loaded once via `/api/admin/equipment?kind=vehicle`. Reason: free-text was creeping into noise like "shelf 3", "Carlos's truck", etc. — dropdown forces "shop or specific truck" so smart-location stays meaningful.
 
-### C(ii) — Voice-driven Inventory Control + truck-as-custodian (next session)
+### C(ii)-a — SHIPPED May 10 (commit `68bb9cb5`)
+Truck-as-custodian + searchable equipment combobox. Mode toggle (🚚 Truck / ✋ Handheld) on Checkout tab. Trucks dropdown auto-resolves operator from current driver; fallback picker if truck has no driver. Equipment combobox: type to filter ~200 items by name/short_name/unit_number/asset_tag. Check-In + History reordered to lead with truck chip.
+
+### C(ii)-b foundation — SHIPPED May 10 (commit `c175782e`)
+Voice mic + parser + auto-fill, MVP slice.
+- Migration: `voice_recognition_corrections` table + pg_trgm extension + trigram indexes on equipment.name + short_name.
+- API `POST /api/admin/equipment-checkouts/voice-parse`: phrase normalization + segmentation ("to truck N", "going with X"), 6-tier scoring (cache hit > alias exact > asset_tag > short_name+unit > partial), returns top-3 alternatives per slot.
+- UI: hold-to-talk mic button (Web Speech API), inline transcript, browser-supported detection (Chrome/Edge/Safari). On stop, parse + auto-fill green-tier matches, show amber-tier picker for uncertain matches, red for unmatched.
+- Stale-closure safe: transcript mirrored in ref so onend always reads latest.
+
+### C(ii)-b polish — NEXT SESSION
+- Multi-item pending tray ("speak 5 things in a row, review + confirm-all")
+- Audio recording (MediaRecorder API) + upload to Supabase Storage → save URL on `equipment_checkouts.voice_note_url` for audit replay
+- Learning-loop alias prompt: count rows in `voice_recognition_corrections` per (tenant_id, normalized_phrase, resolved_id); after 3 matches, prompt shop_manager "Add 'DFS 5' as alias for FS5000 #5?" — one-tap appends to `equipment.aliases` jsonb
+- Insert into `voice_recognition_corrections` on every confirmed checkout (cache the win for next time)
+
+### C(ii) — Voice-driven Inventory Control + truck-as-custodian (HISTORICAL — see C(ii)-a + C(ii)-b above)
 User wants checkout to be voice-first. Current page asks for **operator**; should ask for **truck number** instead since trucks are persistently assigned to operators.
 
 Scope:
