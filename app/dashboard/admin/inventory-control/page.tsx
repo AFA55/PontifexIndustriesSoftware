@@ -345,25 +345,160 @@ function CheckoutTab({
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Voice state — see VoiceMic component below for the full flow.
-  const [voiceResult, setVoiceResult] = useState<VoiceParseResult | null>(null);
-  // When voice resolves to amber-tier matches the user picks from, we let them
-  // override before the auto-fill commits.
-  function applyVoiceMatch(result: VoiceParseResult) {
-    setVoiceResult(result);
-    // Equipment: auto-fill if green tier (≥0.85).
-    if (result.equipment && result.equipment.score >= 0.85) {
-      setEquipmentId(result.equipment.id);
+  // ── Pending tray (voice drafts) ──────────────────────────────────────────
+  // Voice creates DRAFTS in a tray instead of auto-filling the manual form.
+  // User can speak multiple items, edit amber-tier matches, then Confirm All
+  // to submit them in batch. The manual form below stays for one-off
+  // single-piece checkouts.
+  const [drafts, setDrafts] = useState<VoiceDraft[]>([]);
+  const [submittingTray, setSubmittingTray] = useState(false);
+  const [aliasPrompt, setAliasPrompt] = useState<{
+    equipmentId: string;
+    equipmentDisplay: string;
+    phrase: string;
+    count: number;
+  } | null>(null);
+
+  function addDraftFromVoice(result: VoiceParseResult, audioUrl: string | null) {
+    const draft: VoiceDraft = {
+      local_id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`,
+      result,
+      audio_url: audioUrl,
+      // Auto-pick green-tier matches
+      equipment_id: result.equipment && result.equipment.score >= 0.85 ? result.equipment.id : '',
+      truck_id: result.truck && result.truck.score >= 0.85 ? result.truck.id : '',
+      operator_id: result.operator && result.operator.score >= 0.85 ? result.operator.id : '',
+      mode: result.truck ? 'truck' : (result.operator ? 'handheld' : 'truck'),
+    };
+    setDrafts((cur) => [...cur, draft]);
+  }
+  function updateDraft(localId: string, patch: Partial<VoiceDraft>) {
+    setDrafts((cur) => cur.map(d => d.local_id === localId ? { ...d, ...patch } : d));
+  }
+  function removeDraft(localId: string) {
+    setDrafts((cur) => cur.filter(d => d.local_id !== localId));
+  }
+
+  /**
+   * Submit every draft in the tray. For each successful checkout, post the
+   * voice_corrections payload (spoken_text + normalized_phrase + resolved id
+   * + confidence + was_corrected) so the repeat-phrase counter grows. After
+   * the whole batch lands, look up alias suggestions for the equipment we
+   * just checked out — if any phrase has crossed the threshold, surface the
+   * first one as an alias-learning prompt.
+   */
+  async function confirmAllDrafts() {
+    setMsg(null);
+    if (drafts.length === 0) return;
+
+    // Validate every draft before we start hitting the API. Cheaper to bail
+    // here than to half-submit.
+    for (const d of drafts) {
+      if (!d.equipment_id) { setMsg({ type: 'error', text: `Draft "${d.result.phrase}" needs an equipment pick.` }); return; }
+      if (d.mode === 'truck' && !d.truck_id) { setMsg({ type: 'error', text: `Draft "${d.result.phrase}" needs a truck pick.` }); return; }
+      if (d.mode === 'handheld' && !d.operator_id) { setMsg({ type: 'error', text: `Draft "${d.result.phrase}" needs an operator pick.` }); return; }
     }
-    // Truck: auto-fill if green tier AND a truck was matched.
-    if (result.truck && result.truck.score >= 0.85) {
-      setTruckId(result.truck.id);
-      // If voice mentioned a truck, force truck mode.
-      setMode('truck');
-    } else if (result.operator && result.operator.score >= 0.85 && !result.truck) {
-      // No truck mentioned but operator was — handheld mode.
-      setMode('handheld');
-      setCustodianOverrideId(result.operator.id);
+
+    setSubmittingTray(true);
+    const succeeded: VoiceDraft[] = [];
+    const failed: { draft: VoiceDraft; error: string }[] = [];
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setMsg({ type: 'error', text: 'Session expired — sign back in.' }); return; }
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` };
+
+      for (const d of drafts) {
+        // Build the voice_corrections payload for THIS draft — one entry per
+        // slot that had a parse (equipment is required by validation above).
+        // `was_corrected` = the user picked something different from what the
+        // parser proposed at top-1.
+        const corrections: any[] = [];
+        const pushCorrection = (
+          kind: 'equipment' | 'truck' | 'operator',
+          slot: VoiceMatch | null,
+          finalId: string,
+          phraseSegment: string,
+        ) => {
+          if (!finalId || !slot) return;
+          corrections.push({
+            phrase: d.result.phrase,
+            normalized: phraseSegment || d.result.normalized,
+            kind,
+            resolved_id: finalId,
+            confidence: slot.score,
+            was_corrected: slot.id !== finalId,
+          });
+        };
+        pushCorrection('equipment', d.result.equipment, d.equipment_id, d.result.segments.equipment_phrase);
+        if (d.mode === 'truck') {
+          pushCorrection('truck', d.result.truck, d.truck_id, d.result.segments.truck_phrase || '');
+        } else {
+          pushCorrection('operator', d.result.operator, d.operator_id, d.result.segments.operator_phrase || '');
+        }
+
+        const body: Record<string, unknown> = {
+          equipment_id: d.equipment_id,
+          voice_corrections: corrections,
+        };
+        if (d.audio_url) body.voice_note_url = d.audio_url;
+        if (d.mode === 'truck') {
+          body.truck_equipment_id = d.truck_id;
+          // If the truck has no driver, we need to send custodian_id too.
+          // The picker UI in PendingTray sets operator_id in that case.
+          if (d.operator_id) body.custodian_id = d.operator_id;
+        } else {
+          body.custodian_id = d.operator_id;
+        }
+
+        const res = await fetch('/api/admin/equipment-checkouts', {
+          method: 'POST', headers, body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          succeeded.push(d);
+        } else {
+          const j = await res.json().catch(() => ({}));
+          failed.push({ draft: d, error: j.error || j.details || `HTTP ${res.status}` });
+        }
+      }
+
+      // Surface results.
+      if (failed.length === 0) {
+        setMsg({ type: 'success', text: `Checked out ${succeeded.length} item${succeeded.length === 1 ? '' : 's'}.` });
+      } else if (succeeded.length === 0) {
+        setMsg({ type: 'error', text: `All ${failed.length} drafts failed. First error: ${failed[0].error}` });
+      } else {
+        setMsg({ type: 'error', text: `${succeeded.length} succeeded, ${failed.length} failed. First failure: ${failed[0].error}` });
+      }
+
+      // Clear succeeded drafts from the tray; keep failures so user can retry.
+      setDrafts((cur) => cur.filter(d => !succeeded.some(s => s.local_id === d.local_id)));
+
+      // Refresh equipment + open checkouts so the form/state reflect reality.
+      onSuccess();
+
+      // Alias-learning: query suggestions for each piece of equipment that
+      // just got checked out. Surface the first phrase that crossed threshold.
+      // Fire-and-forget across drafts; user can decline / save on the modal.
+      for (const d of succeeded) {
+        try {
+          const aliasRes = await fetch(`/api/admin/equipment/${d.equipment_id}/alias-suggestions`, { headers });
+          if (!aliasRes.ok) continue;
+          const aliasJson = await aliasRes.json();
+          const top = aliasJson.suggestions?.[0];
+          if (top) {
+            setAliasPrompt({
+              equipmentId: d.equipment_id,
+              equipmentDisplay: d.result.equipment?.display || 'this equipment',
+              phrase: top.normalized_phrase,
+              count: top.count,
+            });
+            break; // one modal at a time
+          }
+        } catch { /* ignore — non-blocking */ }
+      }
+    } finally {
+      setSubmittingTray(false);
     }
   }
 
@@ -423,22 +558,33 @@ function CheckoutTab({
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-4">
-      {/* Voice mic — hold to talk. Phone listens, transcript hits the parser,
-          form fields auto-fill on green-tier matches. Amber gets a picker.
+      {/* Voice mic — each tap creates a DRAFT in the pending tray below.
+          Speak many items, then hit Confirm All to submit in batch.
           Skipped silently if browser doesn't support Web Speech API. */}
-      <VoiceMic onResult={applyVoiceMatch} />
+      <VoiceMic onResult={(r, audioUrl) => addDraftFromVoice(r, audioUrl)} />
 
-      {/* Voice result feedback + amber-tier disambiguation pickers */}
-      {voiceResult && (
-        <VoiceMatchSummary
-          result={voiceResult}
-          equipmentId={equipmentId}
-          truckId={truckId}
-          custodianOverrideId={custodianOverrideId}
-          onPickEquipment={(id) => { setEquipmentId(id); setVoiceResult({ ...voiceResult, equipment: voiceResult.equipment ? { ...voiceResult.equipment, id, score: 1, exact_match: true } : null }); }}
-          onPickTruck={(id) => { setTruckId(id); setMode('truck'); setVoiceResult({ ...voiceResult, truck: voiceResult.truck ? { ...voiceResult.truck, id, score: 1, exact_match: true } : null }); }}
-          onPickOperator={(id) => { setCustodianOverrideId(id); }}
-          onDismiss={() => setVoiceResult(null)}
+      {/* Pending tray — appears once at least one voice draft exists. */}
+      {drafts.length > 0 && (
+        <PendingTray
+          drafts={drafts}
+          availableEquipment={availableEquipment}
+          trucks={trucks}
+          operators={operators}
+          submitting={submittingTray}
+          onUpdate={updateDraft}
+          onRemove={removeDraft}
+          onClearAll={() => setDrafts([])}
+          onConfirmAll={confirmAllDrafts}
+        />
+      )}
+
+      {/* Alias-learning prompt — fires after Confirm All if a phrase has
+          been used 3+ times for the same equipment and isn't an alias yet. */}
+      {aliasPrompt && (
+        <AliasPromptModal
+          prompt={aliasPrompt}
+          onClose={() => setAliasPrompt(null)}
+          onSaved={() => setAliasPrompt(null)}
         />
       )}
 
@@ -928,6 +1074,24 @@ interface VoiceParseResult {
 }
 
 /**
+ * VoiceDraft — one row in the pending tray.
+ *
+ * Each tap of the mic produces a draft. Greens (≥0.85) pre-select the matched
+ * id; amber/red leave the slot empty so the user picks from `result.alternatives`.
+ * `Confirm All` submits the whole tray in sequence, then queries for alias
+ * suggestions on the equipment that got checked out.
+ */
+interface VoiceDraft {
+  local_id: string;             // client-side uuid for React keys / removal
+  result: VoiceParseResult;     // raw parse for amber pickers + corrections log
+  audio_url: string | null;     // wired up in Part 4 (audio recording)
+  equipment_id: string;         // empty until user/amber picks
+  truck_id: string;
+  operator_id: string;
+  mode: 'truck' | 'handheld';
+}
+
+/**
  * VoiceMic — hold-to-talk button using the browser's Web Speech API.
  *
  * Flow:
@@ -939,7 +1103,7 @@ interface VoiceParseResult {
  * Browser support: Chrome, Edge, Safari (iOS 14.5+ with HTTPS or localhost).
  * Firefox: not supported. We render a friendly message.
  */
-function VoiceMic({ onResult }: { onResult: (r: VoiceParseResult) => void }) {
+function VoiceMic({ onResult }: { onResult: (r: VoiceParseResult, audioUrl: string | null) => void }) {
   const [supported, setSupported] = useState<boolean | null>(null);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -951,6 +1115,15 @@ function VoiceMic({ onResult }: { onResult: (r: VoiceParseResult) => void }) {
   // a ref lets us read the latest text synchronously when the recognizer ends.
   const transcriptRef = useRef('');
 
+  // ── Audio capture (Part 4) ──────────────────────────────────────────────
+  // Run a MediaRecorder in parallel with SpeechRecognition. Chunks accumulate
+  // into a Blob; on stop, we upload it to the voice-checkouts bucket and pass
+  // the signed URL to the parent via onResult so it lands on the equipment
+  // checkout row's voice_note_url column for forensic replay.
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+
   // Detect support once on mount.
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -958,7 +1131,14 @@ function VoiceMic({ onResult }: { onResult: (r: VoiceParseResult) => void }) {
     setSupported(!!SpeechRecognition);
   }, []);
 
-  function start() {
+  // Cleanup any open stream on unmount (mic indicator should disappear).
+  useEffect(() => {
+    return () => {
+      audioStreamRef.current?.getTracks().forEach(t => t.stop());
+    };
+  }, []);
+
+  async function start() {
     if (typeof window === 'undefined') return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return;
@@ -966,6 +1146,30 @@ function VoiceMic({ onResult }: { onResult: (r: VoiceParseResult) => void }) {
     setError(null);
     setTranscript('');
     transcriptRef.current = '';
+    audioChunksRef.current = [];
+
+    // Kick off audio capture in parallel. If the browser doesn't support
+    // MediaRecorder (or the user denies the second permission prompt), we
+    // still proceed with speech recognition — audio is nice-to-have.
+    try {
+      if (typeof MediaRecorder !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioStreamRef.current = stream;
+        // Pick the most compatible MIME the browser supports. Chrome picks
+        // webm/opus; Safari falls back to mp4/aac. We just try and use the
+        // default if our preferred isn't available.
+        const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/mpeg'];
+        const supportedMime = preferred.find(m => (MediaRecorder as any).isTypeSupported?.(m)) || '';
+        const mr = supportedMime ? new MediaRecorder(stream, { mimeType: supportedMime }) : new MediaRecorder(stream);
+        mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
+        mr.start(250); // ~250ms chunks; small enough for tight stop latency
+        mediaRecorderRef.current = mr;
+      }
+    } catch (err) {
+      console.warn('Audio capture unavailable:', err);
+      // Silently degrade — voice still works, just no replay audio.
+    }
+
     const recog = new SpeechRecognition();
     recog.continuous = false;          // one phrase per tap
     recog.interimResults = true;
@@ -983,12 +1187,17 @@ function VoiceMic({ onResult }: { onResult: (r: VoiceParseResult) => void }) {
     recog.onerror = (e: any) => {
       setError(e.error === 'not-allowed' ? 'Microphone access denied. Allow it in browser settings.' : `Voice error: ${e.error}`);
       setListening(false);
+      stopAudio();
     };
     recog.onend = async () => {
       setListening(false);
       const finalText = transcriptRef.current.trim();
+      // Stop audio recording. Wait for the last `dataavailable` chunk by
+      // listening for the `stop` event on the recorder before parsing — that
+      // way the audio upload can run in parallel with the phrase parse.
+      const audioBlob = await stopAudioAndFlush();
       if (!finalText) return;
-      await parsePhrase(finalText);
+      await parseAndUpload(finalText, audioBlob);
     };
 
     recognitionRef.current = recog;
@@ -1000,23 +1209,70 @@ function VoiceMic({ onResult }: { onResult: (r: VoiceParseResult) => void }) {
     try { recognitionRef.current?.stop(); } catch { /* */ }
   }
 
-  async function parsePhrase(phrase: string) {
+  function stopAudio() {
+    try { mediaRecorderRef.current?.stop(); } catch { /* */ }
+    audioStreamRef.current?.getTracks().forEach(t => t.stop());
+    audioStreamRef.current = null;
+  }
+
+  // Stop the recorder and resolve once the final chunk has landed.
+  function stopAudioAndFlush(): Promise<Blob | null> {
+    return new Promise((resolve) => {
+      const mr = mediaRecorderRef.current;
+      if (!mr || mr.state === 'inactive') {
+        stopAudio();
+        resolve(null);
+        return;
+      }
+      mr.onstop = () => {
+        const mime = mr.mimeType || 'audio/webm';
+        const blob = audioChunksRef.current.length > 0
+          ? new Blob(audioChunksRef.current, { type: mime })
+          : null;
+        audioStreamRef.current?.getTracks().forEach(t => t.stop());
+        audioStreamRef.current = null;
+        resolve(blob);
+      };
+      try { mr.stop(); } catch { resolve(null); }
+    });
+  }
+
+  async function parseAndUpload(phrase: string, audioBlob: Blob | null) {
     setParsing(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError('Session expired'); return; }
-      const res = await fetch('/api/admin/equipment-checkouts/voice-parse', {
+      const headers = { Authorization: `Bearer ${session.access_token}` };
+
+      // Fire parse + upload in parallel.
+      const parsePromise = fetch('/api/admin/equipment-checkouts/voice-parse', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ phrase }),
       });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
+      const uploadPromise: Promise<string | null> = audioBlob
+        ? (async () => {
+            try {
+              const form = new FormData();
+              form.append('audio', audioBlob, `voice-${Date.now()}.webm`);
+              const res = await fetch('/api/admin/equipment-checkouts/voice-note-upload', {
+                method: 'POST', headers, body: form,
+              });
+              if (!res.ok) return null;
+              const j = await res.json();
+              return j.url || null;
+            } catch { return null; }
+          })()
+        : Promise.resolve(null);
+
+      const [parseRes, audioUrl] = await Promise.all([parsePromise, uploadPromise]);
+      if (!parseRes.ok) {
+        const j = await parseRes.json().catch(() => ({}));
         setError(j.error || 'Failed to parse voice input');
         return;
       }
-      const result = await res.json();
-      onResult(result);
+      const result = await parseRes.json();
+      onResult(result, audioUrl);
     } catch (err: any) {
       setError(err.message || 'Voice parse failed');
     } finally {
@@ -1081,124 +1337,374 @@ function VoiceMic({ onResult }: { onResult: (r: VoiceParseResult) => void }) {
   );
 }
 
+// VoiceMatchSummary (single-shot summary) was replaced by PendingTray's
+// inline per-draft pickers in the C(ii)-b polish. Removed from this file
+// because it's no longer rendered; the equivalent UX lives in DraftRow +
+// AltChips below.
+
+// ─── Pending Tray ──────────────────────────────────────────────────────────
 /**
- * VoiceMatchSummary — shows the result of a voice parse.
+ * Multi-item voice draft tray. Speak many phrases, edit each draft inline,
+ * then "Confirm All" submits them in sequence.
  *
- * Three states per slot (equipment / truck / operator):
- *   - Green (score ≥ 0.85): auto-filled, show ✓ chip
- *   - Amber (0.60 ≤ score < 0.85): show top-3 alternatives picker
- *   - Red / null (score < 0.60): not matched, show free-text fallback hint
+ * Each draft row gets:
+ *   - Heard phrase (italic, top)
+ *   - Equipment picker (combobox; pre-filled on green-tier matches)
+ *   - Mode toggle (truck vs handheld)
+ *   - Truck OR operator picker depending on mode (with amber alternatives
+ *     shown as chips for quick correction)
+ *   - Remove button
  */
-function VoiceMatchSummary({
-  result, equipmentId, truckId, custodianOverrideId,
-  onPickEquipment, onPickTruck, onPickOperator, onDismiss,
+function PendingTray({
+  drafts, availableEquipment, trucks, operators,
+  submitting, onUpdate, onRemove, onClearAll, onConfirmAll,
 }: {
-  result: VoiceParseResult;
-  equipmentId: string;
-  truckId: string;
-  custodianOverrideId: string;
-  onPickEquipment: (id: string) => void;
-  onPickTruck: (id: string) => void;
-  onPickOperator: (id: string) => void;
-  onDismiss: () => void;
+  drafts: VoiceDraft[];
+  availableEquipment: Equipment[];
+  trucks: Equipment[];
+  operators: Operator[];
+  submitting: boolean;
+  onUpdate: (localId: string, patch: Partial<VoiceDraft>) => void;
+  onRemove: (localId: string) => void;
+  onClearAll: () => void;
+  onConfirmAll: () => void;
 }) {
-  const slots: Array<{
-    label: string;
-    match: VoiceMatch | null;
-    alternatives: VoiceMatch[];
-    onPick: (id: string) => void;
-    fieldFilled: boolean;
-  }> = [
-    {
-      label: 'Equipment',
-      match: result.equipment,
-      alternatives: result.alternatives.equipment,
-      onPick: onPickEquipment,
-      fieldFilled: !!equipmentId,
-    },
-    {
-      label: 'Truck',
-      match: result.truck,
-      alternatives: result.alternatives.truck,
-      onPick: onPickTruck,
-      fieldFilled: !!truckId,
-    },
-    {
-      label: 'Operator',
-      match: result.operator,
-      alternatives: result.alternatives.operator,
-      onPick: onPickOperator,
-      fieldFilled: !!custodianOverrideId,
-    },
-  ];
+  return (
+    <div className="rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-900/10 p-3 sm:p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-rose-700 dark:text-rose-300">
+          Pending checkouts · {drafts.length}
+        </p>
+        <button
+          type="button"
+          onClick={onClearAll}
+          disabled={submitting}
+          className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 hover:underline disabled:opacity-50"
+        >
+          Clear all
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {drafts.map((d) => (
+          <DraftRow
+            key={d.local_id}
+            draft={d}
+            availableEquipment={availableEquipment}
+            trucks={trucks}
+            operators={operators}
+            onUpdate={(patch) => onUpdate(d.local_id, patch)}
+            onRemove={() => onRemove(d.local_id)}
+          />
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={onConfirmAll}
+        disabled={submitting || drafts.length === 0}
+        className="w-full inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-semibold shadow-lg shadow-rose-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition"
+      >
+        {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : <><CheckCircle2 className="w-4 h-4" /> Confirm All ({drafts.length})</>}
+      </button>
+    </div>
+  );
+}
+
+function DraftRow({
+  draft, availableEquipment, trucks, operators,
+  onUpdate, onRemove,
+}: {
+  draft: VoiceDraft;
+  availableEquipment: Equipment[];
+  trucks: Equipment[];
+  operators: Operator[];
+  onUpdate: (patch: Partial<VoiceDraft>) => void;
+  onRemove: () => void;
+}) {
+  const r = draft.result;
+  const selectedTruck = useMemo(() => trucks.find(t => t.id === draft.truck_id) || null, [trucks, draft.truck_id]);
+  const truckHasNoDriver = !!draft.truck_id && !selectedTruck?.current_custodian?.id;
+  const truckDriverName = selectedTruck?.current_custodian?.full_name || null;
+
+  // Display helpers for the equipment combobox.
+  const equipmentDisplay = (eq: Equipment) =>
+    eq.short_name && eq.unit_number ? `${eq.short_name} #${eq.unit_number}` : eq.name;
 
   return (
-    <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-900/10 p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-rose-700 dark:text-rose-300">Voice match</p>
-        <button onClick={onDismiss} className="text-[11px] text-rose-700 dark:text-rose-300 hover:underline">Dismiss</button>
+    <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-white dark:bg-slate-800 p-3 space-y-2.5">
+      {/* Heard line + remove */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] uppercase tracking-widest text-rose-700 dark:text-rose-300 font-bold">Heard</p>
+          <p className="text-sm text-gray-700 dark:text-slate-200 italic truncate">"{r.phrase}"</p>
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-[11px] font-semibold text-gray-500 hover:text-rose-600 px-2 py-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 transition flex-shrink-0"
+        >
+          Remove
+        </button>
       </div>
-      <p className="text-xs text-gray-600 dark:text-slate-400 italic">Heard: "{result.phrase}"</p>
-      {slots.map((slot) => {
-        const m = slot.match;
-        if (!m || m.score < 0.6) {
-          // Red tier — no confident match. Skip if no segment was even attempted.
-          if (!slot.alternatives.length) return null;
-          return (
-            <div key={slot.label} className="rounded-lg bg-white dark:bg-slate-800 border border-rose-200 p-2">
-              <p className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 mb-1.5">⚠ {slot.label} — no confident match. Pick one:</p>
-              <div className="flex flex-wrap gap-1.5">
-                {slot.alternatives.slice(0, 3).map((alt) => (
-                  <button
-                    key={alt.id}
-                    type="button"
-                    onClick={() => slot.onPick(alt.id)}
-                    className="px-2 py-1 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-semibold border border-rose-200"
-                  >
-                    {alt.display} <span className="text-rose-500/70 ml-0.5">({Math.round(alt.score * 100)}%)</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        }
-        if (m.score >= 0.85) {
-          // Green — auto-filled.
-          return (
-            <div key={slot.label} className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 p-2 flex items-center justify-between gap-2">
-              <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                <span className="font-bold">{slot.label}:</span> {m.display}
-                <span className="text-emerald-600/70 ml-1.5 text-[11px]">({Math.round(m.score * 100)}%, {m.source})</span>
-              </p>
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            </div>
-          );
-        }
-        // Amber tier — show top-3 picker
-        return (
-          <div key={slot.label} className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-2">
-            <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 mb-1.5">
-              {slot.label} — uncertain ({Math.round(m.score * 100)}%). Pick one:
+
+      {/* Equipment slot */}
+      <SlotLabel label="Equipment" match={r.equipment} pickedId={draft.equipment_id} />
+      <EquipmentCombobox
+        value={draft.equipment_id}
+        onChange={(id) => onUpdate({ equipment_id: id })}
+        options={availableEquipment}
+      />
+      {/* Amber/red equipment alternatives — quick-pick chips below combobox */}
+      {r.equipment && r.equipment.score < 0.85 && r.alternatives.equipment.length > 0 && (
+        <AltChips
+          tier={r.equipment.score < 0.6 ? 'red' : 'amber'}
+          alternatives={r.alternatives.equipment}
+          pickedId={draft.equipment_id}
+          onPick={(id) => onUpdate({ equipment_id: id })}
+        />
+      )}
+
+      {/* Mode toggle */}
+      <div className="grid grid-cols-2 gap-1.5 bg-gray-50 dark:bg-slate-900 rounded-lg p-1 border border-gray-200 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={() => onUpdate({ mode: 'truck' })}
+          className={`min-h-[36px] rounded-md text-xs font-semibold transition ${
+            draft.mode === 'truck'
+              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow shadow-rose-500/30'
+              : 'text-gray-600 dark:text-slate-300'
+          }`}
+        >
+          🚚 Truck
+        </button>
+        <button
+          type="button"
+          onClick={() => onUpdate({ mode: 'handheld' })}
+          className={`min-h-[36px] rounded-md text-xs font-semibold transition ${
+            draft.mode === 'handheld'
+              ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow shadow-amber-500/30'
+              : 'text-gray-600 dark:text-slate-300'
+          }`}
+        >
+          ✋ Handheld
+        </button>
+      </div>
+
+      {/* Truck OR direct operator */}
+      {draft.mode === 'truck' ? (
+        <>
+          <SlotLabel label="Truck" match={r.truck} pickedId={draft.truck_id} />
+          <select
+            value={draft.truck_id}
+            onChange={(e) => onUpdate({ truck_id: e.target.value, operator_id: '' })}
+            className={selectClass}
+          >
+            <option value="">Select truck…</option>
+            {trucks.map(t => {
+              const display = t.short_name && t.unit_number ? `${t.short_name} #${t.unit_number}` : t.name;
+              const op = (t as any).current_custodian?.full_name?.split(' ')[0];
+              return <option key={t.id} value={t.id}>{display}{op ? ` · ${op}` : ' · no driver'}</option>;
+            })}
+          </select>
+          {r.truck && r.truck.score < 0.85 && r.alternatives.truck.length > 0 && (
+            <AltChips
+              tier={r.truck.score < 0.6 ? 'red' : 'amber'}
+              alternatives={r.alternatives.truck}
+              pickedId={draft.truck_id}
+              onPick={(id) => onUpdate({ truck_id: id, operator_id: '' })}
+            />
+          )}
+          {truckDriverName && (
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-1">
+              <UserIcon className="w-3 h-3" /> Going with <strong>{truckDriverName}</strong>
             </p>
-            <div className="flex flex-wrap gap-1.5">
-              {slot.alternatives.slice(0, 3).map((alt) => (
-                <button
-                  key={alt.id}
-                  type="button"
-                  onClick={() => slot.onPick(alt.id)}
-                  className={`px-2 py-1 rounded-md text-xs font-semibold border transition ${
-                    alt.id === m.id
-                      ? 'bg-amber-200 text-amber-900 border-amber-300'
-                      : 'bg-white hover:bg-amber-100 text-amber-800 border-amber-200'
-                  }`}
-                >
-                  {alt.display} <span className="text-amber-600/70 ml-0.5">({Math.round(alt.score * 100)}%)</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
+          {truckHasNoDriver && (
+            <>
+              <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">Truck has no driver — pick operator:</p>
+              <select
+                value={draft.operator_id}
+                onChange={(e) => onUpdate({ operator_id: e.target.value })}
+                className={selectClass}
+              >
+                <option value="">Select operator…</option>
+                {operators.map(o => (
+                  <option key={o.id} value={o.id}>{o.full_name}{o.role === 'apprentice' ? ' (Helper)' : ''}</option>
+                ))}
+              </select>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <SlotLabel label="Operator" match={r.operator} pickedId={draft.operator_id} />
+          <select
+            value={draft.operator_id}
+            onChange={(e) => onUpdate({ operator_id: e.target.value })}
+            className={selectClass}
+          >
+            <option value="">Select operator…</option>
+            {operators.map(o => (
+              <option key={o.id} value={o.id}>{o.full_name}{o.role === 'apprentice' ? ' (Helper)' : ''}</option>
+            ))}
+          </select>
+          {r.operator && r.operator.score < 0.85 && r.alternatives.operator.length > 0 && (
+            <AltChips
+              tier={r.operator.score < 0.6 ? 'red' : 'amber'}
+              alternatives={r.alternatives.operator}
+              pickedId={draft.operator_id}
+              onPick={(id) => onUpdate({ operator_id: id })}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SlotLabel({ label, match, pickedId }: { label: string; match: VoiceMatch | null; pickedId: string }) {
+  // Green dot if we have a high-confidence match AND user hasn't deviated from it.
+  // Amber dot if low-confidence match exists. Red if no match at all. Gray if user picked manually.
+  let tone = 'bg-gray-300';
+  let hint = '';
+  if (!match) {
+    tone = pickedId ? 'bg-gray-400' : 'bg-rose-500';
+    hint = pickedId ? '' : '· no match';
+  } else if (match.score >= 0.85 && (match.id === pickedId || !pickedId)) {
+    tone = 'bg-emerald-500';
+    hint = `· ${Math.round(match.score * 100)}%`;
+  } else if (match.score >= 0.6) {
+    tone = 'bg-amber-500';
+    hint = `· ${Math.round(match.score * 100)}% — verify`;
+  } else {
+    tone = 'bg-rose-500';
+    hint = '· low confidence';
+  }
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`w-2 h-2 rounded-full ${tone}`} aria-hidden />
+      <p className="text-[11px] font-bold uppercase tracking-widest text-gray-600 dark:text-slate-300">
+        {label} <span className="text-gray-400 normal-case font-normal">{hint}</span>
+      </p>
+    </div>
+  );
+}
+
+function AltChips({
+  tier, alternatives, pickedId, onPick,
+}: {
+  tier: 'amber' | 'red';
+  alternatives: VoiceMatch[];
+  pickedId: string;
+  onPick: (id: string) => void;
+}) {
+  const isRed = tier === 'red';
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {alternatives.slice(0, 3).map(alt => {
+        const isPicked = alt.id === pickedId;
+        return (
+          <button
+            key={alt.id}
+            type="button"
+            onClick={() => onPick(alt.id)}
+            className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition ${
+              isPicked
+                ? (isRed ? 'bg-rose-200 text-rose-900 border-rose-300' : 'bg-amber-200 text-amber-900 border-amber-300')
+                : (isRed
+                    ? 'bg-white hover:bg-rose-50 text-rose-800 border-rose-200'
+                    : 'bg-white hover:bg-amber-50 text-amber-800 border-amber-200')
+            }`}
+          >
+            {alt.display} <span className="opacity-60 ml-0.5">({Math.round(alt.score * 100)}%)</span>
+          </button>
         );
       })}
+    </div>
+  );
+}
+
+// ─── Alias-Learning Prompt ─────────────────────────────────────────────────
+/**
+ * After Confirm All, if a normalized phrase has been used 3+ times for the
+ * same equipment and isn't already in its `aliases` array, surface this
+ * modal asking the shop manager whether to permanently save it. Saved
+ * aliases hit the alias index in the next voice parse → instant green-tier
+ * match instead of trigram-degraded amber.
+ */
+function AliasPromptModal({
+  prompt, onClose, onSaved,
+}: {
+  prompt: { equipmentId: string; equipmentDisplay: string; phrase: string; count: number };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setError(null);
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError('Session expired.'); return; }
+      // Fetch current aliases first so we don't blow them away.
+      const getRes = await fetch(`/api/admin/equipment/${prompt.equipmentId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!getRes.ok) { setError('Could not load equipment.'); return; }
+      const eqJson = await getRes.json();
+      const existing: string[] = Array.isArray(eqJson.data?.aliases) ? eqJson.data.aliases : [];
+      const next = Array.from(new Set([...existing.map(s => String(s)), prompt.phrase]));
+
+      const patchRes = await fetch(`/api/admin/equipment/${prompt.equipmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ aliases: next }),
+      });
+      if (!patchRes.ok) {
+        const j = await patchRes.json().catch(() => ({}));
+        setError(j.error || 'Could not save alias.');
+        return;
+      }
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-rose-600" />
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">Save voice alias?</h3>
+        </div>
+        <p className="text-sm text-gray-600 dark:text-slate-300">
+          The shop has said <strong className="text-rose-700 dark:text-rose-300">"{prompt.phrase}"</strong> {prompt.count}×
+          to mean <strong>{prompt.equipmentDisplay}</strong>. Save it as an alias so it auto-matches next time?
+        </p>
+        {error && <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded p-2">⚠ {error}</p>}
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="min-h-[44px] rounded-xl border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50 transition"
+          >
+            Not now
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="min-h-[44px] rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-semibold shadow-lg shadow-rose-500/30 disabled:opacity-50 transition inline-flex items-center justify-center gap-1.5"
+          >
+            {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <>Save alias</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

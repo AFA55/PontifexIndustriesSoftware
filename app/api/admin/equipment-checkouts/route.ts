@@ -240,5 +240,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to update equipment status', details: updateError.message }, { status: 500 });
   }
 
+  // ── Learning loop: persist voice corrections (fire-and-forget). ──────────
+  // Each entry: { phrase, normalized, kind: 'equipment'|'truck'|'operator',
+  //               resolved_id, confidence, was_corrected }
+  // Future voice-parse calls hit these via normalized_phrase before falling
+  // back to fuzzy search, so the system learns aliases without manual input.
+  // We don't block the response — if the insert fails, the checkout still
+  // succeeded.
+  const voiceCorrections = Array.isArray(body.voice_corrections) ? body.voice_corrections : [];
+  if (voiceCorrections.length > 0 && auth.tenantId) {
+    const rows = voiceCorrections
+      .filter((c: any) =>
+        c && typeof c.phrase === 'string' && typeof c.normalized === 'string'
+        && ['equipment', 'truck', 'operator'].includes(c.kind)
+        && typeof c.resolved_id === 'string'
+        && typeof c.confidence === 'number'
+      )
+      .map((c: any) => ({
+        tenant_id: auth.tenantId,
+        spoken_text: String(c.phrase).slice(0, 500),
+        normalized_phrase: String(c.normalized).slice(0, 500),
+        resolved_kind: c.kind,
+        resolved_id: c.resolved_id,
+        confidence: Math.max(0, Math.min(1, c.confidence)),
+        was_corrected: !!c.was_corrected,
+        created_by: auth.userId,
+      }));
+    if (rows.length > 0) {
+      // Don't await — fire-and-forget. Logged on error but doesn't fail response.
+      supabaseAdmin.from('voice_recognition_corrections').insert(rows)
+        .then(({ error }) => { if (error) console.error('voice_recognition_corrections insert error:', error); });
+    }
+  }
+
   return NextResponse.json({ success: true, data: checkout });
 }
