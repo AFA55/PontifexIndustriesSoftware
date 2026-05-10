@@ -3,6 +3,44 @@
 
 ---
 
+## MAY 10, 2026 — Per-role lunch default + cleaner edit affordances
+
+Quick polish session after user verified the May 8 PT 4 work on localhost. Three small fixes ready to ride to prod with the next push.
+
+**Branch only — NOT pushed to main yet.** Branch `claude/inspiring-swanson-31ba74`, commit `cd3e72a9`.
+
+### Fix 1 — Shop manager + shop help take a 1-hour lunch
+- Backfill: `UPDATE profiles SET default_lunch_minutes = 60 WHERE role IN ('shop_manager','shop_help') AND default_lunch_minutes IS NULL`. Demo accounts already had 60 from May 7 PT 2 — no-op for them.
+- New role-baseline fallback in `app/api/timecard/clock-out/route.ts`. Resolution order:
+  1. `profile.default_lunch_minutes` (explicit per-user wins)
+  2. `ROLE_DEFAULT_LUNCH` map: `shop_manager` + `shop_help` → 60
+  3. `timecard_settings.break_duration_minutes` (tenant default — typically 30)
+- Future shop_managers/shop_help auto-get 60min even without the explicit per-user override. Defense in depth.
+
+### Fix 2 — Removed Edit button from team payroll table
+The whole row is already a click target (navigates to operator detail). The legacy quick-Edit button was redundant + opened a stripped clock-in-only modal that didn't expose the new PTO/sick/holiday workflow.
+- Renamed remaining "Detail" button to "View" (clearer intent).
+- Edit happens from inside the operator detail page now — full-featured day cells with PTO chips, manual-entry modal, split date/time picker, lunch override.
+
+### Fix 3 — Bigger edit button on operator detail page
+The pencil-only button was too small to spot. Now:
+- Icon + "Edit" text label
+- Blue tint (50/100 bg, 700 text, 200 border)
+- 14px icon, px-3 py-1.5 padding
+- Meets tap-target standards on mobile
+
+### Files changed
+```
+app/api/timecard/clock-out/route.ts                    (per-role lunch fallback)
+app/dashboard/admin/timecards/page.tsx                 (Edit btn removed, Detail→View)
+app/dashboard/admin/timecards/operator/[id]/page.tsx   (bigger edit btn)
+```
+
+### Note: dev server cache flush
+Localhost was rendering unstyled HTML this morning — `Cannot find module './8263.js'` webpack chunk corruption from a 2-day-old `.next/` cache. Standard fix: nuke `.next/` + restart. New port: 55761.
+
+---
+
 ## MAY 8, 2026 (PT 4) — Operator timecard edit UX: split picker + empty-day PTO entry + balance card
 
 User found three problems while editing on the operator timecard detail page (`/dashboard/admin/timecards/operator/[id]`):
