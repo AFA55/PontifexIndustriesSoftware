@@ -27,11 +27,14 @@ Voice mic + parser + auto-fill, MVP slice.
 - UI: hold-to-talk mic button (Web Speech API), inline transcript, browser-supported detection (Chrome/Edge/Safari). On stop, parse + auto-fill green-tier matches, show amber-tier picker for uncertain matches, red for unmatched.
 - Stale-closure safe: transcript mirrored in ref so onend always reads latest.
 
-### C(ii)-b polish — NEXT SESSION
-- Multi-item pending tray ("speak 5 things in a row, review + confirm-all")
-- Audio recording (MediaRecorder API) + upload to Supabase Storage → save URL on `equipment_checkouts.voice_note_url` for audit replay
-- Learning-loop alias prompt: count rows in `voice_recognition_corrections` per (tenant_id, normalized_phrase, resolved_id); after 3 matches, prompt shop_manager "Add 'DFS 5' as alias for FS5000 #5?" — one-tap appends to `equipment.aliases` jsonb
-- Insert into `voice_recognition_corrections` on every confirmed checkout (cache the win for next time)
+### C(ii)-b polish — SHIPPED May 10 (commit `8415ef7d`)
+All four parts landed:
+- **Multi-item pending tray** — `VoiceDraft[]` state in CheckoutTab; each mic tap appends a draft to `PendingTray`. Per-draft `DraftRow` has equipment combobox + mode toggle + truck/operator picker + amber/red `AltChips` for alternatives. "Confirm All" submits sequentially; succeeded drafts removed, failed ones kept for retry.
+- **Voice corrections persisted** — `POST /api/admin/equipment-checkouts` now accepts `voice_corrections` array on body and writes to `voice_recognition_corrections` (fire-and-forget, tenant-scoped). Each entry records spoken_text, normalized_phrase, resolved_kind, resolved_id, confidence, was_corrected.
+- **Alias-learning prompt** — new `GET /api/admin/equipment/[id]/alias-suggestions` counts normalized phrases per equipment (threshold = 3) excluding phrases already in `aliases`. After Confirm All, client queries it per checked-out equipment; first hit surfaces `AliasPromptModal` which PATCHes the equipment with the merged aliases array.
+- **Audio recording** — `MediaRecorder` runs in parallel with `SpeechRecognition` in `VoiceMic`. On stop, blob is multipart-POSTed to new `voice-checkouts` bucket via `POST /api/admin/equipment-checkouts/voice-note-upload` (server uses supabaseAdmin → upload to `<tenantId>/<uuid>.<ext>` → returns 30-day signed URL). URL threads through `addDraftFromVoice` → `confirmAllDrafts` → stored on `equipment_checkouts.voice_note_url`.
+
+Build green. Migration `20260510_voice_checkouts_bucket.sql` applied. Branch only; not on main yet.
 
 ### C(ii) — Voice-driven Inventory Control + truck-as-custodian (HISTORICAL — see C(ii)-a + C(ii)-b above)
 User wants checkout to be voice-first. Current page asks for **operator**; should ask for **truck number** instead since trucks are persistently assigned to operators.

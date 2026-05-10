@@ -1,5 +1,53 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 3, 2026 (SUPERVISOR DASHBOARD SESSION) | **Branch:** `claude/inspiring-swanson-31ba74` (pushed to origin) → merged to local `main` (NOT yet pushed to origin/main) | **Production:** 🚀 LIVE at https://www.pontifexindustries.com (last deploy commit `0963259f`) | **Build:** PASSING ✅ | **DB:** Migration `20260502_supervisor_visits` applied
+**Date:** May 10, 2026 (PT 4 — C(ii)-b POLISH) | **Branch:** `claude/inspiring-swanson-31ba74` (pushed to origin, commit `8415ef7d`) — NOT yet merged anywhere | **Production:** 🚀 LIVE at https://www.pontifexindustries.com | **Build:** PASSING ✅ | **DB:** Migrations `20260510_voice_recognition_corrections` + `20260510_voice_checkouts_bucket` applied
+
+---
+
+## MAY 10, 2026 (PT 4) — Phase C(ii)-b POLISH: pending tray + corrections write + alias learning + audio capture
+
+All four polish parts shipped. Voice checkout is now a real batched workflow with a learning loop. Commit `8415ef7d`.
+
+**Branch only — NOT main.** Verify on localhost, then merge when ready.
+
+### What's live
+- **Pending tray** — each tap of the mic appends a `VoiceDraft` to a tray under the mic banner. Speak many items in a row, edit each draft inline (equipment combobox + truck/operator picker + amber/red alternative chips + mode toggle), then "Confirm All" submits the whole tray sequentially. Failed drafts stay in the tray for retry; succeeded drafts disappear.
+- **Voice corrections persist** — every successful checkout writes a row to `voice_recognition_corrections` with `spoken_text`, `normalized_phrase`, `resolved_kind`, `resolved_id`, `confidence`, `was_corrected` (true if user picked something different from the parser's top-1). Tenant-scoped, fire-and-forget so checkouts aren't blocked by the audit write.
+- **Alias-learning prompt** — after Confirm All, the client queries `GET /api/admin/equipment/[id]/alias-suggestions` for each checked-out piece. If a phrase has been used 3+ times for the same equipment AND isn't already in `aliases`, an `AliasPromptModal` asks the shop manager to save it permanently. Save calls the existing `PATCH /api/admin/equipment/[id]` with the merged aliases array.
+- **Audio recording** — MediaRecorder runs in parallel with SpeechRecognition. On stop, the blob is POSTed (multipart) to `/api/admin/equipment-checkouts/voice-note-upload` which writes to the non-public `voice-checkouts` bucket under `<tenantId>/<uuid>.<ext>` and returns a 30-day signed URL. The URL flows through `addDraftFromVoice` → `confirmAllDrafts` → `equipment_checkouts.voice_note_url` for forensic replay.
+
+### What was removed
+- `VoiceMatchSummary` (single-shot summary) — replaced by the inline per-draft pickers in `DraftRow` + `AltChips`. Dead code dropped.
+
+### Files
+```
+app/api/admin/equipment-checkouts/route.ts                          (POST persists voice_corrections payload)
+app/api/admin/equipment-checkouts/voice-note-upload/route.ts        (new — multipart audio upload → signed URL)
+app/api/admin/equipment/[id]/alias-suggestions/route.ts             (new — phrase counts >= threshold)
+app/dashboard/admin/inventory-control/page.tsx                      (PendingTray, DraftRow, AltChips, AliasPromptModal, audio capture in VoiceMic)
+supabase/migrations/20260510_voice_checkouts_bucket.sql             (new — applied; non-public bucket + auth policies)
+SHOP_MANAGER_PLAN.md                                                (C(ii)-b marked shipped)
+```
+
+### Test path
+1. Localhost (`http://localhost:51361`) on this branch (worktree). Or pull `claude/inspiring-swanson-31ba74` into the main repo.
+2. Login as `shopmanager@pontifex.com` / `Shop1234!`
+3. Inventory Control → Checkout tab
+4. Tap mic, say a phrase ("FS5000 number 5 to truck 3") — wait for the parse, see a draft appear in the pending tray
+5. Tap mic again, say a second phrase — see a second draft
+6. Edit any amber-tier slot inline by clicking an alternative chip
+7. Hit **Confirm All** → drafts submit one by one; succeeded ones disappear
+8. After 3 uses of the same phrase for the same equipment, on the 3rd Confirm All you should see the alias-learning modal — accept it to save the phrase as a permanent alias
+9. (Audio) Verify Supabase Storage → `voice-checkouts` bucket has a recording per voice draft; check `equipment_checkouts.voice_note_url` for the signed URL
+
+### Known caveats
+- Audio capture asks for a SECOND mic permission on first use (separate from the SpeechRecognition prompt). Once granted, both share the same permission afterward.
+- Audio gracefully degrades — if the user denies the second prompt, voice still works, the draft just has `audio_url: null`.
+- The 30-day signed URL is generated at upload time. After 30 days, `voice_note_url` will 404; we'd need a `GET /api/admin/equipment-checkouts/[id]/voice-note` re-sign endpoint to fix this if audit replay starts being used heavily.
+- Alias-learning modal shows ONE phrase at a time. If multiple equipment items in a single Confirm All batch each cross the threshold, the user dismisses the first then re-confirms (or we'd need to queue them — punted).
+- `voice-checkouts` bucket policies are permissive for authenticated users; the API gate at `requireAuth` is where role + tenant scoping actually lives.
+
+### Smoke-test still needed
+None automated. Manual flow above is the verification path.
 
 ---
 
