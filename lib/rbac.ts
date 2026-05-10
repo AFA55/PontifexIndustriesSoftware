@@ -336,6 +336,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
   shop_manager: preset({
     timecards: 'view',
     schedule_board: 'view',
+    active_jobs: 'view',        // see WHERE operators are (to drop off equipment, coordinate visits)
     completed_jobs: 'view',
     equipment: 'full',
     fleet: 'full',

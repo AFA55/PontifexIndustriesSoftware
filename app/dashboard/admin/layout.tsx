@@ -141,16 +141,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )}
 
             {/* + New Job — Link prefetches the schedule-form chunk on hover/viewport
-                so the click feels instant instead of waiting for the JS to load. */}
-            <Link
-              href="/dashboard/admin/schedule-form"
-              prefetch
-              className="flex items-center justify-center gap-1.5 min-w-[44px] min-h-[44px] px-3 sm:px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all shadow-sm"
-              aria-label="New Job"
-            >
-              <Plus className="w-5 h-5" />
-              <span className="hidden sm:inline">New Job</span>
-            </Link>
+                so the click feels instant instead of waiting for the JS to load.
+                Hidden for shop_manager + shop_help — they have read-only access
+                to the schedule (to plan equipment pulls), not creation. */}
+            {user?.role !== 'shop_manager' && user?.role !== 'shop_help' && (
+              <Link
+                href="/dashboard/admin/schedule-form"
+                prefetch
+                className="flex items-center justify-center gap-1.5 min-w-[44px] min-h-[44px] px-3 sm:px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all shadow-sm"
+                aria-label="New Job"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="hidden sm:inline">New Job</span>
+              </Link>
+            )}
 
             {/* Notification bell — light variant for white header */}
             <NotificationBell variant="light" />

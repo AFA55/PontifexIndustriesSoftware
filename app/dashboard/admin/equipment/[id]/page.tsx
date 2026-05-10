@@ -67,6 +67,15 @@ export default function EquipmentDetailPage() {
   const [draft, setDraft] = useState<Partial<Equipment>>({});
   const [aliasesText, setAliasesText] = useState('');
 
+  // Trucks for the location dropdown (loaded once when editing starts)
+  const [trucks, setTrucks] = useState<Array<{
+    id: string;
+    name: string;
+    short_name: string | null;
+    unit_number: string | null;
+    current_custodian: { full_name: string | null } | null;
+  }>>([]);
+
   const canWrite = !!user && WRITE_ROLES.includes(user.role);
 
   useEffect(() => {
@@ -120,6 +129,21 @@ export default function EquipmentDetailPage() {
     });
     setAliasesText((eq.aliases || []).join(', '));
     setEditing(true);
+    // Load trucks for the location dropdown. Fire-and-forget — UI shows
+    // a free-text fallback if the fetch fails.
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch('/api/admin/equipment?kind=vehicle&limit=200', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setTrucks(json.data ?? []);
+        }
+      } catch { /* silent */ }
+    })();
   }
 
   async function handleSave() {
@@ -357,7 +381,35 @@ export default function EquipmentDetailPage() {
 
             <Section title="Storage + Notes">
               <Field label="Home location">
-                <input type="text" value={draft.location || ''} onChange={(e) => setDraft({ ...draft, location: e.target.value })} className={inputClass} />
+                {/* Location is constrained to Shop OR a specific truck.
+                    Free-text used to creep into noise like "shelf 3", "Carlos's truck", etc.
+                    With a dropdown the answer is always actionable: either we know it's
+                    at shop, or we know exactly which truck it's on (and who's driving). */}
+                <select
+                  value={draft.location || ''}
+                  onChange={(e) => setDraft({ ...draft, location: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="">— Not set —</option>
+                  <option value="Shop">🏭 Shop</option>
+                  {trucks.length > 0 && (
+                    <optgroup label="On a truck">
+                      {trucks.map((t) => {
+                        const display = t.short_name && t.unit_number
+                          ? `${t.short_name} #${t.unit_number}`
+                          : t.name;
+                        const op = t.current_custodian?.full_name?.split(' ')[0];
+                        const label = op ? `🚚 ${display} · ${op}` : `🚚 ${display}`;
+                        // Value matches displayed text so it survives round-trip + reads naturally
+                        // in the smart-location formatter on the inventory page.
+                        return <option key={t.id} value={label}>{label}</option>;
+                      })}
+                    </optgroup>
+                  )}
+                </select>
+                {trucks.length === 0 && (
+                  <p className="text-[11px] text-gray-500 mt-1.5">Add trucks under Fleet to populate this list.</p>
+                )}
               </Field>
               <Field label="Notes">
                 <textarea value={draft.notes || ''} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} rows={2} className={inputClass} />

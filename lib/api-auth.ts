@@ -41,6 +41,12 @@ export const ADMIN_ROLES: string[] = ['admin', 'super_admin', 'operations_manage
 /** Broader set for read-only / schedule-board / sales pipeline routes. */
 const SALES_STAFF_ROLES = ['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'];
 
+// Read-only view roles: SALES_STAFF + shop_manager. Used by routes that only
+// expose data (no mutations). shop_manager needs to SEE the schedule + active
+// jobs (to coordinate equipment drops, plan pulls), but should NOT create or
+// edit jobs — write routes keep using SALES_STAFF_ROLES or stricter.
+const SCHEDULE_VIEWER_ROLES = [...SALES_STAFF_ROLES, 'shop_manager'];
+
 /**
  * Internal: resolve Bearer token -> profile. Does NOT enforce tenant presence.
  * Use `requireAuth` for the externally-facing guard.
@@ -219,6 +225,44 @@ export async function requireSalesStaff(request: NextRequest): Promise<AuthResul
   return {
     authorized: true,
     userId: r.userId,
+    role: r.role,
+    tenantId: r.tenantId,
+    userEmail: r.userEmail,
+  };
+}
+
+/**
+ * Read-only guard for routes that schedule viewers can see:
+ * SALES_STAFF + shop_manager. Use on GET routes that return schedule /
+ * active-jobs / job summary data. NEVER use on POST/PATCH/DELETE.
+ */
+export async function requireScheduleViewer(request: NextRequest): Promise<AuthResult> {
+  const r = await resolveAuth(request);
+  if (!r.ok) return { authorized: false, response: r.response };
+
+  if (!SCHEDULE_VIEWER_ROLES.includes(r.role)) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Schedule viewer access required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  if (r.role !== 'super_admin' && !r.tenantId) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Tenant not set for this user.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return {
+    authorized: true,
+    userId: r.userId,
     userEmail: r.userEmail,
     role: r.role,
     tenantId: r.tenantId,
@@ -226,10 +270,13 @@ export async function requireSalesStaff(request: NextRequest): Promise<AuthResul
 }
 
 /**
- * Schedule-board access: same role set as requireSalesStaff plus supervisor.
+ * Schedule-board access: read-only view roles (SALES_STAFF + shop_manager).
+ * shop_manager needs to SEE the schedule to plan equipment pulls + coordinate
+ * drops — they can't create or edit jobs (those routes still go through
+ * requireSalesStaff or stricter guards).
  */
 export async function requireScheduleBoardAccess(request: NextRequest): Promise<AuthResult> {
-  return requireSalesStaff(request);
+  return requireScheduleViewer(request);
 }
 
 /**

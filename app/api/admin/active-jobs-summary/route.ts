@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSalesStaff } from '@/lib/api-auth';
+import { requireScheduleViewer } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // Keep this list in sync with app/api/admin/active-jobs/route.ts so the
@@ -18,7 +18,7 @@ const FULL_ADMIN_ROLES = ['super_admin', 'operations_manager', 'admin'] as const
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireSalesStaff(request);
+    const auth = await requireScheduleViewer(request);
     if (!auth.authorized) return auth.response;
 
     const isFullAdmin = (FULL_ADMIN_ROLES as readonly string[]).includes(auth.role);
