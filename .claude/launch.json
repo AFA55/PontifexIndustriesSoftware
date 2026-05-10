@@ -4,7 +4,7 @@
     {
       "name": "pontifex-dev",
       "runtimeExecutable": "/bin/sh",
-      "runtimeArgs": ["-c", "PATH=/usr/local/bin:/opt/homebrew/bin:$PATH npx next dev"],
+      "runtimeArgs": ["-c", "PATH=/usr/local/bin:/opt/homebrew/bin:$PATH npx next dev --turbopack"],
       "port": 3000,
       "autoPort": true
     }
