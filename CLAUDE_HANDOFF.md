@@ -1,5 +1,364 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 3, 2026 (SUPERVISOR DASHBOARD SESSION) | **Branch:** `claude/inspiring-swanson-31ba74` (pushed to origin) → merged to local `main` (NOT yet pushed to origin/main) | **Production:** 🚀 LIVE at https://www.pontifexindustries.com (last deploy commit `0963259f`) | **Build:** PASSING ✅ | **DB:** Migration `20260502_supervisor_visits` applied
+**Date:** May 10, 2026 (PT 4 — C(ii)-b POLISH) | **Branch:** `claude/inspiring-swanson-31ba74` (pushed to origin, commit `8415ef7d`) — NOT yet merged anywhere | **Production:** 🚀 LIVE at https://www.pontifexindustries.com | **Build:** PASSING ✅ | **DB:** Migrations `20260510_voice_recognition_corrections` + `20260510_voice_checkouts_bucket` applied
+
+---
+
+## MAY 10, 2026 (PT 4) — Phase C(ii)-b POLISH: pending tray + corrections write + alias learning + audio capture
+
+All four polish parts shipped. Voice checkout is now a real batched workflow with a learning loop. Commit `8415ef7d`.
+
+**Branch only — NOT main.** Verify on localhost, then merge when ready.
+
+### What's live
+- **Pending tray** — each tap of the mic appends a `VoiceDraft` to a tray under the mic banner. Speak many items in a row, edit each draft inline (equipment combobox + truck/operator picker + amber/red alternative chips + mode toggle), then "Confirm All" submits the whole tray sequentially. Failed drafts stay in the tray for retry; succeeded drafts disappear.
+- **Voice corrections persist** — every successful checkout writes a row to `voice_recognition_corrections` with `spoken_text`, `normalized_phrase`, `resolved_kind`, `resolved_id`, `confidence`, `was_corrected` (true if user picked something different from the parser's top-1). Tenant-scoped, fire-and-forget so checkouts aren't blocked by the audit write.
+- **Alias-learning prompt** — after Confirm All, the client queries `GET /api/admin/equipment/[id]/alias-suggestions` for each checked-out piece. If a phrase has been used 3+ times for the same equipment AND isn't already in `aliases`, an `AliasPromptModal` asks the shop manager to save it permanently. Save calls the existing `PATCH /api/admin/equipment/[id]` with the merged aliases array.
+- **Audio recording** — MediaRecorder runs in parallel with SpeechRecognition. On stop, the blob is POSTed (multipart) to `/api/admin/equipment-checkouts/voice-note-upload` which writes to the non-public `voice-checkouts` bucket under `<tenantId>/<uuid>.<ext>` and returns a 30-day signed URL. The URL flows through `addDraftFromVoice` → `confirmAllDrafts` → `equipment_checkouts.voice_note_url` for forensic replay.
+
+### What was removed
+- `VoiceMatchSummary` (single-shot summary) — replaced by the inline per-draft pickers in `DraftRow` + `AltChips`. Dead code dropped.
+
+### Files
+```
+app/api/admin/equipment-checkouts/route.ts                          (POST persists voice_corrections payload)
+app/api/admin/equipment-checkouts/voice-note-upload/route.ts        (new — multipart audio upload → signed URL)
+app/api/admin/equipment/[id]/alias-suggestions/route.ts             (new — phrase counts >= threshold)
+app/dashboard/admin/inventory-control/page.tsx                      (PendingTray, DraftRow, AltChips, AliasPromptModal, audio capture in VoiceMic)
+supabase/migrations/20260510_voice_checkouts_bucket.sql             (new — applied; non-public bucket + auth policies)
+SHOP_MANAGER_PLAN.md                                                (C(ii)-b marked shipped)
+```
+
+### Test path
+1. Localhost (`http://localhost:51361`) on this branch (worktree). Or pull `claude/inspiring-swanson-31ba74` into the main repo.
+2. Login as `shopmanager@pontifex.com` / `Shop1234!`
+3. Inventory Control → Checkout tab
+4. Tap mic, say a phrase ("FS5000 number 5 to truck 3") — wait for the parse, see a draft appear in the pending tray
+5. Tap mic again, say a second phrase — see a second draft
+6. Edit any amber-tier slot inline by clicking an alternative chip
+7. Hit **Confirm All** → drafts submit one by one; succeeded ones disappear
+8. After 3 uses of the same phrase for the same equipment, on the 3rd Confirm All you should see the alias-learning modal — accept it to save the phrase as a permanent alias
+9. (Audio) Verify Supabase Storage → `voice-checkouts` bucket has a recording per voice draft; check `equipment_checkouts.voice_note_url` for the signed URL
+
+### Known caveats
+- Audio capture asks for a SECOND mic permission on first use (separate from the SpeechRecognition prompt). Once granted, both share the same permission afterward.
+- Audio gracefully degrades — if the user denies the second prompt, voice still works, the draft just has `audio_url: null`.
+- The 30-day signed URL is generated at upload time. After 30 days, `voice_note_url` will 404; we'd need a `GET /api/admin/equipment-checkouts/[id]/voice-note` re-sign endpoint to fix this if audit replay starts being used heavily.
+- Alias-learning modal shows ONE phrase at a time. If multiple equipment items in a single Confirm All batch each cross the threshold, the user dismisses the first then re-confirms (or we'd need to queue them — punted).
+- `voice-checkouts` bucket policies are permissive for authenticated users; the API gate at `requireAuth` is where role + tenant scoping actually lives.
+
+### Smoke-test still needed
+None automated. Manual flow above is the verification path.
+
+---
+
+## MAY 10, 2026 (PT 3) — Phase C(ii)-b foundation: voice mic + parser + auto-fill
+
+Voice equipment checkout MVP. Hold mic, speak ("FS5000 number 5 to truck 3"), fields auto-fill. Multi-item pending tray + audio recording + learning-loop alias prompts queued for C(ii)-b polish.
+
+**Branch only — NOT main.** Commit `c175782e`.
+
+### What's live
+- **pg_trgm extension** enabled (was missing).
+- **`voice_recognition_corrections` table** — learning-loop foundation. Records every successful voice match → future calls hit cache before fuzzy search.
+- **Trigram GIN indexes** on `equipment.name` + `short_name` (filtered to active rows).
+- **`POST /api/admin/equipment-checkouts/voice-parse`** — 6-tier scoring: cache (0.98) > alias exact (1.00) > asset_tag (0.95) > short_name+unit (0.85-0.90) > partial (0.65-0.85) > trigram fallback. Returns top-3 alternatives per slot for the amber picker.
+- **Phrase segmentation** — "going with X" → operator; "to truck N" / "into X" → truck; rest → equipment. Normalization: lowercase, "number" → "#", strip punctuation.
+- **VoiceMic component** — hold-to-talk button with browser-feature detection (Chrome/Edge/Safari OK; Firefox shows friendly message). Inline transcript + permission-denied error handling. Stale-closure safe (transcript mirrored in ref).
+- **VoiceMatchSummary component** — confidence tiers visualized:
+  - ≥0.85 → green chip + auto-fill the field
+  - 0.60-0.84 → amber + top-3 alternatives picker
+  - <0.60 → red + free-text fallback hint
+
+### What's deliberately deferred (next session: C(ii)-b polish)
+- **Multi-item pending tray** — speak 5 things in a row, confirm-all at end
+- **Audio recording** (MediaRecorder API) + upload to Supabase Storage → save URL on `equipment_checkouts.voice_note_url` for audit replay
+- **Learning-loop alias prompt** — after 3 matches of same phrase, prompt shop_manager to add as permanent alias on equipment row
+- **Persistence** — actually insert into `voice_recognition_corrections` on every confirmed checkout (table exists; just need the write call wired in)
+
+### Files
+```
+supabase/migrations/20260510_voice_recognition_corrections.sql      (new — applied)
+app/api/admin/equipment-checkouts/voice-parse/route.ts              (new)
+app/dashboard/admin/inventory-control/page.tsx                      (VoiceMic, VoiceMatchSummary, integration)
+SHOP_MANAGER_PLAN.md                                                (C(ii) marked shipped + polish queued)
+```
+
+### Test path
+1. Refresh localhost (`http://localhost:51361`)
+2. Login as shopmanager@pontifex.com / Shop1234!
+3. Inventory Control → Checkout tab
+4. Pink mic banner at top — tap mic, allow microphone permission
+5. Say: "FS5000 number 5" (the equipment we created earlier)
+6. Stop talking → see transcript → parse fires → green chip + auto-fill the equipment field
+7. Variations to try: "PTRT-0001" (asset tag), "Husqvarna 5000" (partial name)
+8. With trucks: add a truck via Fleet first, then say "FS5000 number 5 to truck 3"
+
+### Known caveats
+- Web Speech API requires HTTPS or localhost. Production already on HTTPS, localhost works.
+- Permission prompt fires the first time. Once granted, subsequent uses skip the prompt.
+- Browser detection is honest — Firefox users get a clear "use Chrome/Edge/Safari" message instead of a broken button.
+
+---
+
+## MAY 10, 2026 (PT 2) — shop_manager Forbidden bug fix + equipment storage dropdown + Phase C plan
+
+Big multi-task ask from user. Did the two ship-ready fixes and documented the four bigger features as Phase C in `SHOP_MANAGER_PLAN.md`. **Branch only** — not pushed to main. Commit `4e6f1244`.
+
+### Critical bug fixed: shop_manager couldn't load dashboard
+- Symptom: `Forbidden. Sales staff access required` console error on `/dashboard/admin` for shop_manager. Half-rendered page.
+- Cause: `/api/admin/schedule-board` was gated by `requireSalesStaff` (excludes shop_manager).
+- Fix: new `requireScheduleViewer` in `lib/api-auth.ts` — SALES_STAFF + shop_manager. Read-only. Applied to schedule-board root, active-jobs, active-jobs-summary. Write routes (schedule-form POST, job-orders PATCH, etc.) unchanged — shop_manager can SEE schedule but not CREATE jobs.
+
+### Equipment storage location → dropdown
+Free-text was creeping into noise ("shelf 3", "Carlos's truck"). Replaced with:
+- 🏭 Shop
+- 🚚 `<truck>` · `<operator first name>` (per truck, loaded from Fleet)
+
+Applied to New Equipment form + edit modal. Empty state hint if no trucks exist yet.
+
+### UI permission cleanups
+- "+ New Job" header button hidden for shop_manager + shop_help
+- shop_manager preset gained `active_jobs: 'view'` so sidebar passes flag check
+
+### Phase C plan (next sessions, in priority order)
+- **C(ii)** Voice-driven Inventory Control + truck-as-custodian (operator picker → truck picker; mic button; alias fuzzy match; audio audit; learning loop)
+- **C(iii)** Fleet maintenance history (vehicle_service_records table; oil/filter/repair tracking; tie to maintenance_requests)
+- **C(iv)** Operator/Helper Maintenance Request form (3-tap mobile + voice memo) + Maintenance Inbox triage UI
+- **C(v)** Visit-wizard equipment-issues → maintenance_requests conversion hook
+
+Each Phase C entry in the plan doc names which agents own which slice — `supabase-migration-author`, `rls-policy-auditor`, `mobile-responsive-auditor`, plus general-purpose for UI scaffolds. Next sessions will dispatch these in parallel where safe.
+
+### Files changed
+```
+lib/api-auth.ts                                    (new requireScheduleViewer guard)
+lib/rbac.ts                                        (shop_manager preset: active_jobs view)
+app/api/admin/active-jobs/route.ts                 (guard swap)
+app/api/admin/active-jobs-summary/route.ts         (guard swap)
+app/dashboard/admin/layout.tsx                     (hide New Job for shop_manager/help)
+app/dashboard/admin/equipment/[id]/page.tsx        (storage location dropdown)
+app/dashboard/admin/equipment/new/page.tsx         (storage location dropdown)
+SHOP_MANAGER_PLAN.md                               (Phase C added)
+```
+
+---
+
+## MAY 10, 2026 — Per-role lunch default + cleaner edit affordances
+
+Quick polish session after user verified the May 8 PT 4 work on localhost. Three small fixes ready to ride to prod with the next push.
+
+**Branch only — NOT pushed to main yet.** Branch `claude/inspiring-swanson-31ba74`, commit `cd3e72a9`.
+
+### Fix 1 — Shop manager + shop help take a 1-hour lunch
+- Backfill: `UPDATE profiles SET default_lunch_minutes = 60 WHERE role IN ('shop_manager','shop_help') AND default_lunch_minutes IS NULL`. Demo accounts already had 60 from May 7 PT 2 — no-op for them.
+- New role-baseline fallback in `app/api/timecard/clock-out/route.ts`. Resolution order:
+  1. `profile.default_lunch_minutes` (explicit per-user wins)
+  2. `ROLE_DEFAULT_LUNCH` map: `shop_manager` + `shop_help` → 60
+  3. `timecard_settings.break_duration_minutes` (tenant default — typically 30)
+- Future shop_managers/shop_help auto-get 60min even without the explicit per-user override. Defense in depth.
+
+### Fix 2 — Removed Edit button from team payroll table
+The whole row is already a click target (navigates to operator detail). The legacy quick-Edit button was redundant + opened a stripped clock-in-only modal that didn't expose the new PTO/sick/holiday workflow.
+- Renamed remaining "Detail" button to "View" (clearer intent).
+- Edit happens from inside the operator detail page now — full-featured day cells with PTO chips, manual-entry modal, split date/time picker, lunch override.
+
+### Fix 3 — Bigger edit button on operator detail page
+The pencil-only button was too small to spot. Now:
+- Icon + "Edit" text label
+- Blue tint (50/100 bg, 700 text, 200 border)
+- 14px icon, px-3 py-1.5 padding
+- Meets tap-target standards on mobile
+
+### Files changed
+```
+app/api/timecard/clock-out/route.ts                    (per-role lunch fallback)
+app/dashboard/admin/timecards/page.tsx                 (Edit btn removed, Detail→View)
+app/dashboard/admin/timecards/operator/[id]/page.tsx   (bigger edit btn)
+```
+
+### Note: dev server cache flush
+Localhost was rendering unstyled HTML this morning — `Cannot find module './8263.js'` webpack chunk corruption from a 2-day-old `.next/` cache. Standard fix: nuke `.next/` + restart. New port: 55761.
+
+---
+
+## MAY 8, 2026 (PT 4) — Operator timecard edit UX: split picker + empty-day PTO entry + balance card
+
+User found three problems while editing on the operator timecard detail page (`/dashboard/admin/timecards/operator/[id]`):
+1. Native datetime-local picker registered wrong clicks (tap 6 → got 10).
+2. Empty days had no editable affordance — couldn't log PTO/sick/holiday for someone who didn't clock in.
+3. No visible PTO balance per operator.
+
+**Branch only — NOT pushed to main** (user wants to test on localhost first). Branch `claude/inspiring-swanson-31ba74`, commit `9e0d2bca`. Localhost: http://localhost:55697.
+
+### Fix 1 — Split date/time picker
+- New `SplitDateTimePicker` component (file-local, in operator page).
+- Replaces `<input type="datetime-local">` with `<input type="date">` + `<input type="time" step={60}>`.
+- No more wheel-spinner mis-clicks. Reliable across Mac Safari + Chrome + mobile.
+- Composes back to ISO via local Date constructor — no silent UTC drift like the old `.toISOString().slice(0,16)` path did.
+- Accepts `allowEmpty` for clock-out (lets admin clear when still on shift).
+- Both clock-in and clock-out fields in the edit modal now use this picker.
+
+### Fix 2 — Empty-day quick actions + Manual Entry modal
+Each day cell with no entries renders 4 quick-action chips below the day header:
+- **+ PTO** (emerald)
+- **+ Sick** (rose)
+- **+ Holiday** (violet)
+- **+ Manual hrs** (amber)
+
+Click → opens Manual Entry modal pre-filled with that date and type. Modal:
+- Hero gradient swaps based on selected type.
+- Type chip row inside the modal lets admin change type (also exposes `admin_adjustment` as 5th option).
+- Hours: number input (0.25 step, 0.25-16 range) + 4h/8h shortcut buttons.
+- Optional notes field.
+- For PTO: shows "Will use X day(s) · Y day(s) remaining after" live hint using current balance.
+
+Submits to existing `POST /api/admin/timecards/manual` (built May 8 PT 2). That endpoint:
+- Validates entry_type ∈ {pto, sick, holiday, manual, admin_adjustment}.
+- Inserts manually-approved timecard row.
+- For PTO: bumps `operator_pto_balance.pto_days_used` by `hours / 8`.
+- Fire-and-forget audit log.
+
+### Fix 3 — PTO Balance card
+Emerald gradient card at top of operator detail page (above Daily Breakdown). Shows:
+- **Days remaining** (large, primary metric)
+- Allocated / Used / Callouts (3-column sub-stats)
+- Year scoped to current calendar year
+
+Fetched from existing `GET /api/admin/operators/pto-balance` — already tenant-scoped + role-gated. Fire-and-forget — non-blocking on the main timecard load. Card only renders if balance row exists.
+
+### Files changed
+```
+app/dashboard/admin/timecards/operator/[id]/page.tsx   (+343 lines, -11)
+```
+Single-file change. No migration needed — the `manual` API + `operator_pto_balance` table + entry_type CHECK already exist.
+
+### What's still NOT addressed (out of this session's scope)
+- Lunch deduction edit (already exists from May 7 PT 1).
+- "Edit existing entry" gradient styling polish — current edit modal is functional but visually plain. Could match the manual-entry modal's hero-gradient look in a follow-up.
+- PTO balance card on the team payroll page (`/dashboard/admin/timecards`) — only on the per-operator detail right now.
+
+### Next steps queued
+- User verifies on localhost → push to main → Vercel.
+- Phase B(ii) voice checkout still queued.
+- Phase B(iii) Pull Equipment days-ahead picker.
+- Phase B(iv) Schedule board access for shop_manager + Pull Equipment Requirements button.
+
+---
+
+## MAY 8, 2026 (PT 3) — Recenter shop pin → PROD (clock-in actually works now)
+
+User reported shop manager STILL couldn't clock in even after PT 2's 100ft radius widening. Got user to drop a fresh pin on the building from on-site.
+
+**Pushed to production.** Commit `d08a8d1d`, deploy `dpl_3E579bAmp1zbj7kEuVRu4sq8ZVxo`. Aliased to `pontifexindustries.com` + `www.` — both responding 200.
+
+### Root cause
+The original SHOP_LOCATION pin (`34.76874308, -82.43569623`) was far enough off-center that even the 100ft (30.48m) radius didn't cover the whole building. From certain spots in the shop, the user's phone was reading >100ft from the OLD pin. Recentering on user-supplied accurate coordinates moves the geofence circle ~6m NE, and now the entire building footprint sits inside.
+
+### What changed
+- `lib/geolocation.ts` — `SHOP_LOCATION` lat/lng updated:
+  - **From**: `34.76874307354808, -82.43569623308949`
+  - **To**: `34.768775733693474, -82.43564252936702`
+- `components/NfcClockInModal.tsx` — stale comment "6.1m ≈ 20ft" updated to reflect current 30.48m ≈ 100ft (functional code already pulled from the central constant — this was just a comment cleanup).
+
+### Audit confirmed single source of truth
+Every clock-in code path reads from the central `SHOP_LOCATION` constant — no hardcoded coordinates anywhere. Updating one constant updates all flows:
+| Path | Used by |
+|---|---|
+| `/api/timecard/clock-in` | All dashboards (operator, supervisor, shop_manager, shop_help) |
+| `/api/timecard/clock-out` | All dashboards |
+| `components/NfcClockInModal.tsx` | The shared clock-in modal |
+| `components/NFCClockIn.tsx` | NFC scan flow |
+| `app/nfc-clock/page.tsx` | NFC kiosk page |
+| `components/DriveTimeFromShop.tsx` | Drive-time chip on schedule form |
+
+### Files changed
+```
+lib/geolocation.ts                 (SHOP_LOCATION recentered)
+components/NfcClockInModal.tsx     (stale comment fix)
+```
+
+### What this means for trial customer
+Shop manager (and every other role with clock-in) can now clock in from anywhere in the shop building. The 100ft radius around the new center comfortably covers Patriot's footprint.
+
+### Commit chain (May 8 in order)
+```
+d08a8d1d  fix(clockin): recenter shop pin to user-supplied accurate coordinates  ← THIS PT 3
+cb919706  fix(clockin): widen radius to 100ft + admin manual time entry (PTO)   ← PT 2
+447b2387  docs(handoff): Phase B(i) shipped — smart location + unified Inventory Control
+64f1ad54  feat(inventory): Phase B(i) — smart equipment location + unified Inventory Control page
+```
+
+---
+
+## MAY 8, 2026 (PT 2) — On-site fix: 100ft GPS radius + Admin manual time entry → PROD
+
+User on-site testing exposed two urgent gaps. Both shipped to production today.
+
+**Pushed to production.** Commit `cb919706`, deploy `dpl_CZZbU3vtKrjQDdzmVqbfEq12Jxo2`. Built in 76s. Aliased to `pontifexindustries.com` + `www.` — both responding 200. The previously-pushed Phase B(i) Inventory Control work also rode this commit chain (`64f1ad54`, `447b2387`).
+
+### Fix 1 — GPS radius widened to 100ft (clock-in AND clock-out)
+
+**Symptom:** Shop manager standing inside the shop couldn't clock in. App said "you must be at Patriot Concrete Cutting".
+
+**Root cause:** Radius was 20ft (clock-in) / 50ft (clock-out from yesterday's PT 2 fix). Indoor GPS drift on a typical phone is **10-30 meters** — metal/concrete walls scatter the signal. Standing in the shop reading as 30m+ "away" → reject.
+
+**Fix:** Both `ALLOWED_RADIUS_METERS` and `ALLOWED_RADIUS_CLOCKOUT_METERS` set to **30.48m (~100ft)** in `lib/geolocation.ts`. Anti-fraud preserved — home addresses are miles away, not 100ft.
+
+### Fix 2 — Admin manual time entry (PTO + sick + holiday + manual)
+
+**Why:** No way to enter hours for someone who didn't clock in. PTO, sick days, holiday — all needed manual creation, not just edits to existing rows.
+
+**Migration `20260508_timecards_entry_type_extend.sql`** (applied):
+The existing `timecards_entry_type_check` CHECK constraint allowed: regular, overtime, double_time, time_off, holiday, no_call_no_show, late. **Extended** to additionally allow: `pto`, `sick`, `manual`, `admin_adjustment`. Additive only — existing data preserved.
+
+**API `POST /api/admin/timecards/manual`** (new):
+- Body: `{ user_id, date, entry_type, hours, start_time?, notes? }`
+- Validates: `entry_type` ∈ {pto,sick,holiday,manual,admin_adjustment}, hours ∈ [0.25, 16], date YYYY-MM-DD, start_time HH:MM (default 08:00)
+- Inserts a timecard with computed clock_in_time + clock_out_time, `total_hours = gross = net = hours`, `is_approved=true`, `approval_status='manually_approved'`, `clock_in/out_method='manual'`, `timecard_source='manual'`
+- For `entry_type='pto'`: bumps `operator_pto_balance.pto_days_used` by `hours / 8`. Creates a 10-day allocation row if none exists for the year.
+- Audit logged to `audit_logs` (fire-and-forget)
+- Tenant-scoped via `requireAdmin`
+
+**UI on `/dashboard/admin/timecards`:**
+- New emerald gradient **"Add Time"** button next to CSV/PDF export.
+- Modal:
+  - Employee picker (from `teamMembers`)
+  - 5 type cards: PTO / Sick / Holiday / Manual / Adjustment — gradient swaps in modal header to match
+  - Date + Hours (number, step 0.25) + optional Start time + Notes
+  - Live "+0.X day(s) used" hint when type=PTO
+  - Mobile-friendly: bottom sheet on phones, centered modal on sm+
+  - On success: closes + refreshes team summary
+
+### Files changed
+```
+lib/geolocation.ts                                              (radius constants → 30.48m)
+app/api/admin/timecards/manual/route.ts                         (new — manual entry API)
+app/dashboard/admin/timecards/page.tsx                          (Add Time button + AddTimeModal)
+supabase/migrations/20260508_timecards_entry_type_extend.sql    (new — applied)
+```
+
+### Vercel usage observation
+
+Production deploys this billing period (May 1 - May 8, 2026):
+1. `0963259f` — May 2 (Linear Ft calculator)
+2. `11d938b9` — May 2 (Edit Scope)
+3. `0be04c59` — May 6 (lunch override)
+4. `f1d8b2df` — May 7 (50ft clock-out + per-user lunch + sidebar)
+5. `cb919706` — May 8 (100ft + manual entry — this one)
+
+**5 production deploys in 8 days.** Disciplined cadence vs. late April when ~20 preview deploys in 3 days drove the $500 bill. Per `vercel.json` the `claude/*` branch auto-deploys are blocked — only `main` triggers a billed build. Each main push ≈ 60-90s build minutes.
+
+The Vercel MCP exposes deployments + logs but **NOT billing endpoints**. Exact dollar usage requires the dashboard at `vercel.com/andres-altamiranos-projects/pontifex-industries-software-awja/usage`.
+
+### Phase B remaining (next sessions, in order)
+
+- **B(ii)** — Voice layer on Inventory Control Checkout + Check-In tabs (mic button, alias fuzzy match, ≥85% auto-confirm, audio audit trail, learning loop via `voice_recognition_corrections`)
+- **B(iii)** — Pull Equipment workflow (days-ahead picker, reserve equipment, generate pre-use checks)
+- **B(iv)** — Schedule board access for shop_manager + "Pull Equipment Requirements" button on schedule-board edit modal
+
+### Trial customer status
+- Shop manager can now clock in (100ft radius)
+- Admin can manually log PTO / sick / holiday hours via the team payroll page
+- Both Fix 1 + Fix 2 LIVE on `pontifexindustries.com`
 
 ---
 

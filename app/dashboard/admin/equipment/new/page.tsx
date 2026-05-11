@@ -43,8 +43,15 @@ export default function NewEquipmentPage() {
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
-  const [homeLocation, setHomeLocation] = useState('');
+  const [homeLocation, setHomeLocation] = useState('Shop'); // default to Shop on new equipment
   const [notes, setNotes] = useState('');
+  const [trucks, setTrucks] = useState<Array<{
+    id: string;
+    name: string;
+    short_name: string | null;
+    unit_number: string | null;
+    current_custodian: { full_name: string | null } | null;
+  }>>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +64,24 @@ export default function NewEquipmentPage() {
     setUser(cu);
     setAuthLoading(false);
   }, [router]);
+
+  // Load trucks for the location dropdown.
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch('/api/admin/equipment?kind=vehicle&limit=200', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setTrucks(json.data ?? []);
+        }
+      } catch { /* silent */ }
+    })();
+  }, [user]);
 
   // Auto-toggle requires_maintenance_schedule based on kind selection
   useEffect(() => {
@@ -290,8 +315,22 @@ export default function NewEquipmentPage() {
           {/* Other */}
           <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-4">
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">Storage</h2>
-            <Field label="Home location" hint="Where it's stored when not in use">
-              <input type="text" value={homeLocation} onChange={(e) => setHomeLocation(e.target.value)} placeholder="Main shop, Truck #3" className={inputClass} />
+            <Field label="Home location" hint="Either Shop or a specific truck — keeps inventory location consistent + searchable.">
+              <select value={homeLocation} onChange={(e) => setHomeLocation(e.target.value)} className={inputClass}>
+                <option value="Shop">🏭 Shop</option>
+                {trucks.length > 0 && (
+                  <optgroup label="On a truck">
+                    {trucks.map((t) => {
+                      const display = t.short_name && t.unit_number
+                        ? `${t.short_name} #${t.unit_number}`
+                        : t.name;
+                      const op = t.current_custodian?.full_name?.split(' ')[0];
+                      const label = op ? `🚚 ${display} · ${op}` : `🚚 ${display}`;
+                      return <option key={t.id} value={label}>{label}</option>;
+                    })}
+                  </optgroup>
+                )}
+              </select>
             </Field>
             <Field label="Notes">
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={inputClass} />

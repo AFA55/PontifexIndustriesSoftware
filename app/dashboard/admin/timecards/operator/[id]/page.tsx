@@ -249,6 +249,80 @@ function getPayTypeBadge(entry: TimecardEntry, weekRunningHours: number) {
   );
 }
 
+// ── Split Date + Time picker ──────────────────────────────────
+// Replaces the native <input type="datetime-local"> which has known click-
+// registration bugs in some browsers (especially the wheel spinner on Mac
+// where tapping "6" can register as "10"). Splitting into a date input
+// (reliable across all browsers) + an HTML time input (12h-aware) gives
+// predictable behavior + better mobile UX.
+function SplitDateTimePicker({
+  value, onChange, accent = 'blue', allowEmpty = false,
+}: {
+  value: string;            // ISO timestamp or '' / null when allowEmpty
+  onChange: (iso: string) => void;
+  accent?: 'blue' | 'emerald' | 'violet';
+  allowEmpty?: boolean;
+}) {
+  const ring = accent === 'emerald' ? 'focus:ring-emerald-500/20 focus:border-emerald-400' :
+               accent === 'violet'  ? 'focus:ring-violet-500/20 focus:border-violet-400' :
+                                      'focus:ring-blue-500/20 focus:border-blue-400';
+
+  // Parse local-date + local-time from the ISO string (in browser-local TZ).
+  const [localDate, localTime] = useMemo(() => {
+    if (!value) return ['', ''];
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return ['', ''];
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return [`${yyyy}-${mm}-${dd}`, `${hh}:${mi}`];
+  }, [value]);
+
+  function pushChange(date: string, time: string) {
+    if (!date && !time) {
+      if (allowEmpty) onChange('');
+      return;
+    }
+    if (!date || !time) return; // need both
+    const [y, mo, d] = date.split('-').map(Number);
+    const [h, mi] = time.split(':').map(Number);
+    if ([y, mo, d, h, mi].some(n => Number.isNaN(n))) return;
+    const local = new Date(y, mo - 1, d, h, mi, 0, 0);
+    onChange(local.toISOString());
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <input
+        type="date"
+        value={localDate}
+        onChange={(e) => pushChange(e.target.value, localTime || '08:00')}
+        className={`w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 transition-all ${ring}`}
+        aria-label="Date"
+      />
+      <input
+        type="time"
+        value={localTime}
+        step={60}
+        onChange={(e) => pushChange(localDate, e.target.value)}
+        className={`w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 transition-all ${ring}`}
+        aria-label="Time"
+      />
+      {allowEmpty && value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="col-span-2 text-xs text-gray-500 hover:text-rose-600 underline self-start"
+        >
+          Clear (still on shift)
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────
 function OperatorTimecardDetailPageInner() {
   const params = useParams();
@@ -296,6 +370,23 @@ function OperatorTimecardDetailPageInner() {
 
   // Night shift multiplier (fetched from settings for display)
   const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
+
+  // Manual entry (PTO / sick / holiday / manual / called-out) — for days
+  // with no clock-in. Wired to POST /api/admin/timecards/manual.
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualDate, setManualDate] = useState<string>('');
+  const [manualType, setManualType] = useState<'pto' | 'sick' | 'holiday' | 'manual' | 'admin_adjustment'>('pto');
+  const [manualHours, setManualHours] = useState<string>('8');
+  const [manualNotes, setManualNotes] = useState('');
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+
+  // PTO balance (allocated / used / remaining / callouts) for THIS operator
+  const [ptoBalance, setPtoBalance] = useState<{
+    allocated: number;
+    used: number;
+    callouts: number;
+  } | null>(null);
 
   const isRedirecting = useRef(false);
 
@@ -362,6 +453,24 @@ function OperatorTimecardDetailPageInner() {
       } else {
         setFetchError(result.error || 'Failed to load operator data.');
       }
+
+      // Fetch PTO balance (separate endpoint, fire-and-forget). Not blocking.
+      fetch(`/api/admin/operators/pto-balance?year=${new Date().getFullYear()}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(j => {
+          if (!j?.data) return;
+          const row = (j.data as any[]).find(r => r.operator_id === operatorId || r.id === operatorId);
+          if (row) {
+            setPtoBalance({
+              allocated: Number(row.pto_days_allocated ?? 10),
+              used: Number(row.pto_days_used ?? 0),
+              callouts: Number(row.callout_count ?? 0),
+            });
+          }
+        })
+        .catch(() => {});
     } catch (error) {
       console.error('Error fetching operator data:', error);
       setFetchError('Network error. Please check your connection and try again.');
@@ -1180,6 +1289,34 @@ function OperatorTimecardDetailPageInner() {
           return null;
         })()}
 
+        {/* ── PTO Balance card ────────────────────────────── */}
+        {ptoBalance && (
+          <div className="mb-4 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-4 text-white shadow-md">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/75">PTO Balance · {new Date().getFullYear()}</p>
+                <p className="text-2xl font-bold tabular-nums leading-tight mt-0.5">
+                  {Math.max(0, ptoBalance.allocated - ptoBalance.used).toFixed(1)} <span className="text-sm font-medium text-white/80">days remaining</span>
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-xs text-white/75">Allocated</p>
+                  <p className="text-base font-bold tabular-nums">{ptoBalance.allocated}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-white/75">Used</p>
+                  <p className="text-base font-bold tabular-nums">{ptoBalance.used.toFixed(1)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-white/75">Callouts</p>
+                  <p className="text-base font-bold tabular-nums">{ptoBalance.callouts}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Daily Breakdown ──────────────────────────────── */}
         <div className="space-y-2 mb-5">
           {loading ? (
@@ -1284,6 +1421,41 @@ function OperatorTimecardDetailPageInner() {
                       </div>
                     )}
                   </button>
+
+                  {/* Empty-day quick actions — admin can log PTO / sick / holiday /
+                      manual hours for someone who didn't clock in.
+                      Wired to POST /api/admin/timecards/manual. */}
+                  {!hasEntries && (
+                    <div className="px-4 pb-3 pt-1 border-t border-gray-100 bg-gray-50/50">
+                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                        No clock-in for this day
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        {[
+                          { type: 'pto' as const, label: 'PTO', defaultHours: '8', tone: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200' },
+                          { type: 'sick' as const, label: 'Sick', defaultHours: '8', tone: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200' },
+                          { type: 'holiday' as const, label: 'Holiday', defaultHours: '8', tone: 'bg-violet-50 text-violet-700 hover:bg-violet-100 border-violet-200' },
+                          { type: 'manual' as const, label: 'Manual hrs', defaultHours: '8', tone: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },
+                        ].map(({ type, label, defaultHours, tone }) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => {
+                              setManualDate(date);
+                              setManualType(type);
+                              setManualHours(defaultHours);
+                              setManualNotes('');
+                              setManualError(null);
+                              setShowManualModal(true);
+                            }}
+                            className={`px-2.5 py-2 rounded-lg border text-xs font-semibold transition ${tone}`}
+                          >
+                            + {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Expanded day detail */}
                   {isExpanded && hasEntries && (
@@ -1473,10 +1645,12 @@ function OperatorTimecardDetailPageInner() {
 
                                 <button
                                   onClick={() => openEditModal(entry)}
-                                  className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-gray-700 rounded transition-colors"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition-colors"
                                   title="Edit entry"
+                                  aria-label="Edit entry"
                                 >
-                                  <Edit size={12} />
+                                  <Edit size={14} />
+                                  Edit
                                 </button>
 
                                 {!entry.is_approved && (
@@ -1686,24 +1860,79 @@ function OperatorTimecardDetailPageInner() {
             </div>
 
             <div className="p-5 space-y-4">
-              {/* Clock times */}
+              {/* Clock times — split date + time pickers (avoids the native
+                  datetime-local wheel bug where tapping "6" registers as "10") */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Clock In Time</label>
-                <input
-                  type="datetime-local"
-                  value={editFormData.clock_in_time ? new Date(editFormData.clock_in_time).toISOString().slice(0, 16) : ''}
-                  onChange={(e) => setEditFormData({ ...editFormData, clock_in_time: e.target.value ? new Date(e.target.value).toISOString() : '' })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-sm text-gray-900 transition-all"
+                <SplitDateTimePicker
+                  value={editFormData.clock_in_time}
+                  onChange={(iso) => setEditFormData({ ...editFormData, clock_in_time: iso })}
+                  accent="blue"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Clock Out Time</label>
+                <SplitDateTimePicker
+                  value={editFormData.clock_out_time}
+                  onChange={(iso) => setEditFormData({ ...editFormData, clock_out_time: iso })}
+                  accent="blue"
+                  allowEmpty
+                />
+              </div>
+
+              {/* Lunch Deduction (admin-only override) */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Coffee size={14} className="text-amber-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Lunch Deduction (minutes)</p>
+                      <p className="text-[10px] text-gray-500">Auto-applied at 30 min when shift &gt; 6h. Set to 0 if no lunch was taken.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="480"
+                    step="5"
+                    value={editFormData.lunch_duration_minutes}
+                    onChange={(e) => setEditFormData({ ...editFormData, lunch_duration_minutes: parseInt(e.target.value, 10) || 0 })}
+                    className="w-24 px-3 py-2 bg-white border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 text-sm text-gray-900 tabular-nums"
+                  />
+                  <span className="text-xs text-gray-500">min</span>
+                  <div className="flex gap-1 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 0 })}
+                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
+                    >
+                      No lunch
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 30 })}
+                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
+                    >
+                      30 (default)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 60 })}
+                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
+                    >
+                      60
+                    </button>
+                  </div>
+                </div>
                 <input
-                  type="datetime-local"
-                  value={editFormData.clock_out_time ? new Date(editFormData.clock_out_time).toISOString().slice(0, 16) : ''}
-                  onChange={(e) => setEditFormData({ ...editFormData, clock_out_time: e.target.value ? new Date(e.target.value).toISOString() : '' })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-sm text-gray-900 transition-all"
+                  type="text"
+                  placeholder="Reason for override (optional, e.g. 'doctor appt')"
+                  value={editFormData.lunch_override_reason}
+                  onChange={(e) => setEditFormData({ ...editFormData, lunch_override_reason: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 text-xs text-gray-900"
                 />
               </div>
 
@@ -1920,6 +2149,166 @@ function OperatorTimecardDetailPageInner() {
           </div>
         </div>
       )}
+
+      {/* ── Manual Entry Modal (PTO / Sick / Holiday / Manual hrs) ─── */}
+      {showManualModal && (() => {
+        const TYPE_META = {
+          pto:               { label: 'PTO',           gradient: 'from-emerald-500 to-teal-600', dot: 'bg-emerald-100 text-emerald-700' },
+          sick:              { label: 'Sick',          gradient: 'from-rose-500 to-pink-600',    dot: 'bg-rose-100 text-rose-700' },
+          holiday:           { label: 'Holiday',       gradient: 'from-violet-500 to-indigo-600', dot: 'bg-violet-100 text-violet-700' },
+          manual:            { label: 'Manual hours',  gradient: 'from-amber-500 to-orange-600', dot: 'bg-amber-100 text-amber-700' },
+          admin_adjustment:  { label: 'Adjustment',    gradient: 'from-sky-500 to-blue-600',     dot: 'bg-sky-100 text-sky-700' },
+        };
+        const meta = TYPE_META[manualType];
+        const hoursNum = parseFloat(manualHours);
+        const validHours = !Number.isNaN(hoursNum) && hoursNum >= 0.25 && hoursNum <= 16;
+
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden">
+              {/* Hero gradient swaps based on type */}
+              <div className={`bg-gradient-to-br ${meta.gradient} p-5 text-white`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-white/75">Add Time Entry</p>
+                    <h3 className="text-xl font-bold leading-tight mt-0.5">{meta.label}</h3>
+                    <p className="text-xs text-white/80 mt-0.5">{operator?.full_name ?? '—'} · {formatDayName(manualDate)}</p>
+                  </div>
+                  <button
+                    onClick={() => setShowManualModal(false)}
+                    className="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center text-white"
+                    aria-label="Close"
+                  >
+                    <XCircle size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {/* Type picker chips */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Type</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                    {(Object.keys(TYPE_META) as Array<keyof typeof TYPE_META>).map(key => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setManualType(key)}
+                        className={`px-2.5 py-2 rounded-lg text-xs font-semibold transition border ${
+                          manualType === key
+                            ? `bg-gradient-to-br ${TYPE_META[key].gradient} text-white border-transparent shadow-sm`
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {TYPE_META[key].label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Hours */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Hours</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step={0.25}
+                      min={0.25}
+                      max={16}
+                      value={manualHours}
+                      onChange={(e) => setManualHours(e.target.value)}
+                      className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base font-semibold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
+                    />
+                    <div className="flex gap-1.5">
+                      {['4', '8'].map(h => (
+                        <button
+                          key={h}
+                          type="button"
+                          onClick={() => setManualHours(h)}
+                          className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold transition"
+                        >
+                          {h}h
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {manualType === 'pto' && validHours && ptoBalance && (
+                    <p className="text-[11px] text-emerald-700 mt-1.5">
+                      Will use <strong>{(hoursNum / 8).toFixed(2)} day(s)</strong> · {Math.max(0, ptoBalance.allocated - ptoBalance.used - hoursNum / 8).toFixed(1)} day(s) remaining after
+                    </p>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Notes (optional)</label>
+                  <textarea
+                    value={manualNotes}
+                    onChange={(e) => setManualNotes(e.target.value)}
+                    rows={2}
+                    placeholder="e.g. doctor appointment, called out morning of, federal holiday"
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 text-sm text-gray-900 resize-none placeholder-gray-400"
+                  />
+                </div>
+
+                {manualError && (
+                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-sm text-rose-700">
+                    {manualError}
+                  </div>
+                )}
+
+                <div className="flex gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowManualModal(false)}
+                    className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={manualSaving || !validHours}
+                    onClick={async () => {
+                      setManualError(null);
+                      if (!validHours) { setManualError('Hours must be between 0.25 and 16.'); return; }
+                      setManualSaving(true);
+                      try {
+                        const token = await getSessionToken();
+                        if (!token) { setManualError('Session expired'); return; }
+                        const res = await fetch('/api/admin/timecards/manual', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                          body: JSON.stringify({
+                            user_id: operatorId,
+                            date: manualDate,
+                            entry_type: manualType,
+                            hours: hoursNum,
+                            notes: manualNotes.trim() || null,
+                          }),
+                        });
+                        const j = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          setManualError(j.error || j.details || 'Failed to add entry.');
+                          return;
+                        }
+                        setShowManualModal(false);
+                        fetchData();
+                      } catch (err: any) {
+                        setManualError(err.message || 'Failed to add entry.');
+                      } finally {
+                        setManualSaving(false);
+                      }
+                    }}
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm text-white shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-br ${meta.gradient}`}
+                  >
+                    {manualSaving ? 'Saving…' : `Log ${meta.label}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Reject Modal ───────────────────────────────────── */}
       {showRejectModal && (

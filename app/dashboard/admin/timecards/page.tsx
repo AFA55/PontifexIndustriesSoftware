@@ -969,36 +969,18 @@ export default function AdminTimecardsPage() {
                         {/* Actions */}
                         <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                            {/* Detail button removed — entire row is already clickable (see row's onClick).
+                                Click-anywhere-on-row navigates to operator detail. The legacy quick-Edit
+                                button is also removed; admins now edit from inside the detail page where
+                                the day-cell edit affordance is bigger and clearer. */}
                             <button
                               onClick={(e) => { e.stopPropagation(); navigateToOperator(member.userId); }}
                               className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white rounded-md text-[11px] font-semibold border border-gray-200 dark:border-white/10 transition-all"
+                              aria-label="Open detail"
                             >
                               <Eye size={11} />
-                              Detail
+                              View
                             </button>
-                            {(() => {
-                              const lateDay = DAY_NAMES.find(d => member.dailyHours[d]?.firstTimecardId);
-                              const lateDayInfo = lateDay ? member.dailyHours[lateDay] : null;
-                              if (!lateDayInfo?.firstTimecardId) return null;
-                              return (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const clockIn = lateDayInfo.firstClockIn || '';
-                                    // Convert to datetime-local format (YYYY-MM-DDTHH:mm)
-                                    const formatted = clockIn ? clockIn.slice(0, 16) : '';
-                                    setEditClockInTarget({ timecardId: lateDayInfo.firstTimecardId!, currentClockIn: clockIn, memberName: member.fullName });
-                                    setEditClockInTime(formatted);
-                                    setEditClockInNotes('');
-                                  }}
-                                  className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-md text-[11px] font-semibold border border-blue-200 dark:border-blue-400/30 transition-all"
-                                  title="Correct clock-in time"
-                                >
-                                  <Edit2 size={11} />
-                                  Edit
-                                </button>
-                              );
-                            })()}
                             {member.pendingCount > 0 && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleApproveUser(member.userId); }}

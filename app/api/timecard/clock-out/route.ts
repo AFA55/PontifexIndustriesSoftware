@@ -202,10 +202,11 @@ export async function POST(request: NextRequest) {
     try {
       const { data: profileRow } = await supabaseAdmin
         .from('profiles')
-        .select('tenant_id, default_lunch_minutes')
+        .select('tenant_id, role, default_lunch_minutes')
         .eq('id', user.id)
         .single();
       const tenantId = profileRow?.tenant_id;
+      const userRoleForLunch: string = profileRow?.role || '';
       const userLunchOverride: number | null = profileRow?.default_lunch_minutes ?? null;
 
       let settingsQuery = supabaseAdmin
@@ -219,11 +220,23 @@ export async function POST(request: NextRequest) {
       const breakThreshold = tcSettings?.break_threshold_hours ?? 6;
       const breakIsPaid = tcSettings?.break_is_paid ?? false;
 
-      // Per-user wins over tenant. 0 is a valid value ("no lunch by default").
+      // Per-role baseline: shop_manager + shop_help take a 1-hour lunch by default.
+      // Other roles fall through to the tenant default (typically 30min).
+      const ROLE_DEFAULT_LUNCH: Record<string, number> = {
+        shop_manager: 60,
+        shop_help: 60,
+      };
+      const roleDefault = ROLE_DEFAULT_LUNCH[userRoleForLunch];
+
+      // Resolution order:
+      //   1. profile.default_lunch_minutes (explicit per-user, wins)
+      //   2. role default (shop_manager/shop_help → 60min)
+      //   3. tenant default (timecard_settings.break_duration_minutes)
+      // 0 is a valid value at any layer ("no lunch by default").
       const effectiveBreakDuration =
         userLunchOverride !== null && userLunchOverride !== undefined
           ? userLunchOverride
-          : tenantBreakDuration;
+          : (roleDefault !== undefined ? roleDefault : tenantBreakDuration);
 
       if (autoDeduct && totalHours > breakThreshold && effectiveBreakDuration > 0) {
         breakMinutesDeducted = effectiveBreakDuration;

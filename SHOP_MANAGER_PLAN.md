@@ -8,6 +8,86 @@ This is a substantial new module. The goal of this doc is to make sure we build 
 
 ---
 
+## Phase C — Refinements after on-site usage (May 10, 2026)
+
+After Phase B(i) shipped to prod and the shop manager started using it, user fed back five precise refinements. Two are tiny (shipped this session); three are full sub-phases (queued).
+
+### C(i) — SHIPPED May 10
+- **Bug fix**: shop_manager hit `Forbidden. Sales staff access required` on the dashboard because the schedule-board API was gated by `requireSalesStaff` which excluded shop_manager. New `requireScheduleViewer` guard (SALES_STAFF + shop_manager) wraps `/api/admin/schedule-board`, `/api/admin/active-jobs`, `/api/admin/active-jobs-summary`. **Read-only — write routes (schedule-form POST, job-orders PATCH, etc.) keep stricter guards.**
+- **shop_manager sidebar gains Schedule Board + Active Jobs** (read-only access). Hidden the "+ New Job" header button for shop_manager + shop_help since they can't create jobs.
+- **Equipment storage location → dropdown** with two option groups: `🏭 Shop` or `🚚 <truck display> · <operator first name>`. Applied to both the New Equipment form and the edit modal. Trucks loaded once via `/api/admin/equipment?kind=vehicle`. Reason: free-text was creeping into noise like "shelf 3", "Carlos's truck", etc. — dropdown forces "shop or specific truck" so smart-location stays meaningful.
+
+### C(ii)-a — SHIPPED May 10 (commit `68bb9cb5`)
+Truck-as-custodian + searchable equipment combobox. Mode toggle (🚚 Truck / ✋ Handheld) on Checkout tab. Trucks dropdown auto-resolves operator from current driver; fallback picker if truck has no driver. Equipment combobox: type to filter ~200 items by name/short_name/unit_number/asset_tag. Check-In + History reordered to lead with truck chip.
+
+### C(ii)-b foundation — SHIPPED May 10 (commit `c175782e`)
+Voice mic + parser + auto-fill, MVP slice.
+- Migration: `voice_recognition_corrections` table + pg_trgm extension + trigram indexes on equipment.name + short_name.
+- API `POST /api/admin/equipment-checkouts/voice-parse`: phrase normalization + segmentation ("to truck N", "going with X"), 6-tier scoring (cache hit > alias exact > asset_tag > short_name+unit > partial), returns top-3 alternatives per slot.
+- UI: hold-to-talk mic button (Web Speech API), inline transcript, browser-supported detection (Chrome/Edge/Safari). On stop, parse + auto-fill green-tier matches, show amber-tier picker for uncertain matches, red for unmatched.
+- Stale-closure safe: transcript mirrored in ref so onend always reads latest.
+
+### C(ii)-b polish — SHIPPED May 10 (commit `8415ef7d`)
+All four parts landed:
+- **Multi-item pending tray** — `VoiceDraft[]` state in CheckoutTab; each mic tap appends a draft to `PendingTray`. Per-draft `DraftRow` has equipment combobox + mode toggle + truck/operator picker + amber/red `AltChips` for alternatives. "Confirm All" submits sequentially; succeeded drafts removed, failed ones kept for retry.
+- **Voice corrections persisted** — `POST /api/admin/equipment-checkouts` now accepts `voice_corrections` array on body and writes to `voice_recognition_corrections` (fire-and-forget, tenant-scoped). Each entry records spoken_text, normalized_phrase, resolved_kind, resolved_id, confidence, was_corrected.
+- **Alias-learning prompt** — new `GET /api/admin/equipment/[id]/alias-suggestions` counts normalized phrases per equipment (threshold = 3) excluding phrases already in `aliases`. After Confirm All, client queries it per checked-out equipment; first hit surfaces `AliasPromptModal` which PATCHes the equipment with the merged aliases array.
+- **Audio recording** — `MediaRecorder` runs in parallel with `SpeechRecognition` in `VoiceMic`. On stop, blob is multipart-POSTed to new `voice-checkouts` bucket via `POST /api/admin/equipment-checkouts/voice-note-upload` (server uses supabaseAdmin → upload to `<tenantId>/<uuid>.<ext>` → returns 30-day signed URL). URL threads through `addDraftFromVoice` → `confirmAllDrafts` → stored on `equipment_checkouts.voice_note_url`.
+
+Build green. Migration `20260510_voice_checkouts_bucket.sql` applied. Branch only; not on main yet.
+
+### C(ii) — Voice-driven Inventory Control + truck-as-custodian (HISTORICAL — see C(ii)-a + C(ii)-b above)
+User wants checkout to be voice-first. Current page asks for **operator**; should ask for **truck number** instead since trucks are persistently assigned to operators.
+
+Scope:
+- Replace operator picker in Checkout tab with truck picker (vehicles dropdown).
+- Equipment dropdown → searchable combobox (current is plain `<select>` — gets unwieldy at 200 items).
+- Voice button on Checkout + Check-In tabs. Phone listens, transcribes via `SpeechRecognition` API, parses against `equipment.aliases` (already auto-seeded from May 8 work).
+- Confidence-tier confirm: ≥85% auto-save to tray, 60-85% show top-3 picker, <60% free-text.
+- Audio recording uploaded to `equipment_checkouts.voice_note_url` for audit replay.
+- Learning loop: `voice_recognition_corrections` table (schema in earlier section of this plan). After 3 successful matches of the same spoken phrase, prompt shop_manager to add as a permanent alias.
+
+**Agent plan**: `supabase-migration-author` for `voice_recognition_corrections`. General-purpose for the page rebuild. `mobile-responsive-auditor` post-build (mic button needs ≥44px tap target on mobile).
+
+### C(iii) — Fleet maintenance history + oil/filter change tracking (next session)
+User wants Fleet detail to show service history (oil changes, filter changes, repairs) with timestamps + meters + costs.
+
+Scope:
+- New `vehicle_service_records` table — date, type (oil_change / filter / brake / tire / other), odometer_at_service, cost, vendor, notes, performed_by.
+- "Add Service Record" button on `/dashboard/admin/fleet/[id]` with date, type, odometer, cost, notes.
+- History panel shows records DESC + next-service-due ribbon (oil every 5000mi, etc.).
+- Tie in: when a `maintenance_request` is marked `done` on a vehicle, auto-create a `vehicle_service_records` row referencing it.
+
+**Agent plan**: `supabase-migration-author` for the table + RLS. `rls-policy-auditor` review before merge. General-purpose for the UI panel.
+
+### C(iv) — Operator/Helper Maintenance Request card + form (next session)
+The "Report Equipment Issue" card on operator dashboard already links to `/dashboard/maintenance/new` but the page is a Phase 2 placeholder. Time to build it.
+
+Scope:
+- 3-tap mobile-first form (per the research from May 4 session):
+  - Step 1: Pick equipment (or auto-detect from current clocked-in job)
+  - Step 2: Voice memo OR photo OR free text — "what's wrong"
+  - Step 3: Priority chips (low / med / high / critical) + submit
+- POST writes a `maintenance_requests` row tagged with `submitted_by = auth.uid()`, `equipment_id`, `description`, `voice_note_url`, `priority`, `status='open'`.
+- Maintenance Inbox already exists as a placeholder sidebar item — Phase 2 builds the triage UI: tabs Inbox / Active / Closed, status transitions, photo gallery, voice playback.
+
+Plus expose the same form on the shop_help dashboard (they can also file issues, not just respond to them).
+
+**Agent plan**: `supabase-migration-author` for `maintenance_requests` table (already designed in this plan). `rls-policy-auditor` for the operator-scoped RLS. General-purpose × 2 in parallel (submit form + inbox UI). `mobile-responsive-auditor` post-build.
+
+### C(v) — Visit-wizard equipment-issues conversion hook (parallel with C(iv))
+The visit wizard already captures equipment issues into `supervisor_visits.equipment_issues` jsonb (Phase 0, May 3). Once `maintenance_requests` table exists in C(iv), a hook converts each open issue → real maintenance request row.
+
+Scope:
+- Postgres trigger OR API-side conversion on POST/PATCH of `supervisor_visits`.
+- For `action='maintenance'` → insert into `maintenance_requests` with `submitted_by = supervisor_id`, `description = whats_wrong`, original visit referenced.
+- For `action='replace'` → create a `shop_tasks` row (Phase 4 of original plan — table not yet built; defer until shop_tasks lands).
+- Flip the visit issue's `status` from `'open'` to `'converted'`.
+
+**Agent plan**: `supabase-migration-author` writes the trigger. `rls-policy-auditor` confirms it doesn't bypass row-level security.
+
+---
+
 ## Phase 0 — SHIPPED (May 5, 2026)
 
 **Supervisor visit form converted to a 3-step wizard with equipment-issue capture as a placeholder bridge to the future shop manager system.**
