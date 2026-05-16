@@ -1,7 +1,7 @@
 # Shop Manager + Shop Help — Build Plan
 
 **Owner:** Pontifex Platform
-**Status:** Phase 0, 1A, 1B all SHIPPED to feature branch (NOT main). Phase 2 starts when user signals.
+**Status:** Phase 0, 1A, 1B, C(i), C(ii)-a, C(ii)-b foundation + polish all SHIPPED to **production** (`dd28c58b`, May 11, 2026). Next: C(iii) fleet maintenance history, C(iv) operator maintenance request form, C(v) visit-wizard conversion hook.
 **Driven by:** May 5, 2026 user request. Research from two parallel agents (fleet management UX and maintenance workflow patterns).
 
 This is a substantial new module. The goal of this doc is to make sure we build it right the first time — solid schema, solid UX patterns, no regressions on the trial customer's existing experience. Read end-to-end before any code change touches any of this.
@@ -34,7 +34,7 @@ All four parts landed:
 - **Alias-learning prompt** — new `GET /api/admin/equipment/[id]/alias-suggestions` counts normalized phrases per equipment (threshold = 3) excluding phrases already in `aliases`. After Confirm All, client queries it per checked-out equipment; first hit surfaces `AliasPromptModal` which PATCHes the equipment with the merged aliases array.
 - **Audio recording** — `MediaRecorder` runs in parallel with `SpeechRecognition` in `VoiceMic`. On stop, blob is multipart-POSTed to new `voice-checkouts` bucket via `POST /api/admin/equipment-checkouts/voice-note-upload` (server uses supabaseAdmin → upload to `<tenantId>/<uuid>.<ext>` → returns 30-day signed URL). URL threads through `addDraftFromVoice` → `confirmAllDrafts` → stored on `equipment_checkouts.voice_note_url`.
 
-Build green. Migration `20260510_voice_checkouts_bucket.sql` applied. Branch only; not on main yet.
+Build green. Migration `20260510_voice_checkouts_bucket.sql` applied. **Shipped to production on May 11, 2026 via `dd28c58b`.**
 
 ### C(ii) — Voice-driven Inventory Control + truck-as-custodian (HISTORICAL — see C(ii)-a + C(ii)-b above)
 User wants checkout to be voice-first. Current page asks for **operator**; should ask for **truck number** instead since trucks are persistently assigned to operators.

@@ -1,13 +1,48 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 10, 2026 (PT 4 — C(ii)-b POLISH) | **Branch:** `claude/inspiring-swanson-31ba74` (pushed to origin, commit `8415ef7d`) — NOT yet merged anywhere | **Production:** 🚀 LIVE at https://www.pontifexindustries.com | **Build:** PASSING ✅ | **DB:** Migrations `20260510_voice_recognition_corrections` + `20260510_voice_checkouts_bucket` applied
+**Date:** May 11, 2026 (production deploy) — quiet since | **Branch:** `main` is current, last commit `dd28c58b` | **Production:** 🚀 LIVE at https://www.pontifexindustries.com (deployed `dd28c58b` on May 11, 12:40 UTC, 63s build) | **Build:** PASSING ✅ | **DB:** Migrations `20260510_voice_recognition_corrections` + `20260510_voice_checkouts_bucket` applied
+
+> **Status as of May 16, 2026:** No commits since May 11 — `origin/main`, local `main`, and the worktree branch `claude/inspiring-swanson-31ba74` all stable. User returned after ~5 days away; the platform has had several Claude Code updates in the meantime. Resume by reading the **NEXT SESSION** section below.
+
+---
+
+## 🎯 NEXT SESSION — pick up from here
+
+The May 11 production deploy shipped everything queued through C(ii)-b polish. Three unstarted Phase C items remain in `SHOP_MANAGER_PLAN.md` and are the natural next moves:
+
+1. **C(iii) — Fleet maintenance history + oil/filter change tracking.** New `vehicle_service_records` table, "Add Service Record" button on `/dashboard/admin/fleet/[id]`, history panel + next-service-due ribbon, auto-create a service record when a `maintenance_request` on a vehicle is marked `done`. Use `supabase-migration-author` for the table + RLS, `rls-policy-auditor` to review, general-purpose for the UI panel.
+
+2. **C(iv) — Operator/Helper Maintenance Request form.** The "Report Equipment Issue" card already links to `/dashboard/maintenance/new` but the page is a placeholder. Build the 3-tap mobile-first form: pick equipment (or auto-detect from current clocked-in job) → voice memo OR photo OR free text → priority chips + submit. POST writes to `maintenance_requests` with `submitted_by`, `equipment_id`, `description`, `voice_note_url`, `priority`, `status='open'`. Also build the Maintenance Inbox triage UI (tabs Inbox / Active / Closed). Expose the same form on the shop_help dashboard.
+
+3. **C(v) — Visit-wizard equipment-issues conversion hook.** When a supervisor logs an equipment issue inside a site visit report, auto-create a `maintenance_requests` row (or surface a one-tap "create maintenance request from this issue" button on the visit detail).
+
+If user wants something else, just take the prompt and run with it — they'll usually say "pick up next task" if they want the backlog.
+
+### Sanity checks before starting
+- `npm run build` from the main repo to confirm prod state still compiles
+- Read `SHOP_MANAGER_PLAN.md` for the up-to-date Phase C status
+- Read `CLAUDE.md` for working conventions (esp. RLS rules, multi-tenant, mobile-first)
+
+---
+
+## MAY 11, 2026 — Production deploy of C(ii)-b polish (`dd28c58b`)
+
+Merged `claude/inspiring-swanson-31ba74` into main via a deploy branch (used `-X theirs` to resolve textual conflicts on duplicated SHAs — both branches had re-applied the same logical commits since `0963259f` on May 2, just with different SHAs). 13 worktree-only commits landed on main, including:
+
+- 9e0d2bca timecards split picker + empty-day PTO/sick/holiday entry + balance card
+- cd3e72a9 per-role lunch (60min for shop)
+- 8798a6c9 turbopack dev flag (kills the `.next` cache-corruption loop)
+- 4e6f1244 shop_mgr Forbidden bug fix + equipment storage location dropdown
+- 68bb9cb5 C(ii)-a — truck-as-custodian + searchable equipment combobox
+- c175782e C(ii)-b foundation — voice mic + parser API + auto-fill
+- 8415ef7d C(ii)-b polish — pending tray + corrections write + alias learning + audio capture
+
+Vercel build: 63s wall-clock, ~$1-2 in build minutes. Production verified READY.
 
 ---
 
 ## MAY 10, 2026 (PT 4) — Phase C(ii)-b POLISH: pending tray + corrections write + alias learning + audio capture
 
-All four polish parts shipped. Voice checkout is now a real batched workflow with a learning loop. Commit `8415ef7d`.
-
-**Branch only — NOT main.** Verify on localhost, then merge when ready.
+All four polish parts shipped. Voice checkout is now a real batched workflow with a learning loop. Commit `8415ef7d` (now on `main` via `dd28c58b`).
 
 ### What's live
 - **Pending tray** — each tap of the mic appends a `VoiceDraft` to a tray under the mic banner. Speak many items in a row, edit each draft inline (equipment combobox + truck/operator picker + amber/red alternative chips + mode toggle), then "Confirm All" submits the whole tray sequentially. Failed drafts stay in the tray for retry; succeeded drafts disappear.
@@ -46,16 +81,14 @@ SHOP_MANAGER_PLAN.md                                                (C(ii)-b mar
 - Alias-learning modal shows ONE phrase at a time. If multiple equipment items in a single Confirm All batch each cross the threshold, the user dismisses the first then re-confirms (or we'd need to queue them — punted).
 - `voice-checkouts` bucket policies are permissive for authenticated users; the API gate at `requireAuth` is where role + tenant scoping actually lives.
 
-### Smoke-test still needed
-None automated. Manual flow above is the verification path.
+### Smoke-test status
+Live on prod via `dd28c58b` on May 11. Manual flow above is the verification path; no automated test coverage on the voice flow yet.
 
 ---
 
 ## MAY 10, 2026 (PT 3) — Phase C(ii)-b foundation: voice mic + parser + auto-fill
 
-Voice equipment checkout MVP. Hold mic, speak ("FS5000 number 5 to truck 3"), fields auto-fill. Multi-item pending tray + audio recording + learning-loop alias prompts queued for C(ii)-b polish.
-
-**Branch only — NOT main.** Commit `c175782e`.
+Voice equipment checkout MVP. Hold mic, speak ("FS5000 number 5 to truck 3"), fields auto-fill. Now superseded by C(ii)-b polish above. Commit `c175782e` (now on `main`).
 
 ### What's live
 - **pg_trgm extension** enabled (was missing).

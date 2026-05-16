@@ -254,6 +254,58 @@ For now, the auto-preview URL per branch is enough.
 - [x] Mobile audit: NPS chips collapse to 5x2 on phones (was unusably tight at 10-col)
 - [x] **Pushed 97 commits to origin/main → production live**
 
+### Session — May 3, 2026 — Supervisor Dashboard ✅ COMPLETE
+- [x] Migration `20260502_supervisor_visits` — supervisor_visits table with RLS (supervisor sees own; admin/ops/super see all-in-tenant)
+- [x] SupervisorDashboard component (lazy-loaded) — clock-in/out widget with live timer, 4 KPI tiles, Recent Visits + My Active Jobs, Quick Actions
+- [x] Site Visit Report form — pick operator → auto-populate active jobs → fill observations/issues/ratings/follow-up
+- [x] APIs: GET/POST `/api/admin/supervisor-visits`, GET/PATCH single, GET `/api/admin/operators/[id]/active-jobs?date=YYYY-MM-DD`
+- [x] New 'site_visits' RBAC card (supervisor=submit, admin/ops=read-all)
+- [x] Verified end-to-end against `supervisor@pontifex.com` demo account; bugfixes for off-by-one date and Sunday week-bounds bugs
+
+### Session — May 4–6, 2026 — Shop Manager Foundation ✅ COMPLETE
+- [x] Phase 0 — visit-wizard → equipment-issues bridge to shop manager
+- [x] Phase 1A — shop_manager + shop_help roles, dashboards, `work_location` taxonomy on profiles
+- [x] Phase 1B — equipment + fleet CRUD for shop_manager (`/dashboard/admin/equipment`, `/dashboard/admin/fleet`, full route set under `/api/admin/equipment` and `/api/admin/fleet`)
+- [x] All 7 plan questions resolved + 3 new requirements captured in `SHOP_MANAGER_PLAN.md`
+
+### Session — May 7–8, 2026 — Timecard Refinements + GPS Clock-In Fixes ✅ COMPLETE
+- [x] Admin-editable lunch deduction with override audit (`lunch_override_by/at/reason` on `timecards`)
+- [x] Clock-out GPS radius widened to 50ft (mobile drift indoors) + per-user lunch default (`profiles.default_lunch_minutes`)
+- [x] Shop manager sidebar restrictions
+- [x] Clock-in radius widened to 100ft after on-site testing (`ALLOWED_RADIUS_METERS = 30.48m`); shop pin re-centered to user-verified coordinates `34.768775733693474, -82.43564252936702`
+- [x] Admin manual time entry (PTO + sick + holiday + manual hours); migration extends `timecards_entry_type` CHECK to allow `pto|sick|manual|admin_adjustment`
+- [x] Operator timecard split date/time picker + empty-day PTO/sick/holiday entry + balance card
+- [x] Per-role lunch defaults (60min for shop, 30min for field)
+
+### Session — May 9–10, 2026 — Inventory Foundation + Phase C(i)/C(ii) ✅ COMPLETE
+- [x] Phase B(i) — smart equipment location resolver + unified Inventory Control page (`/dashboard/admin/inventory-control`)
+- [x] C(i) — equipment storage location dropdown (`🏭 Shop` or `🚚 <truck> · <operator>`) on New Equipment + edit modal
+- [x] C(ii)-a — truck-as-custodian + searchable equipment combobox on Checkout tab; mode toggle (🚚 Truck / ✋ Handheld); Check-In + History reordered to lead with truck chip
+- [x] C(ii)-b foundation — voice mic + parser API + auto-fill MVP. Migration `20260510_voice_recognition_corrections` + pg_trgm + trigram indexes. 6-tier scoring (cache > alias > asset_tag > short_name+unit > partial > trigram). Returns top-3 alternatives per slot.
+- [x] Shop_manager Forbidden bug fix + read-only schedule access
+- [x] Turbopack dev flag to kill `.next` cache corruption
+
+### Session — May 10, 2026 (PT 4) — Phase C(ii)-b POLISH ✅ COMPLETE
+- [x] **Pending tray** — `VoiceDraft[]` state; speak many items, edit amber alternatives inline, "Confirm All" submits batch sequentially
+- [x] **Voice corrections persisted** — `POST /api/admin/equipment-checkouts` accepts `voice_corrections[]` body field → writes to `voice_recognition_corrections` (fire-and-forget, tenant-scoped, `was_corrected = top1 !== user_pick`)
+- [x] **Alias-learning prompt** — new `GET /api/admin/equipment/[id]/alias-suggestions` (threshold = 3); `AliasPromptModal` PATCHes equipment with merged aliases
+- [x] **Audio recording** — MediaRecorder in parallel with SpeechRecognition; multipart upload to non-public `voice-checkouts` bucket via `POST /api/admin/equipment-checkouts/voice-note-upload`; 30-day signed URL on `equipment_checkouts.voice_note_url`
+- [x] Migration `20260510_voice_checkouts_bucket.sql` applied
+
+### Session — May 11, 2026 — Production Deploy of C(ii)-b Polish ✅ COMPLETE
+- [x] Merged `claude/inspiring-swanson-31ba74` into `main` via deploy branch (`-X theirs` for textual conflicts on duplicated SHAs)
+- [x] **Pushed `dd28c58b` to origin/main → production live** (63s build, ~$1-2 cost)
+- [x] Verified READY on https://www.pontifexindustries.com via Vercel API
+
+### Next Session — C(iii) / C(iv) / C(v) (per SHOP_MANAGER_PLAN.md)
+- [ ] **C(iii)** — Fleet maintenance history + oil/filter change tracking (`vehicle_service_records` table; service history panel; auto-create from completed maintenance_request)
+- [ ] **C(iv)** — Operator/Helper Maintenance Request 3-tap form at `/dashboard/maintenance/new` (currently a placeholder); Maintenance Inbox triage UI; shop_help dashboard also exposes the form
+- [ ] **C(v)** — Visit-wizard equipment-issues conversion hook (auto-create maintenance_request when supervisor logs an issue inside a visit report)
+
 ### Ongoing / As-Needed
 - [ ] SMS integration for signature request delivery
 - [ ] Schedule board performance optimization
+- [ ] Apply pending migrations: `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql`
+- [ ] Set `CRON_SECRET` env var in Vercel dashboard (required for `/api/cron/invoice-30d-reminders`)
+- [ ] Patriot-specific visual assets (logos, custom colors)
+- [ ] Loading states & error handling audit across remaining pages
