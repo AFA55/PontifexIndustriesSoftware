@@ -26,12 +26,42 @@ import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS } from '@/lib/
 
 const NIGHT_SHIFT_START_HOUR = 15;
 
+// Haversine distance in kilometres between two lat/lon points
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
     const user = { id: auth.userId, email: auth.userEmail };
+
+    // -- Rate limit: reject if last clock-in was < 60 seconds ago --
+    const { data: recentEntry } = await supabaseAdmin
+      .from('timecards')
+      .select('id, clock_in_time')
+      .eq('user_id', user.id)
+      .order('clock_in_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentEntry) {
+      const secondsAgo = (Date.now() - new Date(recentEntry.clock_in_time).getTime()) / 1000;
+      if (secondsAgo < 60) {
+        return NextResponse.json(
+          { error: 'Please wait before clocking in again.', block_type: 'rate_limited' },
+          { status: 429 }
+        );
+      }
+    }
 
     const body = await request.json();
     const {
@@ -189,7 +219,22 @@ export async function POST(request: NextRequest) {
 
     // -- Hour categorization --
     const now = new Date();
-    const todayDate = now.toISOString().split('T')[0];
+
+    // Fetch tenant timezone for accurate "today" date computation.
+    // UTC-based split breaks for eastern-timezone operators clocking in late at night.
+    const tenantId = auth.tenantId || null;
+    let tenantTz = 'America/New_York';
+    try {
+      const { data: tenantRow } = await supabaseAdmin
+        .from('tenants')
+        .select('timezone')
+        .eq('id', tenantId)
+        .maybeSingle();
+      if (tenantRow?.timezone) tenantTz = tenantRow.timezone;
+    } catch {
+      // Non-critical — fall back to America/New_York
+    }
+    const todayDate = now.toLocaleDateString('en-CA', { timeZone: tenantTz }); // YYYY-MM-DD
 
     // Auto-close any stale open timecards from previous days before checking today
     const { data: staleTimecards } = await supabaseAdmin
@@ -207,7 +252,27 @@ export async function POST(request: NextRequest) {
         .eq('id', stale.id);
     }
 
-    // Check for an active clock-in for TODAY only
+    // -- Global duplicate open timecard guard (any date) --
+    // Return 409 with a clear message rather than letting a Postgres constraint violation surface.
+    const { data: existingOpen } = await supabaseAdmin
+      .from('timecards')
+      .select('id, clock_in_time')
+      .eq('user_id', user.id)
+      .is('clock_out_time', null)
+      .maybeSingle();
+
+    if (existingOpen) {
+      return NextResponse.json(
+        {
+          error: 'You are already clocked in.',
+          details: `Active clock-in started at ${new Date(existingOpen.clock_in_time).toLocaleTimeString()}. Clock out first.`,
+          block_type: 'already_clocked_in',
+        },
+        { status: 409 }
+      );
+    }
+
+    // Check for an active clock-in for TODAY only (legacy path — kept for DB error surfacing)
     const { data: activeTimecard, error: checkError } = await supabaseAdmin
       .from('timecards')
       .select('*')
@@ -223,14 +288,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Note: the global check above already covers this case with a 409.
+    // This branch is now a safety net for any edge-case the global query misses.
     if (activeTimecard) {
       return NextResponse.json(
         {
-          error: 'You are already clocked in',
+          error: 'You are already clocked in.',
           details: `You clocked in at ${new Date(activeTimecard.clock_in_time).toLocaleTimeString()}. Please clock out first.`,
+          block_type: 'already_clocked_in',
           activeTimecard: { id: activeTimecard.id, clockInTime: activeTimecard.clock_in_time },
         },
-        { status: 400 }
+        { status: 409 }
       );
     }
     const currentHour = now.getHours();
@@ -248,7 +316,7 @@ export async function POST(request: NextRequest) {
 
     const insertData: Record<string, unknown> = {
       user_id: user.id,
-      tenant_id: auth.tenantId || null,
+      tenant_id: tenantId,
       clock_in_time: now.toISOString(),
       clock_in_latitude: latitude,
       clock_in_longitude: longitude,
@@ -289,6 +357,55 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to clock in' },
         { status: 500 }
       );
+    }
+
+    // -- GPS suspicious jump detection (fire-and-forget audit log) --
+    // If the user's last clock-out location is > 80 km (50 miles) away and the
+    // time gap is < 2 hours, log a suspicious_gps_jump event for admin review.
+    // This never blocks the clock-in.
+    if (hasLocation) {
+      try {
+        const { data: lastClosed } = await supabaseAdmin
+          .from('timecards')
+          .select('id, clock_out_time, clock_out_latitude, clock_out_longitude')
+          .eq('user_id', user.id)
+          .not('clock_out_time', 'is', null)
+          .not('clock_out_latitude', 'is', null)
+          .not('clock_out_longitude', 'is', null)
+          .order('clock_out_time', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lastClosed?.clock_out_latitude && lastClosed?.clock_out_longitude) {
+          const prev_clock_out_lat: number = lastClosed.clock_out_latitude;
+          const prev_clock_out_lon: number = lastClosed.clock_out_longitude;
+          const distanceKm = haversineKm(prev_clock_out_lat, prev_clock_out_lon, latitude, longitude);
+          const gapMinutes =
+            (now.getTime() - new Date(lastClosed.clock_out_time).getTime()) / 60000;
+
+          if (distanceKm > 80 && gapMinutes < 120) {
+            Promise.resolve(
+              supabaseAdmin.from('audit_logs').insert({
+                action: 'suspicious_gps_jump',
+                actor_id: user.id,
+                resource_type: 'timecard',
+                resource_id: timecard.id,
+                details: {
+                  prev_clock_out_lat,
+                  prev_clock_out_lon,
+                  new_clock_in_lat: latitude,
+                  new_clock_in_lon: longitude,
+                  distance_km: distanceKm.toFixed(1),
+                  time_gap_minutes: gapMinutes.toFixed(0),
+                },
+                tenant_id: tenantId,
+              })
+            ).catch(() => {});
+          }
+        }
+      } catch {
+        // GPS jump detection is non-critical; never block a successful clock-in
+      }
     }
 
     // -- Late detection --
@@ -332,7 +449,7 @@ export async function POST(request: NextRequest) {
               .from('profiles')
               .select('id')
               .in('role', ['super_admin', 'operations_manager', 'admin'])
-              .eq('tenant_id', auth.tenantId || '');
+              .eq('tenant_id', tenantId || '');
 
             const operatorName = profile?.full_name || user.email;
             const actualTimeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -342,7 +459,7 @@ export async function POST(request: NextRequest) {
               type: 'late_arrival',
               title: 'Late Clock-In',
               message: `${operatorName} clocked in ${lateMinutes} min late (scheduled: ${expectedTimeStr}, actual: ${actualTimeStr}) — Job: ${job.customer_name}`,
-              tenant_id: auth.tenantId || null,
+              tenant_id: tenantId,
               job_order_id: job.id,
               read: false,
               metadata: {

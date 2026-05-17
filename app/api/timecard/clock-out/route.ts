@@ -64,12 +64,27 @@ export async function POST(request: NextRequest) {
     // Check for incomplete dispatched jobs (work-performed hard block)
     const { data: userProfile } = await supabaseAdmin
       .from('profiles')
-      .select('role')
+      .select('role, tenant_id')
       .eq('id', user.id)
       .single();
 
     const userRole = userProfile?.role || '';
-    const today = new Date().toISOString().split('T')[0];
+
+    // Timezone-aware "today" — UTC split breaks for eastern-timezone operators at night.
+    let tenantTz = 'America/New_York';
+    try {
+      if (userProfile?.tenant_id) {
+        const { data: tenantRow } = await supabaseAdmin
+          .from('tenants')
+          .select('timezone')
+          .eq('id', userProfile.tenant_id)
+          .maybeSingle();
+        if (tenantRow?.timezone) tenantTz = tenantRow.timezone;
+      }
+    } catch {
+      // Non-critical — fall back to America/New_York
+    }
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz }); // YYYY-MM-DD
 
     if (['operator', 'apprentice'].includes(userRole)) {
       // For operators: check if any dispatched jobs are not completed
@@ -209,22 +224,45 @@ export async function POST(request: NextRequest) {
       const userRoleForLunch: string = profileRow?.role || '';
       const userLunchOverride: number | null = profileRow?.default_lunch_minutes ?? null;
 
-      let settingsQuery = supabaseAdmin
-        .from('timecard_settings')
-        .select('auto_deduct_break, break_duration_minutes, break_threshold_hours, break_is_paid');
-      if (tenantId) settingsQuery = settingsQuery.eq('tenant_id', tenantId);
-      const { data: tcSettings } = await settingsQuery.limit(1).maybeSingle();
+      // Query timecard_settings_v2 first (current table), fall back to legacy timecard_settings.
+      let tcSettings: Record<string, any> | null = null;
+      if (tenantId) {
+        const { data: v2 } = await supabaseAdmin
+          .from('timecard_settings_v2')
+          .select('auto_deduct_break, break_duration_minutes, break_threshold_hours, break_is_paid')
+          .eq('tenant_id', tenantId)
+          .limit(1)
+          .maybeSingle();
+        if (v2) {
+          tcSettings = v2;
+        } else {
+          const { data: v1 } = await supabaseAdmin
+            .from('timecard_settings')
+            .select('auto_deduct_break, break_duration_minutes, break_threshold_hours, break_is_paid')
+            .eq('tenant_id', tenantId)
+            .limit(1)
+            .maybeSingle();
+          tcSettings = v1 ?? null;
+        }
+      }
 
       const autoDeduct = tcSettings?.auto_deduct_break ?? true;
       const tenantBreakDuration = tcSettings?.break_duration_minutes ?? 30;
       const breakThreshold = tcSettings?.break_threshold_hours ?? 6;
       const breakIsPaid = tcSettings?.break_is_paid ?? false;
 
-      // Per-role baseline: shop_manager + shop_help take a 1-hour lunch by default.
-      // Other roles fall through to the tenant default (typically 30min).
+      // Per-role lunch baselines. Shop roles get 60 min; all field roles get 30 min.
+      // Profile-level default_lunch_minutes still wins over these when set.
       const ROLE_DEFAULT_LUNCH: Record<string, number> = {
         shop_manager: 60,
         shop_help: 60,
+        operator: 30,
+        apprentice: 30,
+        supervisor: 30,
+        salesman: 30,
+        operations_manager: 30,
+        admin: 30,
+        super_admin: 30,
       };
       const roleDefault = ROLE_DEFAULT_LUNCH[userRoleForLunch];
 
