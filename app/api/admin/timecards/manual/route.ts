@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   // Verify the user belongs to this tenant
   const { data: targetProfile, error: profErr } = await supabaseAdmin
     .from('profiles')
-    .select('id, tenant_id, full_name')
+    .select('id, tenant_id, full_name, role')
     .eq('id', user_id)
     .single();
   if (profErr || !targetProfile) return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -72,6 +72,11 @@ export async function POST(request: NextRequest) {
   // Build clock_in_time + clock_out_time as timestamps
   const clockInIso = new Date(`${date}T${startTime}:00`).toISOString();
   const clockOutIso = new Date(new Date(clockInIso).getTime() + hours * 3_600_000).toISOString();
+
+  // Derive work_location from the target user's role so the "who's at the shop"
+  // dashboard query isn't corrupted by field operators logging PTO/sick days.
+  const shopRoles = new Set(['shop_manager', 'shop_help']);
+  const workLocation = shopRoles.has((targetProfile as any).role ?? '') ? 'shop' : 'field';
 
   const insert: Record<string, unknown> = {
     user_id,
@@ -93,7 +98,7 @@ export async function POST(request: NextRequest) {
     timecard_source: 'manual',
     admin_notes: notes,
     notes,
-    work_location: 'shop',
+    work_location: workLocation,
     is_shop_hours: false,
     is_night_shift: false,
     auto_lunch_applied: false,

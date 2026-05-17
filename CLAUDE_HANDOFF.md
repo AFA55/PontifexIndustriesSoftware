@@ -77,7 +77,7 @@ SHOP_MANAGER_PLAN.md                                                (C(ii)-b mar
 ### Known caveats
 - Audio capture asks for a SECOND mic permission on first use (separate from the SpeechRecognition prompt). Once granted, both share the same permission afterward.
 - Audio gracefully degrades — if the user denies the second prompt, voice still works, the draft just has `audio_url: null`.
-- The 30-day signed URL is generated at upload time. After 30 days, `voice_note_url` will 404; we'd need a `GET /api/admin/equipment-checkouts/[id]/voice-note` re-sign endpoint to fix this if audit replay starts being used heavily.
+- The 30-day signed URL is generated at upload time. After 30 days, `voice_note_url` will 404. The re-sign endpoint now exists: `GET /api/admin/equipment-checkouts/[checkoutId]/voice-note` — returns `{ url }` with a fresh 30-day signed URL. The inventory-control frontend should call this endpoint when `voice_note_url` returns a 404 on load, rather than showing a broken link (TODO: wire up on-demand re-sign in the audit-replay player).
 - Alias-learning modal shows ONE phrase at a time. If multiple equipment items in a single Confirm All batch each cross the threshold, the user dismisses the first then re-confirms (or we'd need to queue them — punted).
 - `voice-checkouts` bucket policies are permissive for authenticated users; the API gate at `requireAuth` is where role + tenant scoping actually lives.
 

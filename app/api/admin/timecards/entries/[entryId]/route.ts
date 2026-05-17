@@ -34,6 +34,31 @@ export async function PATCH(
     const body = await request.json();
     const { clock_in, clock_out, pay_category, is_shop_time, admin_notes, lunch_duration_minutes, lunch_override_reason } = body;
 
+    // Block self-approval: an admin cannot approve their own timecard.
+    const isApprovingAction = body.is_approved === true || body.approval_status === 'approved';
+    if (isApprovingAction) {
+      // We need the user_id from whichever table holds this entry.
+      // Check timecard_entries first, then timecards.
+      const { data: entryOwner } = await supabaseAdmin
+        .from('timecard_entries')
+        .select('user_id')
+        .eq('id', entryId)
+        .maybeSingle();
+      const ownerId = entryOwner?.user_id ?? (
+        await supabaseAdmin
+          .from('timecards')
+          .select('user_id')
+          .eq('id', entryId)
+          .maybeSingle()
+      ).data?.user_id;
+      if (ownerId === auth.userId) {
+        return NextResponse.json(
+          { error: 'You cannot approve your own timecard. Ask another admin or a super_admin.' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Validate lunch_duration_minutes if provided (admin-only field).
     // 0 = no lunch deducted. Cap at 480 (8h) — anything more is a data-entry mistake.
     let lunchMinutes: number | undefined = undefined;
