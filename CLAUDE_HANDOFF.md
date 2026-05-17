@@ -15,10 +15,7 @@ Three unstarted Phase C items remain in `SHOP_MANAGER_PLAN.md` and are the natur
 
 3. **C(v) — Visit-wizard equipment-issues conversion hook.** When supervisor logs an equipment issue in a site visit report, one-tap "create maintenance request from this issue" button on visit detail.
 
-**Schedule/dispatch vulnerabilities identified (see May 17 section for full list)** — highest priority items to address eventually:
-- Race condition on simultaneous operator assignment (no row locking)
-- Dispatch is not idempotent — re-clicking "Push Tickets" blasts duplicate notifications
-- Hardcoded shop GPS location in `lib/geolocation.ts` will block clock-in for any new tenant
+**All identified schedule/dispatch vulnerabilities fixed this session (see May 17 section).** Next focus: C(iii), C(iv), C(v) from SHOP_MANAGER_PLAN.md.
 
 ### Sanity checks before starting
 - `npm run build` from the main repo — 0 errors expected
@@ -61,14 +58,14 @@ Migration `20260516_timecard_uniqueness_and_timezone`:
 - `app/page.tsx` — Pontifex Industries homepage (story-driven, targets niche construction companies, non-compete safe, founder's journey narrative)
 - `app/patriot/page.tsx` — Patriot Concrete Cutting operator landing page (red/crimson brand, operator value props, links to `/company` login)
 
-### Schedule/dispatch failure analysis
-Top findings from parallel analysis agent (see NEXT SESSION for full list):
-1. **CRITICAL** — Two admins assigning same operator simultaneously: no row lock, silent double-booking
-2. **CRITICAL** — `lib/geolocation.ts` has hardcoded Patriot GPS coordinates — breaks every new tenant
-3. **CRITICAL** — Dispatch not idempotent: re-clicking "Push Tickets" duplicates all SMS/notifications
-4. **HIGH** — `job_daily_assignments ON DELETE CASCADE` wipes payroll history when job deleted
-5. **HIGH** — Multi-day job assignment mismatch: `job_orders.assigned_to` vs `job_daily_assignments` can desync
-6. **HIGH** — UTC-based date queries on schedule board miss jobs at midnight (US East timezone)
+### Schedule/dispatch vulnerabilities — ALL FIXED (commits d17e4aac, cc46f5e1, 9b16c13b)
+
+1. ✅ **EditJobPanel** — Added "Full Editor" button in Scope of Work section + "Edit Full Job in Schedule Form" CTA at bottom, both linking to `/dashboard/admin/schedule-form?editJobId=<id>`
+2. ✅ **Dispatch idempotency** — "Push Tickets" now skips operators that already received a `dispatched` notification for that date; subsequent clicks are no-ops per recipient
+3. ✅ **Hardcoded GPS** — `lib/geolocation.ts` now accepts `ShopOverride` param; clock-in/out routes read `tenants.shop_latitude/longitude/shop_name/radius` and pass it through; migration `20260517_tenant_shop_location.sql` applied
+4. ✅ **UTC date split** — Schedule board routes (main, capacity, crew-grid, skill-match) now use TZ-aware `toLocaleDateString('en-CA', { timeZone: tenantTz })` for server-side "today"
+5. ✅ **Assignment race condition** — `assign/route.ts` checks for existing assignment before upsert → 409 with job number; partial unique index `job_daily_assignments_operator_date_unique` enforces at DB level (migration applied)
+6. ✅ **CASCADE → RESTRICT** — `job_daily_assignments.job_order_id` FK changed to ON DELETE RESTRICT; job deletion route converted to soft-delete (`deleted_at` + `status: 'cancelled'`); migration `20260517_job_assignments_no_cascade.sql` applied
 
 ---
 
