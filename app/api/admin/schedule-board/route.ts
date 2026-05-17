@@ -20,6 +20,18 @@ export async function GET(request: NextRequest) {
     const tenantId = await getTenantId(auth.userId);
 
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+
+    // Resolve tenant timezone so fallback "today" uses local date, not UTC.
+    let tenantTz = 'America/New_York';
+    try {
+      const { data: tenantRow } = await supabaseAdmin
+        .from('tenants')
+        .select('timezone')
+        .eq('id', tenantId)
+        .maybeSingle();
+      if (tenantRow?.timezone) tenantTz = tenantRow.timezone;
+    } catch { /* non-critical */ }
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date'); // YYYY-MM-DD
     const startDate = searchParams.get('startDate');
@@ -44,7 +56,7 @@ export async function GET(request: NextRequest) {
       // AND (has no end_date OR ends on or after startDate)
       query = query.lte('scheduled_date', endDate).or(`end_date.is.null,end_date.gte.${startDate}`);
     } else {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
       query = query.lte('scheduled_date', today).or(`end_date.is.null,end_date.gte.${today}`);
     }
 

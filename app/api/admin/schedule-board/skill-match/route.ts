@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch badge eligibility if a requiredBadge was specified
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // YYYY-MM-DD
     const badgeMap = new Map<string, { hasBadge: boolean; badgeExpiry: string | null }>();
     if (requiredBadge) {
       const operatorIds = (operators || []).map((op) => op.id);

@@ -1,4 +1,4 @@
-33./**
+/**
  * Geolocation utilities for time tracking
  * Handles distance calculation and location verification
  */
@@ -25,33 +25,28 @@ export const ALLOWED_RADIUS_METERS = 30.48;
 export const ALLOWED_RADIUS_CLOCKOUT_METERS = 30.48;
 
 /**
- * Same shape as isWithinShopRadius but uses the wider clock-out radius.
- */
-export function isWithinShopRadiusForClockout(userLocation: Coordinates): {
-  isWithinRange: boolean;
-  distance: number;
-  distanceFormatted: string;
-} {
-  const distance = calculateDistance(
-    userLocation.latitude,
-    userLocation.longitude,
-    SHOP_LOCATION.latitude,
-    SHOP_LOCATION.longitude
-  );
-  const isWithinRange = distance <= ALLOWED_RADIUS_CLOCKOUT_METERS;
-  const distanceFormatted = distance < 1000
-    ? `${Math.round(distance)}m`
-    : `${(distance / 1000).toFixed(2)}km`;
-  return { isWithinRange, distance, distanceFormatted };
-}
-
-/**
  * Location coordinates interface
  */
 export interface Coordinates {
   latitude: number;
   longitude: number;
   accuracy?: number; // GPS accuracy in meters
+}
+
+/**
+ * Per-tenant shop location override.
+ * When provided, isWithinShopRadius / isWithinShopRadiusForClockout use these
+ * values instead of the hardcoded SHOP_LOCATION / ALLOWED_RADIUS_* constants.
+ * Falls back to the constants when any field is absent.
+ */
+export interface ShopOverride {
+  latitude: number;
+  longitude: number;
+  name?: string;
+  /** Override radius in meters for clock-in (falls back to ALLOWED_RADIUS_METERS). */
+  radius?: number;
+  /** Override radius in meters for clock-out (falls back to ALLOWED_RADIUS_CLOCKOUT_METERS). */
+  clockOutRadius?: number;
 }
 
 /**
@@ -86,24 +81,33 @@ export function calculateDistance(
 }
 
 /**
- * Check if coordinates are within allowed radius of shop location
+ * Check if coordinates are within allowed radius of shop location.
+ * Pass shopOverride to use a tenant-specific shop pin instead of the hardcoded default.
  *
  * @param userLocation - User's current location
+ * @param shopOverride - Optional per-tenant shop coordinates + radius
  * @returns Object with isWithinRange boolean and distance in meters
  */
-export function isWithinShopRadius(userLocation: Coordinates): {
+export function isWithinShopRadius(
+  userLocation: Coordinates,
+  shopOverride?: ShopOverride,
+): {
   isWithinRange: boolean;
   distance: number;
   distanceFormatted: string;
 } {
+  const shopLat = shopOverride?.latitude ?? SHOP_LOCATION.latitude;
+  const shopLon = shopOverride?.longitude ?? SHOP_LOCATION.longitude;
+  const radius = shopOverride?.radius ?? ALLOWED_RADIUS_METERS;
+
   const distance = calculateDistance(
     userLocation.latitude,
     userLocation.longitude,
-    SHOP_LOCATION.latitude,
-    SHOP_LOCATION.longitude
+    shopLat,
+    shopLon,
   );
 
-  const isWithinRange = distance <= ALLOWED_RADIUS_METERS;
+  const isWithinRange = distance <= radius;
 
   // Format distance for display
   let distanceFormatted: string;
@@ -118,6 +122,35 @@ export function isWithinShopRadius(userLocation: Coordinates): {
     distance,
     distanceFormatted,
   };
+}
+
+/**
+ * Same shape as isWithinShopRadius but uses the clock-out radius.
+ * Pass shopOverride to use a tenant-specific shop pin instead of the hardcoded default.
+ */
+export function isWithinShopRadiusForClockout(
+  userLocation: Coordinates,
+  shopOverride?: ShopOverride,
+): {
+  isWithinRange: boolean;
+  distance: number;
+  distanceFormatted: string;
+} {
+  const shopLat = shopOverride?.latitude ?? SHOP_LOCATION.latitude;
+  const shopLon = shopOverride?.longitude ?? SHOP_LOCATION.longitude;
+  const radius = shopOverride?.clockOutRadius ?? ALLOWED_RADIUS_CLOCKOUT_METERS;
+
+  const distance = calculateDistance(
+    userLocation.latitude,
+    userLocation.longitude,
+    shopLat,
+    shopLon,
+  );
+  const isWithinRange = distance <= radius;
+  const distanceFormatted = distance < 1000
+    ? `${Math.round(distance)}m`
+    : `${(distance / 1000).toFixed(2)}km`;
+  return { isWithinRange, distance, distanceFormatted };
 }
 
 /**

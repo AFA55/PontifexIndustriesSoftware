@@ -24,15 +24,17 @@ export async function GET(request: NextRequest) {
     const daysParam = parseInt(searchParams.get('days') || '14');
     const days = Math.min(Math.max(daysParam, 7), 30);
 
-    // Build date range
-    const startDate = startDateParam ? new Date(startDateParam) : new Date();
-    startDate.setHours(0, 0, 0, 0);
+    // Build date range — use en-CA locale (YYYY-MM-DD) with America/New_York fallback
+    // so the date list is correct in US time rather than UTC.
+    const TZ = 'America/New_York'; // best-effort; no per-tenant lookup needed here
+    const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+    const startDate = startDateParam ? new Date(startDateParam + 'T12:00:00') : new Date(todayLocal + 'T12:00:00');
 
     const dates: string[] = [];
     for (let i = 0; i < days; i++) {
       const d = new Date(startDate);
       d.setDate(d.getDate() + i);
-      dates.push(d.toISOString().split('T')[0]);
+      dates.push(d.toLocaleDateString('en-CA', { timeZone: TZ }));
     }
 
     const endDate = dates[dates.length - 1];
@@ -167,7 +169,7 @@ export async function GET(request: NextRequest) {
           dayNum: new Date(d + 'T12:00:00').getDate(),
           month: new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' }),
           isWeekend: [0, 6].includes(new Date(d + 'T12:00:00').getDay()),
-          isToday: d === new Date().toISOString().split('T')[0],
+          isToday: d === todayLocal,
         })),
         rows: [unassignedRow, ...rows],
         totalOperators: activeOperators.length,

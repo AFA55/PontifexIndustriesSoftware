@@ -67,7 +67,10 @@ export async function GET(request: NextRequest) {
 
     // ── Find Next Available Date ──
     if (findNext) {
-      const start = fromDate || new Date().toISOString().split('T')[0];
+      // Use local date for the tenant so we don't roll to tomorrow at UTC midnight.
+      // Fallback to America/New_York when the tenant timezone isn't known here.
+      const localToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+      const start = fromDate || localToday;
       for (let i = 0; i < 90; i++) {
         const d = new Date(start + 'T12:00:00');
         d.setDate(d.getDate() + i);

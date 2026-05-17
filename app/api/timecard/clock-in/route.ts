@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
-import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS } from '@/lib/geolocation';
+import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS, ShopOverride } from '@/lib/geolocation';
 
 const NIGHT_SHIFT_START_HOUR = 15;
 
@@ -164,6 +164,35 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // -- Hour categorization --
+    const now = new Date();
+
+    // Fetch tenant timezone + shop GPS fields for accurate date + per-tenant clock-in radius.
+    // UTC-based split breaks for eastern-timezone operators clocking in late at night.
+    const tenantId = auth.tenantId || null;
+    let tenantTz = 'America/New_York';
+    let shopOverride: ShopOverride | undefined;
+    try {
+      const { data: tenantRow } = await supabaseAdmin
+        .from('tenants')
+        .select('timezone, shop_latitude, shop_longitude, shop_name, clock_in_radius_meters, clock_out_radius_meters')
+        .eq('id', tenantId)
+        .maybeSingle();
+      if (tenantRow?.timezone) tenantTz = tenantRow.timezone;
+      if (tenantRow?.shop_latitude != null && tenantRow?.shop_longitude != null) {
+        shopOverride = {
+          latitude: tenantRow.shop_latitude,
+          longitude: tenantRow.shop_longitude,
+          name: tenantRow.shop_name ?? SHOP_LOCATION.name,
+          radius: tenantRow.clock_in_radius_meters ?? undefined,
+          clockOutRadius: tenantRow.clock_out_radius_meters ?? undefined,
+        };
+      }
+    } catch {
+      // Non-critical — fall back to hardcoded Patriot pin
+    }
+    const todayDate = now.toLocaleDateString('en-CA', { timeZone: tenantTz }); // YYYY-MM-DD
+
     // -- Method-specific validation --
 
     if (clock_in_method === 'nfc') {
@@ -206,17 +235,19 @@ export async function POST(request: NextRequest) {
     } else if (clock_in_method === 'pin') {
       // PIN already verified by /api/timecard/verify-pin before this call; no extra check needed here
     } else {
-      // GPS clock-in: verify location within shop radius
-      const locationCheck = isWithinShopRadius({ latitude, longitude, accuracy });
+      // GPS clock-in: verify location within shop radius (per-tenant pin when configured)
+      const locationCheck = isWithinShopRadius({ latitude, longitude, accuracy }, shopOverride);
+      const shopName = shopOverride?.name ?? SHOP_LOCATION.name;
+      const allowedRadiusMeters = shopOverride?.radius ?? ALLOWED_RADIUS_METERS;
 
       if (!locationCheck.isWithinRange) {
         return NextResponse.json(
           {
-            error: `You must be at ${SHOP_LOCATION.name} to clock in with GPS.`,
-            details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(ALLOWED_RADIUS_METERS * 3.28084).toFixed(0)} feet.`,
+            error: `You must be at ${shopName} to clock in with GPS.`,
+            details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(allowedRadiusMeters * 3.28084).toFixed(0)} feet.`,
             distance: locationCheck.distance,
             distanceFormatted: locationCheck.distanceFormatted,
-            allowedRadius: ALLOWED_RADIUS_METERS,
+            allowedRadius: allowedRadiusMeters,
             hint: 'Try scanning an NFC tag or use Remote Clock-In if you are at a jobsite.',
           },
           { status: 403 }
@@ -230,25 +261,6 @@ export async function POST(request: NextRequest) {
       .select('full_name, email')
       .eq('id', user.id)
       .single();
-
-    // -- Hour categorization --
-    const now = new Date();
-
-    // Fetch tenant timezone for accurate "today" date computation.
-    // UTC-based split breaks for eastern-timezone operators clocking in late at night.
-    const tenantId = auth.tenantId || null;
-    let tenantTz = 'America/New_York';
-    try {
-      const { data: tenantRow } = await supabaseAdmin
-        .from('tenants')
-        .select('timezone')
-        .eq('id', tenantId)
-        .maybeSingle();
-      if (tenantRow?.timezone) tenantTz = tenantRow.timezone;
-    } catch {
-      // Non-critical — fall back to America/New_York
-    }
-    const todayDate = now.toLocaleDateString('en-CA', { timeZone: tenantTz }); // YYYY-MM-DD
 
     // Auto-close any stale open timecards from previous days before checking today
     const { data: staleTimecards } = await supabaseAdmin
@@ -505,7 +517,7 @@ export async function POST(request: NextRequest) {
     flags.push(`Method: ${clock_in_method.toUpperCase()}`);
 
     const locationCheck = hasLocation
-      ? isWithinShopRadius({ latitude, longitude, accuracy })
+      ? isWithinShopRadius({ latitude, longitude, accuracy }, shopOverride)
       : { isWithinRange: false, distance: 0, distanceFormatted: 'N/A' };
 
     console.log(`Clock in: ${profile?.full_name || user.email} at ${now.toLocaleTimeString()} [${flags.join(', ')}]`);

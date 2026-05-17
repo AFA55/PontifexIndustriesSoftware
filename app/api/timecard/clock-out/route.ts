@@ -15,6 +15,7 @@ import {
   isWithinShopRadiusForClockout,
   SHOP_LOCATION,
   ALLOWED_RADIUS_CLOCKOUT_METERS,
+  ShopOverride,
 } from '@/lib/geolocation';
 
 export async function POST(request: NextRequest) {
@@ -71,15 +72,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Verify location is within shop radius — but only enforce for GPS-clocked-in users.
-    // NFC and remote clock-ins may be at jobsites, so we record location but don't block.
     const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
-    const locationCheck = hasLocation
-      ? isWithinShopRadiusForClockout({ latitude, longitude, accuracy })
-      : { isWithinRange: false, distance: 0, distanceFormatted: 'unknown' };
-
-    // Look up how this user clocked in to decide whether to enforce GPS radius
-    // (We fetch the active timecard below, so we'll do the enforcement check after that)
 
     // Check for incomplete dispatched jobs (work-performed hard block)
     const { data: userProfile } = await supabaseAdmin
@@ -90,21 +83,36 @@ export async function POST(request: NextRequest) {
 
     const userRole = userProfile?.role || '';
 
-    // Timezone-aware "today" — UTC split breaks for eastern-timezone operators at night.
+    // Timezone-aware "today" + per-tenant shop GPS pin for clock-out radius check.
     let tenantTz = 'America/New_York';
+    let shopOverride: ShopOverride | undefined;
     try {
       if (userProfile?.tenant_id) {
         const { data: tenantRow } = await supabaseAdmin
           .from('tenants')
-          .select('timezone')
+          .select('timezone, shop_latitude, shop_longitude, shop_name, clock_in_radius_meters, clock_out_radius_meters')
           .eq('id', userProfile.tenant_id)
           .maybeSingle();
         if (tenantRow?.timezone) tenantTz = tenantRow.timezone;
+        if (tenantRow?.shop_latitude != null && tenantRow?.shop_longitude != null) {
+          shopOverride = {
+            latitude: tenantRow.shop_latitude,
+            longitude: tenantRow.shop_longitude,
+            name: tenantRow.shop_name ?? SHOP_LOCATION.name,
+            radius: tenantRow.clock_in_radius_meters ?? undefined,
+            clockOutRadius: tenantRow.clock_out_radius_meters ?? undefined,
+          };
+        }
       }
     } catch {
-      // Non-critical — fall back to America/New_York
+      // Non-critical — fall back to hardcoded Patriot pin
     }
     const today = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz }); // YYYY-MM-DD
+
+    // Compute location check now that shopOverride is available.
+    const locationCheck = hasLocation
+      ? isWithinShopRadiusForClockout({ latitude, longitude, accuracy }, shopOverride)
+      : { isWithinRange: false, distance: 0, distanceFormatted: 'unknown' };
 
     if (['operator', 'apprentice'].includes(userRole)) {
       // For operators: check if any dispatched jobs are not completed
@@ -205,18 +213,20 @@ export async function POST(request: NextRequest) {
     // Enforce GPS radius check for GPS-based clock-ins only.
     // NFC and remote users are at jobsites, so we just record their location.
     const clockInMethod = activeTimecard.clock_in_method || 'gps';
+    const shopName = shopOverride?.name ?? SHOP_LOCATION.name;
+    const allowedClockOutRadius = shopOverride?.clockOutRadius ?? ALLOWED_RADIUS_CLOCKOUT_METERS;
     if (clockInMethod === 'gps' && hasLocation && !locationCheck.isWithinRange) {
       return NextResponse.json(
         {
-          error: `You must be at ${SHOP_LOCATION.name} to clock out.`,
-          details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(ALLOWED_RADIUS_CLOCKOUT_METERS * 3.28084).toFixed(0)} feet (${ALLOWED_RADIUS_CLOCKOUT_METERS}m).`,
+          error: `You must be at ${shopName} to clock out.`,
+          details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(allowedClockOutRadius * 3.28084).toFixed(0)} feet (${allowedClockOutRadius}m).`,
           distance: locationCheck.distance,
           distanceFormatted: locationCheck.distanceFormatted,
-          allowedRadius: ALLOWED_RADIUS_CLOCKOUT_METERS,
+          allowedRadius: allowedClockOutRadius,
           shopLocation: {
-            latitude: SHOP_LOCATION.latitude,
-            longitude: SHOP_LOCATION.longitude,
-            name: SHOP_LOCATION.name,
+            latitude: shopOverride?.latitude ?? SHOP_LOCATION.latitude,
+            longitude: shopOverride?.longitude ?? SHOP_LOCATION.longitude,
+            name: shopName,
           },
           userLocation: { latitude, longitude, accuracy },
         },
@@ -368,13 +378,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's profile for name
-    const { data: profile } = await supabaseAdmin
+    const { data: profileForName } = await supabaseAdmin
       .from('profiles')
       .select('full_name')
       .eq('id', user.id)
       .single();
 
-    console.log(`Clock out: ${profile?.full_name || user.email} at ${now.toLocaleTimeString()}, ${totalHours.toFixed(2)} hrs`);
+    console.log(`Clock out: ${profileForName?.full_name || user.email} at ${now.toLocaleTimeString()}, ${totalHours.toFixed(2)} hrs`);
 
     return NextResponse.json(
       {
