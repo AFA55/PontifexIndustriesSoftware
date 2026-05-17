@@ -1,7 +1,7 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 17, 2026 | **Branch:** `main` | **Last commit:** `d38bbd17` | **Production:** 🚀 LIVE https://www.pontifexindustries.com (last deployed `dd28c58b` May 11 — pending push of May 16-17 changes) | **Build:** PASSING ✅ | **DB:** Migration `20260516_timecard_uniqueness_and_timezone` applied
+**Date:** May 17, 2026 | **Branch:** `main` | **Last commit:** `72b89d6a` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com (needs Vercel deploy to get May 16-17 changes live) | **Build:** PASSING ✅
 
-> **Status as of May 17, 2026 — testing session + clock-in hardening complete.** User did a real-world test of clocking features; fixed lunch deduction, manual time entry, and patched 8 clock-in/out vulnerabilities. Next moves are C(iii), C(iv), C(v) from SHOP_MANAGER_PLAN.md. Need to push local main to origin before next Vercel deploy.
+> **Status as of May 17, 2026 (end of session).** Major session: clock hardening, 6 schedule/dispatch vulnerability fixes, auto clock-out cron, time correction request system, supervisor clock-in/out integration. Next: C(iii), C(iv), C(v) from SHOP_MANAGER_PLAN.md. Remember to set CRON_SECRET in Vercel dashboard before deploying.
 
 ---
 
@@ -15,7 +15,7 @@ Three unstarted Phase C items remain in `SHOP_MANAGER_PLAN.md` and are the natur
 
 3. **C(v) — Visit-wizard equipment-issues conversion hook.** When supervisor logs an equipment issue in a site visit report, one-tap "create maintenance request from this issue" button on visit detail.
 
-**All identified schedule/dispatch vulnerabilities fixed this session (see May 17 section).** Next focus: C(iii), C(iv), C(v) from SHOP_MANAGER_PLAN.md.
+**All identified schedule/dispatch vulnerabilities fixed. Auto clock-out cron, time correction system, and supervisor clock-in all shipped.** Next focus: C(iii), C(iv), C(v) from SHOP_MANAGER_PLAN.md.
 
 ### Sanity checks before starting
 - `npm run build` from the main repo — 0 errors expected
