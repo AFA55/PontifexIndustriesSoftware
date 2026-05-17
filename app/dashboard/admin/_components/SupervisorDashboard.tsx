@@ -4,12 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Clock, Plus, Briefcase, Calendar, ClipboardCheck, ChevronRight,
-  AlertTriangle, FileText, MapPin, Users, Loader2, CheckCircle2,
-  Eye,
+  AlertTriangle, MapPin, Users, Loader2, LogIn, LogOut,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@/lib/auth';
-import NfcClockInModal from '@/components/NfcClockInModal';
 
 interface VisitRow {
   id: string;
@@ -70,7 +68,6 @@ export default function SupervisorDashboard({ user }: { user: User }) {
   const [clocked, setClocked] = useState(false);
   const [card, setCard] = useState<CurrentTimecard | null>(null);
   const [hours, setHours] = useState(0);
-  const [showModal, setShowModal] = useState(false);
   const [clockBusy, setClockBusy] = useState(false);
   const [clockMsg, setClockMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -155,82 +152,82 @@ export default function SupervisorDashboard({ user }: { user: User }) {
     return () => clearInterval(id);
   }, [clocked, card]);
 
-  // ── Clock in / out handlers ──────────────────────────────────────────────
-  async function performClockIn(data: {
-    method: string;
-    nfc_tag_id?: string;
-    nfc_tag_uid?: string;
-    remote_photo_url?: string;
-    latitude: number;
-    longitude: number;
-    accuracy?: number;
-  }) {
-    setClockBusy(true);
-    setClockMsg(null);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Session expired');
-      const res = await fetch('/api/timecard/clock-in', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          latitude: data.latitude,
-          longitude: data.longitude,
-          accuracy: data.accuracy,
-          clock_in_method: data.method,
-          nfc_tag_id: data.nfc_tag_id,
-          nfc_tag_uid: data.nfc_tag_uid,
-          remote_photo_url: data.remote_photo_url,
-        }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error || j.details || 'Failed to clock in');
-      setClocked(true);
-      setCard({ id: j.data.id, clockInTime: j.data.clockInTime });
-      setShowModal(false);
-      setClockMsg({ type: 'success', text: 'Clocked in.' });
-      // Re-sync from server (covers any race between modal close + state update)
-      fetchAll();
-    } catch (err: any) {
-      setClockMsg({ type: 'error', text: err.message || 'Failed to clock in' });
-      throw err;
-    } finally {
-      setClockBusy(false);
-    }
+  // ── GPS helper ───────────────────────────────────────────────────────────
+  function getGps(): Promise<{ latitude: number; longitude: number; accuracy: number }> {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser.'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+        (err) => reject(new Error(
+          err.code === 1 ? 'Location access denied. Please enable GPS in your browser settings.'
+          : err.code === 2 ? 'GPS signal unavailable. Move to a location with better signal and try again.'
+          : 'Could not get your location. Please try again.'
+        )),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
   }
 
-  async function performClockOut(data: { latitude: number; longitude: number; accuracy?: number }) {
+  // ── Clock in / out handlers ──────────────────────────────────────────────
+  async function handleClockToggle() {
     setClockBusy(true);
     setClockMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Session expired');
-      const res = await fetch('/api/timecard/clock-out', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          latitude: data.latitude,
-          longitude: data.longitude,
-          accuracy: data.accuracy,
-        }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error || j.details || 'Failed to clock out');
-      setClocked(false);
-      setCard(null);
-      setHours(0);
-      setShowModal(false);
-      setClockMsg({ type: 'success', text: 'Clocked out.' });
-      fetchAll();
+      if (!session) throw new Error('Session expired. Please log in again.');
+
+      let coords: { latitude: number; longitude: number; accuracy: number };
+      try {
+        coords = await getGps();
+      } catch (gpsErr: any) {
+        setClockMsg({ type: 'error', text: gpsErr.message });
+        return;
+      }
+
+      if (!clocked) {
+        // Clock IN
+        const res = await fetch('/api/timecard/clock-in', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy,
+            clock_in_method: 'field',
+            work_location: 'field',
+            is_shop_hours: false,
+          }),
+        });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || j.details || 'Failed to clock in');
+        setClocked(true);
+        setCard({ id: j.data.id, clockInTime: j.data.clockInTime });
+        setClockMsg({ type: 'success', text: 'Clocked in successfully.' });
+        fetchAll();
+      } else {
+        // Clock OUT
+        const res = await fetch('/api/timecard/clock-out', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy,
+          }),
+        });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || j.details || 'Failed to clock out');
+        setClocked(false);
+        setCard(null);
+        setHours(0);
+        setClockMsg({ type: 'success', text: `Clocked out — ${j.data?.totalHours?.toFixed(2) ?? '0.00'} hrs recorded.` });
+        fetchAll();
+      }
     } catch (err: any) {
-      setClockMsg({ type: 'error', text: err.message || 'Failed to clock out' });
-      throw err;
+      setClockMsg({ type: 'error', text: err.message || 'Something went wrong. Please try again.' });
     } finally {
       setClockBusy(false);
     }
@@ -294,7 +291,7 @@ export default function SupervisorDashboard({ user }: { user: User }) {
             </div>
           </div>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={handleClockToggle}
             disabled={clockBusy}
             className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm shadow-md transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${
               clocked
@@ -303,11 +300,11 @@ export default function SupervisorDashboard({ user }: { user: User }) {
             }`}
           >
             {clockBusy ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <><Loader2 className="w-4 h-4 animate-spin" /> {clocked ? 'Clocking out…' : 'Clocking in…'}</>
             ) : clocked ? (
-              'Clock Out'
+              <><LogOut className="w-4 h-4" /> Clock Out</>
             ) : (
-              'Clock In'
+              <><LogIn className="w-4 h-4" /> Clock In</>
             )}
           </button>
         </div>
@@ -508,16 +505,6 @@ export default function SupervisorDashboard({ user }: { user: User }) {
         </div>
       </div>
 
-      {/* Clock-in modal */}
-      {showModal && (
-        <NfcClockInModal
-          isShopHours={false}
-          isClockedIn={clocked}
-          onClockIn={performClockIn}
-          onClockOut={async (d) => performClockOut({ latitude: d.latitude, longitude: d.longitude, accuracy: d.accuracy })}
-          onClose={() => setShowModal(false)}
-        />
-      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { getCurrentUser, logout, type User } from '@/lib/auth';
 import {
   ArrowLeft, Clock, Calendar, CheckCircle, AlertTriangle,
   ChevronLeft, ChevronRight, Moon, Factory, Briefcase, TrendingUp,
-  LogOut, Loader2, FileText, CalendarOff, Wifi, MapPin
+  LogOut, Loader2, FileText, CalendarOff, Wifi, MapPin, Edit2, X, Send
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import NFCClockIn, { type ClockInResult } from '@/components/NFCClockIn';
@@ -72,6 +72,14 @@ function TimecardPage() {
   const [liveHours, setLiveHours] = useState('0.0');
   const [showTimeOffRequest, setShowTimeOffRequest] = useState(false);
   const [bypassNfc, setBypassNfc] = useState(false);
+
+  // Correction request modal state
+  const [correctionTarget, setCorrectionTarget] = useState<TimecardEntry | null>(null);
+  const [correctionClockIn, setCorrectionClockIn] = useState('');
+  const [correctionClockOut, setCorrectionClockOut] = useState('');
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [submittingCorrection, setSubmittingCorrection] = useState(false);
+  const [correctionSuccess, setCorrectionSuccess] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRedirecting = useRef(false);
@@ -308,6 +316,72 @@ function TimecardPage() {
     }
     return days;
   }, [monday, weekData]);
+
+  // Convert ISO timestamp to datetime-local value (YYYY-MM-DDTHH:MM)
+  const toLocalDatetimeValue = (isoString: string): string => {
+    const d = new Date(isoString);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const openCorrectionModal = (entry: TimecardEntry) => {
+    setCorrectionTarget(entry);
+    setCorrectionClockIn(toLocalDatetimeValue(entry.clock_in_time));
+    setCorrectionClockOut(entry.clock_out_time ? toLocalDatetimeValue(entry.clock_out_time) : '');
+    setCorrectionReason('');
+    setCorrectionSuccess(false);
+  };
+
+  const closeCorrectionModal = () => {
+    setCorrectionTarget(null);
+    setCorrectionClockIn('');
+    setCorrectionClockOut('');
+    setCorrectionReason('');
+    setCorrectionSuccess(false);
+  };
+
+  const handleSubmitCorrection = async () => {
+    if (!correctionTarget) return;
+    if (!correctionReason.trim()) return;
+
+    // Determine what changed
+    const origClockIn = toLocalDatetimeValue(correctionTarget.clock_in_time);
+    const origClockOut = correctionTarget.clock_out_time ? toLocalDatetimeValue(correctionTarget.clock_out_time) : '';
+    const clockInChanged = correctionClockIn !== origClockIn;
+    const clockOutChanged = correctionClockOut !== origClockOut;
+
+    if (!clockInChanged && !clockOutChanged) {
+      alert('Please change at least one time before submitting.');
+      return;
+    }
+
+    setSubmittingCorrection(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const body: Record<string, string> = { timecard_id: correctionTarget.id, reason: correctionReason.trim() };
+      if (clockInChanged && correctionClockIn) body.requested_clock_in = new Date(correctionClockIn).toISOString();
+      if (clockOutChanged && correctionClockOut) body.requested_clock_out = new Date(correctionClockOut).toISOString();
+
+      const res = await fetch('/api/timecard/correction-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        setCorrectionSuccess(true);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to submit correction request');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit correction request');
+    } finally {
+      setSubmittingCorrection(false);
+    }
+  };
 
   if (!user) {
     return (
@@ -691,6 +765,7 @@ function TimecardPage() {
                     <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Hrs</th>
                     <th className="hidden sm:table-cell px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Category</th>
                     <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Status</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-white/5">
@@ -751,6 +826,16 @@ function TimecardPage() {
                             </span>
                           )}
                         </td>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <button
+                            onClick={() => openCorrectionModal(entry)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 transition-colors"
+                            title="Request a time correction"
+                          >
+                            <Edit2 size={10} />
+                            <span className="hidden sm:inline">Correct</span>
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -759,6 +844,124 @@ function TimecardPage() {
             </div>
           )}
         </div>
+
+        {/* ── Correction Request Modal ──────────────────── */}
+        {correctionTarget && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-white/10">
+              {/* Header */}
+              <div className="p-5 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-violet-500/10 dark:bg-violet-500/20 flex items-center justify-center">
+                    <Edit2 size={15} className="text-violet-600 dark:text-violet-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">Request Time Correction</h3>
+                    <p className="text-[10px] text-gray-500 dark:text-white/40">
+                      {formatDate(correctionTarget.date)} &mdash; your manager will review this
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeCorrectionModal}
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X size={16} className="text-gray-400 dark:text-white/40" />
+                </button>
+              </div>
+
+              {correctionSuccess ? (
+                /* Success state */
+                <div className="p-8 text-center">
+                  <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                    <CheckCircle size={28} className="text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <p className="text-base font-bold text-gray-900 dark:text-white mb-1">Request Submitted</p>
+                  <p className="text-sm text-gray-500 dark:text-white/60">
+                    Your manager will review the correction and approve or reject it.
+                  </p>
+                  <button
+                    onClick={closeCorrectionModal}
+                    className="mt-5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                /* Form state */
+                <div className="p-5 space-y-4">
+                  {/* Current times for reference */}
+                  <div className="px-3 py-2.5 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-100 dark:border-white/10 text-xs text-gray-600 dark:text-white/60 space-y-1">
+                    <p><span className="font-semibold">Current clock-in:</span> {formatTime(correctionTarget.clock_in_time)}</p>
+                    <p><span className="font-semibold">Current clock-out:</span> {correctionTarget.clock_out_time ? formatTime(correctionTarget.clock_out_time) : 'Not clocked out'}</p>
+                  </div>
+
+                  {/* Clock-in picker */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-white/60 mb-1.5">
+                      Corrected Clock-In Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={correctionClockIn}
+                      onChange={(e) => setCorrectionClockIn(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                    />
+                  </div>
+
+                  {/* Clock-out picker */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-white/60 mb-1.5">
+                      Corrected Clock-Out Time <span className="font-normal text-gray-400">(leave blank if not changing)</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={correctionClockOut}
+                      onChange={(e) => setCorrectionClockOut(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                    />
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-white/60 mb-1.5">
+                      Reason <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="e.g. Forgot to clock out, clocked in 15 minutes late by mistake..."
+                      value={correctionReason}
+                      onChange={(e) => setCorrectionReason(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all resize-none"
+                    />
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-2.5 pt-1">
+                    <button
+                      onClick={closeCorrectionModal}
+                      className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-700 dark:text-white/80 rounded-xl font-semibold text-sm transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSubmitCorrection}
+                      disabled={submittingCorrection || !correctionReason.trim()}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-xl font-semibold text-sm transition-all disabled:opacity-50 shadow-md shadow-violet-500/20"
+                    >
+                      {submittingCorrection ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Send size={14} />
+                      )}
+                      Submit Request
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Legend ──────────────────────────────────────── */}
         <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 px-2 py-3 text-[11px] text-gray-500 dark:text-white/60">

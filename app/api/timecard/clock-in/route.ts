@@ -86,10 +86,11 @@ export async function POST(request: NextRequest) {
       rawWorkLocation === 'shop' ? 'shop' : 'field';
 
     // Validate clock_in_method to prevent injection of unexpected values
-    const VALID_CLOCK_METHODS = ['nfc', 'gps', 'remote', 'gps_remote', 'pin'] as const;
+    // 'field' = supervisor/field-worker GPS clock-in anywhere (no shop radius, no approval)
+    const VALID_CLOCK_METHODS = ['nfc', 'gps', 'remote', 'gps_remote', 'pin', 'field'] as const;
     if (!VALID_CLOCK_METHODS.includes(clock_in_method as any)) {
       return NextResponse.json(
-        { error: 'Invalid clock_in_method. Must be nfc, gps, remote, gps_remote, or pin.' },
+        { error: 'Invalid clock_in_method. Must be nfc, gps, remote, gps_remote, pin, or field.' },
         { status: 400 }
       );
     }
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
     // --- Server-side bypass_nfc verification ---
     // If NFC is required by settings but user is using GPS method, verify they have
     // an admin-issued bypass notification (prevents manual URL param bypass)
-    // gps_remote and pin bypass the NFC requirement by design (they use separate approval flows)
+    // gps_remote, pin, and field bypass the NFC requirement by design
     if (clock_in_method === 'gps') {
       try {
         // Query timecard_settings_v2 first (active table), fall back to legacy timecard_settings.
@@ -234,6 +235,15 @@ export async function POST(request: NextRequest) {
       }
     } else if (clock_in_method === 'pin') {
       // PIN already verified by /api/timecard/verify-pin before this call; no extra check needed here
+    } else if (clock_in_method === 'field') {
+      // Field GPS clock-in (supervisors and other field workers not based at the shop).
+      // Just needs valid coordinates — no shop radius enforcement, no approval required.
+      if (!hasLocation || (latitude === 0 && longitude === 0)) {
+        return NextResponse.json(
+          { error: 'GPS coordinates are required. Enable location access and try again.' },
+          { status: 400 }
+        );
+      }
     } else {
       // GPS clock-in: verify location within shop radius (per-tenant pin when configured)
       const locationCheck = isWithinShopRadius({ latitude, longitude, accuracy }, shopOverride);
@@ -338,7 +348,8 @@ export async function POST(request: NextRequest) {
     else if (isNightShift) hourType = 'night_shift';
 
     // -- Build insert data --
-    const needsApproval = clock_in_method === 'gps_remote' || requires_approval === true;
+    // 'field' clock-in is for supervisors/field workers — no shop radius enforcement, no approval needed
+    const needsApproval = (clock_in_method === 'gps_remote' || requires_approval === true) && clock_in_method !== 'field';
 
     const insertData: Record<string, unknown> = {
       user_id: user.id,

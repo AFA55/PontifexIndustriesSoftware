@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, AlertTriangle,
   Search, TrendingUp, Users, Loader2, Shield, Zap,
   Bell, DollarSign, Coffee, Eye, ChevronDown, Moon, Settings, Save, X,
-  Edit2, AlertCircle, Timer, Plus
+  Edit2, AlertCircle, Timer, Plus, ClipboardEdit, CheckSquare, XSquare
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -52,6 +52,26 @@ interface TeamTotals {
   pendingApprovals: number;
   activeClockins: number;
   lateArrivalsThisWeek: number;
+}
+
+interface CorrectionRequest {
+  id: string;
+  timecard_id: string;
+  requested_by: string;
+  worker_name: string;
+  worker_role: string;
+  timecard_date: string | null;
+  current_clock_in: string | null;
+  current_clock_out: string | null;
+  current_total_hours: number | null;
+  requested_clock_in: string | null;
+  requested_clock_out: string | null;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reviewer_notes: string | null;
+  created_at: string;
 }
 
 // ── Week helpers ──────────────────────────────────────────────
@@ -128,6 +148,14 @@ export default function AdminTimecardsPage() {
   const [showNightShiftSettings, setShowNightShiftSettings] = useState(false);
   const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
   const [savingNightShiftSettings, setSavingNightShiftSettings] = useState(false);
+
+  // Corrections panel state
+  const [showCorrections, setShowCorrections] = useState(false);
+  const [corrections, setCorrections] = useState<CorrectionRequest[]>([]);
+  const [correctionsLoading, setCorrectionsLoading] = useState(false);
+  const [pendingCorrectionCount, setPendingCorrectionCount] = useState(0);
+  const [reviewingCorrection, setReviewingCorrection] = useState<string | null>(null);
+  const [correctionReviewerNotes, setCorrectionReviewerNotes] = useState('');
 
   // Edit clock-in modal state
   const [editClockInTarget, setEditClockInTarget] = useState<{ timecardId: string; currentClockIn: string; memberName: string } | null>(null);
@@ -333,6 +361,74 @@ export default function AdminTimecardsPage() {
     }
   };
 
+  // ── Corrections ────────────────────────────────────────────
+  const fetchCorrections = useCallback(async (status = 'pending') => {
+    setCorrectionsLoading(true);
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+      const res = await fetch(`/api/admin/timecards/correction-requests?status=${status}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const result = await res.json();
+      if (result.success) setCorrections(result.data.requests);
+    } catch (err) {
+      console.error('Error fetching corrections:', err);
+    } finally {
+      setCorrectionsLoading(false);
+    }
+  }, []);
+
+  const fetchPendingCorrectionCount = useCallback(async () => {
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+      const res = await fetch('/api/admin/timecards/correction-requests?status=pending', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const result = await res.json();
+      if (result.success) setPendingCorrectionCount(result.data.requests.length);
+    } catch { /* non-critical */ }
+  }, []);
+
+  useEffect(() => {
+    if (user) fetchPendingCorrectionCount();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  useEffect(() => {
+    if (showCorrections) fetchCorrections('pending');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCorrections]);
+
+  const handleReviewCorrection = async (id: string, action: 'approve' | 'reject') => {
+    setReviewingCorrection(id);
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+      const res = await fetch(`/api/admin/timecards/correction-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action, reviewer_notes: correctionReviewerNotes || undefined }),
+      });
+      if (res.ok) {
+        setCorrectionReviewerNotes('');
+        fetchCorrections('pending');
+        fetchPendingCorrectionCount();
+        fetchTeamSummary();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to process correction');
+      }
+    } catch (err) {
+      console.error('Error reviewing correction:', err);
+    } finally {
+      setReviewingCorrection(null);
+    }
+  };
+
   // ── Export handlers ────────────────────────────────────────
   const handleExportPDF = async () => {
     setExportingPDF(true);
@@ -487,6 +583,24 @@ export default function AdminTimecardsPage() {
             >
               {exportingPDF ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
               <span className="hidden sm:inline">PDF</span>
+            </button>
+
+            <button
+              onClick={() => setShowCorrections(true)}
+              className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                pendingCorrectionCount > 0
+                  ? 'bg-violet-600 hover:bg-violet-700 text-white border-violet-600 shadow-md shadow-violet-500/30'
+                  : 'bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border-gray-200 dark:border-white/10'
+              }`}
+              title="Time Correction Requests"
+            >
+              <ClipboardEdit size={14} />
+              <span className="hidden sm:inline">Corrections</span>
+              {pendingCorrectionCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                  {pendingCorrectionCount > 9 ? '9+' : pendingCorrectionCount}
+                </span>
+              )}
             </button>
 
             <button
@@ -1075,6 +1189,161 @@ export default function AdminTimecardsPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Corrections Panel ───────────────────────────── */}
+      {showCorrections && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-end" onClick={() => setShowCorrections(false)}>
+          <div
+            className="bg-white dark:bg-[#130b2a] h-full w-full max-w-lg shadow-2xl border-l border-gray-200 dark:border-white/10 flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Panel Header */}
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 dark:bg-violet-500/20 flex items-center justify-center">
+                  <ClipboardEdit size={15} className="text-violet-600 dark:text-violet-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-900 dark:text-white">Time Correction Requests</h2>
+                  <p className="text-[10px] text-gray-500 dark:text-white/40">
+                    {corrections.length} pending
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCorrections(false)}
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X size={16} className="text-gray-400 dark:text-white/40" />
+              </button>
+            </div>
+
+            {/* Panel Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {correctionsLoading ? (
+                <div className="py-16 text-center">
+                  <Loader2 className="w-8 h-8 mx-auto animate-spin text-violet-600 mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-white/40">Loading requests...</p>
+                </div>
+              ) : corrections.length === 0 ? (
+                <div className="py-16 text-center">
+                  <div className="w-14 h-14 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle size={24} className="text-emerald-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-700 dark:text-white/70">All caught up!</p>
+                  <p className="text-xs text-gray-400 dark:text-white/30 mt-1">No pending correction requests.</p>
+                </div>
+              ) : (
+                corrections.map((req) => (
+                  <div
+                    key={req.id}
+                    className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 p-4 space-y-3 shadow-sm"
+                  >
+                    {/* Worker + Date */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">{req.worker_name}</p>
+                        <p className="text-[11px] text-gray-400 dark:text-white/40 capitalize">{req.worker_role}</p>
+                      </div>
+                      <span className="text-[10px] font-semibold text-gray-500 dark:text-white/50 bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        {req.timecard_date
+                          ? new Date(req.timecard_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                          : 'Unknown date'}
+                      </span>
+                    </div>
+
+                    {/* Time comparison grid */}
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-2.5 border border-gray-100 dark:border-white/10">
+                        <p className="text-gray-400 dark:text-white/40 font-semibold uppercase tracking-wider mb-1">Current</p>
+                        <p className="text-gray-700 dark:text-white/80">
+                          In: <span className="font-mono font-semibold">
+                            {req.current_clock_in
+                              ? new Date(req.current_clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                              : '—'}
+                          </span>
+                        </p>
+                        <p className="text-gray-700 dark:text-white/80 mt-0.5">
+                          Out: <span className="font-mono font-semibold">
+                            {req.current_clock_out
+                              ? new Date(req.current_clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                              : '—'}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="bg-violet-50 dark:bg-violet-900/20 rounded-lg p-2.5 border border-violet-100 dark:border-violet-700/30">
+                        <p className="text-violet-600 dark:text-violet-400 font-semibold uppercase tracking-wider mb-1">Requested</p>
+                        <p className="text-violet-700 dark:text-violet-300">
+                          In: <span className="font-mono font-semibold">
+                            {req.requested_clock_in
+                              ? new Date(req.requested_clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                              : <span className="text-gray-400 dark:text-white/30">no change</span>}
+                          </span>
+                        </p>
+                        <p className="text-violet-700 dark:text-violet-300 mt-0.5">
+                          Out: <span className="font-mono font-semibold">
+                            {req.requested_clock_out
+                              ? new Date(req.requested_clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                              : <span className="text-gray-400 dark:text-white/30">no change</span>}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Reason */}
+                    <div className="px-3 py-2 bg-amber-50 dark:bg-amber-900/15 rounded-lg border border-amber-100 dark:border-amber-700/30">
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wider mb-0.5">Reason</p>
+                      <p className="text-xs text-amber-800 dark:text-amber-200">{req.reason}</p>
+                    </div>
+
+                    {/* Reviewer notes input */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-gray-500 dark:text-white/40 uppercase tracking-wider mb-1">
+                        Notes to worker (optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Approved — matched supervisor report"
+                        className="w-full px-3 py-1.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                        onFocus={() => setCorrectionReviewerNotes('')}
+                        onChange={(e) => setCorrectionReviewerNotes(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Approve / Reject buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleReviewCorrection(req.id, 'approve')}
+                        disabled={reviewingCorrection === req.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 shadow-sm shadow-emerald-500/20"
+                      >
+                        {reviewingCorrection === req.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <CheckSquare size={12} />
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleReviewCorrection(req.id, 'reject')}
+                        disabled={reviewingCorrection === req.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-xs font-bold border border-red-200 dark:border-red-700/40 transition-all disabled:opacity-50"
+                      >
+                        {reviewingCorrection === req.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <XSquare size={12} />
+                        )}
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit Clock-In Modal ──────────────────────────── */}
       {editClockInTarget && (
