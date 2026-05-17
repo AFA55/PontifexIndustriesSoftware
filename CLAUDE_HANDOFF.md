@@ -1,27 +1,59 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 17, 2026 | **Branch:** `main` | **Last commit:** `72b89d6a` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com (needs Vercel deploy to get May 16-17 changes live) | **Build:** PASSING ✅
+**Date:** May 17, 2026 | **Branch:** `main` | **Last commit:** `378907b5` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com (pending Vercel deploy — local `main` is 14 commits ahead) | **Build:** PASSING ✅
 
-> **Status as of May 17, 2026 (end of session).** Major session: clock hardening, 6 schedule/dispatch vulnerability fixes, auto clock-out cron, time correction request system, supervisor clock-in/out integration. Next: C(iii), C(iv), C(v) from SHOP_MANAGER_PLAN.md. Remember to set CRON_SECRET in Vercel dashboard before deploying.
+> **Status as of May 17, 2026 (latest).** C(iii), C(iv), C(v) all shipped. Maintenance module fully built: request form, inbox triage, visit-wizard hook, vehicle service history. All Phase C items from SHOP_MANAGER_PLAN.md are now complete. Remember to set CRON_SECRET in Vercel dashboard before next deploy.
 
 ---
 
 ## 🎯 NEXT SESSION — pick up from here
 
-Three unstarted Phase C items remain in `SHOP_MANAGER_PLAN.md` and are the natural next moves:
+**All Phase C items from SHOP_MANAGER_PLAN.md are complete.** Possible next areas:
 
-1. **C(iii) — Fleet maintenance history + oil/filter change tracking.** New `vehicle_service_records` table, "Add Service Record" button on `/dashboard/admin/fleet/[id]`, history panel + next-service-due ribbon, auto-create a service record when a `maintenance_request` on a vehicle is marked `done`. Use `supabase-migration-author` for the table + RLS, `rls-policy-auditor` to review.
+1. **Mobile audit** — run `mobile-responsive-auditor` on the new maintenance form and maintenance inbox (operator pages must pass 375px / 44px tap target requirements before production)
+2. **C(iii) tie-in** — when a `maintenance_request` is marked `done` and its `equipment_id` resolves to a vehicle (`kind='vehicle'` on the equipment row), auto-create a `vehicle_service_records` row with `service_type='repair'`. The maintenance PATCH route has a TODO comment for this.
+3. **CRON_SECRET** — must be set in Vercel dashboard env vars before the auto clock-out cron fires. Add note to deployment checklist.
+4. **Pending migrations** — `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql` still not applied.
+5. **New features** — user may want to move on to analytics, SMS integration, or other items from CLAUDE.md ongoing list.
 
-2. **C(iv) — Operator/Helper Maintenance Request form.** The "Report Equipment Issue" card links to `/dashboard/maintenance/new` but the page is a placeholder. Build the 3-tap mobile-first form: pick equipment → voice memo OR photo OR free text → priority chips + submit. POST to `maintenance_requests` table. Also build Maintenance Inbox triage UI (Inbox / Active / Closed tabs). Expose on shop_help dashboard too.
+### Sanity checks before starting
+- `npm run build` — 0 errors expected
+- `git log --oneline -5` to confirm state
+- Read this file + CLAUDE.md
 
-3. **C(v) — Visit-wizard equipment-issues conversion hook.** When supervisor logs an equipment issue in a site visit report, one-tap "create maintenance request from this issue" button on visit detail.
-
-**All identified schedule/dispatch vulnerabilities fixed. Auto clock-out cron, time correction system, and supervisor clock-in all shipped.** Next focus: C(iii), C(iv), C(v) from SHOP_MANAGER_PLAN.md.
+**All identified schedule/dispatch vulnerabilities fixed. Auto clock-out, time corrections, supervisor clock-in, maintenance module (C(iii/iv/v)) all shipped.**
 
 ### Sanity checks before starting
 - `npm run build` from the main repo — 0 errors expected
 - Read `SHOP_MANAGER_PLAN.md` for Phase C status
 - Read `CLAUDE.md` for conventions (RLS rules, multi-tenant, mobile-first)
 - **Push local main to origin before deploying** — local main is 4 commits ahead of origin
+
+---
+
+## MAY 17, 2026 (PT 2) — Phase C(iii/iv/v) complete — Maintenance module (`378907b5`)
+
+### C(iii) — Fleet service history (`7decdf42`)
+- `vehicle_service_records` table with RLS — references `equipment` table (vehicles are `kind='vehicle'` equipment rows)
+- `GET/POST /api/admin/fleet/[id]/service-records` — list DESC + insert; auto-updates `vehicles.last_service_odometer/last_service_date` on new odometer reading
+- Fleet detail page: new **Service History** tab with next-service ribbon (green/amber/rose based on mileage until next oil change), inline Add Service Record form, type-color-coded record list
+
+### C(iv) — Maintenance request form + inbox (`378907b5`)
+- `maintenance_requests` table with tenant-scoped RLS, priority/status enums, photo URLs, supervisor_visit FK
+- `POST /api/maintenance-requests` — operator submit; notifies shop_managers fire-and-forget
+- `GET /api/admin/maintenance-requests` — paginated with equipment + submitter joins
+- `PATCH /api/admin/maintenance-requests/[id]` — triage (start/done/cancel); notifies submitter on resolution
+- `/dashboard/maintenance/new` — 3-step mobile wizard: equipment picker → describe + photo → priority pills + submit. ≥44px tap targets.
+- `/dashboard/admin/maintenance` — 3-tab inbox (Inbox/In Progress/Closed) with inline triage actions + critical rose highlights
+- `ShopHelpDashboard` — "Report Issue" card added
+
+### C(v) — Visit-wizard conversion hook (`378907b5`)
+- Both POST and PATCH on `supervisor-visits` fire-and-forget convert `equipment_issues` entries with `action='maintenance' && status='open'` → `maintenance_requests` rows, then flip entries to `status='converted'`
+
+### Also shipped this session (May 17 PT 1)
+- Auto clock-out cron (`72b89d6a`) — midnight + noon runs; worker + admin notifications; `timecards.auto_closed` column
+- Time correction request system (`3513e8bc`) — operator submit → admin approve/reject; self-approval blocked; timecard auto-patched on approval
+- Supervisor clock-in with `field` method (`3513e8bc`) — no shop GPS enforcement; SupervisorDashboard rebuilt without NFC modal dependency
+- 6 schedule/dispatch vulnerabilities fixed (`9b16c13b`, `d17e4aac`, `cc46f5e1`) — idempotent dispatch, per-tenant GPS, UTC date fix, assignment race condition, CASCADE→RESTRICT, soft-delete jobs
 
 ---
 
