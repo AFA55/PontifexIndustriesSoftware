@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   X, Calendar, Clock, MapPin, Wrench, Phone, FileText, Edit3, Save, Trash2,
   AlertTriangle, MessageSquare, ChevronRight, Plus, Users, Printer, Loader2,
-  Copy, Upload, User, Mail, Building2, ChevronDown, Check, Paperclip, Send
+  Copy, Upload, User, Mail, Building2, ChevronDown, Check, Paperclip, Send,
+  ExternalLink
 } from 'lucide-react';
 import type { JobCardData } from './JobCard';
 import { EQUIPMENT_ABBREVIATIONS, getDisplayName } from '@/lib/equipment-map';
@@ -465,6 +467,7 @@ export default function EditJobPanel({
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
           {activeTab === 'details' ? (
+            <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
               {/* LEFT COLUMN — Job Info + Contact */}
               <div className="space-y-5">
@@ -520,7 +523,16 @@ export default function EditJobPanel({
                   {/* Scope of Work */}
                   {canEdit ? (
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">SCOPE OF WORK</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-white/50">SCOPE OF WORK</label>
+                        <Link
+                          href={`/dashboard/admin/schedule-form?editJobId=${job.id}`}
+                          className="flex items-center gap-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 bg-purple-50 dark:bg-purple-900/20 px-2.5 py-1 rounded-lg border border-purple-200 dark:border-purple-700/50 transition-colors"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Full Editor
+                        </Link>
+                      </div>
                       <textarea value={description} onChange={e => { setDescription(e.target.value); markChanged(); }}
                         rows={3} className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] resize-none focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
                     </div>
@@ -863,6 +875,19 @@ export default function EditJobPanel({
                 </section>
               </div>
             </div>
+
+            {/* Full Schedule Form CTA */}
+            <div className="px-6 pb-4 mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
+              <Link
+                href={`/dashboard/admin/schedule-form?editJobId=${job.id}`}
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Edit Full Job in Schedule Form
+              </Link>
+              <p className="text-xs text-center text-gray-400 dark:text-white/30 mt-1.5">Edit scope items, measurements, photos, permits</p>
+            </div>
+            </>
           ) : (
             /* Documents tab */
             <div className="p-6 space-y-4">
