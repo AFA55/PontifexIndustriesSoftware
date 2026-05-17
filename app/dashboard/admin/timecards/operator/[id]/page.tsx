@@ -377,6 +377,8 @@ function OperatorTimecardDetailPageInner() {
   const [manualDate, setManualDate] = useState<string>('');
   const [manualType, setManualType] = useState<'pto' | 'sick' | 'holiday' | 'manual' | 'admin_adjustment'>('pto');
   const [manualHours, setManualHours] = useState<string>('8');
+  const [manualStartTime, setManualStartTime] = useState<string>('07:00');
+  const [manualEndTime, setManualEndTime] = useState<string>('15:30');
   const [manualNotes, setManualNotes] = useState('');
   const [manualSaving, setManualSaving] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
@@ -2160,7 +2162,16 @@ function OperatorTimecardDetailPageInner() {
           admin_adjustment:  { label: 'Adjustment',    gradient: 'from-sky-500 to-blue-600',     dot: 'bg-sky-100 text-sky-700' },
         };
         const meta = TYPE_META[manualType];
-        const hoursNum = parseFloat(manualHours);
+        const usesTimePicker = manualType === 'manual' || manualType === 'admin_adjustment';
+        // For time-picker types, compute hours from start/end times
+        const computedHoursFromTimes = (() => {
+          if (!usesTimePicker) return NaN;
+          const [sh, sm] = manualStartTime.split(':').map(Number);
+          const [eh, em] = manualEndTime.split(':').map(Number);
+          const diff = (eh * 60 + em) - (sh * 60 + sm);
+          return diff > 0 ? parseFloat((diff / 60).toFixed(2)) : NaN;
+        })();
+        const hoursNum = usesTimePicker ? computedHoursFromTimes : parseFloat(manualHours);
         const validHours = !Number.isNaN(hoursNum) && hoursNum >= 0.25 && hoursNum <= 16;
 
         return (
@@ -2206,38 +2217,73 @@ function OperatorTimecardDetailPageInner() {
                   </div>
                 </div>
 
-                {/* Hours */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Hours</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      step={0.25}
-                      min={0.25}
-                      max={16}
-                      value={manualHours}
-                      onChange={(e) => setManualHours(e.target.value)}
-                      className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base font-semibold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
-                    />
-                    <div className="flex gap-1.5">
-                      {['4', '8'].map(h => (
-                        <button
-                          key={h}
-                          type="button"
-                          onClick={() => setManualHours(h)}
-                          className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold transition"
-                        >
-                          {h}h
-                        </button>
-                      ))}
+                {/* Hours — time pickers for manual/adjustment, hour input for leave types */}
+                {usesTimePicker ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Shift Times</label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <p className="text-[10px] text-gray-500 mb-1">Clock In</p>
+                        <input
+                          type="time"
+                          value={manualStartTime}
+                          onChange={(e) => setManualStartTime(e.target.value)}
+                          className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base font-semibold text-gray-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400"
+                        />
+                      </div>
+                      <div className="text-gray-400 font-bold mt-4">→</div>
+                      <div className="flex-1">
+                        <p className="text-[10px] text-gray-500 mb-1">Clock Out</p>
+                        <input
+                          type="time"
+                          value={manualEndTime}
+                          onChange={(e) => setManualEndTime(e.target.value)}
+                          className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base font-semibold text-gray-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400"
+                        />
+                      </div>
                     </div>
+                    {validHours && (
+                      <p className="text-[11px] text-amber-700 mt-1.5">
+                        <strong>{hoursNum.toFixed(2)} hours</strong> computed from selected times
+                      </p>
+                    )}
+                    {!validHours && manualStartTime && manualEndTime && (
+                      <p className="text-[11px] text-rose-600 mt-1.5">End time must be after start time (max 16 hrs)</p>
+                    )}
                   </div>
-                  {manualType === 'pto' && validHours && ptoBalance && (
-                    <p className="text-[11px] text-emerald-700 mt-1.5">
-                      Will use <strong>{(hoursNum / 8).toFixed(2)} day(s)</strong> · {Math.max(0, ptoBalance.allocated - ptoBalance.used - hoursNum / 8).toFixed(1)} day(s) remaining after
-                    </p>
-                  )}
-                </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Hours</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step={0.25}
+                        min={0.25}
+                        max={16}
+                        value={manualHours}
+                        onChange={(e) => setManualHours(e.target.value)}
+                        className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base font-semibold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
+                      />
+                      <div className="flex gap-1.5">
+                        {['4', '8'].map(h => (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => setManualHours(h)}
+                            className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold transition"
+                          >
+                            {h}h
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {manualType === 'pto' && validHours && ptoBalance && (
+                      <p className="text-[11px] text-emerald-700 mt-1.5">
+                        Will use <strong>{(hoursNum / 8).toFixed(2)} day(s)</strong> · {Math.max(0, ptoBalance.allocated - ptoBalance.used - hoursNum / 8).toFixed(1)} day(s) remaining after
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Notes */}
                 <div>
@@ -2283,6 +2329,7 @@ function OperatorTimecardDetailPageInner() {
                             date: manualDate,
                             entry_type: manualType,
                             hours: hoursNum,
+                            start_time: usesTimePicker ? manualStartTime : undefined,
                             notes: manualNotes.trim() || null,
                           }),
                         });

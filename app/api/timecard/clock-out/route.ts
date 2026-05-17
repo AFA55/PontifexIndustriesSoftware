@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { latitude, longitude, accuracy } = body;
+    const { latitude, longitude, accuracy, clock_out_method, nfc_tag_uid, nfc_tag_id } = body;
 
     // Validation
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
@@ -49,6 +49,26 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid location data. Latitude and longitude are required.' },
         { status: 400 }
       );
+    }
+
+    // Rate limit: reject if last clock-out was < 60 seconds ago
+    const { data: recentOut } = await supabaseAdmin
+      .from('timecards')
+      .select('id, clock_out_time')
+      .eq('user_id', user.id)
+      .not('clock_out_time', 'is', null)
+      .order('clock_out_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentOut?.clock_out_time) {
+      const secondsAgo = (Date.now() - new Date(recentOut.clock_out_time).getTime()) / 1000;
+      if (secondsAgo < 60) {
+        return NextResponse.json(
+          { error: 'Please wait before clocking out again.', block_type: 'rate_limited' },
+          { status: 429 }
+        );
+      }
     }
 
     // Verify location is within shop radius — but only enforce for GPS-clocked-in users.
@@ -327,6 +347,9 @@ export async function POST(request: NextRequest) {
         clock_out_latitude: latitude,
         clock_out_longitude: longitude,
         clock_out_accuracy: accuracy || null,
+        clock_out_method: clock_out_method || 'gps',
+        nfc_tag_uid: nfc_tag_uid || null,
+        nfc_tag_id: nfc_tag_id || null,
         total_hours: parseFloat(totalHours.toFixed(2)),
         break_minutes: breakMinutesDeducted,
         lunch_duration_minutes: breakMinutesDeducted,

@@ -110,13 +110,27 @@ export async function POST(request: NextRequest) {
     // gps_remote and pin bypass the NFC requirement by design (they use separate approval flows)
     if (clock_in_method === 'gps') {
       try {
-        let settingsQuery = supabaseAdmin
-          .from('timecard_settings')
-          .select('require_nfc');
+        // Query timecard_settings_v2 first (active table), fall back to legacy timecard_settings.
+        let tcSettings: { require_nfc?: boolean } | null = null;
         if (auth.tenantId) {
-          settingsQuery = settingsQuery.eq('tenant_id', auth.tenantId);
+          const { data: v2 } = await supabaseAdmin
+            .from('timecard_settings_v2')
+            .select('require_nfc')
+            .eq('tenant_id', auth.tenantId)
+            .limit(1)
+            .maybeSingle();
+          if (v2) {
+            tcSettings = v2;
+          } else {
+            const { data: v1 } = await supabaseAdmin
+              .from('timecard_settings')
+              .select('require_nfc')
+              .eq('tenant_id', auth.tenantId)
+              .limit(1)
+              .maybeSingle();
+            tcSettings = v1 ?? null;
+          }
         }
-        const { data: tcSettings } = await settingsQuery.limit(1).maybeSingle();
 
         if (tcSettings?.require_nfc) {
           // NFC is required — check for a valid bypass notification from an admin
