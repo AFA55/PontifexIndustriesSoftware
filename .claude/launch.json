@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "pontifex-dev",
+      "name": "pontifex",
       "runtimeExecutable": "/bin/sh",
-      "runtimeArgs": ["-c", "PATH=/usr/local/bin:/opt/homebrew/bin:$PATH npx next dev --turbopack"],
+      "runtimeArgs": ["-c", "cd '/Users/afa55/Documents/Pontifex Industres/pontifex-platform' && PATH=/usr/local/bin:/opt/homebrew/bin:$PATH npx next dev --turbopack"],
       "port": 3000,
       "autoPort": true
     }

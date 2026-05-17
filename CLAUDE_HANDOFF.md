@@ -1,26 +1,74 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 11, 2026 (production deploy) — quiet since | **Branch:** `main` is current, last commit `dd28c58b` | **Production:** 🚀 LIVE at https://www.pontifexindustries.com (deployed `dd28c58b` on May 11, 12:40 UTC, 63s build) | **Build:** PASSING ✅ | **DB:** Migrations `20260510_voice_recognition_corrections` + `20260510_voice_checkouts_bucket` applied
+**Date:** May 17, 2026 | **Branch:** `main` | **Last commit:** `d38bbd17` | **Production:** 🚀 LIVE https://www.pontifexindustries.com (last deployed `dd28c58b` May 11 — pending push of May 16-17 changes) | **Build:** PASSING ✅ | **DB:** Migration `20260516_timecard_uniqueness_and_timezone` applied
 
-> **Status as of May 16, 2026:** No commits since May 11 — `origin/main`, local `main`, and the worktree branch `claude/inspiring-swanson-31ba74` all stable. User returned after ~5 days away; the platform has had several Claude Code updates in the meantime. Resume by reading the **NEXT SESSION** section below.
+> **Status as of May 17, 2026 — testing session + clock-in hardening complete.** User did a real-world test of clocking features; fixed lunch deduction, manual time entry, and patched 8 clock-in/out vulnerabilities. Next moves are C(iii), C(iv), C(v) from SHOP_MANAGER_PLAN.md. Need to push local main to origin before next Vercel deploy.
 
 ---
 
 ## 🎯 NEXT SESSION — pick up from here
 
-The May 11 production deploy shipped everything queued through C(ii)-b polish. Three unstarted Phase C items remain in `SHOP_MANAGER_PLAN.md` and are the natural next moves:
+Three unstarted Phase C items remain in `SHOP_MANAGER_PLAN.md` and are the natural next moves:
 
-1. **C(iii) — Fleet maintenance history + oil/filter change tracking.** New `vehicle_service_records` table, "Add Service Record" button on `/dashboard/admin/fleet/[id]`, history panel + next-service-due ribbon, auto-create a service record when a `maintenance_request` on a vehicle is marked `done`. Use `supabase-migration-author` for the table + RLS, `rls-policy-auditor` to review, general-purpose for the UI panel.
+1. **C(iii) — Fleet maintenance history + oil/filter change tracking.** New `vehicle_service_records` table, "Add Service Record" button on `/dashboard/admin/fleet/[id]`, history panel + next-service-due ribbon, auto-create a service record when a `maintenance_request` on a vehicle is marked `done`. Use `supabase-migration-author` for the table + RLS, `rls-policy-auditor` to review.
 
-2. **C(iv) — Operator/Helper Maintenance Request form.** The "Report Equipment Issue" card already links to `/dashboard/maintenance/new` but the page is a placeholder. Build the 3-tap mobile-first form: pick equipment (or auto-detect from current clocked-in job) → voice memo OR photo OR free text → priority chips + submit. POST writes to `maintenance_requests` with `submitted_by`, `equipment_id`, `description`, `voice_note_url`, `priority`, `status='open'`. Also build the Maintenance Inbox triage UI (tabs Inbox / Active / Closed). Expose the same form on the shop_help dashboard.
+2. **C(iv) — Operator/Helper Maintenance Request form.** The "Report Equipment Issue" card links to `/dashboard/maintenance/new` but the page is a placeholder. Build the 3-tap mobile-first form: pick equipment → voice memo OR photo OR free text → priority chips + submit. POST to `maintenance_requests` table. Also build Maintenance Inbox triage UI (Inbox / Active / Closed tabs). Expose on shop_help dashboard too.
 
-3. **C(v) — Visit-wizard equipment-issues conversion hook.** When a supervisor logs an equipment issue inside a site visit report, auto-create a `maintenance_requests` row (or surface a one-tap "create maintenance request from this issue" button on the visit detail).
+3. **C(v) — Visit-wizard equipment-issues conversion hook.** When supervisor logs an equipment issue in a site visit report, one-tap "create maintenance request from this issue" button on visit detail.
 
-If user wants something else, just take the prompt and run with it — they'll usually say "pick up next task" if they want the backlog.
+**Schedule/dispatch vulnerabilities identified (see May 17 section for full list)** — highest priority items to address eventually:
+- Race condition on simultaneous operator assignment (no row locking)
+- Dispatch is not idempotent — re-clicking "Push Tickets" blasts duplicate notifications
+- Hardcoded shop GPS location in `lib/geolocation.ts` will block clock-in for any new tenant
 
 ### Sanity checks before starting
-- `npm run build` from the main repo to confirm prod state still compiles
-- Read `SHOP_MANAGER_PLAN.md` for the up-to-date Phase C status
-- Read `CLAUDE.md` for working conventions (esp. RLS rules, multi-tenant, mobile-first)
+- `npm run build` from the main repo — 0 errors expected
+- Read `SHOP_MANAGER_PLAN.md` for Phase C status
+- Read `CLAUDE.md` for conventions (RLS rules, multi-tenant, mobile-first)
+- **Push local main to origin before deploying** — local main is 4 commits ahead of origin
+
+---
+
+## MAY 16–17, 2026 — Clock-in hardening + NFC patches + marketing pages (`d38bbd17`)
+
+User returned after 5-day break. Did first real-world test of the clocking system with shop manager demo account. Fixed two live bugs, ran vulnerability analysis, patched 8 security/reliability gaps, and rebuilt both marketing pages.
+
+### Bugs fixed
+- **Lunch deduction not working** — `clock-out/route.ts` was querying `timecard_settings` (legacy) instead of `timecard_settings_v2`, so settings returned null and no lunch was auto-deducted. Fixed with v2→v1 fallback pattern. Added `ROLE_DEFAULT_LUNCH` map (shop roles: 60min, field roles: 30min).
+- **Manual time entry** — admin timecard page now shows Clock In/Clock Out time pickers for `manual` and `admin_adjustment` types (hours auto-computed). Leave types (`pto`, `sick`, `holiday`) keep the hours input.
+
+### Clock-in security hardening (commit `cf4f02df` + this session)
+Applied to `/api/timecard/clock-in`:
+- 60-second rate limit (429 if last clock-in < 60s ago)
+- Duplicate open timecard guard (409 before DB unique index fires)
+- Auto-close stale open timecards from previous days
+- GPS suspicious jump detection → fire-and-forget `audit_logs` row if >80km + <2hr gap
+- Timezone-aware `today` using `tenants.timezone` (no more UTC midnight split)
+- NFC bypass check now queries `timecard_settings_v2` first
+
+Applied to `/api/timecard/clock-out`:
+- 60-second rate limit guard
+- `clock_out_method`, `nfc_tag_uid`, `nfc_tag_id` now stored in timecard update (NFC audit trail)
+
+Admin timecards hardening:
+- Self-approval block on `PATCH /api/admin/timecards/entries/[entryId]` (403 if approving own entry)
+- Manual time entry `work_location` now derived from role (shop vs field), not hardcoded
+
+Migration `20260516_timecard_uniqueness_and_timezone`:
+- `CREATE UNIQUE INDEX timecards_one_open_per_user ... WHERE clock_out_time IS NULL`
+- `ALTER TABLE tenants ADD COLUMN timezone text DEFAULT 'America/New_York'`
+
+### Marketing pages rebuilt
+- `app/page.tsx` — Pontifex Industries homepage (story-driven, targets niche construction companies, non-compete safe, founder's journey narrative)
+- `app/patriot/page.tsx` — Patriot Concrete Cutting operator landing page (red/crimson brand, operator value props, links to `/company` login)
+
+### Schedule/dispatch failure analysis
+Top findings from parallel analysis agent (see NEXT SESSION for full list):
+1. **CRITICAL** — Two admins assigning same operator simultaneously: no row lock, silent double-booking
+2. **CRITICAL** — `lib/geolocation.ts` has hardcoded Patriot GPS coordinates — breaks every new tenant
+3. **CRITICAL** — Dispatch not idempotent: re-clicking "Push Tickets" duplicates all SMS/notifications
+4. **HIGH** — `job_daily_assignments ON DELETE CASCADE` wipes payroll history when job deleted
+5. **HIGH** — Multi-day job assignment mismatch: `job_orders.assigned_to` vs `job_daily_assignments` can desync
+6. **HIGH** — UTC-based date queries on schedule board miss jobs at midnight (US East timezone)
 
 ---
 
@@ -77,7 +125,7 @@ SHOP_MANAGER_PLAN.md                                                (C(ii)-b mar
 ### Known caveats
 - Audio capture asks for a SECOND mic permission on first use (separate from the SpeechRecognition prompt). Once granted, both share the same permission afterward.
 - Audio gracefully degrades — if the user denies the second prompt, voice still works, the draft just has `audio_url: null`.
-- The 30-day signed URL is generated at upload time. After 30 days, `voice_note_url` will 404; we'd need a `GET /api/admin/equipment-checkouts/[id]/voice-note` re-sign endpoint to fix this if audit replay starts being used heavily.
+- The 30-day signed URL is generated at upload time. After 30 days, `voice_note_url` will 404. The re-sign endpoint now exists: `GET /api/admin/equipment-checkouts/[checkoutId]/voice-note` — returns `{ url }` with a fresh 30-day signed URL. The inventory-control frontend should call this endpoint when `voice_note_url` returns a 404 on load, rather than showing a broken link (TODO: wire up on-demand re-sign in the audit-replay player).
 - Alias-learning modal shows ONE phrase at a time. If multiple equipment items in a single Confirm All batch each cross the threshold, the user dismisses the first then re-confirms (or we'd need to queue them — punted).
 - `voice-checkouts` bucket policies are permissive for authenticated users; the API gate at `requireAuth` is where role + tenant scoping actually lives.
 
