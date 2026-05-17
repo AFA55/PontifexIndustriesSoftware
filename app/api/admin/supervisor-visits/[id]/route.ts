@@ -111,5 +111,35 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to update visit' }, { status: 500 });
   }
 
+  // C(v): Convert open equipment issues with action='maintenance' → maintenance_requests
+  Promise.resolve((async () => {
+    const issues: any[] = Array.isArray(data.equipment_issues) ? data.equipment_issues : [];
+    const toConvert = issues.filter((e: any) => e.action === 'maintenance' && e.status === 'open');
+    if (toConvert.length === 0) return;
+
+    for (const issue of toConvert) {
+      await supabaseAdmin.from('maintenance_requests').insert({
+        tenant_id: data.tenant_id,
+        equipment_name: issue.equipment_name || null,
+        equipment_id: issue.equipment_id || null,
+        submitted_by: data.supervisor_id,
+        description: issue.whats_wrong || 'Issue reported via site visit',
+        priority: 'medium',
+        status: 'open',
+        supervisor_visit_id: data.id,
+        photo_urls: Array.isArray(issue.photo_urls) ? issue.photo_urls : [],
+      });
+    }
+
+    // Flip converted issues to status='converted'
+    const updatedIssues = issues.map((e: any) =>
+      e.action === 'maintenance' && e.status === 'open' ? { ...e, status: 'converted' } : e
+    );
+    await supabaseAdmin
+      .from('supervisor_visits')
+      .update({ equipment_issues: updatedIssues })
+      .eq('id', id);
+  })()).catch(() => {});
+
   return NextResponse.json({ success: true, data });
 }

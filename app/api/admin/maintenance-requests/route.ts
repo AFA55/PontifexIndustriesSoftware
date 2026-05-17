@@ -1,106 +1,63 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * API Route: GET /api/admin/maintenance-requests
- * Admin view of all open/in_progress maintenance requests for the tenant,
- * with operator name joined from profiles.
+ * GET /api/admin/maintenance-requests
+ * Shop manager / admin: list maintenance requests with pagination.
+ * Auth: shop_manager, admin, super_admin, operations_manager
  */
 
-import { requireAdmin } from '@/lib/api-auth';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
+
+const SHOP_ROLES = ['shop_manager', 'admin', 'super_admin', 'operations_manager'];
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
 
-  const { tenantId } = auth;
-
-  if (!tenantId) {
-    return NextResponse.json({ error: 'No tenant associated with your account' }, { status: 403 });
+  if (!SHOP_ROLES.includes(auth.role)) {
+    return NextResponse.json({ error: 'Forbidden. Shop manager or admin access required.' }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
-  const statusFilter = searchParams.get('status'); // optional: 'open' | 'in_progress' | 'resolved'
+  const status = searchParams.get('status') ?? 'open';
+  const page = Math.max(0, parseInt(searchParams.get('page') ?? '0', 10));
+  const limit = 20;
+  const offset = page * limit;
 
+  // Build query with joins
   let query = supabaseAdmin
-    .from('equipment_maintenance_requests')
+    .from('maintenance_requests')
     .select(`
-      *,
-      operator:profiles!operator_id(id, full_name, email),
-      resolver:profiles!resolved_by(id, full_name)
-    `)
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false });
+      id, description, priority, status, equipment_name, photo_urls,
+      voice_note_url, resolution_notes, resolved_at, supervisor_visit_id,
+      created_at, updated_at,
+      equipment:equipment_id ( id, name, unit_number ),
+      submitter:submitted_by ( id, full_name, role ),
+      resolver:resolved_by ( id, full_name )
+    `, { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
 
-  if (statusFilter) {
-    query = query.eq('status', statusFilter);
+  // Tenant scoping
+  if (auth.role !== 'super_admin' && auth.tenantId) {
+    query = query.eq('tenant_id', auth.tenantId);
+  }
+
+  // Status filter — 'closed' maps to both done + cancelled
+  if (status === 'closed') {
+    query = query.in('status', ['done', 'cancelled']);
   } else {
-    // Default: return open and in_progress only
-    query = query.in('status', ['open', 'in_progress']);
+    query = query.eq('status', status);
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
 
   if (error) {
-    console.error('Error fetching admin maintenance requests:', error);
-    return NextResponse.json({ error: 'Failed to fetch maintenance requests' }, { status: 500 });
+    console.error('admin/maintenance-requests GET error:', error);
+    return NextResponse.json({ error: 'Failed to load requests', details: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, data }, { status: 200 });
-}
-
-export async function PATCH(request: NextRequest) {
-  const auth = await requireAdmin(request);
-  if (!auth.authorized) return auth.response;
-
-  const { userId, tenantId } = auth;
-
-  if (!tenantId) {
-    return NextResponse.json({ error: 'No tenant associated with your account' }, { status: 403 });
-  }
-
-  let body: any;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const { id, status, resolution_notes } = body;
-
-  if (!id || !status) {
-    return NextResponse.json({ error: 'id and status are required' }, { status: 400 });
-  }
-
-  const validStatuses = ['open', 'in_progress', 'resolved'];
-  if (!validStatuses.includes(status)) {
-    return NextResponse.json({ error: `status must be one of: ${validStatuses.join(', ')}` }, { status: 400 });
-  }
-
-  const updatePayload: any = {
-    status,
-    updated_at: new Date().toISOString(),
-  };
-
-  if (status === 'resolved') {
-    updatePayload.resolved_at = new Date().toISOString();
-    updatePayload.resolved_by = userId;
-    if (resolution_notes) updatePayload.resolution_notes = resolution_notes;
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from('equipment_maintenance_requests')
-    .update(updatePayload)
-    .eq('id', id)
-    .eq('tenant_id', tenantId)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating maintenance request:', error);
-    return NextResponse.json({ error: 'Failed to update maintenance request' }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true, data }, { status: 200 });
+  return NextResponse.json({ success: true, data: data ?? [], total: count ?? 0 });
 }
