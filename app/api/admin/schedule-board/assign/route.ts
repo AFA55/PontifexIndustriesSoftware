@@ -37,6 +37,35 @@ export async function POST(request: NextRequest) {
 
     if (assignment_date) {
       // ── Per-day assignment path ──────────────────────────────────────────
+
+      // Race condition guard: check for an existing assignment for this operator on this date
+      // (a different job = conflict). Must run before the upsert so two simultaneous requests
+      // cannot both pass this check and create a double-booking.
+      if (operatorId) {
+        const { data: existingAssignment } = await supabaseAdmin
+          .from('job_daily_assignments')
+          .select('id, job_order_id')
+          .eq('operator_id', operatorId)
+          .eq('assignment_date', assignment_date)
+          .neq('job_order_id', jobOrderId)
+          .maybeSingle();
+
+        if (existingAssignment) {
+          const { data: conflictJob } = await supabaseAdmin
+            .from('job_orders')
+            .select('job_number, customer_name')
+            .eq('id', existingAssignment.job_order_id)
+            .maybeSingle();
+
+          return NextResponse.json({
+            error: 'Assignment conflict detected.',
+            details: `This operator is already assigned to ${conflictJob?.job_number || 'another job'} (${conflictJob?.customer_name || ''}) on ${assignment_date}. Reassign from that job first.`,
+            conflict_job_id: existingAssignment.job_order_id,
+            block_type: 'operator_conflict',
+          }, { status: 409 });
+        }
+      }
+
       // 1. Look up names for history record
       let operatorName: string | null = null;
       let helperName: string | null = null;

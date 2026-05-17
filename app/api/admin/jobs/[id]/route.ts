@@ -2,9 +2,12 @@ export const dynamic = 'force-dynamic';
 
 /**
  * API Route: DELETE /api/admin/jobs/[id]
- * Permanently removes a job and all related records (scope, progress,
- * completion requests, invoices with only this job's line items, etc.)
- * using the public.delete_job_order_cascade(uuid) RPC.
+ * Soft-deletes a job by setting deleted_at + status='cancelled'.
+ * Hard deletion is intentionally avoided: job_daily_assignments (payroll audit
+ * records) reference job_orders with ON DELETE RESTRICT, so a hard DELETE would
+ * be blocked at the DB level once any operator has been assigned to the job.
+ * Keeping deleted_at lets us answer "was operator X assigned on Thursday?" for
+ * payroll disputes even after the job is removed from the UI.
  *
  * DELETE — requireAdmin, tenant-scoped.
  */
@@ -23,10 +26,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
 
-    // Verify the job exists. Non-super-admins are scoped to their tenant.
+    // Verify the job exists and belongs to this tenant.
     let query = supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, tenant_id')
+      .select('id, job_number, tenant_id, deleted_at')
       .eq('id', jobId);
     if (tenantId) query = query.eq('tenant_id', tenantId);
     const { data: job, error: jobError } = await query.single();
@@ -35,14 +38,27 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    const { error: rpcError } = await supabaseAdmin.rpc('delete_job_order_cascade', {
-      p_job_id: jobId,
-    });
+    if (job.deleted_at) {
+      // Already soft-deleted — treat as success (idempotent).
+      return NextResponse.json({ success: true, data: { id: jobId } });
+    }
 
-    if (rpcError) {
-      console.error('[DELETE /jobs] cascade failed', { jobId, rpcError });
+    // Soft-delete: mark deleted_at and cancel the job.
+    // job_daily_assignments FK is ON DELETE RESTRICT so hard-deleting would fail
+    // anyway once an operator has been assigned — soft-delete is the only safe path.
+    const { error: updateError } = await supabaseAdmin
+      .from('job_orders')
+      .update({
+        deleted_at: new Date().toISOString(),
+        status: 'cancelled',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', jobId);
+
+    if (updateError) {
+      console.error('[DELETE /jobs] soft-delete failed', { jobId, updateError });
       return NextResponse.json(
-        { error: 'Failed to delete job', debug: rpcError.message },
+        { error: 'Failed to delete job', debug: updateError.message },
         { status: 500 }
       );
     }
@@ -57,7 +73,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
         action: 'job.delete',
         resource_type: 'job_order',
         resource_id: jobId,
-        details: { job_number: job.job_number },
+        details: { job_number: job.job_number, soft_delete: true },
       })
     ).catch(() => {});
 
