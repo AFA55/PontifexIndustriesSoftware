@@ -117,9 +117,11 @@ export default function JobDetailPage() {
             const daysWorked = found?.total_days_worked || 0;
             setDayNumber(daysWorked + 1);
 
-            // Resume last position: if operator already visited work-performed today, send them back
+            // Resume last position: if operator already visited work-performed today, send them back.
+            // Helpers never follow this redirect — they have a separate simplified view.
+            const isHelperJob = found.helper_assigned_to === uid && found.assigned_to !== uid;
             const lastPage = localStorage.getItem(`job_last_page_${jobId}`);
-            if (lastPage === 'work-performed' && ['in_route', 'on_site', 'in_progress', 'working', 'pending_completion'].includes(found.status)) {
+            if (!isHelperJob && lastPage === 'work-performed' && ['in_route', 'on_site', 'in_progress', 'working', 'pending_completion'].includes(found.status)) {
               router.replace(`/dashboard/job-schedule/${jobId}/work-performed`);
               return;
             }
@@ -279,7 +281,7 @@ export default function JobDetailPage() {
         ? currentConfirmed
         : [...currentConfirmed, userId];
 
-      await fetch(`/api/job-orders/${job.id}/status`, {
+      const statusRes = await fetch(`/api/job-orders/${job.id}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -290,6 +292,11 @@ export default function JobDetailPage() {
           equipment_confirmed_by: updatedConfirmed,
         }),
       });
+
+      if (!statusRes.ok) {
+        console.error('Failed to update job status to in_route');
+        return;
+      }
 
       router.push(`/dashboard/my-jobs/${job.id}/jobsite`);
     } catch (err) {
@@ -631,20 +638,110 @@ export default function JobDetailPage() {
               </div>
             )}
 
-            {/* Arrived CTA */}
-            <div className="pt-2 pb-6">
-              <button
-                onClick={() => router.push(`/dashboard/my-jobs/${job.id}/jobsite`)}
-                className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3"
-              >
-                <CheckCircle2 className="w-6 h-6" /> Arrived — Start In Progress
-              </button>
-            </div>
+            {/* Arrived CTA — operators only; helpers ride along and don't control job status */}
+            {!jobIsHelper && (
+              <div className="pt-2 pb-6">
+                <button
+                  onClick={() => router.push(`/dashboard/my-jobs/${job.id}/jobsite`)}
+                  className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3"
+                >
+                  <CheckCircle2 className="w-6 h-6" /> Arrived — Start In Progress
+                </button>
+              </div>
+            )}
           </>
         )}
 
-        {/* ── FULL JOB VIEW (not in_route) ─────────────────────── */}
-        {job.status !== 'in_route' && <>
+        {/* ── HELPER SIMPLIFIED VIEW (not in_route) ─────────────────────── */}
+        {job.status !== 'in_route' && jobIsHelper && (
+          <div className="space-y-4 pb-8">
+            {/* Who they're working with — most important piece of info */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:bg-none dark:bg-white/[0.05] rounded-2xl border-2 border-blue-200 dark:border-blue-500/30 p-5">
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-3">Your Crew Today</p>
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-blue-500 text-white rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0">
+                  {(job.operator_name || 'O')[0].toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wide">Lead Operator</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{job.operator_name || 'Assigned Operator'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Job location (unlocked once in_progress or further) */}
+            {['in_progress', 'pending_completion', 'completed'].includes(job.status) && (job.address || job.location) && (
+              <div className="bg-white/90 dark:bg-white/[0.05] rounded-2xl border border-gray-200/50 dark:border-white/10 p-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 bg-red-100 dark:bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-white/40 uppercase tracking-wider mb-1">Job Location</p>
+                    <p className="text-base font-bold text-gray-800 dark:text-white">{job.address || job.location}</p>
+                  </div>
+                </div>
+                {job.address && (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="mt-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
+                  >
+                    <MapPin className="w-4 h-4" /> Open in Maps
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Job description */}
+            {job.description && (
+              <div className="bg-white/90 dark:bg-white/[0.05] rounded-2xl border border-gray-200/50 dark:border-white/10 p-5">
+                <p className="text-xs font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider mb-2">What We're Doing</p>
+                <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.description}</p>
+              </div>
+            )}
+
+            {/* Helper work log — their submission form */}
+            {!isCompleted && (
+              <HelperWorkLog
+                jobId={job.id}
+                jobNumber={job.job_number}
+                customerName={job.customer_name}
+                jobTitle={job.title}
+                job={job}
+              />
+            )}
+
+            {/* Quick actions */}
+            <div className="space-y-3 pt-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-white/30 px-1">Quick Actions</p>
+              <Link
+                href="/dashboard/maintenance/new"
+                className="flex items-center gap-3 px-4 py-4 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded-2xl text-orange-700 dark:text-orange-300 font-semibold text-base hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-colors"
+              >
+                <Wrench className="w-5 h-5 flex-shrink-0" />
+                Report Equipment Issue
+              </Link>
+              <Link
+                href="/dashboard/request-time-off"
+                className="flex items-center gap-3 px-4 py-4 bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/30 rounded-2xl text-violet-700 dark:text-violet-300 font-semibold text-base hover:bg-violet-100 dark:hover:bg-violet-500/20 transition-colors"
+              >
+                <Clock className="w-5 h-5 flex-shrink-0" />
+                Request Time Off
+              </Link>
+              <Link
+                href="/dashboard/timecard"
+                className="flex items-center gap-3 px-4 py-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-2xl text-emerald-700 dark:text-emerald-300 font-semibold text-base hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+              >
+                <Clock className="w-5 h-5 flex-shrink-0" />
+                My Timecard
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* ── FULL OPERATOR JOB VIEW (not in_route) ─────────────────────── */}
+        {job.status !== 'in_route' && !jobIsHelper && <>
 
         {/* Equipment already confirmed banner */}
         {equipmentAlreadyConfirmed && (

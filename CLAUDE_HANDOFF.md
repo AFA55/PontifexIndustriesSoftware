@@ -1,19 +1,18 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 17, 2026 | **Branch:** `main` | **Last commit:** `378907b5` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com (pending Vercel deploy — local `main` is 14 commits ahead) | **Build:** PASSING ✅
+**Date:** May 17, 2026 | **Branch:** `main` | **Last commit:** pending commit (session in progress) | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
 
-> **Status as of May 17, 2026 (latest).** C(iii), C(iv), C(v) all shipped. Maintenance module fully built: request form, inbox triage, visit-wizard hook, vehicle service history. All Phase C items from SHOP_MANAGER_PLAN.md are now complete. Remember to set CRON_SECRET in Vercel dashboard before next deploy.
+> **Status as of May 17, 2026 (latest).** Supervisor/helper/inventory workflow session complete. Supervisor photo uploads, previous-visit detail page, login button on homepage, supervisor schedule+active-jobs access, daily clock-in code access, smart inventory form (NewInventoryModal), and helper simplified view all shipped. CRON_SECRET still needs to be set in Vercel.
 
 ---
 
 ## 🎯 NEXT SESSION — pick up from here
 
-**All Phase C items from SHOP_MANAGER_PLAN.md are complete.** Possible next areas:
-
-1. **Mobile audit** — run `mobile-responsive-auditor` on the new maintenance form and maintenance inbox (operator pages must pass 375px / 44px tap target requirements before production)
-2. **C(iii) tie-in** — when a `maintenance_request` is marked `done` and its `equipment_id` resolves to a vehicle (`kind='vehicle'` on the equipment row), auto-create a `vehicle_service_records` row with `service_type='repair'`. The maintenance PATCH route has a TODO comment for this.
-3. **CRON_SECRET** — must be set in Vercel dashboard env vars before the auto clock-out cron fires. Add note to deployment checklist.
-4. **Pending migrations** — `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql` still not applied.
-5. **New features** — user may want to move on to analytics, SMS integration, or other items from CLAUDE.md ongoing list.
+1. **Mobile audit** — run `mobile-responsive-auditor` on: maintenance request wizard (`/dashboard/maintenance/new`), maintenance inbox (`/dashboard/admin/maintenance`), site visit photos, inventory control new-item modal
+2. **CRON_SECRET** — must be set in Vercel dashboard env vars before the auto clock-out cron fires in production.
+3. **Pending migrations** — `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql` still not applied.
+4. **Push to origin/main** — commit the helper workflow fixes (in this session's worktree) and push via the deploy branch flow.
+5. **C(iii) maintenance→vehicle tie-in** — when `maintenance_request` is marked `done` and `equipment_id` is a vehicle, auto-create a `vehicle_service_records` row. PATCH route has a TODO for this.
+6. **New features** — analytics, SMS integration, or other items from CLAUDE.md ongoing list.
 
 ### Sanity checks before starting
 - `npm run build` — 0 errors expected
@@ -29,6 +28,30 @@
 - **Push local main to origin before deploying** — local main is 4 commits ahead of origin
 
 ---
+
+## MAY 17, 2026 (PT 3) — Supervisor/helper workflow + inventory modal
+
+### Supervisor enhancements
+- Site visit photo uploads (jobsite + per-issue equipment photos) using `maintenance-photos` bucket (`visits/site/` and `visits/issues/` path prefixes)
+- Site visit detail page (`/dashboard/admin/site-visits/[id]/page.tsx`) — full data, star ratings, lightbox
+- Site visit cards now link to detail page (added `ChevronRight` indicator)
+- Supervisor can access **Schedule Board**, **Active Jobs**, and **Daily Clock-In Code** (added `supervisor` to role guards on each page + daily-code API changed from `requireAdmin` → `requireAuth` + `CODE_ROLES` set)
+- `SUPERVISOR_FLAGS` constant in `lib/feature-flags.ts` — bypasses DB lookup; enables schedule board, active jobs, completed jobs, timecards, schedule forms
+- `active_jobs: 'view'` added to supervisor RBAC preset in `lib/rbac.ts`
+
+### Homepage
+- "Log In" button added to Pontifex Industries homepage nav section (`app/page.tsx`)
+
+### Smart Inventory Modal (`NewInventoryModal.tsx`)
+- Roles allowed to create inventory expanded: supervisor, shop_help added to WRITE_ROLES on `POST /api/admin/equipment`
+- `NewInventoryModal` 2-step modal: type picker (powered/hand_tool/accessory/trailer/vehicle) → smart form with fields that adapt per type
+- "+ Add New Item" button added to Inventory Control page; renders modal with `onCreated` callback to refresh list
+
+### Helper (apprentice) workflow hardening (`app/dashboard/my-jobs/[id]/page.tsx`)
+- **Helper simplified view** — when `jobIsHelper`, renders a clean card-based view instead of full operator page: crew-today card (operator name prominent), location (unlocked at in_progress+), job description, HelperWorkLog, quick-action links (Report Equipment Issue → `/dashboard/maintenance/new`, Request Time Off, My Timecard)
+- **"Arrived" button hidden** from helpers in in_route simplified view — only operators change job status
+- **localStorage redirect guard** — helpers no longer get bounced to `/work-performed` when reopening job detail (added `isHelperJob` check before the redirect)
+- **`handleStartRoute` API error guard** — if status update API returns non-OK, operator is no longer silently redirected to jobsite; error is logged and navigation aborted
 
 ## MAY 17, 2026 (PT 2) — Phase C(iii/iv/v) complete — Maintenance module (`378907b5`)
 
