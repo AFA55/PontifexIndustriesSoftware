@@ -1,31 +1,56 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 17, 2026 | **Branch:** `main` | **Last commit:** pending commit (session in progress) | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
+**Date:** May 18, 2026 | **Branch:** `main` | **Last commit:** `a1677128` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
 
-> **Status as of May 17, 2026 (latest).** Supervisor/helper/inventory workflow session complete. Supervisor photo uploads, previous-visit detail page, login button on homepage, supervisor schedule+active-jobs access, daily clock-in code access, smart inventory form (NewInventoryModal), and helper simplified view all shipped. CRON_SECRET still needs to be set in Vercel.
+> **Status as of May 18, 2026 (latest).** Role-agnostic ticket access (slot-based not role-based), duplicate job tickets, password-gated demo dropdown, and 4 demo test accounts (Zack/Aiden operators, Lucas/Javi helpers) all shipped and live on Vercel. Testers can log in now.
 
 ---
 
 ## 🎯 NEXT SESSION — pick up from here
 
-1. **Mobile audit** — run `mobile-responsive-auditor` on: maintenance request wizard (`/dashboard/maintenance/new`), maintenance inbox (`/dashboard/admin/maintenance`), site visit photos, inventory control new-item modal
+1. **Mobile audit** — run `mobile-responsive-auditor` on: maintenance request wizard (`/dashboard/maintenance/new`), maintenance inbox (`/dashboard/admin/maintenance`), site visit photos, inventory control new-item modal, duplicate job modal on active-jobs page
 2. **CRON_SECRET** — must be set in Vercel dashboard env vars before the auto clock-out cron fires in production.
 3. **Pending migrations** — `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql` still not applied.
-4. **Push to origin/main** — commit the helper workflow fixes (in this session's worktree) and push via the deploy branch flow.
-5. **C(iii) maintenance→vehicle tie-in** — when `maintenance_request` is marked `done` and `equipment_id` is a vehicle, auto-create a `vehicle_service_records` row. PATCH route has a TODO for this.
-6. **New features** — analytics, SMS integration, or other items from CLAUDE.md ongoing list.
+4. **C(iii) maintenance→vehicle tie-in** — when `maintenance_request` is marked `done` and `equipment_id` is a vehicle, auto-create a `vehicle_service_records` row. PATCH route has a TODO for this.
+5. **New features** — analytics, SMS integration, or other items from CLAUDE.md ongoing list.
+
+### Tester credentials (shared May 18)
+- URL: https://www.pontifexindustries.com/login
+- Company Code: `PATRIOT`
+- Demo gate password: `PontifexDemo2026` (unlock the dropdown on login page)
+- **Operators:** zack@demopontifex.com / aiden@demopontifex.com — password `Patriot2026!`
+- **Helpers:** lucas@demopontifex.com / javi@demopontifex.com — password `Patriot2026!`
 
 ### Sanity checks before starting
 - `npm run build` — 0 errors expected
 - `git log --oneline -5` to confirm state
 - Read this file + CLAUDE.md
 
-**All identified schedule/dispatch vulnerabilities fixed. Auto clock-out, time corrections, supervisor clock-in, maintenance module (C(iii/iv/v)) all shipped.**
+---
 
-### Sanity checks before starting
-- `npm run build` from the main repo — 0 errors expected
-- Read `SHOP_MANAGER_PLAN.md` for Phase C status
-- Read `CLAUDE.md` for conventions (RLS rules, multi-tenant, mobile-first)
-- **Push local main to origin before deploying** — local main is 4 commits ahead of origin
+## MAY 18, 2026 — Role-agnostic tickets, duplicate jobs, password-gated demo, test accounts (`a1677128`)
+
+### Role-agnostic ticket access (slot-based, not role-based)
+- `jobIsHelper` in `app/dashboard/my-jobs/[id]/page.tsx` was wrongly using profile role to determine view. Fixed to `!!job?.isHelper` (slot-based: `helper_assigned_to === uid && assigned_to !== uid`). A helper/apprentice placed in the `assigned_to` (operator) slot now gets the full operator ticket view.
+- localStorage resume-to-`work-performed` redirect guard now checks `isHelperJob` before redirecting.
+- `handleStartRoute` now checks API response; aborts navigation on non-OK instead of silently redirecting.
+
+### Duplicate job tickets (`app/api/admin/jobs/[id]/duplicate/route.ts` — NEW)
+- `POST /api/admin/jobs/[id]/duplicate` — requires `{ assigned_to }` body, optional `scheduled_date`
+- Generates new `JOB-{year}-{seq}` number; sets `parent_job_id` to root ancestor (chains correctly if original is itself a copy)
+- Copies all scope/equipment/customer/location/compliance fields from original
+- Admin active jobs page (`app/dashboard/admin/active-jobs/page.tsx`) — cyan Copy button on each job card (hover-reveal) + duplicate modal with operator dropdown + date picker
+
+### Password-gated demo dropdown on login (`app/login/page.tsx`)
+- Replaced raw demo account links with accordion that requires `PontifexDemo2026` to unlock
+- Clicking a demo account fills email + password fields via `react-hook-form setValue`, shows "✓ Filled!" for 1s then closes dropdown
+- Accounts shown: Zack (operator), Aiden (operator), Lucas (helper), Javi (helper)
+
+### Test accounts created in Supabase (tenant: PATRIOT)
+- zack@demopontifex.com — role: `operator`
+- aiden@demopontifex.com — role: `operator`
+- lucas@demopontifex.com — role: `apprentice` (helper)
+- javi@demopontifex.com — role: `apprentice` (helper)
+- All password: `Patriot2026!`
 
 ---
 
