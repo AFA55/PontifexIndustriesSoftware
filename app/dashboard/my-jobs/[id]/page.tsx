@@ -576,7 +576,7 @@ export default function JobDetailPage() {
       <div className="container mx-auto px-4 py-5 max-w-lg space-y-4">
 
         {/* ── IN-ROUTE SIMPLIFIED VIEW ───────────────────────── */}
-        {job.status === 'in_route' && (
+        {job.status === 'in_route' && !jobIsHelper && (
           <>
             {/* Location */}
             {(job.address || job.location) && (
@@ -655,10 +655,10 @@ export default function JobDetailPage() {
           </>
         )}
 
-        {/* ── HELPER SIMPLIFIED VIEW (not in_route) ─────────────────────── */}
-        {job.status !== 'in_route' && jobIsHelper && (
+        {/* ── HELPER SIMPLIFIED VIEW ────────────────────────────────────── */}
+        {jobIsHelper && (
           <div className="space-y-4 pb-8">
-            {/* Who they're working with — most important piece of info */}
+            {/* Who they're working with — always show this first */}
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:bg-none dark:bg-white/[0.05] rounded-2xl border-2 border-blue-200 dark:border-blue-500/30 p-5">
               <p className="text-xs font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-3">Your Crew Today</p>
               <div className="flex items-center gap-4">
@@ -672,8 +672,8 @@ export default function JobDetailPage() {
               </div>
             </div>
 
-            {/* Job location (unlocked once in_progress or further) */}
-            {['in_progress', 'pending_completion', 'completed'].includes(job.status) && (job.address || job.location) && (
+            {/* Job location — show once in_route or further */}
+            {['in_route', 'in_progress', 'pending_completion', 'completed'].includes(job.status) && (job.address || job.location) && (
               <div className="bg-white/90 dark:bg-white/[0.05] rounded-2xl border border-gray-200/50 dark:border-white/10 p-5">
                 <div className="flex items-start gap-4">
                   <div className="w-10 h-10 bg-red-100 dark:bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -696,23 +696,39 @@ export default function JobDetailPage() {
               </div>
             )}
 
-            {/* Job description */}
-            {job.description && (
-              <div className="bg-white/90 dark:bg-white/[0.05] rounded-2xl border border-gray-200/50 dark:border-white/10 p-5">
-                <p className="text-xs font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider mb-2">What We're Doing</p>
-                <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.description}</p>
+            {/* Work details — what's being done */}
+            {(job.description || (job.scope_details && Object.keys(job.scope_details).length > 0)) && (
+              <div className="bg-white/90 dark:bg-white/[0.05] rounded-2xl border border-gray-200/50 dark:border-white/10 p-5 space-y-3">
+                <p className="text-xs font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider">Work Details</p>
+                {job.description && (
+                  <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.description}</p>
+                )}
+                {job.scope_details && Object.keys(job.scope_details).length > 0 && (
+                  <ScopeDetailsDisplay
+                    scopeDetails={job.scope_details}
+                    fallbackOvercutAllowed={!!job.jobsite_conditions?.overcutting_allowed}
+                  />
+                )}
               </div>
             )}
 
-            {/* Helper work log — their submission form */}
-            {!isCompleted && (
-              <HelperWorkLog
-                jobId={job.id}
-                jobNumber={job.job_number}
-                customerName={job.customer_name}
-                jobTitle={job.title}
-                job={job}
-              />
+            {/* Site contact */}
+            {(job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
+              <div className="bg-white/90 dark:bg-white/[0.05] rounded-2xl border border-green-200/60 dark:border-white/10 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Phone className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <p className="text-xs font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider">Site Contact</p>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-100 dark:border-green-500/20">
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{job.foreman_name || job.customer_contact || '—'}</p>
+                  {(job.foreman_phone || job.site_contact_phone) && (
+                    <a href={`tel:${job.foreman_phone || job.site_contact_phone}`}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-xl text-sm font-bold hover:bg-green-600 transition-colors">
+                      <Phone className="w-4 h-4" /> Call
+                    </a>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* Quick actions */}
@@ -743,7 +759,7 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* ── FULL OPERATOR JOB VIEW (not in_route) ─────────────────────── */}
+        {/* ── FULL OPERATOR JOB VIEW ────────────────────────────────────── */}
         {job.status !== 'in_route' && !jobIsHelper && <>
 
         {/* Equipment already confirmed banner */}
