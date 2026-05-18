@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Plus, ClipboardCheck, User as UserIcon, Briefcase, Calendar,
-  AlertTriangle, Star, Loader2, ArrowLeft, Search, Filter,
+  AlertTriangle, Star, Loader2, ArrowLeft, Search, Filter, ChevronRight,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
@@ -181,9 +181,10 @@ export default function SiteVisitsListPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map((v) => (
-              <article
+              <Link
                 key={v.id}
-                className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 hover:border-violet-300 dark:hover:border-violet-700 transition"
+                href={`/dashboard/admin/site-visits/${v.id}`}
+                className="block bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 hover:border-violet-300 dark:hover:border-violet-700 hover:shadow-lg hover:shadow-violet-500/10 transition cursor-pointer"
               >
                 {/* Top row */}
                 <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
@@ -209,9 +210,12 @@ export default function SiteVisitsListPage() {
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-gray-400 dark:text-slate-500">
-                    by {v.supervisor_name || 'Supervisor'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 dark:text-slate-500">
+                      by {v.supervisor_name || 'Supervisor'}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600" />
+                  </div>
                 </div>
 
                 {/* Customer */}
@@ -245,7 +249,7 @@ export default function SiteVisitsListPage() {
                     {v.cleanliness_rating && <RatingChip label="Cleanliness" value={v.cleanliness_rating} />}
                   </div>
                 )}
-              </article>
+              </Link>
             ))}
           </div>
         )}

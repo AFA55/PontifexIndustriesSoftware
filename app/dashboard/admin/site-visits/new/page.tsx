@@ -2,13 +2,13 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, ClipboardCheck, User as UserIcon, Calendar,
   Briefcase, MessageSquare, AlertTriangle, Star, Loader2, CheckCircle,
-  MapPin, Wrench, Plus, Trash2, Check,
+  MapPin, Wrench, Plus, Trash2, Check, Camera, X, ImageIcon,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
@@ -32,6 +32,8 @@ interface EquipmentIssue {
   equipment_name: string;
   whats_wrong: string;
   action: 'maintenance' | 'replace';
+  photo_urls: string[];
+  photoUploading?: boolean;
 }
 
 const ALLOWED_ROLES = ['supervisor', 'admin', 'super_admin', 'operations_manager'];
@@ -73,6 +75,12 @@ export default function NewSiteVisitPage() {
   // Step 3 — Equipment Issues
   const [hasEquipmentIssues, setHasEquipmentIssues] = useState(false);
   const [equipmentIssues, setEquipmentIssues] = useState<EquipmentIssue[]>([]);
+
+  // Photos — site visit (step 2) + per-issue (step 3)
+  const [sitePhotoUrls, setSitePhotoUrls] = useState<string[]>([]);
+  const [sitePhotoUploading, setSitePhotoUploading] = useState(false);
+  const siteFileRef = useRef<HTMLInputElement>(null);
+  const issueFileRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Lookup state
   const [operators, setOperators] = useState<OperatorOpt[]>([]);
@@ -174,10 +182,57 @@ export default function NewSiteVisitPage() {
     return new Date(`${visitDate}T${departureTime}:00`).toISOString();
   }
 
+  async function uploadPhoto(file: File, pathPrefix: string): Promise<string | null> {
+    const ext = file.name.split('.').pop() ?? 'jpg';
+    const path = `${pathPrefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from('maintenance-photos')
+      .upload(path, file, { contentType: file.type, upsert: false });
+    if (upErr) { console.error('Photo upload failed:', upErr); return null; }
+    const { data: signed } = await supabase.storage
+      .from('maintenance-photos')
+      .createSignedUrl(path, 60 * 60 * 24 * 30);
+    return signed?.signedUrl ?? null;
+  }
+
+  async function handleSitePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSitePhotoUploading(true);
+    try {
+      const url = await uploadPhoto(file, 'visits/site');
+      if (url) setSitePhotoUrls((prev) => [...prev, url]);
+    } finally {
+      setSitePhotoUploading(false);
+      if (siteFileRef.current) siteFileRef.current.value = '';
+    }
+  }
+
+  async function handleIssuePhotoSelect(idx: number, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    updateEquipmentIssue(idx, { photoUploading: true });
+    try {
+      const url = await uploadPhoto(file, 'visits/issues');
+      if (url) {
+        setEquipmentIssues((prev) => prev.map((it, i) =>
+          i === idx ? { ...it, photo_urls: [...it.photo_urls, url], photoUploading: false } : it
+        ));
+      } else {
+        updateEquipmentIssue(idx, { photoUploading: false });
+      }
+    } catch {
+      updateEquipmentIssue(idx, { photoUploading: false });
+    } finally {
+      const ref = issueFileRefs.current[idx];
+      if (ref) ref.value = '';
+    }
+  }
+
   function addEquipmentIssue() {
     setEquipmentIssues((prev) => [
       ...prev,
-      { equipment_name: '', whats_wrong: '', action: 'maintenance' },
+      { equipment_name: '', whats_wrong: '', action: 'maintenance', photo_urls: [] },
     ]);
   }
   function removeEquipmentIssue(idx: number) {
@@ -200,7 +255,6 @@ export default function NewSiteVisitPage() {
       return;
     }
 
-    // Filter: only keep equipment issues with at least a name OR a description.
     const cleanedIssues = hasEquipmentIssues
       ? equipmentIssues.filter((it) => it.equipment_name.trim() || it.whats_wrong.trim())
       : [];
@@ -232,7 +286,8 @@ export default function NewSiteVisitPage() {
           performance_rating: performance,
           safety_rating: safety,
           cleanliness_rating: cleanliness,
-          equipment_issues: cleanedIssues,
+          photo_urls: sitePhotoUrls,
+          equipment_issues: cleanedIssues.map(({ photoUploading: _, ...rest }) => rest),
         }),
       });
 
@@ -502,6 +557,51 @@ export default function NewSiteVisitPage() {
                 />
               )}
             </section>
+
+            {/* Jobsite Photos */}
+            <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-3">
+              <p className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-slate-200">
+                <ImageIcon className="w-4 h-4 text-violet-500" /> Jobsite Photos (optional)
+              </p>
+              {sitePhotoUrls.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {sitePhotoUrls.map((url, i) => (
+                    <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Site photo ${i + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setSitePhotoUrls((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                        aria-label="Remove photo"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <input
+                ref={siteFileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleSitePhotoSelect}
+              />
+              <button
+                type="button"
+                onClick={() => siteFileRef.current?.click()}
+                disabled={sitePhotoUploading}
+                className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border-2 border-dashed border-violet-300 dark:border-violet-700 text-violet-600 dark:text-violet-400 hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition text-sm font-semibold disabled:opacity-50"
+              >
+                {sitePhotoUploading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
+                ) : (
+                  <><Camera className="w-4 h-4" /> {sitePhotoUrls.length > 0 ? 'Add another photo' : 'Take or upload a jobsite photo'}</>
+                )}
+              </button>
+            </section>
           </div>
         )}
 
@@ -614,6 +714,53 @@ export default function NewSiteVisitPage() {
                           </div>
                         </button>
                       </div>
+                    </div>
+
+                    {/* Per-issue photo */}
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-2">
+                        Photo of issue (optional)
+                      </p>
+                      {it.photo_urls.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2 mb-2">
+                          {it.photo_urls.map((url, pi) => (
+                            <div key={pi} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt={`Issue ${idx + 1} photo`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => setEquipmentIssues((prev) => prev.map((item, i) =>
+                                  i === idx ? { ...item, photo_urls: item.photo_urls.filter((_, j) => j !== pi) } : item
+                                ))}
+                                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                                aria-label="Remove photo"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <input
+                        ref={(el) => { issueFileRefs.current[idx] = el; }}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => handleIssuePhotoSelect(idx, e)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => issueFileRefs.current[idx]?.click()}
+                        disabled={!!it.photoUploading}
+                        className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border border-dashed border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 transition text-sm font-medium disabled:opacity-50"
+                      >
+                        {it.photoUploading ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
+                        ) : (
+                          <><Camera className="w-4 h-4" /> {it.photo_urls.length > 0 ? 'Add another photo' : 'Photo of broken equipment'}</>
+                        )}
+                      </button>
                     </div>
                   </div>
                 ))}
