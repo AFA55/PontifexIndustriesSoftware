@@ -325,6 +325,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
   supervisor: preset({
     schedule_form: 'submit',
     schedule_board: 'view',
+    active_jobs: 'view',
     customer_profiles: 'view',
     completed_jobs: 'view',
     timecards: 'view',

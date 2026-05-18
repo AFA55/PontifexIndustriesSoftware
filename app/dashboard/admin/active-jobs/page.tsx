@@ -101,7 +101,7 @@ export default function ActiveJobsPage() {
       router.push('/login');
       return;
     }
-    const adminRoles = ['super_admin', 'operations_manager', 'admin', 'salesman', 'shop_manager'];
+    const adminRoles = ['super_admin', 'operations_manager', 'admin', 'salesman', 'shop_manager', 'supervisor'];
     if (!adminRoles.includes(currentUser.role)) {
       router.push('/dashboard');
       return;

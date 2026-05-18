@@ -9,13 +9,16 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAuth } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+
+const CODE_ROLES = new Set(['admin', 'super_admin', 'operations_manager', 'supervisor']);
 
 // GET: fetch today's PIN code
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
+  if (!CODE_ROLES.has(auth.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const tenantId = await getTenantId(auth.userId);
 
   const today = new Date().toISOString().split('T')[0];
@@ -34,8 +37,9 @@ export async function GET(request: NextRequest) {
 
 // POST: set or regenerate today's code
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
+  if (!CODE_ROLES.has(auth.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const tenantId = await getTenantId(auth.userId);
 
   const body = await request.json().catch(() => ({}));

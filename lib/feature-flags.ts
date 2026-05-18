@@ -55,6 +55,17 @@ export const SUPER_ADMIN_FLAGS: UserFeatureFlags = Object.fromEntries(
   Object.keys(DEFAULT_FLAGS).map((k) => [k, k === 'admin_type' ? 'super_admin' : true])
 ) as unknown as UserFeatureFlags;
 
+// Supervisors get read access to schedule + jobs, and can submit forms / visit reports
+export const SUPERVISOR_FLAGS: UserFeatureFlags = {
+  ...DEFAULT_FLAGS,
+  can_view_schedule_board: true,
+  can_view_active_jobs: true,
+  can_view_completed_jobs: true,
+  can_view_timecards: true,
+  can_create_schedule_forms: true,
+  admin_type: 'supervisor',
+};
+
 export function useFeatureFlags(
   userId: string | null,
   role: string | null
@@ -73,9 +84,16 @@ export function useFeatureFlags(
 
     setLoading(true); // reset before every fetch so guards wait for fresh data
 
-    // Super admins get all permissions — no DB lookup needed
+    // Super admins / ops managers get all permissions — no DB lookup needed
     if (role === 'super_admin' || role === 'operations_manager') {
       setFlags(SUPER_ADMIN_FLAGS);
+      setLoading(false);
+      return;
+    }
+
+    // Supervisors get a fixed role-based preset — no DB lookup needed
+    if (role === 'supervisor') {
+      setFlags(SUPERVISOR_FLAGS);
       setLoading(false);
       return;
     }

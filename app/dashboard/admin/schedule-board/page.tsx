@@ -300,7 +300,7 @@ export default function ScheduleBoardPage() {
     const currentUser = getCurrentUser();
     if (!currentUser) { router.push('/login'); return; }
     const role = currentUser.role || 'admin';
-    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(role)) {
+    if (!['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor'].includes(role)) {
       router.push('/dashboard');
       return;
     }
