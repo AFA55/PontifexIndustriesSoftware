@@ -232,7 +232,7 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
               </div>
               <div>
                 <label className={labelClass}>Website</label>
-                <input type="url" className={inputClass} placeholder="https://example.com" value={form.website} onChange={e => update('website', e.target.value)} />
+                <input type="text" className={inputClass} placeholder="www.example.com" value={form.website} onChange={e => update('website', e.target.value)} />
               </div>
             </div>
           </div>
