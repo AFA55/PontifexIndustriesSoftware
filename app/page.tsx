@@ -445,6 +445,12 @@ export default function HomePage() {
           {/* CTA */}
           <div className="flex items-center gap-3">
             <a
+              href="/login"
+              className="px-4 py-2 rounded-xl border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white text-sm font-semibold transition-all"
+            >
+              Log In
+            </a>
+            <a
               href="/request-demo"
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-900/30"
             >
