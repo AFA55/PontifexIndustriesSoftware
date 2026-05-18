@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useBranding } from '@/lib/branding-context';
 
@@ -27,7 +27,7 @@ const DEMO_ACCOUNTS = [
 ];
 const DEMO_GATE_PASSWORD = 'PontifexDemo2026';
 
-export default function LoginPage() {
+function LoginPageInner() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +36,29 @@ export default function LoginPage() {
   const [demoGateError, setDemoGateError] = useState(false);
   const [demoUnlocked, setDemoUnlocked] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+  const [tenantBranding, setTenantBranding] = useState<any>(null);
   const router = useRouter();
-  const { branding } = useBranding();
+  const searchParams = useSearchParams();
+  const tenantId = searchParams.get('tenant_id');
+  const { branding: contextBranding } = useBranding();
+  const branding = tenantBranding || contextBranding;
+
+  // Redirect to company-login if no tenant_id param
+  useEffect(() => {
+    if (!tenantId) {
+      router.replace('/company-login');
+    }
+  }, [tenantId, router]);
+
+  // Fetch branding for the specific tenant from the URL param
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(`/api/admin/branding?tenant_id=${tenantId}`)
+      .then(r => r.json())
+      .then(json => { if (json.success && json.data) setTenantBranding(json.data); })
+      .catch(() => {});
+  }, [tenantId]);
+
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
@@ -153,6 +174,11 @@ export default function LoginPage() {
             {branding.login_welcome_text || 'Welcome Back'}
           </motion.h1>
           <p className="text-gray-600 text-sm font-medium">{branding.tagline || 'Concrete Cutting Management System'}</p>
+          {tenantId && (
+            <Link href="/company-login" className="mt-3 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              <ArrowLeft className="w-3 h-3" /> Change company
+            </Link>
+          )}
         </div>
 
         {/* Login Form */}
@@ -360,6 +386,14 @@ export default function LoginPage() {
         </motion.div>
       </motion.div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-900" />}>
+      <LoginPageInner />
+    </Suspense>
   );
 }
 

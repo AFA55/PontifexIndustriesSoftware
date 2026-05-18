@@ -445,7 +445,7 @@ export default function HomePage() {
           {/* CTA */}
           <div className="flex items-center gap-3">
             <a
-              href="/login"
+              href="/company-login"
               className="px-4 py-2 rounded-xl border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white text-sm font-semibold transition-all"
             >
               Log In

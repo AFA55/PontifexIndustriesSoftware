@@ -1,0 +1,126 @@
+'use client';
+
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { Building2, ArrowRight, Loader2 } from 'lucide-react';
+
+function PontifexLogo() {
+  return (
+    <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
+      <span className="text-white font-bold text-2xl tracking-tight">P</span>
+    </div>
+  );
+}
+
+export default function CompanyLoginPage() {
+  const router = useRouter();
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/public/tenant-by-code?code=${encodeURIComponent(trimmed)}`);
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setError(json.error || 'Company not found. Please check your code.');
+        setLoading(false);
+        return;
+      }
+
+      router.push(`/login?tenant_id=${json.data.tenant_id}`);
+    } catch {
+      setError('Unable to connect. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+      {/* Background blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl animate-pulse delay-1000" />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="relative z-10 w-full max-w-sm px-4"
+      >
+        {/* Card */}
+        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-8">
+          {/* Logo + title */}
+          <div className="flex flex-col items-center mb-8">
+            <PontifexLogo />
+            <h1 className="text-2xl font-bold text-white mt-5 mb-1 tracking-tight">
+              Pontifex Industries
+            </h1>
+            <p className="text-slate-400 text-sm text-center">
+              Enter your company code to sign in
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="relative">
+              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
+              <input
+                type="text"
+                value={code}
+                onChange={e => { setCode(e.target.value.toUpperCase()); setError(null); }}
+                placeholder="COMPANY CODE"
+                autoFocus
+                autoComplete="organization"
+                className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-500 font-mono tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all uppercase"
+                required
+              />
+            </div>
+
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-red-400 text-sm text-center bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2"
+              >
+                {error}
+              </motion.p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !code.trim()}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/40"
+            >
+              {loading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Looking up company…</>
+              ) : (
+                <>Continue <ArrowRight className="w-4 h-4" /></>
+              )}
+            </button>
+          </form>
+
+          <p className="text-center text-slate-500 text-xs mt-6">
+            Don&apos;t have a company code?{' '}
+            <a href="/request-demo" className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium">
+              Request a demo
+            </a>
+          </p>
+        </div>
+
+        <p className="text-center text-slate-600 text-xs mt-6">
+          © {new Date().getFullYear()} Pontifex Industries. All rights reserved.
+        </p>
+      </motion.div>
+    </div>
+  );
+}
