@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useBranding } from '@/lib/branding-context';
 
@@ -19,13 +19,26 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+const DEMO_ACCOUNTS = [
+  { label: 'Operator', name: 'Zack',  email: 'zack@demopontifex.com',  password: 'Patriot2026!', color: 'blue' },
+  { label: 'Operator', name: 'Aiden', email: 'aiden@demopontifex.com', password: 'Patriot2026!', color: 'blue' },
+  { label: 'Helper',   name: 'Lucas', email: 'lucas@demopontifex.com', password: 'Patriot2026!', color: 'emerald' },
+  { label: 'Helper',   name: 'Javi',  email: 'javi@demopontifex.com',  password: 'Patriot2026!', color: 'emerald' },
+];
+const DEMO_GATE_PASSWORD = 'PontifexDemo2026';
+
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoGateInput, setDemoGateInput] = useState('');
+  const [demoGateError, setDemoGateError] = useState(false);
+  const [demoUnlocked, setDemoUnlocked] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const router = useRouter();
   const { branding } = useBranding();
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
@@ -245,101 +258,106 @@ export default function LoginPage() {
           </motion.div>
         </form>
 
-        {/* Demo Credentials - Modern Cards (conditionally shown) */}
-        {branding.show_demo_accounts && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
-            className="mt-8 space-y-3"
+        {/* Demo Access — password-gated dropdown */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="mt-6"
+        >
+          <button
+            type="button"
+            onClick={() => { setDemoOpen(o => !o); setDemoGateError(false); }}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600 text-sm font-medium transition-colors"
           >
-            <h3 className="text-gray-700 font-bold text-sm mb-4 text-center">Quick Access Demo Accounts</h3>
+            <span className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-gray-400" />
+              Demo Account Access
+            </span>
+            {demoOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
 
-            {/* Operator Account */}
-            <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 hover:border-blue-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <h4 className="text-blue-800 font-bold text-xs tracking-wider">OPERATOR DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-blue-700 font-bold">Email:</span> demo@pontifex.com</div>
-                <div><span className="text-blue-700 font-bold">Password:</span> Demo1234!</div>
-              </div>
+          {demoOpen && (
+            <div className="mt-2 p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+              {!demoUnlocked ? (
+                /* Gate: require access code */
+                <div>
+                  <p className="text-xs text-gray-500 mb-3 text-center">Enter the demo access code to view credentials</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={demoGateInput}
+                      onChange={e => { setDemoGateInput(e.target.value); setDemoGateError(false); }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          if (demoGateInput === DEMO_GATE_PASSWORD) { setDemoUnlocked(true); setDemoGateError(false); }
+                          else setDemoGateError(true);
+                        }
+                      }}
+                      placeholder="Access code"
+                      className={`flex-1 px-3 py-2 text-sm border rounded-lg outline-none focus:ring-2 ${demoGateError ? 'border-red-400 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-200'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (demoGateInput === DEMO_GATE_PASSWORD) { setDemoUnlocked(true); setDemoGateError(false); }
+                        else setDemoGateError(true);
+                      }}
+                      className="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      Unlock
+                    </button>
+                  </div>
+                  {demoGateError && <p className="text-xs text-red-500 mt-1">Incorrect access code</p>}
+                </div>
+              ) : (
+                /* Unlocked: show demo accounts */
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Demo Accounts — Password: <span className="font-mono text-gray-700">Patriot2026!</span></p>
+                  {DEMO_ACCOUNTS.map(acc => (
+                    <div
+                      key={acc.email}
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all hover:shadow-sm ${
+                        acc.color === 'blue'
+                          ? 'bg-blue-50 border-blue-200 hover:border-blue-300'
+                          : 'bg-emerald-50 border-emerald-200 hover:border-emerald-300'
+                      }`}
+                      onClick={() => {
+                        setValue('email', acc.email, { shouldValidate: true });
+                        setValue('password', acc.password, { shouldValidate: true });
+                        setCopiedEmail(acc.email);
+                        setTimeout(() => { setCopiedEmail(null); setDemoOpen(false); }, 1000);
+                      }}
+                    >
+                      <div>
+                        <p className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${acc.color === 'blue' ? 'text-blue-600' : 'text-emerald-600'}`}>
+                          {acc.label} — {acc.name}
+                        </p>
+                        <p className="text-xs font-mono text-gray-700">{acc.email}</p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${
+                        copiedEmail === acc.email
+                          ? 'bg-green-500 text-white'
+                          : acc.color === 'blue'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        {copiedEmail === acc.email ? '✓ Filled!' : 'Use this account'}
+                      </span>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => { setDemoUnlocked(false); setDemoGateInput(''); }}
+                    className="w-full text-xs text-gray-400 hover:text-gray-600 pt-1 transition-colors"
+                  >
+                    Lock credentials
+                  </button>
+                </div>
+              )}
             </div>
-
-            {/* Team Member Account */}
-            <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 hover:border-green-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <h4 className="text-green-800 font-bold text-xs tracking-wider">TEAM MEMBER DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-green-700 font-bold">Email:</span> team@pontifex.com</div>
-                <div><span className="text-green-700 font-bold">Password:</span> Team1234!</div>
-              </div>
-            </div>
-
-            {/* Sales / PM Account */}
-            <div className="p-4 bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl border-2 border-purple-200 hover:border-purple-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-                <h4 className="text-purple-800 font-bold text-xs tracking-wider">SALES / PM DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-purple-700 font-bold">Email:</span> sales@pontifex.com</div>
-                <div><span className="text-purple-700 font-bold">Password:</span> Sales1234!</div>
-              </div>
-            </div>
-
-            {/* Supervisor Account */}
-            <div className="p-4 bg-gradient-to-br from-violet-50 to-indigo-50 rounded-xl border-2 border-violet-200 hover:border-violet-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse"></div>
-                <h4 className="text-violet-800 font-bold text-xs tracking-wider">SUPERVISOR DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-violet-700 font-bold">Email:</span> supervisor@pontifex.com</div>
-                <div><span className="text-violet-700 font-bold">Password:</span> Supervisor1234!</div>
-              </div>
-            </div>
-
-            {/* Shop Manager Account */}
-            <div className="p-4 bg-gradient-to-br from-cyan-50 to-sky-50 rounded-xl border-2 border-cyan-200 hover:border-cyan-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></div>
-                <h4 className="text-cyan-800 font-bold text-xs tracking-wider">SHOP MANAGER DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-cyan-700 font-bold">Email:</span> shopmanager@pontifex.com</div>
-                <div><span className="text-cyan-700 font-bold">Password:</span> Shop1234!</div>
-              </div>
-            </div>
-
-            {/* Shop Helper Account */}
-            <div className="p-4 bg-gradient-to-br from-teal-50 to-emerald-50 rounded-xl border-2 border-teal-200 hover:border-teal-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>
-                <h4 className="text-teal-800 font-bold text-xs tracking-wider">SHOP HELPER DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-teal-700 font-bold">Email:</span> shophelp@pontifex.com</div>
-                <div><span className="text-teal-700 font-bold">Password:</span> Help1234!</div>
-              </div>
-            </div>
-
-            {/* Admin Account */}
-            <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200 hover:border-orange-300 transition-all hover:shadow-md cursor-default">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                <h4 className="text-red-800 font-bold text-xs tracking-wider">ADMIN DASHBOARD</h4>
-              </div>
-              <div className="text-xs text-gray-700 space-y-1 font-mono bg-white/60 p-2 rounded-lg">
-                <div><span className="text-red-700 font-bold">Email:</span> admin@pontifex.com</div>
-                <div><span className="text-red-700 font-bold">Password:</span> Admin1234!</div>
-              </div>
-            </div>
-          </motion.div>
-        )}
+          )}
+        </motion.div>
       </motion.div>
     </div>
   );

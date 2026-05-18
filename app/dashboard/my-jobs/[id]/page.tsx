@@ -20,8 +20,8 @@ import { unifyEquipmentSelections, allItemsConfirmed as checkAllConfirmed } from
 import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
 import { PhotoViewer } from '@/components/PhotoUploader';
 
-// HelperWorkLog only renders when the current user is an apprentice (jobIsHelper).
-// Non-apprentice operators (the majority) never need this code on first paint.
+// HelperWorkLog only renders when the user is in the helper slot on this job.
+// Whoever is assigned as `assigned_to` gets the full operator flow regardless of their profile role.
 const HelperWorkLog = nextDynamic(() => import('../_components/HelperWorkLog'), { ssr: false });
 
 function toDateString(date: Date) {
@@ -263,7 +263,10 @@ export default function JobDetailPage() {
   const isInProgress = job ? ['in_route', 'in_progress', 'pending_completion'].includes(job.status) : false;
   // Multi-day job that was reset to "scheduled" after "Done for Today"
   const isMultiDayReadyToStart = job?.status === 'scheduled' && job?.is_multi_day === true && dayNumber > 1;
-  const jobIsHelper = job?.isHelper || isHelper;
+  // jobIsHelper is slot-based, NOT role-based.
+  // A helper/apprentice put in the assigned_to (operator) slot gets the full operator view.
+  // Only users in the helper_assigned_to slot see the simplified helper view.
+  const jobIsHelper = !!job?.isHelper;
 
   // Split documents into admin-attached and operator-uploaded
   const adminDocs = documents.filter(d => d.uploaded_by !== userId);

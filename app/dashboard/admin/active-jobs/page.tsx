@@ -16,6 +16,7 @@ import {
   StickyNote,
   Trash2,
   X,
+  Copy,
 } from 'lucide-react';
 
 interface ActiveJob {
@@ -40,6 +41,12 @@ interface ScopeMeta {
   is_scoped: boolean;
   role: string;
   scoped_to_user: string | null;
+}
+
+interface OperatorOption {
+  id: string;
+  full_name: string;
+  role: string;
 }
 
 interface JobProgress {
@@ -95,6 +102,15 @@ export default function ActiveJobsPage() {
   const [scopeMeta, setScopeMeta] = useState<ScopeMeta | null>(null);
   const [progressMap, setProgressMap] = useState<Record<string, JobProgress>>({});
 
+  // ── Duplicate modal state ────────────────────────────────────────────────
+  const [duplicateTarget, setDuplicateTarget] = useState<ActiveJob | null>(null);
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [duplicateOperatorId, setDuplicateOperatorId] = useState('');
+  const [duplicateDate, setDuplicateDate] = useState('');
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateSuccess, setDuplicateSuccess] = useState<{ id: string; job_number: string } | null>(null);
+  const [operators, setOperators] = useState<OperatorOption[]>([]);
+
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -133,6 +149,80 @@ export default function ActiveJobsPage() {
       console.error('Error deleting job:', err);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // ── Fetch operator list when duplicate modal opens ───────────────────────
+  useEffect(() => {
+    if (!duplicateModalOpen) return;
+    const FIELD_ROLES = ['operator', 'apprentice', 'supervisor', 'shop_help'];
+    const load = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        // The /api/admin/profiles endpoint returns operator+apprentice. Fetch all
+        // profiles separately using the team-profiles endpoint to capture supervisors.
+        const res = await fetch('/api/admin/profiles', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          // Filter to field-assignable roles
+          const filtered = (json.data as OperatorOption[]).filter(
+            p => FIELD_ROLES.includes(p.role)
+          );
+          setOperators(filtered);
+        }
+      } catch (err) {
+        console.error('Error fetching operators for duplicate modal:', err);
+      }
+    };
+    load();
+  }, [duplicateModalOpen]);
+
+  const openDuplicateModal = (job: ActiveJob) => {
+    setDuplicateTarget(job);
+    setDuplicateOperatorId('');
+    setDuplicateDate(job.scheduled_date || '');
+    setDuplicateSuccess(null);
+    setDuplicateModalOpen(true);
+  };
+
+  const closeDuplicateModal = () => {
+    setDuplicateModalOpen(false);
+    setDuplicateTarget(null);
+    setDuplicateSuccess(null);
+  };
+
+  const handleDuplicate = async () => {
+    if (!duplicateTarget || !duplicateOperatorId) return;
+    setDuplicating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/admin/jobs/${duplicateTarget.id}/duplicate`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assigned_to: duplicateOperatorId,
+          scheduled_date: duplicateDate || duplicateTarget.scheduled_date,
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setDuplicateSuccess(json.data);
+        // Refresh the job list in the background
+        fetchJobs();
+      } else {
+        console.error('Duplicate failed:', json.error);
+      }
+    } catch (err) {
+      console.error('Error duplicating job:', err);
+    } finally {
+      setDuplicating(false);
     }
   };
 
@@ -318,6 +408,144 @@ export default function ActiveJobsPage() {
           </div>
         </div>
       )}
+      {/* ── Duplicate job modal ─────────────────────────────────────────────── */}
+      {duplicateModalOpen && duplicateTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white dark:bg-[#1a0d2e] border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            {duplicateSuccess ? (
+              /* ── Success state ── */
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-500/20 flex items-center justify-center">
+                    <Copy className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white">Job Duplicated</h3>
+                    <p className="text-sm text-slate-500 dark:text-white/60">New ticket created</p>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-700 dark:text-white/80 mb-5">
+                  <span className="font-semibold text-cyan-700 dark:text-cyan-300">{duplicateSuccess.job_number}</span> has been added to Active Jobs.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeDuplicateModal}
+                    className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      closeDuplicateModal();
+                      router.push(`/dashboard/admin/jobs/${duplicateSuccess.id}`);
+                    }}
+                    className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-cyan-600 hover:bg-cyan-700 text-white transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    Open Job
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* ── Form state ── */
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-500/20 flex items-center justify-center">
+                      <Copy className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 dark:text-white">Duplicate Job</h3>
+                      <p className="text-sm text-slate-500 dark:text-white/60">{duplicateTarget.job_number}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={closeDuplicateModal}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-500 dark:text-white/50 mb-4">
+                  Copies all scope, equipment, and customer data. New ticket starts as{' '}
+                  <span className="font-semibold text-sky-600 dark:text-sky-400">Scheduled</span>.
+                </p>
+
+                {/* Customer label */}
+                <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm text-slate-700 dark:text-white/80">
+                  <span className="text-slate-500 dark:text-white/50 text-xs block mb-0.5">Customer</span>
+                  {duplicateTarget.customer_name || duplicateTarget.title || '—'}
+                </div>
+
+                {/* Operator dropdown */}
+                <div className="mb-4">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-white/60 mb-1.5">
+                    Assign Operator <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={duplicateOperatorId}
+                    onChange={e => setDuplicateOperatorId(e.target.value)}
+                    className="
+                      w-full px-3 py-2 rounded-xl text-sm border
+                      bg-white text-slate-900 border-slate-200
+                      dark:bg-white/5 dark:text-white dark:border-white/15
+                      focus:outline-none focus:ring-2 focus:ring-cyan-500/40
+                    "
+                  >
+                    <option value="">Select operator…</option>
+                    {operators.map(op => (
+                      <option key={op.id} value={op.id}>
+                        {op.full_name}{op.role !== 'operator' ? ` (${op.role.replace(/_/g, ' ')})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date picker */}
+                <div className="mb-5">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-white/60 mb-1.5">
+                    Scheduled Date
+                  </label>
+                  <input
+                    type="date"
+                    value={duplicateDate}
+                    onChange={e => setDuplicateDate(e.target.value)}
+                    className="
+                      w-full px-3 py-2 rounded-xl text-sm border
+                      bg-white text-slate-900 border-slate-200
+                      dark:bg-white/5 dark:text-white dark:border-white/15
+                      focus:outline-none focus:ring-2 focus:ring-cyan-500/40
+                    "
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeDuplicateModal}
+                    className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDuplicate}
+                    disabled={!duplicateOperatorId || duplicating}
+                    className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-cyan-600 hover:bg-cyan-700 text-white disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {duplicating ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                    Create Copy
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         {(() => {
@@ -587,6 +815,13 @@ export default function ActiveJobsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDuplicateModal(job); }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:text-cyan-400 dark:hover:bg-cyan-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Duplicate job"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(job); }}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors opacity-0 group-hover:opacity-100"
