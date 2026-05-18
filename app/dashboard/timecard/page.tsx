@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import NFCClockIn, { type ClockInResult } from '@/components/NFCClockIn';
+import { requestLocation, LocationBlockedModal, type LocationErrorKind } from '@/components/ui/LocationPermissionGuard';
 
 interface TimecardEntry {
   id: string;
@@ -72,6 +73,8 @@ function TimecardPage() {
   const [liveHours, setLiveHours] = useState('0.0');
   const [showTimeOffRequest, setShowTimeOffRequest] = useState(false);
   const [bypassNfc, setBypassNfc] = useState(false);
+  const [locationErrorKind, setLocationErrorKind] = useState<LocationErrorKind | null>(null);
+  const [pendingClockInAfterLocationFix, setPendingClockInAfterLocationFix] = useState(false);
 
   // Correction request modal state
   const [correctionTarget, setCorrectionTarget] = useState<TimecardEntry | null>(null);
@@ -146,19 +149,26 @@ function TimecardPage() {
 
   const handleClockIn = useCallback(async (nfcTagUid?: string) => {
     setClockingAction(true);
+    setLocationErrorKind(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // NFC doesn't require GPS — skip location for NFC clock-ins
       let latitude: number | undefined, longitude: number | undefined, accuracy: number | undefined;
-      try {
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
-        });
-        latitude = pos.coords.latitude;
-        longitude = pos.coords.longitude;
-        accuracy = pos.coords.accuracy;
-      } catch { /* GPS optional for NFC */ }
+      if (!nfcTagUid && clockMethod !== 'nfc') {
+        try {
+          const loc = await requestLocation();
+          latitude = loc.latitude;
+          longitude = loc.longitude;
+          accuracy = loc.accuracy;
+        } catch (locErr: any) {
+          setClockingAction(false);
+          setLocationErrorKind(locErr.kind ?? 'position_unavailable');
+          setPendingClockInAfterLocationFix(true);
+          return;
+        }
+      }
 
       const body: Record<string, unknown> = {
         clock_in_method: nfcTagUid ? 'nfc' : clockMethod,
@@ -192,13 +202,11 @@ function TimecardPage() {
 
       let latitude: number | undefined, longitude: number | undefined, accuracy: number | undefined;
       try {
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
-        });
-        latitude = pos.coords.latitude;
-        longitude = pos.coords.longitude;
-        accuracy = pos.coords.accuracy;
-      } catch { /* GPS optional */ }
+        const loc = await requestLocation();
+        latitude = loc.latitude;
+        longitude = loc.longitude;
+        accuracy = loc.accuracy;
+      } catch { /* GPS optional for clock-out */ }
 
       const res = await fetch('/api/timecard/clock-out', {
         method: 'POST',
@@ -399,6 +407,19 @@ function TimecardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
+      {/* Location permission modal — shows when GPS is blocked */}
+      <LocationBlockedModal
+        errorKind={locationErrorKind}
+        onDismiss={() => { setLocationErrorKind(null); setPendingClockInAfterLocationFix(false); }}
+        onRetry={() => {
+          setLocationErrorKind(null);
+          if (pendingClockInAfterLocationFix) {
+            setPendingClockInAfterLocationFix(false);
+            handleClockIn();
+          }
+        }}
+      />
+
       {/* ── Header ─────────────────────────────────────── */}
       <header className="sticky top-0 z-10 bg-white dark:bg-white/5 border-b border-gray-200 dark:border-white/10 shadow-sm">
         <div className="max-w-[1024px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
