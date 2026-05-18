@@ -8,8 +8,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, Package, Truck, Search, Loader2, ChevronRight, History,
   LogOut as CheckoutIcon, LogIn as CheckinIcon, Filter, CheckCircle2,
-  AlertTriangle, User as UserIcon, Briefcase, Wrench, Mic, MicOff, Sparkles,
+  AlertTriangle, User as UserIcon, Briefcase, Wrench, Mic, MicOff, Sparkles, Plus,
 } from 'lucide-react';
+import NewInventoryModal from './_components/NewInventoryModal';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 
@@ -85,6 +86,8 @@ export default function InventoryControlPage() {
   const [historyRows, setHistoryRows] = useState<CheckoutRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
+
+  const [showNewModal, setShowNewModal] = useState(false);
 
   // Auth
   useEffect(() => {
@@ -240,7 +243,19 @@ export default function InventoryControlPage() {
 
         {/* ── INVENTORY TAB ───────────────────────────────────────────────── */}
         {tab === 'inventory' && (
-          <InventoryTab equipment={equipment} loading={equipmentLoading} />
+          <>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowNewModal(true)}
+                className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 text-white text-sm font-semibold shadow-lg shadow-cyan-500/30 transition"
+              >
+                <Plus className="w-4 h-4" />
+                Add New Item
+              </button>
+            </div>
+            <InventoryTab equipment={equipment} loading={equipmentLoading} />
+          </>
         )}
 
         {/* ── CHECKOUT TAB ───────────────────────────────────────────────── */}
@@ -278,6 +293,13 @@ export default function InventoryControlPage() {
           />
         )}
       </div>
+
+      {showNewModal && (
+        <NewInventoryModal
+          onClose={() => setShowNewModal(false)}
+          onCreated={() => { void fetchEquipment(); }}
+        />
+      )}
     </div>
   );
 }

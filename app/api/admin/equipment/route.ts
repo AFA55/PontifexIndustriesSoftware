@@ -14,7 +14,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 
 const READ_ROLES = new Set(['shop_manager','admin','super_admin','operations_manager','supervisor','salesman']);
-const WRITE_ROLES = new Set(['shop_manager','admin','super_admin','operations_manager']);
+const WRITE_ROLES = new Set(['shop_manager','shop_help','supervisor','admin','super_admin','operations_manager']);
 
 const VALID_KIND = ['powered','hand_tool','accessory','vehicle','trailer'];
 const VALID_POWER_SOURCE = ['diesel','gas','hydraulic','electric','pneumatic'];
