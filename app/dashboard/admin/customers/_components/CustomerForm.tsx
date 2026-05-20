@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Building2, Loader2, User, DollarSign, MapPin, FileText, Plus, Users } from 'lucide-react';
+import { X, Building2, Loader2, User, DollarSign, MapPin, FileText, Plus, Users, CreditCard } from 'lucide-react';
 import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 
 interface AdditionalContact {
@@ -68,6 +68,9 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
     state: customer?.state || '',
     zip: customer?.zip || '',
     customer_type: customer?.customer_type || '',
+    payment_terms: customer?.payment_terms != null ? String(customer.payment_terms) : '',
+    payment_method: customer?.payment_method || '',
+    tax_id: customer?.tax_id || '',
     website: customer?.website || '',
     notes: customer?.notes || '',
   });
@@ -273,12 +276,49 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
                 <input type="text" className={inputClass} placeholder="Jane Doe" value={form.billing_contact_name} onChange={e => update('billing_contact_name', e.target.value)} />
               </div>
               <div>
-                <label className={labelClass}>Billing Email *</label>
+                <label className={labelClass}>Billing Email</label>
                 <input type="email" className={inputClass} placeholder="billing@example.com" value={form.billing_contact_email} onChange={e => update('billing_contact_email', e.target.value)} />
               </div>
               <div>
                 <label className={labelClass}>Billing Phone</label>
                 <input type="tel" className={inputClass} placeholder="(555) 123-4567" value={form.billing_contact_phone} onChange={e => update('billing_contact_phone', e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          {/* Payment & Billing Section */}
+          <div className={sectionClass}>
+            <div className="flex items-center gap-2 mb-1">
+              <CreditCard className="w-4 h-4 text-purple-600" />
+              <h3 className="text-sm font-bold text-gray-900">Payment &amp; Billing</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>Payment Terms</label>
+                <select className={inputClass} value={form.payment_terms} onChange={e => update('payment_terms', e.target.value)}>
+                  <option value="">Select terms...</option>
+                  <option value="15">Net 15</option>
+                  <option value="30">Net 30</option>
+                  <option value="45">Net 45</option>
+                  <option value="60">Net 60</option>
+                  <option value="90">Net 90</option>
+                  <option value="cod">COD (Cash on Delivery)</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Payment Method</label>
+                <select className={inputClass} value={form.payment_method} onChange={e => update('payment_method', e.target.value)}>
+                  <option value="">Select method...</option>
+                  <option value="check">Check</option>
+                  <option value="ach">ACH / Bank Transfer</option>
+                  <option value="credit_card">Credit Card</option>
+                  <option value="cash">Cash</option>
+                  <option value="wire">Wire Transfer</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Tax ID</label>
+                <input type="text" className={inputClass} placeholder="XX-XXXXXXX" value={form.tax_id} onChange={e => update('tax_id', e.target.value)} />
               </div>
             </div>
           </div>
