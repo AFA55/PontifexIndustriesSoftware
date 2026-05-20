@@ -43,9 +43,29 @@ export async function GET(
     // Get job info
     const { data: job } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, customer_name, job_type, address, location, description, assigned_to, site_contact_phone, customer_contact, in_route_at, arrived_at_jobsite_at, work_started_at, work_completed_at')
+      .select('id, job_number, customer_name, job_type, address, location, description, assigned_to, site_contact_phone, customer_contact, in_route_at, arrived_at_jobsite_at, work_started_at, work_completed_at, tenant_id')
       .eq('id', sigRequest.job_order_id)
       .single();
+
+    // Fetch tenant branding for the sign page header
+    let tenantName = 'Your Service Provider';
+    if (job?.tenant_id) {
+      const { data: branding } = await supabaseAdmin
+        .from('tenant_branding')
+        .select('company_name')
+        .eq('tenant_id', job.tenant_id)
+        .single();
+      if (branding?.company_name) {
+        tenantName = branding.company_name;
+      } else {
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('name')
+          .eq('id', job.tenant_id)
+          .single();
+        if (tenant?.name) tenantName = tenant.name;
+      }
+    }
 
     // Fetch work items for this job
     const { data: workItems } = await supabaseAdmin
@@ -78,6 +98,7 @@ export async function GET(
         request_type: sigRequest.request_type,
         contact_name: sigRequest.contact_name,
         status: sigRequest.status,
+        tenant_name: tenantName,
         form_template: sigRequest.form_templates || null,
         work_items: workItems || [],
         daily_logs: dailyLogs || [],
@@ -218,6 +239,26 @@ export async function POST(
         }
       }
 
+      // Resolve tenant name for the thank-you email
+      let surveyTenantName = 'Your Service Provider';
+      if (job?.tenant_id) {
+        const { data: tb } = await supabaseAdmin
+          .from('tenant_branding')
+          .select('company_name')
+          .eq('tenant_id', job.tenant_id)
+          .single();
+        if (tb?.company_name) {
+          surveyTenantName = tb.company_name;
+        } else {
+          const { data: t } = await supabaseAdmin
+            .from('tenants')
+            .select('name')
+            .eq('id', job.tenant_id)
+            .single();
+          if (t?.name) surveyTenantName = t.name;
+        }
+      }
+
       // Decide delivery channel: email if customer provided one, else site_contact_phone.
       const sitePhone = (job?.site_contact_phone || job?.customer_contact || '').trim() || null;
       let deliveredTo: string | null = null;
@@ -284,6 +325,7 @@ export async function POST(
         const html = buildSurveyEmailHtml({
           jobNumber: job?.job_number || '',
           customerName: job?.customer_name || '',
+          companyName: surveyTenantName,
           cleanliness,
           communication,
           likelyAgain,
@@ -292,7 +334,7 @@ export async function POST(
         Promise.resolve(
           sendEmail({
             to: sendToEmail,
-            subject: 'Thank you from Patriot Concrete Cutting',
+            subject: `Thank you from ${surveyTenantName}`,
             html,
           })
         )
@@ -411,6 +453,7 @@ function buildSurveySmsMessage({
 function buildSurveyEmailHtml({
   jobNumber,
   customerName,
+  companyName,
   cleanliness,
   communication,
   likelyAgain,
@@ -418,6 +461,7 @@ function buildSurveyEmailHtml({
 }: {
   jobNumber: string;
   customerName: string;
+  companyName: string;
   cleanliness: number | null;
   communication: number | null;
   likelyAgain: number | null;
@@ -445,7 +489,7 @@ function buildSurveyEmailHtml({
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Thank you from Patriot Concrete Cutting</title>
+  <title>Thank you from ${escape(companyName)}</title>
 </head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f8fafc;color:#1e293b;">
   <table role="presentation" style="width:100%;border-collapse:collapse;background-color:#f8fafc;">
@@ -458,7 +502,7 @@ function buildSurveyEmailHtml({
                 Thank you for your feedback
               </h1>
               <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">
-                Patriot Concrete Cutting &middot; Job ${escape(jobNumber)}
+                ${escape(companyName)} &middot; Job ${escape(jobNumber)}
               </p>
             </td>
           </tr>
@@ -488,14 +532,14 @@ function buildSurveyEmailHtml({
                   : ''
               }
               <p style="margin:0;color:#475569;font-size:15px;line-height:1.6;">
-                Your comments help us improve every single day. Thank you for trusting Patriot Concrete Cutting.
+                Your comments help us improve every single day. Thank you for trusting ${escape(companyName)}.
               </p>
             </td>
           </tr>
           <tr>
             <td style="background-color:#f8fafc;padding:24px 40px;text-align:center;border-top:1px solid #e2e8f0;">
               <p style="margin:0;color:#64748b;font-size:13px;line-height:1.5;">
-                <strong style="color:#475569;">Patriot Concrete Cutting</strong><br>
+                <strong style="color:#475569;">${escape(companyName)}</strong><br>
                 Licensed &middot; Insured &middot; Professional
               </p>
             </td>

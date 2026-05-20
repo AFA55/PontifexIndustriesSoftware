@@ -36,6 +36,7 @@ interface SignatureData {
   request_type: RequestType;
   contact_name: string;
   status: string;
+  tenant_name?: string;
   form_template: {
     id: string;
     name: string;
@@ -432,7 +433,7 @@ export default function PublicSignPage() {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Patriot Concrete Cutting</h1>
+              <h1 className="text-lg font-bold tracking-tight">{data?.tenant_name || 'Your Service Provider'}</h1>
               <p className="text-xs text-slate-400">Licensed &bull; Insured &bull; Professional</p>
             </div>
           </div>
@@ -739,7 +740,7 @@ export default function PublicSignPage() {
         </button>
 
         <p className="text-center text-xs text-slate-400 pb-8">
-          Powered by Pontifex Industries
+          Powered by {data?.tenant_name || 'Pontifex Industries'}
         </p>
       </div>
     </div>
