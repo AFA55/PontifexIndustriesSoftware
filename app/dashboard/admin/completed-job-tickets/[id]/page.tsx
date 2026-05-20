@@ -157,6 +157,8 @@ export default function CompletedJobSummaryPage() {
   const [sigPhone, setSigPhone] = useState('');
   const [sendingSig, setSendingSig] = useState(false);
   const [sigRequests, setSigRequests] = useState<SigRequest[]>([]);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -261,6 +263,27 @@ export default function CompletedJobSummaryPage() {
       }
     } catch (_) { setActionMsg({ type: 'error', text: 'Network error. Please try again.' }); }
     finally { setSendingSig(false); }
+  };
+
+  const handleResend = async (request: SigRequest) => {
+    setResendingId(request.id);
+    setResendSuccess(null);
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/send-signature-request`, {
+        method: 'POST',
+        body: JSON.stringify({ customer_email: request.contact_email, customer_name: request.contact_name }),
+      });
+      if (res.ok) {
+        setResendSuccess(request.id);
+        setActionMsg({ type: 'success', text: `Signature request resent to ${request.contact_email}` });
+        loadSigRequests();
+        setTimeout(() => setResendSuccess(null), 4000);
+      } else {
+        const err = await res.json();
+        setActionMsg({ type: 'error', text: err.error || 'Failed to resend signature request.' });
+      }
+    } catch (_) { setActionMsg({ type: 'error', text: 'Network error. Please try again.' }); }
+    finally { setResendingId(null); }
   };
 
   const handleAddMilestone = async () => {
@@ -865,6 +888,42 @@ export default function CompletedJobSummaryPage() {
               </div>
             )}
           </div>
+
+          {/* Expired signature requests — show resend option for each */}
+          {sigRequests.filter(r => r.is_expired).length > 0 && (
+            <div className="mt-3 space-y-2">
+              {sigRequests.filter(r => r.is_expired).map(req => (
+                <div key={req.id} className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white/50 dark:ring-white/10">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                    Expired request &mdash; {req.contact_email || 'unknown email'}
+                    {req.sent_at && (
+                      <span className="ml-1 opacity-70">
+                        (sent {new Date(req.sent_at).toLocaleDateString()})
+                      </span>
+                    )}
+                  </div>
+                  {resendSuccess === req.id ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30 dark:text-emerald-300">
+                      <CheckCircle className="w-3 h-3" />
+                      Sent!
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleResend(req)}
+                      disabled={resendingId === req.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50
+                        bg-white border border-rose-300 text-rose-700 hover:bg-rose-50
+                        dark:bg-white/5 dark:border-rose-400/30 dark:text-rose-300 dark:hover:bg-rose-500/15"
+                    >
+                      {resendingId === req.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      Resend
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Core documents */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
