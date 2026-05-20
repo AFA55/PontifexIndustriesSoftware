@@ -168,7 +168,13 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
     setError('');
     try {
       const validContacts = additionalContacts.filter(c => c.name.trim());
-      await onSubmit({ ...form, additional_contacts: validContacts.length > 0 ? validContacts : undefined });
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out. Please try again.')), 25000)
+      );
+      await Promise.race([
+        onSubmit({ ...form, additional_contacts: validContacts.length > 0 ? validContacts : undefined }),
+        timeout,
+      ]);
     } catch (err: any) {
       setError(err.message || 'Failed to save customer');
     } finally {

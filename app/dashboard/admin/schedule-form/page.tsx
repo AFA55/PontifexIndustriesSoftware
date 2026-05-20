@@ -1333,42 +1333,50 @@ export default function ScheduleFormPage() {
   // ── Create new customer handler ────────────────────────────
   // Accepts the data object from CustomerForm's onSubmit callback
   const handleCreateCustomer = async (data: Record<string, any>) => {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) throw new Error('Not authenticated');
-    const res = await fetch('/api/admin/customers', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.session.access_token}`,
-      },
-      body: JSON.stringify(data),
-    });
-    const result = await res.json();
-    if (res.ok && result.data) {
-      const created = result.data;
-      // Add to CRM list
+    const controller = new AbortController();
+    const abortTimer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error('Not authenticated');
+      const res = await fetch('/api/admin/customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.session.access_token}`,
+        },
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to create customer');
+      const created = result.data || result;
+      const companyName = created.company_name || created.name || data.company_name;
       setCrmCustomers(prev => [{
         id: created.id,
-        company_name: created.company_name || created.name || data.company_name,
+        company_name: companyName,
         primary_contact_name: created.primary_contact_name || data.primary_contact_name || null,
         primary_contact_phone: created.primary_contact_phone || data.primary_contact_phone || null,
         address: created.address || data.address || null,
       }, ...prev]);
-      // Select the new customer
       updateForm({
-        contractor_name: created.company_name || created.name || data.company_name,
+        contractor_name: companyName,
         customer_id: created.id,
         site_contact: data.primary_contact_name || '',
         contact_phone: data.primary_contact_phone || '',
       });
-      // New customer has no history yet — clear any stale history state
       setCustomerPONumbers([]);
       setCustomerContacts([]);
       setCustomerSiteAddresses([]);
       setCustomerProjectNames([]);
       setShowNewCustomerModal(false);
-    } else {
-      throw new Error(result.error || 'Failed to create customer');
+    } catch (err: any) {
+      clearTimeout(abortTimer);
+      const msg = err?.name === 'AbortError'
+        ? 'Request timed out — please check your connection and try again.'
+        : err?.message || 'Failed to create customer';
+      throw new Error(msg);
+    } finally {
+      clearTimeout(abortTimer);
     }
   };
 
