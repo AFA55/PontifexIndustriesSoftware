@@ -625,7 +625,7 @@ export default function PublicSignPage() {
                 onChange={e => setWorkConfirmed(e.target.checked)}
                 className="w-5 h-5 mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />
-              <span className="text-sm text-slate-700">
+              <span className="text-sm font-semibold text-slate-700">
                 I confirm the work described above has been completed satisfactorily.
                 <span className="text-red-500 ml-1">*</span>
               </span>
@@ -724,6 +724,13 @@ export default function PublicSignPage() {
             </p>
           </div>
         </div>
+
+        {/* Completion checkbox guidance — only shown after signature drawn but box not yet checked */}
+        {isCompletion && !workConfirmed && signatureData && (
+          <p className="text-center text-xs text-amber-600 font-medium">
+            Please check the confirmation box above before signing
+          </p>
+        )}
 
         {/* Submit */}
         <button
