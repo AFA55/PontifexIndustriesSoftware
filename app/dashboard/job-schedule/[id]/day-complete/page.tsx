@@ -89,14 +89,39 @@ export default function DayCompletePage() {
   useEffect(() => {
     fetchJob();
     fetchScheduleInfo();
-    // Load work performed from localStorage
-    const stored = localStorage.getItem(`work-performed-${jobId}`);
-    if (stored) {
+    // DB-first: fetch saved work items; fall back to localStorage if DB is empty
+    (async () => {
       try {
-        const parsed = JSON.parse(stored);
-        setWorkPerformedItems(parsed.items || []);
-      } catch { /* ignore */ }
-    }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`/api/job-orders/${jobId}/work-items`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const rows: any[] = json.data || json.items || [];
+          if (rows.length > 0) {
+            setWorkPerformedItems(rows.map((r: any) => ({
+              type: r.work_type || r.type,
+              description: r.details_json?.description || r.description,
+              quantity: r.quantity,
+              unit: r.unit || r.details_json?.unit,
+              depth: r.cut_depth_inches || r.core_depth_inches || r.depth,
+              notes: r.notes,
+            })));
+            return;
+          }
+        }
+      } catch { /* fall through to localStorage */ }
+      // localStorage fallback
+      const stored = localStorage.getItem(`work-performed-${jobId}`);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setWorkPerformedItems(parsed.items || []);
+        } catch { /* ignore */ }
+      }
+    })();
   }, [jobId]);
 
   const fetchJob = async () => {
@@ -248,8 +273,7 @@ export default function DayCompletePage() {
         }
       }
 
-      const stored = localStorage.getItem(`work-performed-${jobId}`);
-      const workPerformed = stored ? JSON.parse(stored).items : [];
+      const workPerformed = workPerformedItems;
 
       const res = await fetch(`/api/job-orders/${jobId}/daily-log`, {
         method: 'POST',
@@ -268,6 +292,7 @@ export default function DayCompletePage() {
 
       if (res.ok) {
         localStorage.removeItem(`work-performed-${jobId}`);
+        localStorage.removeItem(`work-draft-${jobId}`);
         setSuccessMode('done_for_day');
       } else {
         const data = await res.json();
@@ -305,8 +330,7 @@ export default function DayCompletePage() {
         }
       }
 
-      const stored = localStorage.getItem(`work-performed-${jobId}`);
-      const workPerformed = stored ? JSON.parse(stored).items : workPerformedItems;
+      const workPerformed = workPerformedItems;
 
       // ── Generate & upload completion PDF ──────────────────────────────────
       let generatedPdfUrl: string | null = null;
@@ -370,6 +394,7 @@ export default function DayCompletePage() {
 
       if (statusRes.ok) {
         localStorage.removeItem(`work-performed-${jobId}`);
+        localStorage.removeItem(`work-draft-${jobId}`);
         // Route through customer satisfaction survey before showing success card
         setSurveyMode(true);
       } else {
@@ -475,8 +500,7 @@ export default function DayCompletePage() {
       }
 
       // 4. Log the day and submit for completion
-      const stored = localStorage.getItem(`work-performed-${jobId}`);
-      const workPerformed = stored ? JSON.parse(stored).items : [];
+      const workPerformed = workPerformedItems;
 
       await fetch(`/api/job-orders/${jobId}/daily-log`, {
         method: 'POST',
@@ -505,6 +529,7 @@ export default function DayCompletePage() {
       }).catch(() => {});
 
       localStorage.removeItem(`work-performed-${jobId}`);
+      localStorage.removeItem(`work-draft-${jobId}`);
       setRemoteSentPhone(remotePhone.trim());
       setShowRemotePanel(false);
       setRemoteSent(true);
