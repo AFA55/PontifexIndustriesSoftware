@@ -297,6 +297,16 @@ For now, the auto-preview URL per branch is enough.
 - [x] **Pushed `dd28c58b` to origin/main → production live** (63s build, ~$1-2 cost)
 - [x] Verified READY on https://www.pontifexindustries.com via Vercel API
 
+### Session — May 21, 2026 — Login Outage Fix + iOS App Icon ✅ COMPLETE
+- [x] iOS app icon alpha-channel bug fixed — bridge logo over `#1e1b4b` background, `hasAlpha: no`
+- [x] `APP_CHANGES.md` created — tracks native app-only changes separately from web
+- [x] `vercel.json` maxDuration raised 10→25s default; 30s for 4 login-critical routes
+- [x] `branding/route.ts` hardened — `withTimeout(20s)`, `.maybeSingle()`, non-fatal timeout
+- [x] `tenant-by-code/route.ts` hardened — AbortController covers full body read (not just headers)
+- [x] **FINAL FIX**: `company-login/page.tsx` rewrites to call `supabase.rpc('lookup_tenant_by_code')` directly — no Vercel Lambda hop. Sub-second response.
+- [x] Migration `20260521_public_tenant_lookup_fn` — SECURITY DEFINER RPC callable by anon, returns only `id/name/company_code`
+- [x] Migration `20260521_drop_redundant_duplicate_indexes` — dropped 31 redundant indexes
+
 ### Next Session — C(iii) / C(iv) / C(v) (per SHOP_MANAGER_PLAN.md)
 - [ ] **C(iii)** — Fleet maintenance history + oil/filter change tracking (`vehicle_service_records` table; service history panel; auto-create from completed maintenance_request)
 - [ ] **C(iv)** — Operator/Helper Maintenance Request 3-tap form at `/dashboard/maintenance/new` (currently a placeholder); Maintenance Inbox triage UI; shop_help dashboard also exposes the form
@@ -306,6 +316,10 @@ For now, the auto-preview URL per branch is enough.
 - [ ] SMS integration for signature request delivery
 - [ ] Schedule board performance optimization
 - [ ] Apply pending migrations: `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql`
-- [ ] Set `CRON_SECRET` env var in Vercel dashboard (required for `/api/cron/invoice-30d-reminders`)
+- [ ] Set `CRON_SECRET` env var in Vercel dashboard (required for `/api/cron/auto-clockout` and `/api/cron/invoice-30d-reminders`)
 - [ ] Patriot-specific visual assets (logos, custom colors)
 - [ ] Loading states & error handling audit across remaining pages
+- [ ] Mobile responsive audit: maintenance wizard, maintenance inbox, inventory new-item modal, duplicate job modal
+- [ ] iOS splash screen (2732×2732 opaque purple + bridge logo)
+- [ ] Apple Developer Program enrollment ($99/yr) — required for TestFlight + App Store
+- [ ] App Store metadata: screenshots, description, privacy policy page at `/privacy-policy`

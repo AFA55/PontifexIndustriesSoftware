@@ -1,19 +1,79 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 20, 2026 | **Branch:** `main` | **Last commit:** `9a92c907` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
+**Date:** May 21, 2026 | **Branch:** `main` | **Last commit:** `2e4fd55e` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
 
-> **Status as of May 20, 2026.** Major workflow audit + parallel agent fixes shipped: remote signature auto-completes jobs + generates PDF, invoice line items now have correct rates, day-complete reads from DB not localStorage, completion PDF linked to invoices. Also: customer form infinite-loading bug fixed, payment terms fields added, sign page tenant branding fixed.
+> **Status as of May 21, 2026.** Critical login outage resolved after 2+ hour investigation. Company-code login now queries Supabase directly from the browser (no Vercel Lambda). iOS app icon alpha-channel bug fixed. 31 redundant database indexes dropped. Session also confirmed: Vercel iad1→Supabase TCP connections hang indefinitely due to an undici/AbortController bug — all critical-path lookups should go client→Supabase directly, not through Vercel serverless.
 
 ---
 
 ## 🎯 NEXT SESSION — pick up from here
 
-1. **App Store / Google Play** — user wants to publish. Plan: Capacitor wrapper (`@capacitor/core`, `@capacitor/ios`, `@capacitor/android`). Plugins needed: `@capacitor/camera`, `@capacitor/geolocation`, `@capacitor/push-notifications`, `@capacitor/nfc`, `@capacitor/haptics`. Need: Apple Developer account ($99/yr), Google Play Console ($25 one-time), app icons, privacy policy URL, screenshots.
-2. **Billing page RLS risk** — billing page uses browser Supabase client directly (not API route). Tenant isolation depends solely on RLS. Should migrate to `/api/admin/billing` route with `supabaseAdmin` + explicit tenant filter. Medium priority.
-3. **SMS silent failure** — when remote signature SMS fails (no Twilio key), operator sees "Link Sent!" but customer never gets the text. Add a visible warning when SMS is not configured.
-4. **Invoice PDF storage** — invoice PDFs are generated on-demand (not stored). When billing sends an invoice via email, it re-generates the PDF inline. Verify the send-invoice route works correctly; consider storing generated invoice PDFs in Supabase Storage.
-5. **CRON_SECRET** — still must be set in Vercel dashboard env vars for auto clock-out cron.
-6. **C(iii) maintenance→vehicle tie-in** — when `maintenance_request` is marked `done` and `equipment_id` is a vehicle, auto-create a `vehicle_service_records` row. PATCH route has a TODO for this.
-7. **Mobile audit** — run `mobile-responsive-auditor` on: maintenance request wizard, maintenance inbox, inventory control new-item modal, duplicate job modal.
+### 🚨 MUST DO BEFORE LAUNCH (blockers)
+1. **CRON_SECRET env var** — add to Vercel dashboard → Settings → Environment Variables. Without it, auto-clock-out and invoice reminder crons are fail-closed (won't run). Value: any strong random string, must match whatever is set.
+2. **Pending migrations** — two migrations were written but never applied to production:
+   - `supabase/migrations/20260427_utility_waiver_fields.sql`
+   - `supabase/migrations/20260427_operator_badges.sql`
+   Apply via: `supabase db push` or Supabase MCP `apply_migration`.
+3. **SMS silent failure** — when no Twilio key is set, operator sees "Link Sent!" but customer gets nothing. Add a visible warning banner in the admin UI when `TWILIO_AUTH_TOKEN` is not configured.
+4. **End-to-end workflow test** — run the full loop: Schedule job → Dispatch → Operator clock-in → Work performed → Done for today → Complete → Invoice → Paid. Last verified May 1 (demo). Verify nothing regressed.
+
+### 📱 iOS / Android App (App Store prep)
+5. **Splash screen** — 2732×2732px opaque PNG, bridge logo centered on `#1e1b4b` background. File goes in `ios/App/App/Assets.xcassets/Splash.imageset/`. Current splash is still the default white Capacitor screen.
+6. **CFBundleDisplayName** — confirm `ios/App/App/Info.plist` has `CFBundleDisplayName = "Pontifex Industries"` (not just "App").
+7. **Apple Developer Program** — enroll at https://developer.apple.com/programs/ ($99/yr). Required for TestFlight + App Store distribution. Current builds only run on simulator.
+8. **App Store metadata** — description, screenshots (6.7" iPhone required), age rating (4+), export compliance declaration. See `APP_CHANGES.md` Phase 3–5 checklist.
+9. **Privacy Policy page** — must exist at a public URL before App Store submission. Build `/privacy-policy` page (currently 404).
+
+### 🏗️ Feature backlog (remaining planned work)
+10. **C(iii) Fleet maintenance history** — `vehicle_service_records` table; oil/filter change tracking; auto-create from completed maintenance request. See `SHOP_MANAGER_PLAN.md`.
+11. **C(iv) Maintenance Request form + inbox** — `/dashboard/maintenance/new` is a placeholder stub. 3-tap mobile wizard: equipment picker → describe + photo → priority + submit. Maintenance Inbox triage UI for shop_manager.
+12. **C(v) Visit-wizard equipment-issues hook** — auto-create `maintenance_request` when supervisor logs an equipment issue inside a visit report.
+13. **C(iii) maintenance→vehicle tie-in** — when `maintenance_request` is marked `done` and `equipment_id` is a vehicle, auto-create a `vehicle_service_records` row. PATCH route has a TODO.
+14. **Patriot-specific visual assets** — custom logo, colors, and branding for the Patriot tenant in `tenant_branding` table.
+15. **Loading states audit** — many admin pages show blank screens during data fetch with no skeleton/spinner. Audit and add consistent loading UI.
+16. **Mobile responsive audit** — run `mobile-responsive-auditor` subagent on: maintenance request wizard, maintenance inbox, inventory control new-item modal, duplicate job modal.
+17. **Billing page RLS risk** — billing page uses the browser Supabase client directly. Tenant isolation relies solely on RLS. Consider migrating to `/api/admin/billing` with `supabaseAdmin` + explicit tenant filter for defense-in-depth.
+18. **Invoice PDF storage** — currently generated on-demand (not stored). When a send-invoice email is triggered, it re-generates the PDF inline. Verify the send-invoice route works; consider persisting PDFs in Supabase Storage.
+
+### Tester credentials
+- URL: https://www.pontifexindustries.com/company-login
+- Company Code: `PATRIOT`
+- Demo gate password: `PontifexDemo2026`
+- **Operators:** zack@demopontifex.com / aiden@demopontifex.com — password `Patriot2026!`
+- **Helpers:** lucas@demopontifex.com / javi@demopontifex.com — password `Patriot2026!`
+
+### Sanity checks before starting
+- `npm run build` — 0 errors expected
+- `git log --oneline -5` to confirm state
+- Read this file + CLAUDE.md sprint backlog
+
+---
+
+## MAY 21, 2026 — Login outage fix + iOS app icon (`2e4fd55e`)
+
+### Problem: Company-code login hung indefinitely on production
+The `/api/public/tenant-by-code` Vercel serverless function was returning STATUS:000 (0 bytes received) after 30+ seconds, causing "Looking up company..." to spin forever on `pontifexindustries.com/company-login`. Multiple fix attempts (maxDuration increases, AbortController refactors) failed because the root cause was **Vercel iad1→Supabase TCP socket staying open indefinitely** — a Node.js undici bug where `AbortController.abort()` does not close already-established sockets in certain network conditions.
+
+### Fix: Browser → Supabase directly (no Vercel Lambda)
+- **Migration `20260521_public_tenant_lookup_fn`** — created `SECURITY DEFINER` function `public.lookup_tenant_by_code(text)` callable by the `anon` role. Returns only `id, name, company_code` — no billing/plan data exposed.
+- **`app/company-login/page.tsx`** — rewrote to call `supabase.rpc('lookup_tenant_by_code', { p_code })` directly from the browser using the public anon key. No Vercel serverless hop. Verified: 0.12–0.77s round-trip consistently.
+- **`app/api/public/tenant-by-code/route.ts`** — also hardened (AbortController covers full body read, not just headers) and kept as dead-code for now. The login page no longer calls it.
+- **`app/api/admin/branding/route.ts`** — added `withTimeout(20s)` guard; changed `.single()` → `.maybeSingle()`; branding timeout returns `{ data: null }` (non-fatal) instead of hanging.
+- **`vercel.json`** — raised default `maxDuration` from 10→25s for all API routes; explicit 30s for 4 login-critical routes.
+
+### iOS App Icon fix
+- `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png` had `hasAlpha: yes` — iOS silently shows a gray "P" placeholder for transparent app icons.
+- Fixed by compositing the bridge logo over a solid `#1e1b4b` background using Python/PIL → `hasAlpha: no`, fully opaque 1024×1024 RGB PNG.
+- Created `APP_CHANGES.md` to track native app-only changes (icons, splash, native plugins) separately from web changes.
+
+### Database cleanup
+- **Migration `20260521_drop_redundant_duplicate_indexes`** — dropped 31 redundant non-unique indexes that duplicated unique constraints or other identical indexes. Every write to those tables was paying for duplicate B-tree maintenance with zero query benefit.
+
+### Commits in this session
+- `47f8820f` — vercel.json maxDuration + branding route timeout
+- `02f08082` — tenant-by-code AbortController full body-read coverage
+- `2e4fd55e` — **FINAL FIX**: company-login → Supabase RPC direct (this is the one that works)
+
+---
 
 ### Tester credentials (shared May 18)
 - URL: https://www.pontifexindustries.com/login
