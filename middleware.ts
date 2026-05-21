@@ -47,6 +47,8 @@ const RATE_LIMITED_PATHS = [
   '/api/access-requests',
   '/api/auth/login',
   '/api/auth/forgot-password',
+  '/api/public/tenant-by-code',   // HIGH-1: unauthenticated tenant lookup (login page)
+  '/api/auth/lookup-company',      // HIGH-1: unauthenticated company code lookup
 ];
 
 export function middleware(request: NextRequest) {
@@ -76,7 +78,24 @@ export function middleware(request: NextRequest) {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set(
     'Permissions-Policy',
-    'camera=(self), microphone=(), geolocation=(self), payment=()'
+    'camera=(self), microphone=(self), geolocation=(self), payment=()'
+  );
+  // Content-Security-Policy: restrict where scripts/frames/connections can originate.
+  // 'unsafe-inline' required for Next.js inline scripts; nonce-based CSP is a future upgrade.
+  response.headers.set(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // Next.js requires unsafe-eval in dev
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://maps.googleapis.com",
+      "frame-src 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ')
   );
 
   // Prevent caching of API responses with sensitive data

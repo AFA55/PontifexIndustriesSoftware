@@ -41,6 +41,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company code is required' }, { status: 400 });
     }
 
+    // Validate format: alphanumeric only, 2–20 chars.
+    // Rejects SQL special chars, slashes, spaces — defense-in-depth beyond encodeURIComponent.
+    if (!/^[A-Z0-9]{2,20}$/.test(code)) {
+      return NextResponse.json({ error: 'Invalid company code format' }, { status: 400 });
+    }
+
     // Direct REST call — 8 second hard cap, no client-lib cold-start overhead
     const tenantRes = await supabaseFetch(
       `tenants?company_code=eq.${encodeURIComponent(code)}&select=id,name,slug,company_code,logo_url,primary_color&limit=1`,

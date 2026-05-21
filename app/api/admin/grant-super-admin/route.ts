@@ -24,21 +24,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'User not found in your organization' }, { status: 404 });
   }
 
-  // Update user_metadata role in auth.users
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    user_metadata: { role: 'super_admin' },
-  });
+  // Update profiles table ONLY — this is the authoritative source for roles.
+  // NEVER write role to user_metadata: it is client-writable via supabase.auth.updateUser()
+  // and any operator could self-promote. RLS helpers read from public.profiles exclusively.
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({ role: 'super_admin' })
+    .eq('id', userId);
 
   if (error) {
     console.error('Error granting super admin:', error);
     return NextResponse.json({ error: 'Failed to update user role' }, { status: 500 });
   }
-
-  // Also update profiles table
-  await supabaseAdmin
-    .from('profiles')
-    .update({ role: 'super_admin' })
-    .eq('id', userId);
 
   // Fire-and-forget audit log
   Promise.resolve(

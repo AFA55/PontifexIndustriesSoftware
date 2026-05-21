@@ -16,11 +16,12 @@ export const dynamic = 'force-dynamic';
  * 4. Returns 200 if healthy, 500 if not
  */
 export async function GET(request: NextRequest) {
-  // Protect the endpoint — only Vercel Cron (or manual calls with the secret) allowed
+  // Protect the endpoint — ALWAYS require CRON_SECRET.
+  // If the env var is not set, the endpoint is locked down entirely (fail-closed).
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

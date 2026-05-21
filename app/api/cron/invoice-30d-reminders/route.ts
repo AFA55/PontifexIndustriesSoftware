@@ -1,16 +1,16 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * API Route: POST /api/cron/invoice-30d-reminders
+ * GET /api/cron/invoice-30d-reminders
  *
  * Sends a 30-day "invoice unpaid" reminder to the salesperson who created
- * each outstanding invoice's source job. Designed to be triggered by a cron
- * service (Vercel Cron / external scheduler) via:
+ * each outstanding invoice's source job. Triggered by Vercel Cron (GET) via:
  *
  *   Authorization: Bearer ${CRON_SECRET}
  *
- * If `CRON_SECRET` is not configured, the route falls back to admin auth so
- * it can be triggered manually for testing.
+ * SECURITY: Only CRON_SECRET is accepted. No admin-auth fallback — that
+ * fallback would let any admin trigger a cross-tenant scan without the secret.
+ * If CRON_SECRET is not set, the endpoint is locked down entirely (fail-closed).
  *
  * Dedupe: skips invoices that already have an `invoice_unpaid_30d`
  * notification (matching `metadata->>invoiceId`) within the last 7 days.
@@ -20,25 +20,17 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
 import { notifySalesperson } from '@/lib/notify-salesperson';
 
-export async function POST(request: NextRequest) {
+// Vercel Cron always sends GET — exported as GET to match vercel.json schedule
+export async function GET(request: NextRequest) {
   try {
-    // Auth: prefer CRON_SECRET, fall back to admin for manual testing.
+    // Auth: CRON_SECRET required. Fail-closed if env var not configured.
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get('authorization') || '';
-    const tokenMatchesCronSecret =
-      cronSecret && authHeader === `Bearer ${cronSecret}`;
 
-    if (!tokenMatchesCronSecret) {
-      if (cronSecret) {
-        // Cron secret configured but header didn't match — reject.
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      // No cron secret configured — fall back to admin auth for testing.
-      const auth = await requireAdmin(request);
-      if (!auth.authorized) return auth.response;
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)

@@ -153,8 +153,17 @@ export async function POST(
     const body = await request.json();
     const { signature_data, signer_name, signer_title, form_data, survey } = body;
 
-    if (!signature_data) {
+    if (!signature_data || typeof signature_data !== 'string') {
       return NextResponse.json({ error: 'Signature is required' }, { status: 400 });
+    }
+
+    // Validate: must be a base64 image data URL and within safe size bounds (200 KB max).
+    // This prevents an unauthenticated caller from writing arbitrary large blobs to the DB.
+    if (!signature_data.startsWith('data:image/') || signature_data.length > 200_000) {
+      return NextResponse.json(
+        { error: 'Invalid signature data — must be a PNG/JPEG data URL under 200 KB' },
+        { status: 400 }
+      );
     }
 
     // Update signature request

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       const { data } = await withTimeout(
         supabaseAdmin
           .from('tenant_branding')
-          .select('*')
+          .select('company_name, logo_url, primary_color, secondary_color, login_bg_gradient_from, login_bg_gradient_to, login_welcome_text, tagline')
           .eq('tenant_id', tenant.id)
           .eq('is_active', true)
           .maybeSingle(),

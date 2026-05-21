@@ -148,9 +148,10 @@ async function computeLunchDeduction(
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  // Verify CRON_SECRET
+  // Verify CRON_SECRET — fail-closed if env var not configured
+  const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -179,13 +180,6 @@ export async function GET(request: NextRequest) {
   }
 
   let closedCount = 0;
-  const details: Array<{
-    tenant_id: string;
-    user_id: string;
-    timecard_id: string;
-    clock_out_set_to: string;
-    total_hours: number;
-  }> = [];
 
   for (const tenant of tenants ?? []) {
     const tenantId: string = tenant.id;
@@ -292,14 +286,6 @@ export async function GET(request: NextRequest) {
         closedCount++;
         const timeStr = formatTime(clockOutTarget, tenantTz);
 
-        details.push({
-          tenant_id: tenantId,
-          user_id: tc.user_id,
-          timecard_id: tc.id,
-          clock_out_set_to: clockOutTarget.toISOString(),
-          total_hours: totalHours,
-        });
-
         // ─── Notifications (fire-and-forget) ─────────────────────────────────
 
         const workerNotif = {
@@ -355,6 +341,7 @@ export async function GET(request: NextRequest) {
     run_type: isMidnightRun ? 'midnight' : 'noon',
     closed_count: closedCount,
     tenant_count: (tenants ?? []).length,
-    details,
+    // Note: per-timecard details omitted from response to avoid leaking PII (user_id, timecard_id).
+    // Closed timecards are visible in the admin timecard review page.
   });
 }
