@@ -141,9 +141,16 @@ const STATUS_ICONS: Record<string, any> = {
   void: Ban,
 };
 
-async function getToken() {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || '';
+async function getToken(): Promise<string> {
+  try {
+    const result = await Promise.race<{ data: { session: { access_token: string } | null } }>([
+      supabase.auth.getSession() as any,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 8000)),
+    ]);
+    return (result as any).data?.session?.access_token || '';
+  } catch {
+    return '';
+  }
 }
 
 async function apiFetch(url: string, opts?: RequestInit) {
@@ -297,6 +304,10 @@ export default function BillingPage() {
   const fetchData = async () => {
     setLoading(true);
     setError(null);
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      setError('Request timed out. Please refresh the page.');
+    }, 30000);
     try {
       const invoiceRes = await apiFetch('/api/admin/invoices');
       let invoicesArr: Invoice[] = [];
@@ -369,6 +380,7 @@ export default function BillingPage() {
       console.error('Error fetching billing data:', err);
       setError('Failed to load billing data. Please try again.');
     } finally {
+      clearTimeout(safetyTimer);
       setLoading(false);
     }
   };

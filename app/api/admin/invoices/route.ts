@@ -17,9 +17,17 @@ export async function GET(request: NextRequest) {
     const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
-    const tenantId = await getTenantId(auth.userId);
+    let tenantId = await getTenantId(auth.userId);
 
-    if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    // super_admin can pass ?tenantId= to scope; without it, they see all tenants
+    if (!tenantId && auth.role === 'super_admin') {
+      const { searchParams: sp } = new URL(request.url);
+      tenantId = sp.get('tenantId');
+    }
+
+    if (!tenantId && auth.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Tenant scope required.' }, { status: 400 });
+    }
     // Auto-mark overdue: flip any sent invoices past due_date to 'overdue' (fire-and-forget)
     const today = new Date().toISOString().split('T')[0];
     Promise.resolve(
@@ -41,7 +49,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    query = query.eq('tenant_id', tenantId);
+    if (tenantId) query = query.eq('tenant_id', tenantId);
 
     // RBAC: salesman sees only invoices they created; admin/super_admin/
     // operations_manager/supervisor see everything in their tenant.
@@ -134,8 +142,8 @@ export async function POST(request: NextRequest) {
     }
 
     const callerTenantId = await getTenantId(auth.userId);
-    if (!callerTenantId) {
-      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    if (!callerTenantId && auth.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Tenant scope required.' }, { status: 400 });
     }
 
     // Fetch the completed job with all details
