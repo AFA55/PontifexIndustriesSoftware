@@ -3,68 +3,75 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/public/tenant-by-code?code=PATRIOT
  * No auth required — used by the company-login page before any session exists.
- * Returns tenant_id + branding info so the login page can display the right brand.
+ * Uses direct Supabase REST fetch (no client lib) to avoid cold-start hangs.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 
-// Race a thenable against a timeout so the serverless function never hangs
-function withTimeout<T>(thenable: PromiseLike<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    Promise.resolve(thenable),
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    ),
-  ]);
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+async function supabaseFetch(path: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      signal: controller.signal,
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+    });
+    clearTimeout(timer);
+    return res;
+  } catch (err: any) {
+    clearTimeout(timer);
+    throw err;
+  }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const code = request.nextUrl.searchParams.get('code')?.trim().toUpperCase();
+    const raw = request.nextUrl.searchParams.get('code') ?? '';
+    const code = raw.trim().toUpperCase().replace(/\s+/g, '');
 
     if (!code || code.length < 2) {
       return NextResponse.json({ error: 'Company code is required' }, { status: 400 });
     }
 
-    // Tenant lookup — 8 second hard timeout so Vercel never gets a hung function
-    const { data: tenant, error: tenantError } = await withTimeout(
-      supabaseAdmin
-        .from('tenants')
-        .select('id, name, slug, company_code, logo_url, primary_color')
-        .eq('company_code', code)
-        .maybeSingle(),
-      8000,
-      'tenant lookup'
+    // Direct REST call — 8 second hard cap, no client-lib cold-start overhead
+    const tenantRes = await supabaseFetch(
+      `tenants?company_code=eq.${encodeURIComponent(code)}&select=id,name,slug,company_code,logo_url,primary_color&limit=1`,
+      8000
     );
 
-    if (tenantError) {
-      console.error('[tenant-by-code] DB error:', tenantError.message);
-      return NextResponse.json({ error: 'Company lookup failed. Please try again.' }, { status: 500 });
+    if (!tenantRes.ok) {
+      console.error('[tenant-by-code] tenant query failed:', tenantRes.status);
+      return NextResponse.json({ error: 'Company lookup failed. Please try again.' }, { status: 502 });
     }
+
+    const tenants: any[] = await tenantRes.json();
+    const tenant = tenants[0] ?? null;
 
     if (!tenant) {
       return NextResponse.json({ error: 'Company not found. Please check your company code.' }, { status: 404 });
     }
 
-    // Branding lookup — separate timeout, non-fatal if it fails
-    let branding = null;
+    // Branding — non-fatal, separate timeout
+    let branding: any = null;
     try {
-      const { data: brandingData } = await withTimeout(
-        supabaseAdmin
-          .from('tenant_branding')
-          .select('company_name, logo_url, primary_color, secondary_color, login_bg_gradient_from, login_bg_gradient_to, login_welcome_text, tagline')
-          .eq('tenant_id', tenant.id)
-          .eq('is_active', true)
-          .limit(1)
-          .maybeSingle(),
-        5000,
-        'branding lookup'
+      const brandRes = await supabaseFetch(
+        `tenant_branding?tenant_id=eq.${tenant.id}&is_active=eq.true&select=company_name,logo_url,primary_color,secondary_color,login_bg_gradient_from,login_bg_gradient_to,login_welcome_text,tagline&limit=1`,
+        5000
       );
-      branding = brandingData || null;
-    } catch (brandingErr) {
-      // Branding is optional — log but don't fail the whole request
-      console.warn('[tenant-by-code] Branding lookup failed (non-fatal):', String(brandingErr));
+      if (brandRes.ok) {
+        const rows: any[] = await brandRes.json();
+        branding = rows[0] ?? null;
+      }
+    } catch {
+      // branding is optional — proceed without it
     }
 
     return NextResponse.json({
@@ -77,9 +84,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err: any) {
-    console.error('[tenant-by-code] Unhandled error:', err?.message || String(err));
+    const isTimeout = err?.name === 'AbortError';
+    console.error('[tenant-by-code]', isTimeout ? 'timed out' : err?.message);
     return NextResponse.json(
-      { error: 'Service temporarily unavailable. Please try again.' },
+      { error: isTimeout ? 'Lookup timed out — please try again.' : 'Service unavailable. Please try again.' },
       { status: 503 }
     );
   }

@@ -41,7 +41,10 @@
   "git": {
     "deploymentEnabled": {
       "main": true,
-      "claude/*": false
+      "develop": false,
+      "claude/*": false,
+      "fix/*": false,
+      "feat/*": false
     }
   }
 }
