@@ -8,7 +8,8 @@ import {
   Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
   UserCheck, UserX, FolderOpen, Timer, Loader2, Settings, Search, X,
-  Megaphone, CheckCircle2, Sparkles, Zap, Brain, RefreshCw, KeyRound, Copy
+  Megaphone, CheckCircle2, Sparkles, Zap, Brain, RefreshCw, KeyRound, Copy,
+  MessageSquareOff
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
@@ -236,6 +237,10 @@ export default function ScheduleBoardPage() {
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
   const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null } | null>(null);
 
+  // ═══ SMS CONFIG WARNING STATE ═══
+  const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
+  const [smsWarningDismissed, setSmsWarningDismissed] = useState(false);
+
   // ═══ DAILY CODE STATE ═══
   const [showDailyCode, setShowDailyCode] = useState(false);
   const [dailyCode, setDailyCode] = useState<string | null>(null);
@@ -307,6 +312,24 @@ export default function ScheduleBoardPage() {
     setUserRole(role);
     setUserId(currentUser.id || null);
   }, [router]);
+
+  // ═══ SMS CONFIG CHECK ═══
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem('sms_warning_dismissed') === 'true';
+      setSmsWarningDismissed(dismissed);
+    } catch { /* ignore */ }
+    const adminRoles = ['admin', 'super_admin', 'operations_manager'];
+    const currentUser = getCurrentUser();
+    if (!currentUser || !adminRoles.includes(currentUser.role)) return;
+    apiFetch('/api/admin/config-status')
+      .then(r => r.json())
+      .then(json => {
+        if (json?.data != null) setSmsConfigured(json.data.sms_configured === true);
+      })
+      .catch(() => { /* non-fatal */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ═══ FEATURE FLAG GUARD ═══
   useEffect(() => {
@@ -1861,6 +1884,30 @@ export default function ScheduleBoardPage() {
       </div>
 
       {/* ═══ DATE NAVIGATION + STATS ═════════════════════════════════════ */}
+      {/* SMS not configured warning */}
+      {smsConfigured === false && !smsWarningDismissed && (
+        <div className="container mx-auto px-4 md:px-6 pt-4">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/30">
+            <MessageSquareOff className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0" />
+            <p className="text-sm text-amber-800 dark:text-amber-200 flex-1">
+              <span className="font-semibold">SMS not configured</span> — dispatch text notifications won&apos;t reach operators.
+              Set <code className="font-mono text-xs bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">TELNYX_API_KEY</code> or{' '}
+              <code className="font-mono text-xs bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">TWILIO_AUTH_TOKEN</code> in Vercel environment variables.
+            </p>
+            <button
+              onClick={() => {
+                setSmsWarningDismissed(true);
+                try { localStorage.setItem('sms_warning_dismissed', 'true'); } catch { /* ignore */ }
+              }}
+              className="text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200 transition-colors flex-shrink-0"
+              title="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="container mx-auto px-4 md:px-6 py-4">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 p-4 md:p-5">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

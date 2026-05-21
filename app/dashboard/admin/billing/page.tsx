@@ -28,6 +28,7 @@ import {
   Ban,
   CheckCircle,
   TrendingUp,
+  MessageSquareOff,
 } from 'lucide-react';
 
 interface Invoice {
@@ -184,6 +185,10 @@ export default function BillingPage() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [confirmVoid, setConfirmVoid] = useState<string | null>(null);
 
+  // SMS configuration warning
+  const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
+  const [smsWarningDismissed, setSmsWarningDismissed] = useState(false);
+
   // Cache: created_by uuid -> full_name (for "Submitted by" chips)
   const [profilesById, setProfilesById] = useState<Record<string, string>>({});
 
@@ -300,6 +305,31 @@ export default function BillingPage() {
       return () => clearTimeout(t);
     }
   }, [successMsg]);
+
+  // Check SMS configuration and localStorage dismiss state
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem('sms_warning_dismissed') === 'true';
+      setSmsWarningDismissed(dismissed);
+    } catch {
+      // ignore
+    }
+    const currentUser = getCurrentUser();
+    const adminRoles = ['admin', 'super_admin', 'operations_manager'];
+    if (!currentUser || !adminRoles.includes(currentUser.role)) return;
+
+    apiFetch('/api/admin/config-status')
+      .then(r => r.json())
+      .then(json => {
+        if (json?.data != null) {
+          setSmsConfigured(json.data.sms_configured === true);
+        }
+      })
+      .catch(() => {
+        // non-fatal — don't show warning if check fails
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -803,6 +833,32 @@ export default function BillingPage() {
             <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-300 flex-shrink-0" />
             <p className="text-sm text-emerald-700 dark:text-emerald-200 flex-1">{successMsg}</p>
             <button onClick={() => setSuccessMsg(null)} className="text-emerald-400 hover:text-emerald-600 dark:text-emerald-300 dark:hover:text-emerald-100 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* SMS not configured warning */}
+        {smsConfigured === false && !smsWarningDismissed && (
+          <div className="
+            mb-4 p-3 rounded-xl flex items-center gap-3
+            bg-amber-50 ring-1 ring-amber-200
+            dark:bg-amber-500/10 dark:ring-amber-400/30
+          ">
+            <MessageSquareOff className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0" />
+            <p className="text-sm text-amber-800 dark:text-amber-200 flex-1">
+              <span className="font-semibold">SMS not configured</span> — customers won&apos;t receive text messages.
+              Set <code className="font-mono text-xs bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">TELNYX_API_KEY</code> or{' '}
+              <code className="font-mono text-xs bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">TWILIO_AUTH_TOKEN</code> in Vercel environment variables.
+            </p>
+            <button
+              onClick={() => {
+                setSmsWarningDismissed(true);
+                try { localStorage.setItem('sms_warning_dismissed', 'true'); } catch { /* ignore */ }
+              }}
+              className="text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200 transition-colors flex-shrink-0"
+              title="Dismiss"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
