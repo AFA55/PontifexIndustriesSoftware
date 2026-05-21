@@ -11,7 +11,15 @@ import { NextRequest, NextResponse } from 'next/server';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-async function supabaseFetch(path: string, timeoutMs: number) {
+/**
+ * Fetch from Supabase REST API and return the parsed JSON body.
+ * The AbortController timer stays active through BOTH the network round-trip
+ * AND the response body read — so a stalled body stream is aborted just like
+ * a stalled connection.  Timer is cleared only after data is fully in memory.
+ *
+ * Returns the parsed array, or throws on timeout / non-2xx / parse error.
+ */
+async function supabaseFetch<T = any>(path: string, timeoutMs: number): Promise<T[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -24,8 +32,16 @@ async function supabaseFetch(path: string, timeoutMs: number) {
         Prefer: 'return=representation',
       },
     });
+    // Do NOT clearTimeout here — abort signal must stay live during body read.
+    if (!res.ok) {
+      clearTimeout(timer);
+      throw Object.assign(new Error(`HTTP ${res.status}`), { httpStatus: res.status });
+    }
+    // Body read is covered by the same abort signal — if Supabase stalls mid-stream,
+    // the timer fires, signal aborts, and res.json() throws an AbortError.
+    const data = await res.json();
     clearTimeout(timer);
-    return res;
+    return data as T[];
   } catch (err: any) {
     clearTimeout(timer);
     throw err;
@@ -47,37 +63,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid company code format' }, { status: 400 });
     }
 
-    // Direct REST call — 8 second hard cap, no client-lib cold-start overhead
-    const tenantRes = await supabaseFetch(
-      `tenants?company_code=eq.${encodeURIComponent(code)}&select=id,name,slug,company_code,logo_url,primary_color&limit=1`,
-      8000
-    );
-
-    if (!tenantRes.ok) {
-      console.error('[tenant-by-code] tenant query failed:', tenantRes.status);
-      return NextResponse.json({ error: 'Company lookup failed. Please try again.' }, { status: 502 });
+    // Direct REST call — 8 second hard cap, abort fires if connection OR body stalls
+    let tenants: any[];
+    try {
+      tenants = await supabaseFetch(
+        `tenants?company_code=eq.${encodeURIComponent(code)}&select=id,name,slug,company_code,logo_url,primary_color&limit=1`,
+        8000
+      );
+    } catch (err: any) {
+      const isAbort = err?.name === 'AbortError';
+      console.error('[tenant-by-code] tenant query failed:', err?.message);
+      return NextResponse.json(
+        { error: isAbort ? 'Lookup timed out — please try again.' : 'Company lookup failed. Please try again.' },
+        { status: isAbort ? 503 : 502 }
+      );
     }
 
-    const tenants: any[] = await tenantRes.json();
     const tenant = tenants[0] ?? null;
 
     if (!tenant) {
       return NextResponse.json({ error: 'Company not found. Please check your company code.' }, { status: 404 });
     }
 
-    // Branding — non-fatal, separate timeout
+    // Branding — non-fatal, separate 5s timeout
     let branding: any = null;
     try {
-      const brandRes = await supabaseFetch(
+      const rows = await supabaseFetch(
         `tenant_branding?tenant_id=eq.${tenant.id}&is_active=eq.true&select=company_name,logo_url,primary_color,secondary_color,login_bg_gradient_from,login_bg_gradient_to,login_welcome_text,tagline&limit=1`,
         5000
       );
-      if (brandRes.ok) {
-        const rows: any[] = await brandRes.json();
-        branding = rows[0] ?? null;
-      }
+      branding = rows[0] ?? null;
     } catch {
-      // branding is optional — proceed without it
+      // branding is optional — login page works without it
     }
 
     return NextResponse.json({
@@ -90,10 +107,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err: any) {
-    const isTimeout = err?.name === 'AbortError';
-    console.error('[tenant-by-code]', isTimeout ? 'timed out' : err?.message);
+    console.error('[tenant-by-code] unexpected error:', err?.message);
     return NextResponse.json(
-      { error: isTimeout ? 'Lookup timed out — please try again.' : 'Service unavailable. Please try again.' },
+      { error: 'Service unavailable. Please try again.' },
       { status: 503 }
     );
   }
