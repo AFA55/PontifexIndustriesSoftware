@@ -8,9 +8,9 @@ const config: CapacitorConfig = {
   webDir: 'out',
   server: {
     // Always loads the live Vercel deployment.
-    // This means: code changes ship instantly via `git push origin main`
-    // with zero App Store re-submission (only native plugin changes need re-review).
-    url: 'https://www.pontifexindustries.com',
+    // Points directly to /login so the app never shows the marketing landing page.
+    // Code changes ship instantly via Vercel — no App Store re-submission needed.
+    url: 'https://www.pontifexindustries.com/login',
     cleartext: false,
     androidScheme: 'https',
   },
