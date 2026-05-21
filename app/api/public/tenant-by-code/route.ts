@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     .from('tenants')
     .select('id, name, slug, company_code, logo_url, primary_color')
     .eq('company_code', code)
-    .single();
+    .maybeSingle();
 
   if (error || !tenant) {
     return NextResponse.json({ error: 'Company not found. Please check your company code.' }, { status: 404 });
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     .eq('tenant_id', tenant.id)
     .eq('is_active', true)
     .limit(1)
-    .single();
+    .maybeSingle();
 
   return NextResponse.json({
     success: true,

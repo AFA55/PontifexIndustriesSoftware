@@ -21,14 +21,22 @@ export default function CompanyLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Trim spaces AND uppercase — handles "PATRIOT ", " patriot", etc.
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) return;
 
     setLoading(true);
     setError(null);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+
     try {
-      const res = await fetch(`/api/public/tenant-by-code?code=${encodeURIComponent(trimmed)}`);
+      const res = await fetch(
+        `/api/public/tenant-by-code?code=${encodeURIComponent(trimmed)}`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeout);
       const json = await res.json();
 
       if (!res.ok || !json.success) {
@@ -37,9 +45,16 @@ export default function CompanyLoginPage() {
         return;
       }
 
+      // Reset loading before navigation in case the router is slow
+      setLoading(false);
       router.push(`/login?tenant_id=${json.data.tenant_id}`);
-    } catch {
-      setError('Unable to connect. Please try again.');
+    } catch (err: any) {
+      clearTimeout(timeout);
+      if (err?.name === 'AbortError') {
+        setError('Request timed out. Check your connection and try again.');
+      } else {
+        setError('Unable to connect. Please try again.');
+      }
       setLoading(false);
     }
   };
@@ -77,7 +92,7 @@ export default function CompanyLoginPage() {
               <input
                 type="text"
                 value={code}
-                onChange={e => { setCode(e.target.value.toUpperCase()); setError(null); }}
+                onChange={e => { setCode(e.target.value.replace(/\s/g, '').toUpperCase()); setError(null); }}
                 placeholder="COMPANY CODE"
                 autoFocus
                 autoComplete="organization"
