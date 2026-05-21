@@ -92,6 +92,47 @@ export async function PATCH(
         action_url: '/dashboard/maintenance/new',
       });
     })()).catch(() => {});
+
+    // Fire-and-forget: if the equipment is a vehicle, auto-create a service record
+    if (existing.equipment_id) {
+      Promise.resolve((async () => {
+        // Check if this equipment is a vehicle
+        const { data: eq } = await supabaseAdmin
+          .from('equipment')
+          .select('id, kind')
+          .eq('id', existing.equipment_id)
+          .maybeSingle();
+
+        if (eq?.kind !== 'vehicle') return;
+
+        // Look up the vehicles row by equipment_id to get the vehicle UUID
+        const { data: vehicle } = await supabaseAdmin
+          .from('vehicles')
+          .select('id')
+          .eq('equipment_id', existing.equipment_id)
+          .maybeSingle();
+
+        if (!vehicle?.id) return;
+
+        // Build a human-readable note from the maintenance request fields
+        const noteParts: string[] = [];
+        if (data.equipment_name) noteParts.push(data.equipment_name);
+        if (data.description) noteParts.push(data.description);
+        if (data.resolution_notes) noteParts.push(`Resolution: ${data.resolution_notes}`);
+        const notes = noteParts.join(' — ') || 'Maintenance completed';
+
+        await supabaseAdmin.from('vehicle_service_records').insert({
+          tenant_id:              existing.tenant_id,
+          vehicle_id:             vehicle.id,
+          service_type:           'repair',
+          notes,
+          service_date:           new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+          maintenance_request_id: id,
+          vendor:                 'Maintenance System (auto)',
+          created_by:             auth.userId,
+        });
+      })()).catch(() => {});
+    }
   }
 
   return NextResponse.json({ success: true, data });

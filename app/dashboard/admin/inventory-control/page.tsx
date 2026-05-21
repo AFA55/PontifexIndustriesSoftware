@@ -9,6 +9,7 @@ import {
   ArrowLeft, Package, Truck, Search, Loader2, ChevronRight, History,
   LogOut as CheckoutIcon, LogIn as CheckinIcon, Filter, CheckCircle2,
   AlertTriangle, User as UserIcon, Briefcase, Wrench, Mic, MicOff, Sparkles, Plus,
+  Volume2, RefreshCw,
 } from 'lucide-react';
 import NewInventoryModal from './_components/NewInventoryModal';
 import { supabase } from '@/lib/supabase';
@@ -54,6 +55,7 @@ interface CheckoutRow {
   notes: string | null;
   hour_meter_out: number | null;
   hour_meter_in: number | null;
+  voice_note_url: string | null;
   equipment: { id: string; name: string; short_name: string | null; unit_number: string | null; asset_tag: string | null } | null;
   truck: { id: string; name: string; short_name: string | null; unit_number: string | null } | null;
   custodian: { id: string; full_name: string; email: string } | null;
@@ -966,6 +968,57 @@ function CheckinTab({
   );
 }
 
+// ─── Voice Note Player (with auto re-sign on 404) ───────────────────────────
+function VoiceNotePlayer({ checkoutId, initialUrl }: { checkoutId: string; initialUrl: string }) {
+  const [src, setSrc] = useState(initialUrl);
+  const [status, setStatus] = useState<'idle' | 'refreshing' | 'error'>('idle');
+
+  async function resign() {
+    setStatus('refreshing');
+    try {
+      const res = await fetch(`/api/admin/equipment-checkouts/${checkoutId}/voice-note`);
+      if (!res.ok) throw new Error('re-sign failed');
+      const json = await res.json();
+      setSrc(json.url);
+      setStatus('idle');
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <Volume2 className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+        <span className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">Voice note</span>
+        <button
+          onClick={resign}
+          disabled={status === 'refreshing'}
+          className="ml-auto inline-flex items-center gap-1 text-[10px] text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
+          title="Reload audio if it fails to play"
+        >
+          <RefreshCw className={`w-3 h-3 ${status === 'refreshing' ? 'animate-spin' : ''}`} />
+          Reload
+        </button>
+      </div>
+      {status === 'error' ? (
+        <p className="text-[10px] text-rose-500">Could not refresh audio link. Try again later.</p>
+      ) : (
+        <audio
+          key={src}
+          controls
+          src={src}
+          className="w-full h-8"
+          onError={() => {
+            // Auto-retry once on error (handles expired signed URLs silently)
+            if (status === 'idle') void resign();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── History Tab ────────────────────────────────────────────────────────────
 function HistoryTab({
   rows, loading, search, onSearchChange,
@@ -1022,6 +1075,9 @@ function HistoryTab({
                   <p>In: {co.checked_in_at ? new Date(co.checked_in_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '—'}</p>
                 </div>
                 {co.notes && <p className="mt-2 text-xs text-gray-600 dark:text-slate-400 italic">"{co.notes}"</p>}
+                {co.voice_note_url && (
+                  <VoiceNotePlayer checkoutId={co.id} initialUrl={co.voice_note_url} />
+                )}
               </div>
             );
           })}
