@@ -1,17 +1,19 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 18, 2026 | **Branch:** `main` | **Last commit:** `a1677128` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
+**Date:** May 20, 2026 | **Branch:** `main` | **Last commit:** `9a92c907` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
 
-> **Status as of May 18, 2026 (latest).** Role-agnostic ticket access (slot-based not role-based), duplicate job tickets, password-gated demo dropdown, and 4 demo test accounts (Zack/Aiden operators, Lucas/Javi helpers) all shipped and live on Vercel. Testers can log in now.
+> **Status as of May 20, 2026.** Major workflow audit + parallel agent fixes shipped: remote signature auto-completes jobs + generates PDF, invoice line items now have correct rates, day-complete reads from DB not localStorage, completion PDF linked to invoices. Also: customer form infinite-loading bug fixed, payment terms fields added, sign page tenant branding fixed.
 
 ---
 
 ## 🎯 NEXT SESSION — pick up from here
 
-1. **Mobile audit** — run `mobile-responsive-auditor` on: maintenance request wizard (`/dashboard/maintenance/new`), maintenance inbox (`/dashboard/admin/maintenance`), site visit photos, inventory control new-item modal, duplicate job modal on active-jobs page
-2. **CRON_SECRET** — must be set in Vercel dashboard env vars before the auto clock-out cron fires in production.
-3. **Pending migrations** — `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql` still not applied.
-4. **C(iii) maintenance→vehicle tie-in** — when `maintenance_request` is marked `done` and `equipment_id` is a vehicle, auto-create a `vehicle_service_records` row. PATCH route has a TODO for this.
-5. **New features** — analytics, SMS integration, or other items from CLAUDE.md ongoing list.
+1. **App Store / Google Play** — user wants to publish. Plan: Capacitor wrapper (`@capacitor/core`, `@capacitor/ios`, `@capacitor/android`). Plugins needed: `@capacitor/camera`, `@capacitor/geolocation`, `@capacitor/push-notifications`, `@capacitor/nfc`, `@capacitor/haptics`. Need: Apple Developer account ($99/yr), Google Play Console ($25 one-time), app icons, privacy policy URL, screenshots.
+2. **Billing page RLS risk** — billing page uses browser Supabase client directly (not API route). Tenant isolation depends solely on RLS. Should migrate to `/api/admin/billing` route with `supabaseAdmin` + explicit tenant filter. Medium priority.
+3. **SMS silent failure** — when remote signature SMS fails (no Twilio key), operator sees "Link Sent!" but customer never gets the text. Add a visible warning when SMS is not configured.
+4. **Invoice PDF storage** — invoice PDFs are generated on-demand (not stored). When billing sends an invoice via email, it re-generates the PDF inline. Verify the send-invoice route works correctly; consider storing generated invoice PDFs in Supabase Storage.
+5. **CRON_SECRET** — still must be set in Vercel dashboard env vars for auto clock-out cron.
+6. **C(iii) maintenance→vehicle tie-in** — when `maintenance_request` is marked `done` and `equipment_id` is a vehicle, auto-create a `vehicle_service_records` row. PATCH route has a TODO for this.
+7. **Mobile audit** — run `mobile-responsive-auditor` on: maintenance request wizard, maintenance inbox, inventory control new-item modal, duplicate job modal.
 
 ### Tester credentials (shared May 18)
 - URL: https://www.pontifexindustries.com/login
