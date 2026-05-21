@@ -10,3 +10,10 @@
 node_modules/
 # Capacitor static export stub — not a real build artifact
 /out/
+
+# Ruflo runtime data (logs, sessions, learned data — machine-specific)
+.claude-flow/logs/
+.claude-flow/sessions/
+.claude-flow/data/
+.claude/memory.db
+.swarm/
