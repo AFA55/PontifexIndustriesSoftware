@@ -8,3 +8,5 @@
 .env.production
 .next/
 node_modules/
+# Capacitor static export stub — not a real build artifact
+/out/
