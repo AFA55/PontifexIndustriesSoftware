@@ -8,45 +8,45 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import NetworkMonitor from '@/components/NetworkMonitor';
 
 export const metadata: Metadata = {
-  title: 'Patriot Concrete Cutting - Concrete Cutting Management Software',
-  description: 'Complete job workflow, real-time profitability tracking, and OSHA compliance for concrete cutting contractors. GPS time tracking, digital signatures, and automated documentation. Setup in 5 minutes.',
+  title: 'Pontifex Industries - Field Operations Platform',
+  description: 'Complete field operations platform for concrete cutting and construction crews. GPS time tracking, digital signatures, job scheduling, and automated documentation. Setup in 5 minutes.',
   keywords: [
     'concrete cutting software',
+    'field operations platform',
     'construction management software',
     'OSHA compliance',
     'job tracking software',
     'contractor software',
-    'concrete contractor management',
     'GPS time tracking',
     'construction profitability tracking',
-    'silica exposure tracking',
     'job management system',
+    'crew management',
   ],
-  authors: [{ name: 'Patriot Concrete Cutting' }],
-  creator: 'Patriot Concrete Cutting',
-  publisher: 'Patriot Concrete Cutting',
-  metadataBase: new URL('https://patriotconcretecutting.com'), // Update with your actual domain
+  authors: [{ name: 'Pontifex Industries' }],
+  creator: 'Pontifex Industries',
+  publisher: 'Pontifex Industries',
+  metadataBase: new URL('https://www.pontifexindustries.com'),
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://patriotconcretecutting.com', // Update with your actual domain
-    title: 'Patriot Concrete Cutting - Concrete Cutting Management Software',
-    description: 'Run your concrete cutting business like a Fortune 500 company. Track jobs, profitability, and OSHA compliance in real-time.',
-    siteName: 'Patriot Concrete Cutting',
+    url: 'https://www.pontifexindustries.com',
+    title: 'Pontifex Industries - Field Operations Platform',
+    description: 'Run your field crew like a Fortune 500 company. Track jobs, profitability, and OSHA compliance in real-time.',
+    siteName: 'Pontifex Industries',
     images: [
       {
-        url: '/og-image.jpg', // You'll need to create this
-        width: 1200,
-        height: 630,
-        alt: 'Patriot Concrete Cutting - Concrete Management Platform',
+        url: '/icon-512.png',
+        width: 512,
+        height: 512,
+        alt: 'Pontifex Industries - Field Operations Platform',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Patriot Concrete Cutting - Concrete Cutting Management Software',
-    description: 'Complete job workflow, real-time profitability, and OSHA compliance for concrete contractors.',
-    images: ['/og-image.jpg'], // You'll need to create this
+    title: 'Pontifex Industries - Field Operations Platform',
+    description: 'Complete field operations platform for concrete cutting and construction crews.',
+    images: ['/icon-512.png'],
   },
   robots: {
     index: true,
@@ -59,12 +59,20 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  icons: [
-    {
-      rel: 'icon',
-      url: '/favicon.ico',
-    },
-  ],
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      { rel: 'mask-icon', url: '/favicon.svg', color: '#7c3aed' },
+    ],
+  },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

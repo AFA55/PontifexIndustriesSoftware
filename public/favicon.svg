@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="680" viewBox="0 0 680 680" role="img">
+  <title>Pontifex Industries</title>
+  <desc>Bold centered suspension bridge mark — Pontifex Industries icon</desc>
+
+  <rect width="680" height="680" fill="#0f0120"/>
+  <rect x="40" y="40" width="600" height="600" rx="44" fill="#160230"/>
+  <rect x="40" y="40" width="600" height="600" rx="44" fill="none" stroke="#2d0a5e" stroke-width="1"/>
+
+  <g transform="translate(340, 437.5)">
+
+    <rect x="-260" y="100" width="520" height="16" rx="3" fill="#ffffff"/>
+    <rect x="-260" y="116" width="520" height="28" fill="#a855f7"/>
+    <rect x="-260" y="144" width="520" height="12" rx="3" fill="#7c3aed"/>
+
+    <rect x="-180" y="-220" width="32" height="320" rx="6" fill="#ffffff"/>
+    <rect x="148"  y="-220" width="32" height="320" rx="6" fill="#ffffff"/>
+
+    <rect x="-200" y="-246" width="72" height="32" rx="6" fill="#ffffff"/>
+    <rect x="128"  y="-246" width="72" height="32" rx="6" fill="#ffffff"/>
+
+    <rect x="-196" y="-242" width="14" height="24" rx="3" fill="#a855f7"/>
+    <rect x="-174" y="-242" width="14" height="24" rx="3" fill="#a855f7"/>
+    <rect x="154"  y="-242" width="14" height="24" rx="3" fill="#a855f7"/>
+    <rect x="176"  y="-242" width="14" height="24" rx="3" fill="#a855f7"/>
+
+    <path d="M-164 -200 C-164 -420 164 -420 164 -200" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round"/>
+    <path d="M-164 -200 C-164 -420 164 -420 164 -200" fill="none" stroke="#a855f7" stroke-width="10" stroke-linecap="round"/>
+
+    <line x1="-260" y1="100" x2="-164" y2="-200" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+    <line x1="260"  y1="100" x2="164"  y2="-200" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+    <line x1="-260" y1="100" x2="-164" y2="-200" stroke="#a855f7" stroke-width="4"  stroke-linecap="round"/>
+    <line x1="260"  y1="100" x2="164"  y2="-200" stroke="#a855f7" stroke-width="4"  stroke-linecap="round"/>
+
+    <line x1="-120" y1="100" x2="-112" y2="-278" stroke="#e2d9f3" stroke-width="6" stroke-linecap="round"/>
+    <line x1="-40"  y1="100" x2="-38"  y2="-334" stroke="#e2d9f3" stroke-width="6" stroke-linecap="round"/>
+    <line x1="0"    y1="100" x2="0"    y2="-348" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+    <line x1="40"   y1="100" x2="38"   y2="-334" stroke="#e2d9f3" stroke-width="6" stroke-linecap="round"/>
+    <line x1="120"  y1="100" x2="112"  y2="-278" stroke="#e2d9f3" stroke-width="6" stroke-linecap="round"/>
+
+    <circle cx="-112" cy="-278" r="10" fill="#160230"/>
+    <circle cx="-112" cy="-278" r="10" fill="none" stroke="#e2d9f3" stroke-width="4"/>
+
+    <circle cx="-38"  cy="-334" r="10" fill="#160230"/>
+    <circle cx="-38"  cy="-334" r="10" fill="none" stroke="#e2d9f3" stroke-width="4"/>
+
+    <circle cx="0"    cy="-348" r="13" fill="#160230"/>
+    <circle cx="0"    cy="-348" r="13" fill="none" stroke="#ffffff" stroke-width="5"/>
+    <circle cx="0"    cy="-348" r="5"  fill="#ffffff"/>
+
+    <circle cx="38"   cy="-334" r="10" fill="#160230"/>
+    <circle cx="38"   cy="-334" r="10" fill="none" stroke="#e2d9f3" stroke-width="4"/>
+
+    <circle cx="112"  cy="-278" r="10" fill="#160230"/>
+    <circle cx="112"  cy="-278" r="10" fill="none" stroke="#e2d9f3" stroke-width="4"/>
+
+    <rect x="-260" y="156" width="30" height="10" rx="3" fill="#4c1d95"/>
+    <rect x="-220" y="156" width="16" height="10" rx="3" fill="#4c1d95"/>
+    <rect x="204"  y="156" width="30" height="10" rx="3" fill="#4c1d95"/>
+    <rect x="164"  y="156" width="16" height="10" rx="3" fill="#4c1d95"/>
+
+  </g>
+
+</svg>
