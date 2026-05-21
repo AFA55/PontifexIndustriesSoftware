@@ -487,6 +487,7 @@ export async function POST(request: NextRequest) {
         notes: `Job: ${job.job_number}\nLocation: ${job.location || job.address || 'N/A'}`,
         created_by: auth.userId,
         tenant_id: tenantIdForInsert || null,
+        completion_pdf_url: job.completion_pdf_url || null,
       })
       .select()
       .single();
