@@ -19,11 +19,24 @@ const ALLOWED_FIELDS = [
   'show_inventory_module', 'show_nfc_module', 'show_customer_crm',
 ];
 
+/** Race a PromiseLike against a hard deadline (ms). */
+function withTimeout<T>(thenable: PromiseLike<T>, ms: number): Promise<T> {
+  return Promise.race([
+    Promise.resolve(thenable),
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('query_timeout')), ms)
+    ),
+  ]);
+}
+
 /**
  * GET /api/admin/branding
  * Public -- no auth required (used by login page before user is authenticated)
  * Fetches the active tenant branding row.
  * Supports optional ?tenant_id= query param for tenant-specific branding.
+ *
+ * 20s timeout: branding is non-critical so we fail-safe with data: null
+ * rather than hanging until Vercel's maxDuration kills the function.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -34,12 +47,14 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('is_active', true);
 
-    query = query.eq('tenant_id', tenantId);
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
-    const { data, error } = await query.limit(1).single();
+    const { data, error } = await withTimeout(query.limit(1).maybeSingle(), 20_000);
 
     if (error || !data) {
-      // Return defaults if no branding row exists
+      // Return defaults if no branding row exists or on any error
       return NextResponse.json(
         { success: true, data: null },
         {
@@ -56,7 +71,16 @@ export async function GET(request: NextRequest) {
         headers: { 'Cache-Control': 'public, max-age=300' },
       }
     );
-  } catch (err) {
+  } catch (err: any) {
+    const isTimeout = err?.message === 'query_timeout';
+    if (isTimeout) {
+      console.error('[branding] GET timed out after 20s — returning null branding');
+      // Non-fatal: login page works without branding
+      return NextResponse.json(
+        { success: true, data: null },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
     console.error('Branding GET error:', err);
     return NextResponse.json(
       { error: 'Failed to fetch branding' },
