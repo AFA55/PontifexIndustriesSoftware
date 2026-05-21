@@ -224,20 +224,91 @@ export async function POST(request: NextRequest) {
       laborHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
     }
 
-    // Default rates by work type (admin can adjust on the invoice)
-    const DEFAULT_RATES: Record<string, { rate: number; unit: string }> = {
-      'Core Drilling': { rate: 150, unit: 'cores' },
-      'Wall Sawing': { rate: 12, unit: 'LF' },
-      'Flat Sawing': { rate: 8, unit: 'LF' },
-      'Wire Sawing': { rate: 25, unit: 'LF' },
-      'Hand Sawing': { rate: 10, unit: 'LF' },
-      'Ring Sawing': { rate: 10, unit: 'LF' },
-      'Chain Sawing': { rate: 15, unit: 'LF' },
-      'GPR Scanning': { rate: 250, unit: 'each' },
-      'Demolition': { rate: 175, unit: 'hours' },
-      'Removal': { rate: 150, unit: 'hours' },
-      'Hauling': { rate: 125, unit: 'hours' },
+    // Comprehensive work type rates map.
+    // Keys match BOTH the exact strings stored in work_items.work_type by the
+    // work-performed form (ALL CAPS) AND legacy DEFAULT_RATES keys (Title Case).
+    // Use getWorkTypeRate() below for case-insensitive lookup with fallback.
+    const WORK_TYPE_RATES: Record<string, { rate: number; unit: string }> = {
+      // ── Core Drilling (stored values) ──────────────────────────────────────
+      'CORE DRILL':           { rate: 150, unit: 'cores' },
+      'HYDRAULIC CORE DRILL': { rate: 150, unit: 'cores' },
+      'SPOT/CAUGHT CORES':    { rate: 150, unit: 'cores' },
+
+      // ── Sawing (stored values) ─────────────────────────────────────────────
+      'SLAB SAW':             { rate: 8,  unit: 'LF' },
+      'ELECTRIC SLAB SAW':    { rate: 8,  unit: 'LF' },
+      'WALL SAW':             { rate: 12, unit: 'LF' },
+      'WIRE SAW':             { rate: 25, unit: 'LF' },
+      'HAND SAW':             { rate: 10, unit: 'LF' },
+      'FLUSH CUT HAND SAW':   { rate: 10, unit: 'LF' },
+      'CHAIN SAW':            { rate: 15, unit: 'LF' },
+      'RING SAW':             { rate: 10, unit: 'LF' },
+      'PUSH SAW':             { rate: 8,  unit: 'LF' },
+
+      // ── Breaking & Removal (stored values) ────────────────────────────────
+      'BREAK & REMOVE':       { rate: 175, unit: 'hours' },
+      'DEMOLITION':           { rate: 175, unit: 'hours' },
+      'REMOVAL':              { rate: 150, unit: 'hours' },
+      'EXCAVATE DIRT':        { rate: 150, unit: 'hours' },
+      'BROKK':                { rate: 200, unit: 'hours' },
+
+      // ── Concrete Work (stored values) ──────────────────────────────────────
+      'POURED/FINISH CONCRETE': { rate: 125, unit: 'hours' },
+      'REPAIR':               { rate: 125, unit: 'hours' },
+      'GRINDING':             { rate: 100, unit: 'hours' },
+      'CHIPPING':             { rate: 100, unit: 'hours' },
+
+      // ── Installation (stored values) ───────────────────────────────────────
+      'INSTALL BOLLARD(S)':   { rate: 125, unit: 'each' },
+      'INSTALL LINTEL(S)':    { rate: 125, unit: 'each' },
+      'MANHOLE BOOT':         { rate: 125, unit: 'each' },
+      'JOINT SEALING':        { rate: 100, unit: 'LF' },
+
+      // ── Equipment & Tools (stored values) ──────────────────────────────────
+      'JACK HAMMERING':       { rate: 100, unit: 'hours' },
+      'HAND DRILL':           { rate: 75,  unit: 'hours' },
+      'PRESSURE WASH':        { rate: 75,  unit: 'hours' },
+      'VACUUMING & WATER CONTROL': { rate: 75, unit: 'hours' },
+
+      // ── Services (stored values) ───────────────────────────────────────────
+      'IMAGE SCAN':           { rate: 250, unit: 'each' },
+      'SAFETY MEETINGS/ORIENTATION': { rate: 0, unit: 'each' },
+      'STANDBY TIME':         { rate: 125, unit: 'hours' },
+      'TRAVEL CHARGE':        { rate: 125, unit: 'hours' },
+      'TRIP CHARGE':          { rate: 125, unit: 'each' },
+      'HAULING':              { rate: 125, unit: 'hours' },
+      'DELIVER':              { rate: 100, unit: 'hours' },
+      'DUMPSTER CHARGE':      { rate: 250, unit: 'each' },
+
+      // ── Materials (stored values) ──────────────────────────────────────────
+      'MATERIAL(S)':          { rate: 0, unit: 'each' },
+      'SALE OF':              { rate: 0, unit: 'each' },
+
+      // ── Legacy Title Case keys (backward compatibility) ────────────────────
+      'Core Drilling':  { rate: 150, unit: 'cores' },
+      'Wall Sawing':    { rate: 12,  unit: 'LF' },
+      'Flat Sawing':    { rate: 8,   unit: 'LF' },
+      'Wire Sawing':    { rate: 25,  unit: 'LF' },
+      'Hand Sawing':    { rate: 10,  unit: 'LF' },
+      'Ring Sawing':    { rate: 10,  unit: 'LF' },
+      'Chain Sawing':   { rate: 15,  unit: 'LF' },
+      'GPR Scanning':   { rate: 250, unit: 'each' },
+      'Demolition':     { rate: 175, unit: 'hours' },
+      'Removal':        { rate: 150, unit: 'hours' },
+      'Hauling':        { rate: 125, unit: 'hours' },
     };
+
+    // Case-insensitive rate lookup with three-tier fallback.
+    const getWorkTypeRate = (workType: string | null | undefined): { rate: number; unit: string } => {
+      if (!workType) return { rate: 0, unit: 'each' };
+      return (
+        WORK_TYPE_RATES[workType] ??
+        WORK_TYPE_RATES[workType.toUpperCase()] ??
+        Object.entries(WORK_TYPE_RATES).find(([k]) => k.toLowerCase() === workType.toLowerCase())?.[1] ??
+        { rate: 0, unit: 'each' }
+      );
+    };
+
     const DEFAULT_LABOR_RATE = 125; // $/hr
 
     // Build line items — routed by billing_type to avoid double-billing
@@ -300,15 +371,16 @@ export async function POST(request: NextRequest) {
         for (const item of workItems) {
           let desc = item.work_type || 'Concrete Cutting';
           let qty = Number(item.quantity) || 1;
-          let unit = 'each';
-          let rate = DEFAULT_RATES[item.work_type]?.rate || 0;
+          const rateInfo = getWorkTypeRate(item.work_type);
+          let unit = rateInfo.unit;
+          let rate = rateInfo.rate;
 
           // Set quantities and units based on work type specifics
           if (item.core_quantity) {
             desc += ` (${item.core_size || ''} x ${item.core_depth_inches || ''}in)`;
             qty = Number(item.core_quantity);
             unit = 'cores';
-            rate = DEFAULT_RATES['Core Drilling']?.rate || 150;
+            rate = getWorkTypeRate('CORE DRILL').rate;
           } else if (item.linear_feet_cut) {
             desc += ` (${item.cut_depth_inches || ''}in deep)`;
             qty = Number(item.linear_feet_cut);
