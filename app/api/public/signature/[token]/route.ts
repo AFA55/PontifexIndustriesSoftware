@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendSMS, formatPhoneNumber } from '@/lib/sms';
 import { sendEmail } from '@/lib/email';
+import { generateAndUploadCompletionPdf } from '@/lib/generate-completion-pdf';
 
 export async function GET(
   request: NextRequest,
@@ -177,17 +178,83 @@ export async function POST(
     // If completion type, update job_orders with remote signature
     if (sigRequest.request_type === 'completion') {
       const signer_ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
+      const now = new Date().toISOString();
+
+      // 1. Save signature fields + advance job status to 'completed'
       Promise.resolve(
         supabaseAdmin
           .from('job_orders')
           .update({
             customer_signature: signature_data,
-            customer_signed_at: new Date().toISOString(),
+            customer_signed_at: now,
             customer_signature_method: 'remote',
             ...(signer_name ? { completion_signer_name: signer_name } : {}),
+            // Advance status — only move forward, never regress
+            status: 'completed',
+            work_completed_at: now,
           })
           .eq('id', sigRequest.job_order_id)
+          .in('status', ['pending_completion', 'in_progress'])
       ).then(() => {}).catch(() => {});
+
+      // 2. Record status history
+      Promise.resolve(
+        supabaseAdmin.from('job_status_history').insert({
+          job_order_id: sigRequest.job_order_id,
+          status: 'completed',
+          changed_at: now,
+          notes: `Remote signature by ${signer_name || 'customer'}`,
+        })
+      ).then(() => {}).catch(() => {});
+
+      // 3. Generate + upload completion PDF (fire-and-forget — never blocks the response)
+      Promise.resolve(
+        (async () => {
+          // Fetch job row for PDF data
+          const { data: jobForPdf } = await supabaseAdmin
+            .from('job_orders')
+            .select('job_number, customer_name, address, location, scheduled_date, description, scope_of_work, assigned_to, helper_assigned_to, tenant_id')
+            .eq('id', sigRequest.job_order_id)
+            .single();
+
+          if (!jobForPdf) return;
+
+          // Fetch work items
+          const { data: workItems } = await supabaseAdmin
+            .from('work_items')
+            .select('work_type, quantity, notes, core_quantity, core_size, linear_feet_cut')
+            .eq('job_order_id', sigRequest.job_order_id)
+            .order('created_at', { ascending: true });
+
+          const { pdfUrl } = await generateAndUploadCompletionPdf({
+            jobId: sigRequest.job_order_id,
+            tenantId: jobForPdf.tenant_id || null,
+            job: jobForPdf,
+            signerName: signer_name || null,
+            signatureDataUrl: signature_data || null,
+            workPerformed: workItems || [],
+          });
+
+          // Persist the PDF URL
+          await supabaseAdmin
+            .from('job_orders')
+            .update({
+              completion_pdf_url: pdfUrl,
+              completion_signed_at: now,
+              completion_signer_name: signer_name || null,
+            })
+            .eq('id', sigRequest.job_order_id);
+        })()
+      ).then(() => {}).catch((err) => {
+        console.error('Remote sign PDF generation failed (non-fatal):', err);
+        // Set sentinel so admin knows a remote sign happened even if PDF generation failed
+        Promise.resolve(
+          supabaseAdmin
+            .from('job_orders')
+            .update({ completion_pdf_url: 'remote_signed_pending' })
+            .eq('id', sigRequest.job_order_id)
+        ).then(() => {}).catch(() => {});
+      });
 
       // Also store signer_ip on the signature_request (fire-and-forget)
       if (signer_ip) {

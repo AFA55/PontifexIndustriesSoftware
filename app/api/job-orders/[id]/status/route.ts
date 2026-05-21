@@ -44,7 +44,7 @@ async function updateJobStatus(
     const { status, latitude, longitude, accuracy, departure_time, ...additionalFields } = body;
 
     // Validate status value is in the recognized set
-    const validStatuses = ['scheduled', 'assigned', 'in_route', 'on_site', 'in_progress', 'completed', 'cancelled', 'archived'];
+    const validStatuses = ['scheduled', 'assigned', 'in_route', 'on_site', 'in_progress', 'pending_completion', 'completed', 'cancelled', 'archived'];
     if (!status || !validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
@@ -61,7 +61,8 @@ async function updateJobStatus(
       assigned: ['in_route', 'scheduled', 'cancelled'],
       in_route: ['on_site', 'in_progress', 'cancelled'],
       on_site: ['in_progress', 'cancelled'],
-      in_progress: ['completed', 'cancelled'],
+      in_progress: ['completed', 'pending_completion', 'cancelled'],
+      pending_completion: ['completed', 'in_progress', 'scheduled'],  // admin can approve or reopen
       completed: ['archived'],
       cancelled: [],
       archived: [],
