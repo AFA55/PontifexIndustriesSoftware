@@ -1,6 +1,15 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { PRIVACY_POLICY_FULL } from '@/lib/legal/privacy-policy';
 import { ArrowLeft, Shield } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy — Pontifex Industries',
+  description: 'Privacy policy for Pontifex Industries field operations platform.',
+  alternates: {
+    canonical: 'https://www.pontifexindustries.com/privacy',
+  },
+};
 
 export default function PrivacyPolicyPage() {
   // Simple markdown-to-sections renderer

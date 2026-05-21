@@ -1,6 +1,15 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { TERMS_OF_SERVICE_FULL } from '@/lib/legal/terms-of-service';
 import { ArrowLeft, FileText } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'Terms of Service — Pontifex Industries',
+  description: 'Terms of service for Pontifex Industries field operations platform.',
+  alternates: {
+    canonical: 'https://www.pontifexindustries.com/terms',
+  },
+};
 
 export default function TermsOfServicePage() {
   const sections = TERMS_OF_SERVICE_FULL.trim().split('\n').map((line, i) => {
