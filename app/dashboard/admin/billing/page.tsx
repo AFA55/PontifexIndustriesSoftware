@@ -53,6 +53,7 @@ interface Invoice {
   paid_date: string | null;
   created_at: string;
   created_by: string | null;
+  completion_pdf_url: string | null;
 }
 
 interface InvoiceDetail extends Invoice {
@@ -71,6 +72,7 @@ interface CompletedJob {
   billing_type: string | null;
   has_invoice: boolean;
   created_by: string | null;
+  completion_pdf_url: string | null;
 }
 
 interface PreviewLineItem {
@@ -309,7 +311,7 @@ export default function BillingPage() {
 
       let completedQuery = supabase
         .from('job_orders')
-        .select('id, job_number, title, customer_name, estimated_cost, work_completed_at, status, billing_type, created_by')
+        .select('id, job_number, title, customer_name, estimated_cost, work_completed_at, status, billing_type, created_by, completion_pdf_url')
         .eq('status', 'completed')
         .is('deleted_at', null)
         .order('work_completed_at', { ascending: false })
@@ -1155,6 +1157,16 @@ export default function BillingPage() {
                             {job.job_number}
                           </Link>
                           {billingTypeBadge(job.billing_type)}
+                          {job.completion_pdf_url && (
+                            <span className="
+                              inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold
+                              bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200
+                              dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30
+                            ">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Signed
+                            </span>
+                          )}
                           {job.work_completed_at && (
                             <span className="text-xs text-slate-500 dark:text-white/50">
                               Completed {new Date(job.work_completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -1356,6 +1368,23 @@ export default function BillingPage() {
                     </>
                   )}
                 </div>
+
+                {/* View Signed Document */}
+                {selectedInvoice.completion_pdf_url && (
+                  <div className="flex items-center gap-3 p-3 rounded-xl ring-1 bg-blue-50 ring-blue-200 dark:bg-blue-500/10 dark:ring-blue-400/30">
+                    <FileText className="w-4 h-4 text-blue-600 dark:text-blue-300 flex-shrink-0" />
+                    <span className="text-sm text-blue-700 dark:text-blue-200 font-medium flex-1">Customer-signed completion document available</span>
+                    <a
+                      href={selectedInvoice.completion_pdf_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors dark:bg-blue-500/20 dark:border-blue-400/30 dark:text-blue-200 dark:hover:bg-blue-500/30 flex-shrink-0"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      View Signed Document
+                    </a>
+                  </div>
+                )}
 
                 {/* Invoice Details Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
