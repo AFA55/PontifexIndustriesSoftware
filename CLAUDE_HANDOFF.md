@@ -1,38 +1,38 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 21, 2026 | **Branch:** `main` | **Last commit:** `2e4fd55e` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
+**Date:** May 21, 2026 (Session 2) | **Branch:** `main` | **Last commit:** `61377823` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
 
-> **Status as of May 21, 2026.** Critical login outage resolved after 2+ hour investigation. Company-code login now queries Supabase directly from the browser (no Vercel Lambda). iOS app icon alpha-channel bug fixed. 31 redundant database indexes dropped. Session also confirmed: Vercel iad1→Supabase TCP connections hang indefinitely due to an undici/AbortController bug — all critical-path lookups should go client→Supabase directly, not through Vercel serverless.
+> **Status as of May 21, 2026 (Session 2).** Major parallel dev sprint: 7 features shipped, 2 pending migrations applied, iOS splash fixed, Ruflo v3.7 multi-agent orchestration installed + memory seeded. Platform is now in strong shape for App Store submission and ongoing feature work.
 
 ---
 
 ## 🎯 NEXT SESSION — pick up from here
 
 ### 🚨 MUST DO BEFORE LAUNCH (blockers)
-1. **CRON_SECRET env var** — add to Vercel dashboard → Settings → Environment Variables. Without it, auto-clock-out and invoice reminder crons are fail-closed (won't run). Value: any strong random string, must match whatever is set.
-2. **Pending migrations** — two migrations were written but never applied to production:
-   - `supabase/migrations/20260427_utility_waiver_fields.sql`
-   - `supabase/migrations/20260427_operator_badges.sql`
-   Apply via: `supabase db push` or Supabase MCP `apply_migration`.
-3. **SMS silent failure** — when no Twilio key is set, operator sees "Link Sent!" but customer gets nothing. Add a visible warning banner in the admin UI when `TWILIO_AUTH_TOKEN` is not configured.
-4. **End-to-end workflow test** — run the full loop: Schedule job → Dispatch → Operator clock-in → Work performed → Done for today → Complete → Invoice → Paid. Last verified May 1 (demo). Verify nothing regressed.
+1. **CRON_SECRET env var** — ⚠️ STILL NEEDED — add to Vercel dashboard → Settings → Environment Variables. Without it, auto-clock-out and invoice reminder crons are fail-closed. Value: any strong random string.
+2. ~~**Pending migrations**~~ ✅ DONE — `utility_waiver_fields` + `operator_badges` applied May 21
+3. ~~**SMS silent failure warning**~~ ✅ DONE — amber banner on billing + schedule-board pages when Twilio not configured
+4. **End-to-end workflow test** — code audit shows all 6 pipeline steps clean (May 21). Still worth a live browser test before customer demo.
 
 ### 📱 iOS / Android App (App Store prep)
-5. **Splash screen** — 2732×2732px opaque PNG, bridge logo centered on `#1e1b4b` background. File goes in `ios/App/App/Assets.xcassets/Splash.imageset/`. Current splash is still the default white Capacitor screen.
-6. **CFBundleDisplayName** — confirm `ios/App/App/Info.plist` has `CFBundleDisplayName = "Pontifex Industries"` (not just "App").
-7. **Apple Developer Program** — enroll at https://developer.apple.com/programs/ ($99/yr). Required for TestFlight + App Store distribution. Current builds only run on simulator.
-8. **App Store metadata** — description, screenshots (6.7" iPhone required), age rating (4+), export compliance declaration. See `APP_CHANGES.md` Phase 3–5 checklist.
-9. **Privacy Policy page** — must exist at a public URL before App Store submission. Build `/privacy-policy` page (currently 404).
+5. ~~**Splash screen**~~ ✅ DONE — Bridge logo on `#1e1b4b`, opaque, 2732×2732px (May 21)
+6. **CFBundleDisplayName** — confirm `ios/App/App/Info.plist` has `CFBundleDisplayName = "Pontifex Industries"` (not just "App")
+7. **Apple Developer Program** — enroll at https://developer.apple.com/programs/ ($99/yr). Required for TestFlight + App Store. Current builds only run on simulator.
+8. **App Store metadata** — description, screenshots (6.7" iPhone required), age rating (4+), export compliance. See `APP_CHANGES.md` Phase 3–5 checklist.
+9. ~~**Privacy Policy page**~~ ✅ DONE — `/privacy-policy` redirects to `/privacy` (May 21). `/terms-of-service` → `/terms` also added.
 
 ### 🏗️ Feature backlog (remaining planned work)
-10. **C(iii) Fleet maintenance history** — `vehicle_service_records` table; oil/filter change tracking; auto-create from completed maintenance request. See `SHOP_MANAGER_PLAN.md`.
-11. **C(iv) Maintenance Request form + inbox** — `/dashboard/maintenance/new` is a placeholder stub. 3-tap mobile wizard: equipment picker → describe + photo → priority + submit. Maintenance Inbox triage UI for shop_manager.
-12. **C(v) Visit-wizard equipment-issues hook** — auto-create `maintenance_request` when supervisor logs an equipment issue inside a visit report.
-13. **C(iii) maintenance→vehicle tie-in** — when `maintenance_request` is marked `done` and `equipment_id` is a vehicle, auto-create a `vehicle_service_records` row. PATCH route has a TODO.
-14. **Patriot-specific visual assets** — custom logo, colors, and branding for the Patriot tenant in `tenant_branding` table.
-15. **Loading states audit** — many admin pages show blank screens during data fetch with no skeleton/spinner. Audit and add consistent loading UI.
-16. **Mobile responsive audit** — run `mobile-responsive-auditor` subagent on: maintenance request wizard, maintenance inbox, inventory control new-item modal, duplicate job modal.
-17. **Billing page RLS risk** — billing page uses the browser Supabase client directly. Tenant isolation relies solely on RLS. Consider migrating to `/api/admin/billing` with `supabaseAdmin` + explicit tenant filter for defense-in-depth.
-18. **Invoice PDF storage** — currently generated on-demand (not stored). When a send-invoice email is triggered, it re-generates the PDF inline. Verify the send-invoice route works; consider persisting PDFs in Supabase Storage.
+10. ~~**C(iii) Fleet maintenance history**~~ ✅ DONE (May 17)
+11. ~~**C(iv) Maintenance Request wizard**~~ ✅ DONE (May 17)
+12. ~~**C(v) Visit-wizard hook**~~ ✅ DONE (May 17)
+13. ~~**C(iii) maintenance→vehicle tie-in**~~ ✅ DONE (May 21) — PATCH auto-creates `vehicle_service_records` on completion
+14. ~~**Patriot branding**~~ ✅ DONE (May 21) — `tenants.primary_color = #dc2626`, BrandingProvider confirmed wired
+15. ~~**Loading states audit**~~ ✅ DONE (May 21) — animate-pulse skeletons on 5 admin pages, light+dark mode
+16. **Mobile responsive audit** — still needed: maintenance wizard, maintenance inbox, inventory new-item modal, duplicate job modal
+17. ~~**Billing RLS hardening**~~ ✅ DONE (May 21) — `/api/admin/billing` with `supabaseAdmin` + explicit `tenant_id` filter
+18. ~~**Invoice send route**~~ ✅ DONE (May 21) — hardened: missing RESEND key, SDK error shape, status update failure
+19. ~~**Voice note 404 re-sign**~~ ✅ DONE (May 21) — `VoiceNotePlayer` auto-refreshes expired signed URL on error
+20. **Ruflo daemon** — run `npx ruflo@latest daemon start` once to activate 12 background workers (audit, optimize, testgaps)
+21. **Ruflo memory — seed CLAUDE_SESSION_CONTEXT.md** — deeper schema/pattern caching for future sessions
 
 ### Tester credentials
 - URL: https://www.pontifexindustries.com/company-login
