@@ -1,0 +1,15 @@
+# Native mobile projects — Vercel doesn't need these, they bloat the bundle
+# and increase cold-start times for serverless functions
+ios/
+android/
+assets/
+
+# Capacitor config is only needed locally for npx cap commands
+# capacitor.config.ts is intentionally NOT ignored — it's tiny
+
+# Development artifacts
+*.xcworkspace
+*.xcodeproj
+*.gradle
+gradlew
+gradlew.bat
