@@ -3,6 +3,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
+  "ignoreCommand": "[ \"$VERCEL_GIT_COMMIT_REF\" = \"main\" ] || exit 1",
   "regions": ["iad1"],
   "functions": {
     "app/api/**/*.ts": {
@@ -48,7 +49,13 @@
       "develop": false,
       "claude/*": false,
       "fix/*": false,
-      "feat/*": false
+      "feat/*": false,
+      "feature/*": false,
+      "worktree-agent/*": false,
+      "worktree/*": false,
+      "vercel/*": false,
+      "world-of-concrete-launch": false,
+      "backend-development": false
     }
   }
 }
