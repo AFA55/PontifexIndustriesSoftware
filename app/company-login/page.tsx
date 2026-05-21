@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Building2, ArrowRight, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 function PontifexLogo() {
   return (
@@ -21,40 +22,45 @@ export default function CompanyLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Trim spaces AND uppercase — handles "PATRIOT ", " patriot", etc.
-    const trimmed = code.trim().toUpperCase();
+    const trimmed = code.trim().toUpperCase().replace(/\s+/g, '');
     if (!trimmed) return;
+
+    if (!/^[A-Z0-9]{2,20}$/.test(trimmed)) {
+      setError('Invalid company code format.');
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-
     try {
-      const res = await fetch(
-        `/api/public/tenant-by-code?code=${encodeURIComponent(trimmed)}`,
-        { signal: controller.signal }
-      );
-      clearTimeout(timeout);
-      const json = await res.json();
+      // Call Supabase directly — no Vercel Lambda in the path.
+      // lookup_tenant_by_code is a SECURITY DEFINER function callable by anon,
+      // returning only id + name + company_code (no billing data exposed).
+      const { data, error: rpcError } = await supabase
+        .rpc('lookup_tenant_by_code', { p_code: trimmed });
 
-      if (!res.ok || !json.success) {
-        setError(json.error || 'Company not found. Please check your code.');
+      if (rpcError) {
+        console.error('[company-login] rpc error:', rpcError.message);
+        setError('Lookup failed. Please try again.');
         setLoading(false);
         return;
       }
 
-      // Reset loading before navigation in case the router is slow
-      setLoading(false);
-      router.push(`/login?tenant_id=${json.data.tenant_id}`);
-    } catch (err: any) {
-      clearTimeout(timeout);
-      if (err?.name === 'AbortError') {
-        setError('Request timed out. Check your connection and try again.');
-      } else {
-        setError('Unable to connect. Please try again.');
+      const tenant = Array.isArray(data) ? data[0] : data;
+
+      if (!tenant?.id) {
+        setError('Company not found. Please check your company code.');
+        setLoading(false);
+        return;
       }
+
+      // Navigate before clearing loading — router.push triggers navigation immediately
+      router.push(`/login?tenant_id=${tenant.id}`);
+      // setLoading(false) intentionally omitted — page unmounts on navigation
+    } catch (err: any) {
+      console.error('[company-login] unexpected error:', err?.message);
+      setError('Unable to connect. Please try again.');
       setLoading(false);
     }
   };
