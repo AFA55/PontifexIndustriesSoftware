@@ -188,7 +188,41 @@ export default function InventoryControlPage() {
   );
 
   if (authLoading) {
-    return <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-cyan-600" /></div>;
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 pb-12">
+        <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
+          {/* Back link */}
+          <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          {/* Hero banner */}
+          <div className="rounded-2xl bg-gray-200 dark:bg-gray-700 animate-pulse h-24 sm:h-28" />
+          {/* Tab pills */}
+          <div className="flex gap-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-10 w-28 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+            ))}
+          </div>
+          {/* Search bar */}
+          <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+          {/* Inventory cards grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-4 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  </div>
+                  <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                </div>
+                <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                <div className="h-3 w-2/3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const currentMeta = TAB_META[tab];
@@ -1061,7 +1095,21 @@ function Tile({ gradient, shadow, value, label }: { gradient: string; shadow: st
 }
 
 function Loading() {
-  return <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-cyan-600" /></div>;
+  return (
+    <div className="space-y-3 py-2">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4 flex items-center gap-3 shadow-sm">
+          <div className="h-10 w-10 bg-gray-200 dark:bg-gray-600 rounded-xl animate-pulse flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-40 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
+            <div className="h-3 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
+          </div>
+          <div className="h-6 w-16 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse" />
+          <div className="h-8 w-8 bg-gray-200 dark:bg-gray-600 rounded-lg animate-pulse" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function Empty({ icon: Icon, text, iconClassName }: { icon: React.ElementType; text: string; iconClassName?: string }) {

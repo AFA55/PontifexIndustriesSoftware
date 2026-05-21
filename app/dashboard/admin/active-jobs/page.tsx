@@ -364,6 +364,70 @@ export default function ActiveJobsPage() {
     },
   ];
 
+  // ── Skeleton loading state ──────────────────────────────────────────────
+  if (loading && jobs.length === 0) {
+    return (
+      <div className="min-h-screen p-6 bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="space-y-2">
+              <div className="h-7 w-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-9 w-28 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+              <div className="h-9 w-9 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+            </div>
+          </div>
+          {/* Stat tiles */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="h-3.5 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  <div className="h-9 w-9 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+                </div>
+                <div className="h-8 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+          {/* Filter pills */}
+          <div className="flex gap-2 mb-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+            ))}
+          </div>
+          {/* Job cards */}
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pt-5 shadow-sm overflow-hidden relative">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                    </div>
+                    <div className="h-5 w-56 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="flex gap-4">
+                      <div className="h-3.5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="h-3.5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse flex-shrink-0" />
+                </div>
+                <div className="mt-3">
+                  <div className="h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="
@@ -687,8 +751,27 @@ export default function ActiveJobsPage() {
 
         {/* Job list */}
         {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 pt-5 shadow-sm overflow-hidden relative">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                    </div>
+                    <div className="h-5 w-56 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="flex gap-4">
+                      <div className="h-3.5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="h-3.5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse flex-shrink-0" />
+                </div>
+                <div className="mt-3 h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="

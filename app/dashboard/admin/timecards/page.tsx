@@ -523,13 +523,65 @@ export default function AdminTimecardsPage() {
   // ── Loading state ──────────────────────────────────────────
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-14 h-14 mx-auto mb-4 relative">
-            <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-white/10"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"></div>
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
+        {/* Skeleton header */}
+        <header className="sticky top-0 z-10 bg-white/80 dark:bg-[#0b0618]/80 backdrop-blur-xl border-b border-gray-200 dark:border-white/10 shadow-sm">
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+              <div className="h-5 w-px bg-gray-200 dark:bg-gray-700" />
+              <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+              <div className="h-5 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-9 w-24 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+              <div className="h-9 w-24 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+            </div>
           </div>
-          <p className="text-gray-500 dark:text-white/40 text-sm font-medium">Loading payroll overview...</p>
+        </header>
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-5">
+          {/* Week nav */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+              <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <div className="h-9 w-9 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+            </div>
+            <div className="h-9 w-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+          </div>
+          {/* Summary tiles */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-4 shadow-sm">
+                <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
+                <div className="h-7 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+          {/* Team table skeleton */}
+          <div className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+            {/* Table header */}
+            <div className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 px-4 py-3 grid grid-cols-9 gap-3">
+              {[...Array(9)].map((_, i) => (
+                <div key={i} className="h-3.5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              ))}
+            </div>
+            {/* Rows */}
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="px-4 py-3 border-b border-gray-100 dark:border-white/5 grid grid-cols-9 gap-3 items-center">
+                <div className="flex items-center gap-2 col-span-2">
+                  <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse flex-shrink-0" />
+                  <div className="space-y-1.5">
+                    <div className="h-3.5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  </div>
+                </div>
+                {[...Array(7)].map((_, j) => (
+                  <div key={j} className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -910,12 +962,20 @@ export default function AdminTimecardsPage() {
         {/* ── Team Table ──────────────────────────────────── */}
         <div className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
           {loading ? (
-            <div className="p-16 text-center">
-              <div className="w-10 h-10 mx-auto mb-3 relative">
-                <div className="absolute inset-0 rounded-full border-[3px] border-gray-200 dark:border-white/10"></div>
-                <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-blue-600 animate-spin"></div>
-              </div>
-              <p className="text-gray-500 dark:text-white/40 text-sm">Loading team data...</p>
+            <div className="divide-y divide-gray-100 dark:divide-white/5">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="px-4 py-3 flex items-center gap-3">
+                  <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  </div>
+                  {[...Array(7)].map((_, j) => (
+                    <div key={j} className="h-8 w-14 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse flex-shrink-0" />
+                  ))}
+                  <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse flex-shrink-0" />
+                </div>
+              ))}
             </div>
           ) : filteredMembers.length === 0 ? (
             <div className="p-16 text-center">
