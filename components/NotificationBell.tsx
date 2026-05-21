@@ -160,7 +160,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setOpen(!open)}
-        className={`relative p-2.5 rounded-xl transition-all duration-200 ${
+        className={`relative p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all duration-200 ${
           isDark
             ? unreadCount > 0
               ? 'bg-white/20 hover:bg-white/30 text-white'

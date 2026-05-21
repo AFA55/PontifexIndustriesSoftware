@@ -615,7 +615,7 @@ export default function DashboardSidebar() {
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation menu"
-            className="p-2 rounded-lg bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 shadow-lg transition-colors border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700 dark:border-slate-700"
+            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 shadow-lg transition-colors border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700 dark:border-slate-700"
           >
             <Menu className="w-5 h-5" />
           </button>

@@ -50,7 +50,7 @@ export function DarkModeIconToggle({ className = '' }: { className?: string }) {
     <button
       onClick={toggleTheme}
       className={`
-        p-2 rounded-xl transition-all duration-200
+        p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all duration-200
         hover:bg-gray-100 dark:hover:bg-gray-800
         focus:outline-none focus:ring-2 focus:ring-primary-500
         ${className}

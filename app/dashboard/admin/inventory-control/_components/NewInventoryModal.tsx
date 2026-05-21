@@ -195,7 +195,8 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
               <button
                 type="button"
                 onClick={() => { setStep(1); setError(null); }}
-                className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition"
+                className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition"
+                aria-label="Back"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
@@ -214,7 +215,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition ${
               selectedType ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-600 dark:text-slate-300'
             }`}
             aria-label="Close"
@@ -372,7 +373,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                           key={ps}
                           type="button"
                           onClick={() => setPowerSource(ps === powerSource ? '' : ps)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition capitalize ${
+                          className={`px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold border-2 transition capitalize ${
                             powerSource === ps
                               ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
                               : 'border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:border-amber-300'

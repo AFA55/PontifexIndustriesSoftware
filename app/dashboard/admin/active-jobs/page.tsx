@@ -456,14 +456,14 @@ export default function ActiveJobsPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                className="flex-1 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
                 {deleting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 Delete
@@ -494,7 +494,7 @@ export default function ActiveJobsPage() {
                 <div className="flex gap-3">
                   <button
                     onClick={closeDuplicateModal}
-                    className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                    className="flex-1 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                   >
                     Close
                   </button>
@@ -503,7 +503,7 @@ export default function ActiveJobsPage() {
                       closeDuplicateModal();
                       router.push(`/dashboard/admin/jobs/${duplicateSuccess.id}`);
                     }}
-                    className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-cyan-600 hover:bg-cyan-700 text-white transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold bg-cyan-600 hover:bg-cyan-700 text-white transition-colors flex items-center justify-center gap-2"
                   >
                     <ChevronRight className="w-4 h-4" />
                     Open Job
@@ -525,7 +525,8 @@ export default function ActiveJobsPage() {
                   </div>
                   <button
                     onClick={closeDuplicateModal}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                    className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                    aria-label="Close"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -587,14 +588,14 @@ export default function ActiveJobsPage() {
                 <div className="flex gap-3">
                   <button
                     onClick={closeDuplicateModal}
-                    className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                    className="flex-1 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleDuplicate}
                     disabled={!duplicateOperatorId || duplicating}
-                    className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold bg-cyan-600 hover:bg-cyan-700 text-white disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold bg-cyan-600 hover:bg-cyan-700 text-white disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                   >
                     {duplicating ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -640,7 +641,7 @@ export default function ActiveJobsPage() {
               <button
                 onClick={() => setViewAll(!viewAll)}
                 className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
+                  flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg text-sm font-medium transition-colors border
                   ${badgeClass}
                 `}
               >
@@ -649,7 +650,7 @@ export default function ActiveJobsPage() {
             ) : (
               <span
                 className={`
-                  inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border
+                  inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg text-sm font-medium border
                   ${badgeClass}
                 `}
               >
@@ -660,7 +661,7 @@ export default function ActiveJobsPage() {
               onClick={fetchJobs}
               disabled={loading}
               className="
-                p-2 rounded-lg transition-colors disabled:opacity-50
+                p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors disabled:opacity-50
                 bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50
                 dark:bg-white/5 dark:border-white/10 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10
               "
@@ -725,7 +726,7 @@ export default function ActiveJobsPage() {
                 key={val}
                 onClick={() => setFilter(val)}
                 className={`
-                  px-4 py-2 rounded-full text-sm font-medium transition-all relative
+                  px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium transition-all relative
                   ${active
                     ? 'bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 text-white shadow-md shadow-violet-500/20'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10'
@@ -900,15 +901,17 @@ export default function ActiveJobsPage() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDuplicateModal(job); }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:text-cyan-400 dark:hover:bg-cyan-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:text-cyan-400 dark:hover:bg-cyan-500/10 transition-colors opacity-0 group-hover:opacity-100"
                         title="Duplicate job"
+                        aria-label="Duplicate job"
                       >
                         <Copy className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(job); }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors opacity-0 group-hover:opacity-100"
                         title="Delete job"
+                        aria-label="Delete job"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

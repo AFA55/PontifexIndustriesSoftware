@@ -143,7 +143,7 @@ function RequestCard({
           </div>
           <button
             onClick={() => setExpanded(v => !v)}
-            className="flex-shrink-0 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"
+            className="flex-shrink-0 p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"
             aria-label={expanded ? 'Collapse' : 'Expand'}
           >
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -189,7 +189,7 @@ function RequestCard({
               <button
                 onClick={() => patch({ status: 'in_progress' })}
                 disabled={busy}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors min-h-[36px] disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors min-h-[44px] disabled:opacity-50"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
                 Start Work
@@ -200,7 +200,7 @@ function RequestCard({
               <button
                 onClick={() => setShowNotesInput(true)}
                 disabled={busy}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors min-h-[36px] disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors min-h-[44px] disabled:opacity-50"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Mark Done
@@ -210,7 +210,7 @@ function RequestCard({
             <button
               onClick={() => patch({ status: 'cancelled' })}
               disabled={busy}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 text-xs font-semibold transition-colors min-h-[36px] disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 text-xs font-semibold transition-colors min-h-[44px] disabled:opacity-50"
             >
               <XCircle className="w-3.5 h-3.5" />
               Cancel
@@ -232,14 +232,14 @@ function RequestCard({
                 <button
                   onClick={() => patch({ status: 'done', resolution_notes: notes })}
                   disabled={busy}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors min-h-[36px] disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors min-h-[44px] disabled:opacity-50"
                 >
                   {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                   Confirm Done
                 </button>
                 <button
                   onClick={() => setShowNotesInput(false)}
-                  className="px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-600 text-xs text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors min-h-[36px]"
+                  className="px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-600 text-xs text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors min-h-[44px]"
                 >
                   Cancel
                 </button>
