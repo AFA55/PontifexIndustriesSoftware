@@ -339,72 +339,35 @@ export default function BillingPage() {
       setError('Request timed out. Please refresh the page.');
     }, 30000);
     try {
-      const invoiceRes = await apiFetch('/api/admin/invoices');
-      let invoicesArr: Invoice[] = [];
+      // Fetch invoices + billing data in parallel via server-side API routes.
+      // Both routes use supabaseAdmin with explicit tenant_id filters — no
+      // direct browser-side Supabase queries, so tenant isolation is guaranteed
+      // even if an RLS policy has a gap.
+      const [invoiceRes, billingRes] = await Promise.all([
+        apiFetch('/api/admin/invoices'),
+        apiFetch('/api/admin/billing'),
+      ]);
+
       if (invoiceRes.ok) {
         const invoiceData = await invoiceRes.json();
-        invoicesArr = invoiceData.data || [];
-        setInvoices(invoicesArr);
+        setInvoices(invoiceData.data || []);
         setStats(invoiceData.stats || {});
       } else {
         setError('Failed to load invoices.');
       }
 
-      let completedQuery = supabase
-        .from('job_orders')
-        .select('id, job_number, title, customer_name, estimated_cost, work_completed_at, status, billing_type, created_by, completion_pdf_url')
-        .eq('status', 'completed')
-        .is('deleted_at', null)
-        .order('work_completed_at', { ascending: false })
-        .limit(50);
-
-      // RBAC: salesman only sees their own ready-to-bill jobs.
-      const cu = getCurrentUser();
-      if (cu?.role === 'salesman' && cu.id) {
-        completedQuery = completedQuery.eq('created_by', cu.id);
-      }
-
-      const { data: completed } = await completedQuery;
-
-      let completedArr: CompletedJob[] = [];
-      if (completed) {
-        const { data: existingLineItems } = await supabase
-          .from('invoice_line_items')
-          .select('job_order_id')
-          .in('job_order_id', completed.map(j => j.id));
-
-        const invoicedJobIds = new Set((existingLineItems || []).map(li => li.job_order_id));
-
-        completedArr = completed.map(j => ({
-          ...j,
-          has_invoice: invoicedJobIds.has(j.id),
-        })) as CompletedJob[];
-        setCompletedJobs(completedArr);
-      }
-
-      // Bulk-resolve "Submitted by" full names for the chips.
-      const ids = new Set<string>();
-      for (const inv of invoicesArr) if (inv.created_by) ids.add(inv.created_by);
-      for (const j of completedArr) if (j.created_by) ids.add(j.created_by);
-      const missing = Array.from(ids).filter(id => !(id in profilesById));
-      if (missing.length > 0) {
-        try {
-          const { data: profs } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .in('id', missing);
-          if (profs && profs.length > 0) {
-            setProfilesById(prev => {
-              const next = { ...prev };
-              for (const p of profs as any[]) {
-                if (p?.id) next[p.id] = p.full_name || '';
-              }
-              return next;
-            });
-          }
-        } catch {
-          // best-effort; chips will simply not render for unresolved ids
+      if (billingRes.ok) {
+        const billingData = await billingRes.json();
+        const { completedJobs: completedArr = [], profilesById: resolvedProfiles = {} } =
+          billingData.data || {};
+        setCompletedJobs(completedArr as CompletedJob[]);
+        // Merge resolved profiles into local cache
+        if (Object.keys(resolvedProfiles).length > 0) {
+          setProfilesById(prev => ({ ...prev, ...resolvedProfiles }));
         }
+      } else {
+        // Non-fatal: invoices still loaded; ready-to-bill tab will be empty
+        console.warn('Failed to load completed jobs from billing API.');
       }
     } catch (err) {
       console.error('Error fetching billing data:', err);

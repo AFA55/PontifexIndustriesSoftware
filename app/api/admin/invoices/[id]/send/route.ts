@@ -244,18 +244,48 @@ export async function POST(
 </body>
 </html>`;
 
-    // 5. Send email via Resend
+    // 5. Guard: Resend API key must be configured
+    if (!process.env.RESEND_API_KEY) {
+      console.error('RESEND_API_KEY is not configured.');
+      return NextResponse.json(
+        { error: 'Email delivery is not configured. Please contact your administrator.' },
+        { status: 503 }
+      );
+    }
+
+    // 6. Send email via Resend
     const resend = new Resend(process.env.RESEND_API_KEY);
     const fromAddress = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@resend.dev>';
-    await resend.emails.send({
-      from: fromAddress,
-      to: invoice.customer_email,
-      subject: `Invoice ${invoice.invoice_number} from Patriot Concrete Cutting`,
-      html,
-    });
 
-    // 6. Update invoice status to 'sent'
-    await supabaseAdmin
+    let sendResult: { data: any; error: any };
+    try {
+      sendResult = await resend.emails.send({
+        from: fromAddress,
+        to: invoice.customer_email,
+        subject: `Invoice ${invoice.invoice_number} from Patriot Concrete Cutting`,
+        html,
+      });
+    } catch (emailErr: any) {
+      console.error('Resend SDK threw during email send:', emailErr);
+      return NextResponse.json(
+        { error: 'Failed to send invoice email. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    // Resend returns { data, error } — a non-null error means delivery was rejected
+    if (sendResult.error) {
+      console.error('Resend rejected the email:', sendResult.error);
+      return NextResponse.json(
+        {
+          error: `Email delivery failed: ${sendResult.error.message || 'Unknown error from email provider.'}`,
+        },
+        { status: 502 }
+      );
+    }
+
+    // 7. Update invoice status to 'sent' — email is out, update must succeed
+    const { error: updateError } = await supabaseAdmin
       .from('invoices')
       .update({
         status: 'sent',
@@ -264,7 +294,16 @@ export async function POST(
       })
       .eq('id', id);
 
-    // 7. Fire-and-forget audit log
+    if (updateError) {
+      // Email was sent but status update failed — log it but return success so
+      // the caller knows the email went out. Admin can manually flip status.
+      console.error(
+        `Invoice ${invoice.invoice_number} email sent but status update failed:`,
+        updateError
+      );
+    }
+
+    // 8. Fire-and-forget audit log
     Promise.resolve(
       supabaseAdmin.from('audit_logs').insert({
         user_id: auth.userId,
@@ -275,6 +314,7 @@ export async function POST(
           invoice_number: invoice.invoice_number,
           customer_email: invoice.customer_email,
           customer_name: invoice.customer_name,
+          status_update_failed: !!updateError,
         },
       })
     )
@@ -284,6 +324,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       message: `Invoice sent to ${invoice.customer_email}`,
+      ...(updateError ? { warning: 'Invoice sent but status update failed — please refresh billing page.' } : {}),
     });
   } catch (error: any) {
     console.error('Error sending invoice email:', error);
