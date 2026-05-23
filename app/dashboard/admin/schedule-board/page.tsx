@@ -118,6 +118,11 @@ function toJobCard(job: any, viewDate?: string): JobCardData {
     po_number: job.po_number || null,
     day_label: computeDayLabel(job, viewDate),
     status: job.status || null,
+    // Live operator-progress timestamps (already in job_orders select('*'))
+    in_route_at: job.in_route_at ?? null,
+    arrived_at_jobsite_at: job.arrived_at_jobsite_at ?? null,
+    work_started_at: job.work_started_at ?? null,
+    work_completed_at: job.work_completed_at ?? null,
   };
 }
 

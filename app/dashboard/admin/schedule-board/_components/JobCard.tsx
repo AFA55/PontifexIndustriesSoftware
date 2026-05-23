@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, Edit3, FileText, Users, CheckCircle2, Trash2 } from 'lucide-react';
+import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, Edit3, FileText, Users, CheckCircle2, Trash2, Navigation, MapPinned, Hammer } from 'lucide-react';
 import { getDisplayName } from '@/lib/equipment-map';
 
 export interface JobCardData {
@@ -28,6 +28,63 @@ export interface JobCardData {
   route_started_at?: string | null;
   done_for_day_at?: string | null;
   overall_pct?: number | null; // scope progress 0-100
+  // Live operator-progress timestamps (from job_orders) — drive the live-status pill
+  in_route_at?: string | null;
+  arrived_at_jobsite_at?: string | null;
+  work_started_at?: string | null;
+  work_completed_at?: string | null;
+}
+
+// ─── Live operator status pill ───────────────────────────────────────────
+// Derives the operator's current step purely from the job's timestamps/status.
+// No API call — fields come from the board's existing job fetch.
+import type { LucideIcon } from 'lucide-react';
+
+export function jobLiveStatus(
+  job: Pick<JobCardData, 'status' | 'in_route_at' | 'arrived_at_jobsite_at' | 'work_started_at' | 'work_completed_at'>
+): { label: string; classes: string; Icon: LucideIcon } | null {
+  // Done — work completed or job marked completed
+  if (job.work_completed_at || job.status === 'completed') {
+    return {
+      label: 'Done',
+      classes: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/40',
+      Icon: CheckCircle2,
+    };
+  }
+  // Working — work has started but not completed
+  if (job.work_started_at) {
+    return {
+      label: 'Working',
+      classes: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-500/40',
+      Icon: Hammer,
+    };
+  }
+  // On site — arrived but not started work
+  if (job.arrived_at_jobsite_at) {
+    return {
+      label: 'On site',
+      classes: 'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-500/40',
+      Icon: MapPinned,
+    };
+  }
+  // En route — left but not arrived
+  if (job.in_route_at) {
+    return {
+      label: 'En route',
+      classes: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/40',
+      Icon: Navigation,
+    };
+  }
+  // Dispatched / assigned — no field activity yet
+  if (job.status === 'dispatched' || job.status === 'assigned' || job.status === 'in_route' || job.status === 'in_progress') {
+    return {
+      label: 'Dispatched',
+      classes: 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/70 border border-slate-200 dark:border-white/15',
+      Icon: Clock,
+    };
+  }
+  // Scheduled (not yet dispatched) — no badge
+  return null;
 }
 
 function getStatusColor(job: JobCardData): { border: string; dot: string; bg: string } {
@@ -84,6 +141,8 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
   const isCompleted = job.status === 'completed';
   const statusColor = getStatusColor(job);
   const statusLabel = STATUS_LABELS[job.status || ''] || '';
+  // Live operator-progress pill. Suppressed when the COMPLETED badge already covers it.
+  const liveStatus = isCompleted ? null : jobLiveStatus(job);
 
   const formatTime = (time: string | null) => {
     if (!time) return null;
@@ -148,6 +207,15 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/40">
                   <Phone className="w-3 h-3" />
                   WILL CALL
+                </span>
+              )}
+              {liveStatus && (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${liveStatus.classes}`}
+                  title={`Operator status: ${liveStatus.label}`}
+                >
+                  <liveStatus.Icon className="w-3 h-3" />
+                  {liveStatus.label}
                 </span>
               )}
               {job.day_label && (

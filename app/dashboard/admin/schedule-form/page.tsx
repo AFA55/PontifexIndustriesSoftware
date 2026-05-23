@@ -421,6 +421,8 @@ interface FormData {
   can_work_weekends: boolean;
   outside_hours: boolean;
   outside_hours_details: string;
+  out_of_town: boolean;
+  hotel_directions: string;
   // Step 6
   orientation_required: boolean;
   orientation_datetime: string;
@@ -504,6 +506,8 @@ const initialFormData: FormData = {
   can_work_weekends: false,
   outside_hours: false,
   outside_hours_details: '',
+  out_of_town: false,
+  hotel_directions: '',
   orientation_required: false,
   orientation_datetime: '',
   badging_required: false,
@@ -943,6 +947,13 @@ export default function ScheduleFormPage() {
             scope_photo_urls: j.scope_photo_urls || [],
             start_date: j.scheduled_date || '',
             end_date: j.end_date || '',
+            // Scheduling flexibility
+            can_work_fridays: typeof sched.can_work_fridays === 'boolean' ? sched.can_work_fridays : (f as any).can_work_fridays,
+            can_work_weekends: typeof sched.can_work_weekends === 'boolean' ? sched.can_work_weekends : (f as any).can_work_weekends,
+            outside_hours: typeof sched.outside_hours === 'boolean' ? sched.outside_hours : (f as any).outside_hours,
+            outside_hours_details: sched.outside_hours_details || '',
+            out_of_town: typeof sched.out_of_town === 'boolean' ? sched.out_of_town : (f as any).out_of_town,
+            hotel_directions: sched.hotel_directions || '',
             difficulty_rating: j.difficulty_rating || (f as any).difficulty_rating,
             additional_notes: j.additional_notes || '',
             // Booleans / nested
@@ -1643,6 +1654,8 @@ export default function ScheduleFormPage() {
           can_work_weekends: form.can_work_weekends,
           outside_hours: form.outside_hours,
           outside_hours_details: form.outside_hours_details || null,
+          out_of_town: form.out_of_town,
+          hotel_directions: form.hotel_directions || null,
         },
         site_compliance: {
           orientation_required: form.orientation_required,
@@ -3623,6 +3636,23 @@ export default function ScheduleFormPage() {
                 onChange={v => updateForm({ can_work_weekends: v })}
                 label="Can Work Weekends?"
               />
+              <Toggle
+                checked={form.out_of_town}
+                onChange={v => updateForm({ out_of_town: v })}
+                label="Out of town job?"
+                icon={MapPin}
+              />
+              {form.out_of_town && (
+                <div className="pl-4 border-l-2 border-blue-200 ml-2">
+                  <label className="block text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2">Hotel / lodging directions</label>
+                  <TextArea
+                    rows={3}
+                    placeholder="Hotel name, address, and directions for the crew"
+                    value={form.hotel_directions}
+                    onChange={e => updateForm({ hotel_directions: e.target.value })}
+                  />
+                </div>
+              )}
               <Toggle
                 checked={form.outside_hours}
                 onChange={v => updateForm({ outside_hours: v })}

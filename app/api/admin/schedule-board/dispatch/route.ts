@@ -14,10 +14,13 @@ import { sendSMS } from '@/lib/sms';
  * Body: { target_date: 'YYYY-MM-DD' }
  *
  * Behavior:
- * - Always pushes ALL assigned jobs active on target_date (no blocking on prior dispatch state)
- * - Each push inserts a schedule_notification with type='dispatched' and metadata.dispatch_date=targetDate
- * - dispatched_at is set on first-ever dispatch only (not overwritten on re-push)
- * - Multi-day jobs are included via date-range query (scheduled_date <= target AND end_date >= target)
+ * - Notifies/texts ONLY jobs being dispatched for the first time this call (dispatched_at was NULL).
+ * - Jobs that already have a dispatched_at (set on a prior call) are SKIPPED for SMS + notification
+ *   insert and reported back as `already_dispatched_count` — this is the duplicate-dispatch guard
+ *   that prevents repeat SMS (cost) + duplicate notifications when "Dispatch" is pressed twice or a
+ *   day that was already dispatched is re-dispatched.
+ * - dispatched_at is set on first-ever dispatch only (not overwritten on re-push).
+ * - Multi-day jobs are included via date-range query (scheduled_date <= target AND end_date >= target).
  */
 export async function POST(request: NextRequest) {
   const auth = await requireScheduleBoardAccess(request);
@@ -85,13 +88,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Always dispatch all assigned jobs on the target date — no blocking on prior dispatch state
-    const jobsToDispatch = jobs;
+    // Duplicate-dispatch guard:
+    //   - "firstTimeJobs" = dispatched_at was NULL before this call → notify + SMS (this is the
+    //     call that flips dispatched_at from null → now).
+    //   - "alreadyDispatchedJobs" = dispatched_at already set on a prior call → SKIP SMS +
+    //     notifications (prevents duplicate texts / notifications on re-press or re-dispatch),
+    //     but still report them so the UI can show "X dispatched, Y already dispatched".
+    const firstTimeJobs = jobs.filter(j => j.dispatched_at === null);
+    const alreadyDispatchedJobs = jobs.filter(j => j.dispatched_at !== null);
 
     // 2. Set dispatched_at on first-time dispatches (don't overwrite existing dispatched_at)
-    const firstTimeDispatchIds = jobsToDispatch
-      .filter(j => j.dispatched_at === null)
-      .map(j => j.id);
+    const firstTimeDispatchIds = firstTimeJobs.map(j => j.id);
 
     if (firstTimeDispatchIds.length > 0) {
       const { error: updateError } = await supabaseAdmin
@@ -108,6 +115,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Only first-time jobs get notified / texted. Already-dispatched jobs are skipped.
+    const jobsToNotify = firstTimeJobs;
+
     // 4. Create notifications for operators and helpers
     const notifications: {
       recipient_id: string;
@@ -120,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     // Get operator/helper names for notification messages
     const allUserIds = new Set<string>();
-    jobsToDispatch.forEach(j => {
+    jobsToNotify.forEach(j => {
       if (j.assigned_to) allUserIds.add(j.assigned_to);
       if (j.helper_assigned_to) allUserIds.add(j.helper_assigned_to);
     });
@@ -145,7 +155,7 @@ export async function POST(request: NextRequest) {
 
     const notifTitle = 'Job Ticket Dispatched';
 
-    for (const job of jobsToDispatch) {
+    for (const job of jobsToNotify) {
       // Determine multi-day label
       const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
 
@@ -208,9 +218,9 @@ export async function POST(request: NextRequest) {
 
     // 5. Fire-and-forget SMS to operators/helpers who have a phone number
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pontifexindustries.com';
-    const smsPromises: Promise<any>[] = [];
+    const smsPromises: Promise<unknown>[] = [];
 
-    for (const job of jobsToDispatch) {
+    for (const job of jobsToNotify) {
       const formatTime = (t: string | null) => {
         if (!t) return '';
         const [h, m] = t.split(':');
@@ -249,12 +259,26 @@ export async function POST(request: NextRequest) {
     // Don't await — fire-and-forget (don't block response on SMS delivery)
     Promise.allSettled(smsPromises).catch(() => {});
 
+    const dispatchedCount = jobsToNotify.length;
+    const alreadyDispatchedCount = alreadyDispatchedJobs.length;
+
+    const messageParts = [`Dispatched ${dispatchedCount} job(s) for ${formattedDate}.`];
+    if (alreadyDispatchedCount > 0) {
+      messageParts.push(`${alreadyDispatchedCount} already dispatched (skipped to avoid duplicate texts).`);
+    }
+    if (dispatchedCount > 0) {
+      messageParts.push(`${notificationCount} notification(s) sent.`);
+    }
+
     return NextResponse.json({
       success: true,
-      dispatched_count: jobsToDispatch.length,
+      dispatched_count: dispatchedCount,
+      already_dispatched_count: alreadyDispatchedCount,
+      // Total jobs active on the date (newly dispatched + already dispatched)
+      total_jobs: jobs.length,
       notification_count: notificationCount,
       sms_attempted: smsPromises.length,
-      message: `Dispatched ${jobsToDispatch.length} job(s) for ${formattedDate}. ${notificationCount} notification(s) sent.`,
+      message: messageParts.join(' '),
     });
   } catch (error) {
     console.error('Dispatch error:', error);
