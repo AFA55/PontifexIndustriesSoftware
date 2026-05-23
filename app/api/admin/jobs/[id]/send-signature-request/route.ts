@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { sendEmail } from '@/lib/email';
+import { sendSignatureRequestSMS } from '@/lib/sms';
 import crypto from 'crypto';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -109,6 +110,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
       // Return success — the link is still created and can be manually shared
     }
 
+    // Send SMS if a phone number was provided
+    let smsSent = false;
+    if (customer_phone) {
+      const smsResult = await sendSignatureRequestSMS({
+        to: customer_phone,
+        customerName: customer_name || job.customer_name,
+        jobNumber: job.job_number,
+        companyName,
+        signingUrl,
+      });
+      smsSent = smsResult.success;
+      if (!smsResult.success) {
+        console.warn('SMS failed to send for signature request:', smsResult.error);
+      }
+    }
+
     // Fire-and-forget audit log
     Promise.resolve(
       supabaseAdmin.from('audit_logs').insert({
@@ -119,8 +136,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
         details: {
           job_number: job.job_number,
           sent_to: customer_email,
+          sent_sms_to: customer_phone || null,
           token: token.slice(0, 8) + '…',
           email_sent: emailSent,
+          sms_sent: smsSent,
         },
       })
     ).then(() => {}).catch(() => {});
@@ -131,7 +150,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
         token,
         signing_url: signingUrl,
         sent_to: customer_email,
+        sent_sms_to: customer_phone || null,
         email_sent: emailSent,
+        sms_sent: smsSent,
         signature_request_id: sigReq.id,
       },
     });

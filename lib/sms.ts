@@ -1,12 +1,83 @@
 /**
  * SMS Notification Service
- * Handles sending SMS via Twilio for job notifications
+ * Handles sending SMS via Telnyx (preferred) or Twilio (fallback).
  */
 
 // Twilio configuration
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+// Telnyx configuration (no npm package needed — uses fetch)
+const telnyxApiKey = process.env.TELNYX_API_KEY;
+const telnyxPhoneNumber = process.env.TELNYX_PHONE_NUMBER;
+
+/**
+ * Send SMS via Telnyx or Twilio, whichever is configured.
+ * Telnyx is preferred (no npm dependency).
+ * Returns { success, messageId?, error? }.
+ */
+export async function sendSMSAny(options: SMSOptions): Promise<{
+  success: boolean;
+  messageId?: string;
+  error?: string;
+  provider?: string;
+}> {
+  const toNumber = formatPhoneNumber(options.to);
+  if (!toNumber) {
+    return { success: false, error: 'Invalid phone number format' };
+  }
+
+  // 1. Try Telnyx first (pure HTTP, no npm required)
+  if (telnyxApiKey && telnyxPhoneNumber) {
+    try {
+      const res = await fetch('https://api.telnyx.com/v2/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${telnyxApiKey}`,
+        },
+        body: JSON.stringify({
+          from: telnyxPhoneNumber,
+          to: toNumber,
+          text: options.message,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          success: true,
+          messageId: data?.data?.id,
+          provider: 'telnyx',
+        };
+      }
+      const errData = await res.json().catch(() => ({}));
+      console.warn('Telnyx SMS failed, trying Twilio:', errData);
+    } catch (err) {
+      console.warn('Telnyx fetch error, trying Twilio:', err);
+    }
+  }
+
+  // 2. Fallback to Twilio
+  return sendSMS(options);
+}
+
+/**
+ * Send a signature-request SMS to a customer.
+ * Message is concise — under 160 chars wherever possible.
+ */
+export async function sendSignatureRequestSMS(options: {
+  to: string;
+  customerName: string;
+  jobNumber: string;
+  companyName: string;
+  signingUrl: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const shortUrl = options.signingUrl; // Use as-is; future: short.link
+  const message =
+    `${options.companyName}: Hi ${options.customerName}, please sign your work completion form for ${options.jobNumber}: ${shortUrl}`;
+  return sendSMSAny({ to: options.to, message, jobId: options.jobNumber });
+}
 
 // Lazily initialize Twilio client (only on server-side, only when needed)
 let twilioClient: any = null;
