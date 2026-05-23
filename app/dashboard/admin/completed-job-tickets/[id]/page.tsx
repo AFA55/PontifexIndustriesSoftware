@@ -13,7 +13,7 @@ import {
   ArrowLeft, FileText, Star, Clock, DollarSign, User, MapPin,
   CheckCircle, Calendar, AlertCircle, Download, Eye, X, Plus,
   Loader2, Bell, Receipt, TrendingUp, BarChart3, Target,
-  Image as ImageIcon, Milestone, ChevronRight, Send, PenTool, RefreshCw,
+  Image as ImageIcon, Milestone, ChevronRight, Send, PenTool, RefreshCw, Globe,
 } from 'lucide-react';
 
 interface CompletionSummary {
@@ -160,6 +160,13 @@ export default function CompletedJobSummaryPage() {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [resendSuccess, setResendSuccess] = useState<string | null>(null);
 
+  // Customer portal link modal state
+  const [showPortalModal, setShowPortalModal] = useState(false);
+  const [portalEmail, setPortalEmail] = useState('');
+  const [portalPhone, setPortalPhone] = useState('');
+  const [sendingPortal, setSendingPortal] = useState(false);
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
+
   useEffect(() => {
     const user = getCurrentUser();
     if (!user) { router.push('/login'); return; }
@@ -265,6 +272,36 @@ export default function CompletedJobSummaryPage() {
       }
     } catch (_) { setActionMsg({ type: 'error', text: 'Network error. Please try again.' }); }
     finally { setSendingSig(false); }
+  };
+
+  const handleSendPortalLink = async () => {
+    if (!summary?.customer_name) return;
+    setSendingPortal(true);
+    setPortalUrl(null);
+    try {
+      const res = await apiFetch('/api/admin/portal-links', {
+        method: 'POST',
+        body: JSON.stringify({
+          customer_name: summary.customer_name,
+          customer_email: portalEmail.trim() || summary.customer_email || undefined,
+          customer_phone: portalPhone.trim() || undefined,
+          job_order_id: jobId,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const url = data?.data?.portal_url;
+        setPortalUrl(url);
+        const parts = ['Portal link created'];
+        if (data?.data?.email_sent) parts.push(`email sent to ${portalEmail.trim() || summary.customer_email}`);
+        if (data?.data?.sms_sent) parts.push(`SMS sent to ${portalPhone.trim()}`);
+        setActionMsg({ type: 'success', text: parts.join(' · ') });
+      } else {
+        const err = await res.json();
+        setActionMsg({ type: 'error', text: err.error || 'Failed to create portal link.' });
+      }
+    } catch (_) { setActionMsg({ type: 'error', text: 'Network error. Please try again.' }); }
+    finally { setSendingPortal(false); }
   };
 
   const handleResend = async (request: SigRequest) => {
@@ -406,6 +443,15 @@ export default function CompletedJobSummaryPage() {
               >
                 <Send className="w-4 h-4" />
                 Send for Signature
+              </button>
+              <button
+                onClick={() => { setPortalUrl(null); setPortalEmail(summary?.customer_email || ''); setPortalPhone(''); setShowPortalModal(true); }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                  bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100
+                  dark:bg-sky-500/15 dark:border-sky-400/30 dark:text-sky-200 dark:hover:bg-sky-500/25"
+              >
+                <Globe className="w-4 h-4" />
+                Customer Portal
               </button>
               <Link
                 href={`/dashboard/admin/billing/create?job=${jobId}`}
@@ -1144,6 +1190,104 @@ export default function CompletedJobSummaryPage() {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Portal Modal */}
+      {showPortalModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#120a24] rounded-2xl shadow-2xl w-full max-w-md ring-1 ring-slate-200 dark:ring-white/10">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-sky-600 dark:text-sky-300" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Send Customer Portal Link</h3>
+              </div>
+              <button
+                onClick={() => setShowPortalModal(false)}
+                className="p-2 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-white/10"
+              >
+                <X className="w-5 h-5 text-slate-500 dark:text-white/60" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-500 dark:text-white/60">
+                The customer receives a 30-day link to <strong className="text-slate-700 dark:text-white/80">sign this ticket</strong> and
+                view their full job history with your company. No login required.
+              </p>
+
+              {portalUrl ? (
+                <div className="space-y-3">
+                  <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-xl p-4 border border-emerald-200 dark:border-emerald-500/20">
+                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-2">Portal link created ✓</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 break-all font-mono">{portalUrl}</p>
+                  </div>
+                  <button
+                    onClick={() => navigator.clipboard?.writeText(portalUrl).then(() => setActionMsg({ type: 'success', text: 'Portal link copied!' }))}
+                    className="w-full py-2.5 rounded-xl text-sm font-medium bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-200 dark:hover:bg-white/15 transition-colors"
+                  >
+                    Copy Link
+                  </button>
+                  <button
+                    onClick={() => setShowPortalModal(false)}
+                    className="w-full py-2.5 rounded-xl text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-white/80 mb-1">
+                      Customer Email <span className="text-slate-400 text-xs font-normal">(for email delivery)</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={portalEmail}
+                      onChange={(e) => setPortalEmail(e.target.value)}
+                      placeholder="customer@example.com"
+                      className="w-full px-4 py-3 rounded-xl text-slate-900 transition-colors
+                        bg-white border border-slate-300 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 focus:outline-none
+                        dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-sky-400/60 dark:focus:ring-sky-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-white/80 mb-1">
+                      Phone <span className="text-slate-400 text-xs font-normal">(for SMS delivery)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={portalPhone}
+                      onChange={(e) => setPortalPhone(e.target.value)}
+                      placeholder="(555) 000-0000"
+                      className="w-full px-4 py-3 rounded-xl text-slate-900 transition-colors
+                        bg-white border border-slate-300 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 focus:outline-none
+                        dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-sky-400/60 dark:focus:ring-sky-500/20"
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={handleSendPortalLink}
+                      disabled={sendingPortal}
+                      className="flex-1 rounded-xl py-3 font-semibold text-sm text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2
+                        bg-gradient-to-r from-sky-500 to-indigo-600 hover:shadow-md shadow-sky-500/20"
+                    >
+                      {sendingPortal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                      {sendingPortal ? 'Creating...' : 'Create & Send Portal Link'}
+                    </button>
+                    <button
+                      onClick={() => setShowPortalModal(false)}
+                      disabled={sendingPortal}
+                      className="px-4 py-3 rounded-xl font-medium transition-colors disabled:opacity-50
+                        bg-white border border-slate-300 text-slate-700 hover:bg-slate-50
+                        dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
