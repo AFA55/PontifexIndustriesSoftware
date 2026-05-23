@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
+import { notifySalesperson } from '@/lib/notify-salesperson';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -39,25 +40,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const message = `${job.job_number} — ${job.project_name || 'Job'} has been completed and is ready for invoicing.`;
-
-    const { error: notifError } = await supabaseAdmin
-      .from('schedule_notifications')
-      .insert({
-        user_id: job.salesperson_id,
-        job_order_id: jobId,
-        tenant_id: tenantId || null,
-        notification_type: 'job_completed',
-        title: 'Job Ready for Billing',
-        message,
-        is_read: false,
-        created_at: new Date().toISOString(),
-      });
-
-    if (notifError) {
-      console.error('Error inserting salesperson notification:', notifError);
-      return NextResponse.json({ error: 'Failed to send notification' }, { status: 500 });
-    }
+    // Route through the shared helper — writes to the `notifications` table
+    // with the correct columns (the bell reads from there) AND sends a
+    // best-effort email. The previous direct insert into schedule_notifications
+    // used wrong column names (user_id/notification_type/is_read instead of
+    // recipient_id/type/read) and silently failed every time.
+    await notifySalesperson({
+      event: 'invoice_ready',
+      jobOrderId: jobId,
+      recipientUserId: job.salesperson_id,
+      tenantId: tenantId || null,
+      subjectName: job.job_number,
+      customerName: job.project_name || undefined,
+    });
 
     // Fire-and-forget audit log
     Promise.resolve(

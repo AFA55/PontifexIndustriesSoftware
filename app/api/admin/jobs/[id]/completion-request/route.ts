@@ -22,6 +22,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
+import { notifySalesperson } from '@/lib/notify-salesperson';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -190,6 +191,29 @@ export async function PUT(request: NextRequest, context: RouteContext) {
           if (error) console.error('Failed to send approval notification:', error);
         })
         .catch(() => {});
+
+      // Notify the ticket creator / salesperson that the job is complete and
+      // ready for invoicing (they confirm invoice details, then bill it).
+      Promise.resolve((async () => {
+        const { data: jobMeta } = await supabaseAdmin
+          .from('job_orders')
+          .select('created_by, salesperson_id, customer_name, job_number')
+          .eq('id', jobId)
+          .single();
+        const recipients = Array.from(
+          new Set([jobMeta?.salesperson_id, jobMeta?.created_by].filter(Boolean) as string[])
+        );
+        for (const recipient of recipients) {
+          await notifySalesperson({
+            event: 'job_completed',
+            jobOrderId: jobId,
+            recipientUserId: recipient,
+            tenantId: tenantId || null,
+            subjectName: jobMeta?.job_number || job.job_number,
+            customerName: jobMeta?.customer_name || undefined,
+          });
+        }
+      })()).catch(() => {});
 
       return NextResponse.json({
         success: true,
