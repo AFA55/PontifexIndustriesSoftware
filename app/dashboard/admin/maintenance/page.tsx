@@ -82,6 +82,7 @@ function RequestCard({
   const [expanded, setExpanded] = useState(false);
   const [showNotesInput, setShowNotesInput] = useState(false);
   const [notes, setNotes] = useState('');
+  const [equipmentResolution, setEquipmentResolution] = useState<'returned_to_service' | 'out_of_service'>('returned_to_service');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -228,9 +229,38 @@ function RequestCard({
                 autoFocus
                 className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
               />
+              {req.equipment && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-gray-600 dark:text-slate-400">Equipment outcome</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEquipmentResolution('returned_to_service')}
+                      className={`flex-1 px-3 py-2 rounded-xl text-xs font-semibold transition-colors min-h-[44px] border ${
+                        equipmentResolution === 'returned_to_service'
+                          ? 'bg-emerald-500 text-white border-emerald-500'
+                          : 'bg-gray-50 dark:bg-slate-900 text-gray-600 dark:text-slate-400 border-gray-200 dark:border-slate-600'
+                      }`}
+                    >
+                      Back in service
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEquipmentResolution('out_of_service')}
+                      className={`flex-1 px-3 py-2 rounded-xl text-xs font-semibold transition-colors min-h-[44px] border ${
+                        equipmentResolution === 'out_of_service'
+                          ? 'bg-rose-500 text-white border-rose-500'
+                          : 'bg-gray-50 dark:bg-slate-900 text-gray-600 dark:text-slate-400 border-gray-200 dark:border-slate-600'
+                      }`}
+                    >
+                      Still out of service
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
-                  onClick={() => patch({ status: 'done', resolution_notes: notes })}
+                  onClick={() => patch({ status: 'done', resolution_notes: notes, ...(req.equipment ? { equipment_resolution: equipmentResolution } : {}) })}
                   disabled={busy}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors min-h-[44px] disabled:opacity-50"
                 >

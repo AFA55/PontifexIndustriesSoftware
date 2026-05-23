@@ -38,6 +38,7 @@ import {
   Camera,
   Pencil,
   ChevronDown,
+  Printer,
 } from 'lucide-react';
 import EditTimestampModal from '@/components/admin/EditTimestampModal';
 import { getCurrentUser } from '@/lib/auth';
@@ -1241,6 +1242,18 @@ export default function AdminJobDetailPage({
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+              <Link
+                href={`/dashboard/admin/jobs/${job.id}/print`}
+                target="_blank"
+                className="
+                  inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors
+                  text-slate-700 bg-white border border-slate-200 hover:bg-slate-50
+                  dark:text-white/80 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10
+                "
+              >
+                <Printer className="w-4 h-4" />
+                Print Ticket
+              </Link>
               <button
                 onClick={() => setShowEditSchedule(true)}
                 className="

@@ -13,6 +13,33 @@ import { requireAuth } from '@/lib/api-auth';
 const SHOP_ROLES = ['shop_manager', 'admin', 'super_admin', 'operations_manager'];
 const VALID_STATUSES = ['open', 'in_progress', 'done', 'cancelled'];
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'];
+const VALID_EQUIPMENT_RESOLUTIONS = ['returned_to_service', 'out_of_service'];
+
+/**
+ * Map the new maintenance-request status to an equipment.status value.
+ * Returns null when the equipment status should be left unchanged.
+ * Valid equipment.status (per equipment_status_check):
+ *   available | assigned | reserved | in_use | pending_putaway |
+ *   maintenance | in_maintenance | out_of_service | retired
+ */
+function resolveEquipmentStatus(
+  requestStatus: string,
+  priority: string | undefined,
+  equipmentResolution: string | undefined
+): string | null {
+  switch (requestStatus) {
+    case 'in_progress':
+      return 'in_maintenance';
+    case 'open':
+      // High-urgency open requests pull the asset offline proactively.
+      return priority === 'critical' || priority === 'high' ? 'in_maintenance' : null;
+    case 'done':
+      return equipmentResolution === 'out_of_service' ? 'out_of_service' : 'available';
+    case 'cancelled':
+    default:
+      return null;
+  }
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -74,6 +101,46 @@ export async function PATCH(
   if (error) {
     console.error('admin/maintenance-requests PATCH error:', error);
     return NextResponse.json({ error: 'Failed to update request', details: error.message }, { status: 500 });
+  }
+
+  // Sync the linked equipment's status to reflect the triage outcome.
+  // Fire-and-forget, but log failures so a CHECK violation / RLS issue surfaces.
+  if (existing.equipment_id && typeof update.status === 'string') {
+    const equipmentResolution =
+      typeof body.equipment_resolution === 'string' &&
+      VALID_EQUIPMENT_RESOLUTIONS.includes(body.equipment_resolution)
+        ? body.equipment_resolution
+        : undefined;
+    // Use the patched priority if supplied, otherwise the new request status alone drives it.
+    const effectivePriority =
+      typeof update.priority === 'string' ? update.priority : undefined;
+    const targetEquipmentStatus = resolveEquipmentStatus(
+      update.status as string,
+      effectivePriority,
+      equipmentResolution
+    );
+
+    if (targetEquipmentStatus) {
+      const equipmentId = existing.equipment_id as string;
+      Promise.resolve((async () => {
+        let eqUpdate = supabaseAdmin
+          .from('equipment')
+          .update({ status: targetEquipmentStatus })
+          .eq('id', equipmentId);
+        if (auth.role !== 'super_admin' && auth.tenantId) {
+          eqUpdate = eqUpdate.eq('tenant_id', auth.tenantId);
+        }
+        const { error: eqErr } = await eqUpdate;
+        if (eqErr) {
+          console.error(
+            `admin/maintenance-requests: failed to sync equipment ${equipmentId} status to ${targetEquipmentStatus}:`,
+            eqErr
+          );
+        }
+      })()).catch((e) => {
+        console.error('admin/maintenance-requests: equipment status sync threw:', e);
+      });
+    }
   }
 
   // Fire-and-forget: notify submitter when resolved

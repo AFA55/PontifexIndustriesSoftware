@@ -28,10 +28,25 @@ import {
   Mail,
   Heart,
   Sparkles,
+  Navigation,
 } from 'lucide-react';
 import PhotoUploader from '@/components/PhotoUploader';
 import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
 import CustomerSatisfactionSurvey from '@/components/CustomerSatisfactionSurvey';
+
+// Shop location for "Directions back to shop". Hardcoded for now — Patriot's
+// verified shop coordinates. TODO: make tenant-configurable (e.g. read from
+// tenants.shop_latitude / tenants.shop_longitude) when multi-tenant shops land.
+const SHOP_LAT = 34.768775733693474;
+const SHOP_LNG = -82.43564252936702;
+
+function openDirectionsToShop(provider: 'apple' | 'google') {
+  const url =
+    provider === 'apple'
+      ? `https://maps.apple.com/?daddr=${SHOP_LAT},${SHOP_LNG}&dirflg=d`
+      : `https://www.google.com/maps/dir/?api=1&destination=${SHOP_LAT},${SHOP_LNG}`;
+  window.open(url, '_blank');
+}
 
 export default function DayCompletePage() {
   const router = useRouter();
@@ -74,6 +89,7 @@ export default function DayCompletePage() {
   const [supervisorNote, setSupervisorNote] = useState('');
   const [supervisorNoteSubmitting, setSupervisorNoteSubmitting] = useState(false);
   const [supervisorNoteSent, setSupervisorNoteSent] = useState(false);
+  const [showDirectionsChooser, setShowDirectionsChooser] = useState(false);
 
   // ─── Remote signature (Option 3) state ───────────────────────────────────
   const [showRemotePanel, setShowRemotePanel] = useState(false);
@@ -745,6 +761,42 @@ export default function DayCompletePage() {
               )}
             </div>
           )}
+
+          {/* Directions back to shop */}
+          <div className="mb-3">
+            {!showDirectionsChooser ? (
+              <button
+                onClick={() => setShowDirectionsChooser(true)}
+                className="w-full min-h-[44px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+              >
+                <Navigation className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                Directions back to shop
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" />
+                  Open directions in
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openDirectionsToShop('apple')}
+                    className="flex-1 min-h-[44px] flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gray-900 dark:bg-white/10 text-white text-sm font-semibold hover:bg-gray-800 dark:hover:bg-white/20 transition-colors"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    Apple Maps
+                  </button>
+                  <button
+                    onClick={() => openDirectionsToShop('google')}
+                    className="flex-1 min-h-[44px] flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    Google Maps
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Back to My Jobs */}
           <button
