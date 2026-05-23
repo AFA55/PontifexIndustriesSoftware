@@ -447,6 +447,49 @@ async function getTeamStatus(
   }
 }
 
+async function getOperationalAlerts(tenantId: string) {
+  try {
+    const today = todayISO();
+
+    const [lateClockins, openMaintenance, pendingTimeOff] = await Promise.all([
+      // Late clock-ins today
+      supabaseAdmin
+        .from('timecards')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('is_late', true)
+        .eq('date', today),
+
+      // Open maintenance requests
+      supabaseAdmin
+        .from('maintenance_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .in('status', ['open', 'in_progress']),
+
+      // Pending time-off requests
+      supabaseAdmin
+        .from('operator_time_off')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('status', 'pending'),
+    ]);
+
+    return {
+      late_clockins_today: lateClockins.count ?? 0,
+      open_maintenance_requests: openMaintenance.count ?? 0,
+      pending_time_off: pendingTimeOff.count ?? 0,
+    };
+  } catch (err: any) {
+    console.error('[dashboard-summary] operational_alerts error:', err?.message);
+    return {
+      late_clockins_today: 0,
+      open_maintenance_requests: 0,
+      pending_time_off: 0,
+    };
+  }
+}
+
 async function getRecentActivity(
   tenantId: string,
   opts: { isPersonal: boolean; targetUserId: string }
@@ -636,7 +679,7 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Run all sections in parallel ──────────────────────────────────────────
-  const [jobs_today, revenue_mtd, open_items, crew_utilization, team_status, recent_activity] =
+  const [jobs_today, revenue_mtd, open_items, crew_utilization, team_status, recent_activity, operational_alerts] =
     await Promise.all([
       getJobsToday(tenantId, opts),
       getRevenueMtd(tenantId, opts),
@@ -644,6 +687,7 @@ export async function GET(request: NextRequest) {
       getCrewUtilization(tenantId, opts),
       getTeamStatus(tenantId, opts),
       getRecentActivity(tenantId, opts),
+      getOperationalAlerts(tenantId),
     ]);
 
   return NextResponse.json({
@@ -657,6 +701,7 @@ export async function GET(request: NextRequest) {
       crew_utilization,
       team_status,
       recent_activity,
+      operational_alerts,
     },
   });
 }

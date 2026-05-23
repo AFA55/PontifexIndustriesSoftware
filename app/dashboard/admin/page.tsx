@@ -28,6 +28,8 @@ import {
   Tag,
   HandCoins,
   Eye,
+  Timer,
+  CalendarClock,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
@@ -98,6 +100,12 @@ interface ActivityItem {
   link: string | null;
 }
 
+interface OperationalAlerts {
+  late_clockins_today: number;
+  open_maintenance_requests: number;
+  pending_time_off: number;
+}
+
 interface DashboardData {
   jobs_today: { count: number; jobs: JobToday[] };
   revenue_mtd: RevenueMtd;
@@ -105,6 +113,7 @@ interface DashboardData {
   crew_utilization: CrewUtilization;
   team_status: TeamMember[];
   recent_activity: ActivityItem[];
+  operational_alerts?: OperationalAlerts;
 }
 
 interface SalesCommissionRow {
@@ -1005,6 +1014,54 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Operational Alerts strip ─────────────────────────────────────── */}
+      {!dashLoading && dashData?.operational_alerts && (() => {
+        const alerts = dashData.operational_alerts!;
+        const chips = [
+          {
+            key: 'late',
+            count: alerts.late_clockins_today,
+            icon: <Timer className="w-3.5 h-3.5" />,
+            label: (n: number) => `${n} late clock-in${n !== 1 ? 's' : ''} today`,
+            href: '/dashboard/admin/timecards',
+          },
+          {
+            key: 'maint',
+            count: alerts.open_maintenance_requests,
+            icon: <Wrench className="w-3.5 h-3.5" />,
+            label: (n: number) => `${n} open maintenance`,
+            href: '/dashboard/admin/maintenance',
+          },
+          {
+            key: 'pto',
+            count: alerts.pending_time_off,
+            icon: <CalendarClock className="w-3.5 h-3.5" />,
+            label: (n: number) => `${n} time-off pending`,
+            href: '/dashboard/admin/time-off',
+          },
+        ].filter((c) => c.count > 0);
+
+        if (chips.length === 0) return null;
+
+        return (
+          <div className="flex flex-wrap gap-2 -mt-2">
+            {chips.map((chip) => (
+              <Link
+                key={chip.key}
+                href={chip.href}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold
+                  bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400
+                  border border-amber-200 dark:border-amber-700/50
+                  hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+              >
+                {chip.icon}
+                {chip.label(chip.count)}
+              </Link>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* ── Two-column layout ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">

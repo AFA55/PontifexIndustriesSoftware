@@ -42,7 +42,7 @@ export async function sendEmail({ to, subject, html, attachments }: EmailOptions
     // Send email using Resend
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: any = {
-      from: process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <onboarding@resend.dev>',
+      from: process.env.RESEND_FROM_EMAIL || 'Pontifex Industries <noreply@pontifexindustries.com>',
       to: [to],
       subject: subject,
       html: html,

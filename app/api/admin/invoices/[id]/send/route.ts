@@ -255,7 +255,7 @@ export async function POST(
 
     // 6. Send email via Resend
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@resend.dev>';
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Pontifex Industries <noreply@pontifexindustries.com>';
 
     let sendResult: { data: any; error: any };
     try {
