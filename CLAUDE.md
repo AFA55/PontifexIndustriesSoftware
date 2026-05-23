@@ -9,6 +9,7 @@ Next.js 15 (App Router) + React 19 + TypeScript + Supabase (PostgreSQL) + Tailwi
 - Apply database migrations via Supabase MCP when ready
 - Run `npm run build` after significant changes to verify no errors
 - Commit work in logical chunks with descriptive messages
+- **💰 BUDGET (May 2026): ~$15 Vercel build credit left. Each push to `main` = ~$1–2 build. BATCH commits and push only ONCE per session/batch — never per-feature or docs-only. Commits are free; pushes cost money. Confirm before pushing unless told "push it." See `DEPLOYMENT_COST.md`.**
 - Push to feature branch when commits are ready
 - When starting a new session, read CLAUDE_HANDOFF.md first to resume context
 - At the END of every session, update CLAUDE_HANDOFF.md with what was done and what's next

@@ -1,5 +1,13 @@
 # Deployment Cost Discipline
 
+> ## 🚨 LIVE BUDGET (May 2026): ~$15 of build credit remaining
+> **Every `git push origin main` triggers ONE billed production build (~$1–2).** With ~$15 left, that's only ~7–10 pushes before we're out. **Therefore:**
+> - **BATCH commits, push rarely.** Commit each feature locally as it's finished (commits are free), but **push to `main` only when a meaningful batch is ready** — ideally once per work session, not once per feature.
+> - **Never push docs-only or trivial one-line changes on their own.** Fold them into the next feature batch.
+> - **Confirm with the user before pushing** unless they've said "push it." A push spends real money now.
+> - Only `main` builds (branch builds are disabled via `ignoreCommand`) — that protection stays.
+> - If a build fails, fix locally and re-verify with `npm run build` BEFORE pushing again — a failed push still burns a build.
+
 **Why this doc exists:** we got hit with a ~$487 Vercel invoice on a $20/month plan. **86% of it was build time** — not runtime, not bandwidth, not function invocations. Every reckless `git push` to a branch with auto-deploy enabled costs real money.
 
 This doc captures the actual cost drivers, what we changed, and the rules we follow now. Read it before changing any deployment behavior.

@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('operator_time_off')
-      .select('id, operator_id, date, type, notes, status, approved_by, created_at')
+      .select('id, operator_id, date, end_date, type, notes, status, approved_by, created_at')
       .order('date', { ascending: true });
 
     query = query.eq('tenant_id', tenantId)
@@ -34,9 +34,16 @@ export async function GET(request: NextRequest) {
       .or('status.eq.approved,status.is.null');
 
     if (date) {
-      query = query.eq('date', date);
+      // Match rows whose span [date, end_date] covers the queried day.
+      // Single-day rows have end_date NULL, so cover them with an OR on date.
+      query = query
+        .lte('date', date)
+        .or(`end_date.gte.${date},end_date.is.null`);
     } else if (startDate && endDate) {
-      query = query.gte('date', startDate).lte('date', endDate);
+      // Overlap test: row.date <= range.end AND coalesce(end_date,date) >= range.start
+      query = query
+        .lte('date', endDate)
+        .or(`end_date.gte.${startDate},and(end_date.is.null,date.gte.${startDate})`);
     } else {
       return NextResponse.json({ error: 'Must provide date or startDate+endDate' }, { status: 400 });
     }
