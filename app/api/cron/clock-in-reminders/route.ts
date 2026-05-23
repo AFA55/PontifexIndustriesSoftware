@@ -1,0 +1,168 @@
+export const dynamic = 'force-dynamic';
+
+/**
+ * GET /api/cron/clock-in-reminders
+ *
+ * Runs every 5 minutes via Vercel Cron. Reminds operators to clock in around
+ * their scheduled start time.
+ *
+ *   - "Pre" reminder fires ~5 min BEFORE their earliest scheduled job arrival
+ *   - "Post" reminder fires ~5 min AFTER, only if they still haven't clocked in
+ *
+ * "Start time" = the earliest arrival_time among the operator's jobs scheduled
+ * for today (their schedule-board start time). Computed in each tenant's
+ * timezone. Each reminder fires at most once per operator per day (reminder_log
+ * dedup). Respects per-user notification_preferences.
+ *
+ * Authorization: Bearer ${CRON_SECRET}  (fail-closed if env var unset)
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { sendReminderOnce } from '@/lib/send-reminder';
+
+const ACTIVE_STATUSES = ['scheduled', 'assigned', 'dispatched', 'in_route', 'in_progress', 'on_site'];
+
+function todayInTz(tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+}
+function nowMinutesInTz(tz: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const h = Number(parts.find((p) => p.type === 'hour')?.value || '0');
+  const m = Number(parts.find((p) => p.type === 'minute')?.value || '0');
+  return (h % 24) * 60 + m;
+}
+function parseHHMM(t: string | null): number | null {
+  if (!t) return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t).trim());
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+export async function GET(request: NextRequest) {
+  // Auth — fail closed
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'Not configured' }, { status: 503 });
+  }
+  const authHeader = request.headers.get('authorization') || '';
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let remindersSent = 0;
+  const errors: string[] = [];
+
+  try {
+    const { data: tenants } = await supabaseAdmin.from('tenants').select('id, timezone');
+    if (!tenants) return NextResponse.json({ success: true, remindersSent: 0 });
+
+    for (const tenant of tenants as { id: string; timezone: string | null }[]) {
+      const tz = tenant.timezone || 'America/New_York';
+      const today = todayInTz(tz);
+      const nowMin = nowMinutesInTz(tz);
+
+      // 1. Jobs scheduled for the operator today (direct assignment)
+      const { data: jobs } = await supabaseAdmin
+        .from('job_orders')
+        .select('id, assigned_to, helper_assigned_to, arrival_time, scheduled_date, status')
+        .eq('tenant_id', tenant.id)
+        .eq('scheduled_date', today)
+        .in('status', ACTIVE_STATUSES)
+        .not('arrival_time', 'is', null);
+
+      // 2. Per-day assignment overrides for today
+      const { data: dailyAssignments } = await supabaseAdmin
+        .from('job_daily_assignments')
+        .select('operator_id, helper_id, job_order_id, job_orders(arrival_time)')
+        .eq('assignment_date', today);
+
+      // Build operator -> earliest start (minutes)
+      const earliestStart = new Map<string, number>();
+      const consider = (opId: string | null | undefined, arrival: string | null) => {
+        if (!opId) return;
+        const mins = parseHHMM(arrival);
+        if (mins == null) return;
+        const cur = earliestStart.get(opId);
+        if (cur == null || mins < cur) earliestStart.set(opId, mins);
+      };
+
+      for (const j of (jobs || []) as Array<{ assigned_to: string | null; helper_assigned_to: string | null; arrival_time: string | null }>) {
+        consider(j.assigned_to, j.arrival_time);
+        consider(j.helper_assigned_to, j.arrival_time);
+      }
+      for (const a of (dailyAssignments || []) as Array<{ operator_id: string | null; helper_id: string | null; job_orders: { arrival_time: string | null } | { arrival_time: string | null }[] | null }>) {
+        const jo = Array.isArray(a.job_orders) ? a.job_orders[0] : a.job_orders;
+        const arrival = jo?.arrival_time ?? null;
+        consider(a.operator_id, arrival);
+        consider(a.helper_id, arrival);
+      }
+
+      if (earliestStart.size === 0) continue;
+
+      // Determine who is in a reminder window
+      const candidates: { opId: string; phase: 'pre' | 'post'; startMin: number }[] = [];
+      for (const [opId, startMin] of earliestStart) {
+        // pre: 5 min before (window [start-7, start-2])
+        if (nowMin >= startMin - 7 && nowMin <= startMin - 2) candidates.push({ opId, phase: 'pre', startMin });
+        // post: 5 min after (window [start+3, start+8])
+        else if (nowMin >= startMin + 3 && nowMin <= startMin + 8) candidates.push({ opId, phase: 'post', startMin });
+      }
+      if (candidates.length === 0) continue;
+
+      const opIds = candidates.map((c) => c.opId);
+
+      // Who already clocked in today?
+      const { data: timecards } = await supabaseAdmin
+        .from('timecards')
+        .select('user_id, clock_in_time')
+        .eq('date', today)
+        .in('user_id', opIds);
+      const clockedIn = new Set(
+        (timecards || []).filter((t: { clock_in_time: string | null }) => !!t.clock_in_time).map((t: { user_id: string }) => t.user_id)
+      );
+
+      // Phone numbers for SMS fallback
+      const { data: profiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id, phone, phone_number')
+        .in('id', opIds);
+      const phoneMap = new Map<string, string | null>(
+        (profiles || []).map((p: { id: string; phone: string | null; phone_number: string | null }) => [p.id, p.phone || p.phone_number || null])
+      );
+
+      for (const c of candidates) {
+        if (clockedIn.has(c.opId)) continue; // already clocked in — no reminder needed
+
+        const startH = Math.floor(c.startMin / 60);
+        const startM = c.startMin % 60;
+        const startLabel = `${((startH % 12) || 12)}:${String(startM).padStart(2, '0')} ${startH >= 12 ? 'PM' : 'AM'}`;
+
+        const title = c.phase === 'pre' ? 'Clock in soon' : 'Time to clock in';
+        const message = c.phase === 'pre'
+          ? `Your shift starts at ${startLabel}. Don't forget to clock in.`
+          : `You're scheduled to have started at ${startLabel}. Please clock in now.`;
+
+        const res = await sendReminderOnce(`clock_in_${c.phase}:${today}`, {
+          userId: c.opId,
+          tenantId: tenant.id,
+          category: 'clock_in_reminder',
+          inAppType: 'reminder',
+          title,
+          message,
+          actionUrl: '/dashboard/timecard',
+          smsPhone: phoneMap.get(c.opId) ?? null,
+        });
+        if (res) remindersSent++;
+      }
+    }
+
+    return NextResponse.json({ success: true, remindersSent });
+  } catch (error) {
+    console.error('[clock-in-reminders] error:', error);
+    errors.push(String(error));
+    return NextResponse.json({ success: false, remindersSent, errors }, { status: 500 });
+  }
+}

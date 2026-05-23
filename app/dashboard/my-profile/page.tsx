@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ChevronLeft, User, Phone, Calendar, Shield, Save,
-  Loader2, CheckCircle, Camera, Upload
+  Loader2, CheckCircle, Camera, Upload, Bell, ChevronRight
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -348,6 +348,23 @@ export default function MyProfilePage() {
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                 />
               </div>
+            </div>
+
+            {/* Settings links */}
+            <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden shadow-sm">
+              <Link
+                href="/dashboard/settings/notifications"
+                className="flex items-center gap-3 px-6 py-4 min-h-[44px] hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors"
+              >
+                <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-4.5 h-4.5 text-purple-600 dark:text-purple-300" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Notification Settings</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Choose how you get push, SMS, and email alerts</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+              </Link>
             </div>
 
             {/* Save Button */}
