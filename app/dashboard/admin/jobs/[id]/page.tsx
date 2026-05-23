@@ -49,6 +49,10 @@ const JobScopePanel = dynamicImport(() => import('@/components/JobScopePanel'), 
   ssr: false,
   loading: () => <div className="h-64 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />,
 });
+const OfficeDocumentsPanel = dynamicImport(() => import('@/components/admin/OfficeDocumentsPanel'), {
+  ssr: false,
+  loading: () => <div className="h-48 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />,
+});
 const JobProgressChart = dynamicImport(() => import('@/components/JobProgressChart'), {
   ssr: false,
   loading: () => <div className="h-64 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />,
@@ -1693,6 +1697,11 @@ export default function AdminJobDetailPage({
 
             {/* ── Live Status Panel (rendered via shared renderer) ── */}
             {renderLiveStatusPanel()}
+
+            {/* ── Office Documents (management-only; component self-guards) ── */}
+            {['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(userRole) && (
+              <OfficeDocumentsPanel jobId={jobId} userRole={userRole} />
+            )}
 
             {/* ── Pending Completion Approval ── */}
             {isPendingCompletion && (

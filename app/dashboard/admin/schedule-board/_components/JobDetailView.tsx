@@ -14,12 +14,16 @@ import type { JobCardData } from './JobCard';
 import { getDisplayName } from '@/lib/equipment-map';
 
 const WorkHistoryTimeline = lazy(() => import('./WorkHistoryTimeline'));
+const OfficeDocumentsPanel = lazy(() => import('@/components/admin/OfficeDocumentsPanel'));
+
+const OFFICE_DOC_ROLES = new Set(['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman']);
 
 interface JobDetailViewProps {
   job: JobCardData;
   operatorName?: string | null;
   helperName?: string | null;
   rowIndex: number | null;
+  userRole?: string;
   onClose: () => void;
   onEdit: () => void;
   onRemove?: () => void;
@@ -179,7 +183,7 @@ function StatusTimeline({ data }: { data: FullJobData }) {
   );
 }
 
-export default function JobDetailView({ job, operatorName, helperName, rowIndex, onClose, onEdit, onRemove }: JobDetailViewProps) {
+export default function JobDetailView({ job, operatorName, helperName, rowIndex, userRole, onClose, onEdit, onRemove }: JobDetailViewProps) {
   const [fullData, setFullData] = useState<FullJobData | null>(null);
   const [loading, setLoading] = useState(true);
   const [printingPdf, setPrintingPdf] = useState(false);
@@ -874,6 +878,13 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       )}
                     </>
                   </SectionCard>
+
+                  {/* ---- Office Documents (management-only) ---- */}
+                  {userRole && OFFICE_DOC_ROLES.has(userRole) && (
+                    <Suspense fallback={<div className="h-40 rounded-2xl bg-slate-100 animate-pulse" />}>
+                      <OfficeDocumentsPanel jobId={job.id} userRole={userRole} />
+                    </Suspense>
+                  )}
 
                   {/* ---- Equipment ---- */}
                   <SectionCard

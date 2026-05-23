@@ -2541,6 +2541,7 @@ export default function ScheduleBoardPage() {
           operatorName={jobDetailTarget.operatorName}
           helperName={jobDetailTarget.helperName}
           rowIndex={jobDetailTarget.rowIndex}
+          userRole={userRole}
           onClose={() => setJobDetailTarget(null)}
           onEdit={() => {
             const target = jobDetailTarget;
