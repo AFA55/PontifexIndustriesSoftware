@@ -1,37 +1,39 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 21, 2026 (Session 2) | **Branch:** `main` | **Last commit:** `61377823` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅
+**Date:** May 22, 2026 | **Branch:** `main` | **Last commit:** `a5b74819` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅ (0 TS errors)
 
-> **Status as of May 21, 2026 (Session 2).** Major parallel dev sprint: 7 features shipped, 2 pending migrations applied, iOS splash fixed, Ruflo v3.7 multi-agent orchestration installed + memory seeded. Platform is now in strong shape for App Store submission and ongoing feature work.
+> **Status as of May 22, 2026.** Session focused on env-var setup, Vercel cost reduction, and hardening. 4 commits shipped: 12 new loading.tsx files, SMS signature delivery, SMS tenant-awareness, production URL fallbacks. Platform fully functional pending RESEND_API_KEY env var addition + redeploy.
 
 ---
 
 ## 🎯 NEXT SESSION — pick up from here
 
-### 🚨 MUST DO BEFORE LAUNCH (blockers)
-1. **CRON_SECRET env var** — ⚠️ STILL NEEDED — add to Vercel dashboard → Settings → Environment Variables. Without it, auto-clock-out and invoice reminder crons are fail-closed. Value: any strong random string.
-2. ~~**Pending migrations**~~ ✅ DONE — `utility_waiver_fields` + `operator_badges` applied May 21
-3. ~~**SMS silent failure warning**~~ ✅ DONE — amber banner on billing + schedule-board pages when Twilio not configured
-4. **End-to-end workflow test** — code audit shows all 6 pipeline steps clean (May 21). Still worth a live browser test before customer demo.
+### 🚨 ENV VARS — user action required (do these before redeploy)
+1. ~~**CRON_SECRET env var**~~ ✅ DONE — added to Vercel May 22. Auto-clockout + invoice reminders will fire.
+2. **RESEND_API_KEY** — add to Vercel dashboard → Settings → Env Vars. Key name: `RESEND_API_KEY`. Get value from resend.com/api-keys → "Pontifex Industries" key → `...` → Copy. Without this, all transactional email (invoices, signatures, notifications) is silently dropped.
+3. **NEXT_PUBLIC_APP_URL** = `https://www.pontifexindustries.com` — add to Vercel (Production + Preview + Development scopes). Used in email links, SMS links, signature URLs.
+4. **NEXT_PUBLIC_SITE_URL** = `https://www.pontifexindustries.com` — add to Vercel. Used in service-completion-agreement email dispatch.
+5. **After adding all 3 above**: Vercel dashboard → project → Deployments → latest → `...` → **Redeploy**
+
+### 🚨 MUST DO BEFORE LAUNCH
+6. **End-to-end workflow test** — code audit shows all 6 pipeline steps clean. Still worth a live browser test: schedule → dispatch → in-route → work-performed → day-complete → invoice.
 
 ### 📱 iOS / Android App (App Store prep)
-5. ~~**Splash screen**~~ ✅ DONE — Bridge logo on `#1e1b4b`, opaque, 2732×2732px (May 21)
-6. **CFBundleDisplayName** — confirm `ios/App/App/Info.plist` has `CFBundleDisplayName = "Pontifex Industries"` (not just "App")
-7. **Apple Developer Program** — enroll at https://developer.apple.com/programs/ ($99/yr). Required for TestFlight + App Store. Current builds only run on simulator.
-8. **App Store metadata** — description, screenshots (6.7" iPhone required), age rating (4+), export compliance. See `APP_CHANGES.md` Phase 3–5 checklist.
-9. ~~**Privacy Policy page**~~ ✅ DONE — `/privacy-policy` redirects to `/privacy` (May 21). `/terms-of-service` → `/terms` also added.
+7. ~~**Splash screen**~~ ✅ DONE — Bridge logo on `#1e1b4b`, opaque (May 21)
+8. ~~**CFBundleDisplayName**~~ ✅ CONFIRMED — `Info.plist` already has `"Pontifex Industries"`
+9. **Apple Developer Program** — enroll at https://developer.apple.com/programs/ ($99/yr). Required for TestFlight + App Store. Current builds only run on simulator.
+10. **App Store metadata** — description, screenshots (6.7" iPhone required), age rating (4+), export compliance. See `APP_CHANGES.md` Phase 3–5 checklist.
+11. ~~**Privacy Policy page**~~ ✅ DONE — `/privacy-policy` → `/privacy`, `/terms-of-service` → `/terms` (May 21)
 
 ### 🏗️ Feature backlog (remaining planned work)
-10. ~~**C(iii) Fleet maintenance history**~~ ✅ DONE (May 17)
-11. ~~**C(iv) Maintenance Request wizard**~~ ✅ DONE (May 17)
-12. ~~**C(v) Visit-wizard hook**~~ ✅ DONE (May 17)
-13. ~~**C(iii) maintenance→vehicle tie-in**~~ ✅ DONE (May 21) — PATCH auto-creates `vehicle_service_records` on completion
-14. ~~**Patriot branding**~~ ✅ DONE (May 21) — `tenants.primary_color = #dc2626`, BrandingProvider confirmed wired
-15. ~~**Loading states audit**~~ ✅ DONE (May 21) — animate-pulse skeletons on 5 admin pages, light+dark mode
-16. **Mobile responsive audit** — still needed: maintenance wizard, maintenance inbox, inventory new-item modal, duplicate job modal
-17. ~~**Billing RLS hardening**~~ ✅ DONE (May 21) — `/api/admin/billing` with `supabaseAdmin` + explicit `tenant_id` filter
-18. ~~**Invoice send route**~~ ✅ DONE (May 21) — hardened: missing RESEND key, SDK error shape, status update failure
-19. ~~**Voice note 404 re-sign**~~ ✅ DONE (May 21) — `VoiceNotePlayer` auto-refreshes expired signed URL on error
-20. **Ruflo daemon** — run `npx ruflo@latest daemon start` once to activate 12 background workers (audit, optimize, testgaps)
+12. ~~**C(iii/iv/v)**~~ ✅ DONE — Fleet maintenance, maintenance wizard, visit-wizard hook (May 17–21)
+13. ~~**Loading states audit**~~ ✅ DONE — all 90+ pages now have loading.tsx (12 added May 22: equipment, fleet, maintenance, site-visits, inventory-control, maintenance/new)
+14. ~~**Mobile responsive audit**~~ ✅ DONE — maintenance wizard, inbox, inventory modal, active-jobs modal all fixed (May 21)
+15. ~~**SMS signature delivery**~~ ✅ DONE (May 22) — `lib/sms.ts` has `sendSMSAny()` (Telnyx→Twilio) + `sendSignatureRequestSMS()`. Admin signature request route sends SMS when phone provided. Completion SMS is tenant-aware (no more hardcoded "Patriot").
+16. ~~**URL fallbacks**~~ ✅ DONE (May 22) — dispatch/route.ts (empty string → prod URL) + send-schedule/route.ts (no fallback → prod URL)
+17. ~~**Billing RLS hardening**~~ ✅ DONE (May 21)
+18. ~~**Invoice send route hardening**~~ ✅ DONE (May 21)
+19. **Schedule board performance optimization** — page.tsx is 2,850 lines / 137KB. Extract `OperatorRow`, `JobCard`, `EditModal`, `DispatchModal` to _components/. This is a refactor-only change (no logic change needed).
+20. **Ruflo daemon** — run `npx ruflo@latest daemon start` once to activate 12 background workers
 21. **Ruflo memory — seed CLAUDE_SESSION_CONTEXT.md** — deeper schema/pattern caching for future sessions
 
 ### Tester credentials
