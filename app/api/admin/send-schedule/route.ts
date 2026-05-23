@@ -230,7 +230,7 @@ async function sendScheduleEmail(schedule: OperatorSchedule, scheduled_date: str
 
           <!-- Preview Button -->
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/job-schedule"
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://www.pontifexindustries.com'}/dashboard/job-schedule"
                style="display: inline-block; background: #3b82f6; color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 16px;">
               📱 View Full Schedule in App
             </a>
@@ -282,7 +282,7 @@ ${schedule.jobs.map((job, index) => `
   ${job.description ? `Description: ${job.description}` : ''}
 `).join('\n')}
 
-View your full schedule: ${process.env.NEXT_PUBLIC_APP_URL}/dashboard/job-schedule
+View your full schedule: ${process.env.NEXT_PUBLIC_APP_URL || 'https://www.pontifexindustries.com'}/dashboard/job-schedule
 
 Important Reminders:
 - Review your equipment checklist before leaving the shop

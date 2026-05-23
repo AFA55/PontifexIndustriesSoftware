@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Fire-and-forget SMS to operators/helpers who have a phone number
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pontifexindustries.com';
     const smsPromises: Promise<any>[] = [];
 
     for (const job of jobsToDispatch) {
