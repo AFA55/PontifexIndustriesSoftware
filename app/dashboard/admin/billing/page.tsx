@@ -189,6 +189,10 @@ export default function BillingPage() {
   const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
   const [smsWarningDismissed, setSmsWarningDismissed] = useState(false);
 
+  // Email configuration state (for Send Invoice button hint)
+  const [emailConfigured, setEmailConfigured] = useState<boolean | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+
   // Cache: created_by uuid -> full_name (for "Submitted by" chips)
   const [profilesById, setProfilesById] = useState<Record<string, string>>({});
 
@@ -323,6 +327,7 @@ export default function BillingPage() {
       .then(json => {
         if (json?.data != null) {
           setSmsConfigured(json.data.sms_configured === true);
+          setEmailConfigured(json.data.email_configured === true);
         }
       })
       .catch(() => {
@@ -569,6 +574,35 @@ export default function BillingPage() {
     } finally {
       setUpdatingStatus(null);
       setConfirmVoid(null);
+    }
+  };
+
+  const handleSendEmail = async (invoiceId: string) => {
+    setSendingEmail(invoiceId);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/admin/invoices/${invoiceId}/send`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setSuccessMsg(data.message || 'Invoice emailed successfully.');
+        if (data.warning) setError(data.warning);
+        fetchData();
+        if (selectedInvoice?.id === invoiceId) {
+          // Refresh selected invoice detail
+          const refreshRes = await apiFetch(`/api/admin/invoices/${invoiceId}`);
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            if (refreshData.data) setSelectedInvoice(refreshData.data);
+          }
+        }
+      } else {
+        setError(data.error || 'Failed to send invoice email.');
+      }
+    } catch (err) {
+      console.error('Error sending invoice email:', err);
+      setError('Failed to send invoice email. Please try again.');
+    } finally {
+      setSendingEmail(null);
     }
   };
 
@@ -1272,6 +1306,27 @@ export default function BillingPage() {
                   <p className="text-sm text-slate-500 dark:text-white/60">{selectedInvoice.customer_name}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Send Invoice Email — only show when email is configured and invoice has a customer email */}
+                  {emailConfigured && selectedInvoice.customer_email && selectedInvoice.status !== 'void' && (
+                    <button
+                      onClick={() => handleSendEmail(selectedInvoice.id)}
+                      disabled={sendingEmail === selectedInvoice.id}
+                      className="
+                        flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border
+                        bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100
+                        dark:bg-violet-500/15 dark:border-violet-400/30 dark:text-violet-300 dark:hover:bg-violet-500/25
+                        disabled:opacity-60 disabled:cursor-not-allowed
+                      "
+                      title={`Email invoice to ${selectedInvoice.customer_email}`}
+                    >
+                      {sendingEmail === selectedInvoice.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      Send Email
+                    </button>
+                  )}
                   <button
                     onClick={() => downloadPdf(selectedInvoice.id, selectedInvoice.invoice_number)}
                     disabled={downloadingPdf === selectedInvoice.id}
@@ -1399,6 +1454,21 @@ export default function BillingPage() {
                     </>
                   )}
                 </div>
+
+                {/* Email send hint / warning */}
+                {emailConfigured === true && selectedInvoice.customer_email && selectedInvoice.status !== 'void' && (
+                  <p className="text-xs text-slate-400 dark:text-white/40 -mt-2">
+                    Will send from: <span className="font-mono">noreply@pontifexindustries.com</span>
+                  </p>
+                )}
+                {emailConfigured === false && selectedInvoice.status !== 'void' && (
+                  <div className="flex items-start gap-2 p-3 rounded-xl ring-1 bg-amber-50 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/30 -mt-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      Email not configured. Set <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">RESEND_API_KEY</code> in Vercel environment variables to enable invoice email delivery.
+                    </p>
+                  </div>
+                )}
 
                 {/* View Signed Document */}
                 {selectedInvoice.completion_pdf_url && (
