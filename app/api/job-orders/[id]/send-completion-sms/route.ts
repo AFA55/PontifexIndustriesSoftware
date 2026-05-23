@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { formatPhoneNumber } from '@/lib/sms';
 
 export async function POST(
@@ -38,7 +39,26 @@ export async function POST(
     }
 
     const jobLabel = jobNumber || 'your job';
-    const message = `Patriot Concrete Cutting has completed work on your project (${jobLabel}). Please review the work performed and sign here: ${signUrl}`;
+
+    // Resolve tenant company name (fire-and-forget — default to generic if it fails)
+    let companyName = 'Your contractor';
+    try {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', auth.userId)
+        .single();
+      if (profile?.tenant_id) {
+        const { data: branding } = await supabaseAdmin
+          .from('tenant_branding')
+          .select('company_name')
+          .eq('tenant_id', profile.tenant_id)
+          .single();
+        if (branding?.company_name) companyName = branding.company_name;
+      }
+    } catch (_) { /* use default */ }
+
+    const message = `${companyName} has completed work on ${jobLabel}. Please review and sign here: ${signUrl}`;
 
     // ── Try Telnyx ──────────────────────────────────────────────────────────
     const telnyxApiKey = process.env.TELNYX_API_KEY;

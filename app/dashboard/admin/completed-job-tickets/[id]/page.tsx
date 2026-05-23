@@ -254,7 +254,9 @@ export default function CompletedJobSummaryPage() {
         body: JSON.stringify({ customer_email: sigEmail.trim(), customer_name: sigName.trim() || summary?.customer_name, customer_phone: sigPhone.trim() || undefined }),
       });
       if (res.ok) {
-        setActionMsg({ type: 'success', text: `Signature request sent to ${sigEmail.trim()}` });
+        const data = await res.json();
+        const smsPart = data?.data?.sms_sent ? ` · SMS sent to ${sigPhone.trim()}` : '';
+        setActionMsg({ type: 'success', text: `Signature request sent to ${sigEmail.trim()}${smsPart}` });
         setShowSigModal(false); setSigEmail(''); setSigName(''); setSigPhone('');
         loadSigRequests();
       } else {
@@ -1077,8 +1079,8 @@ export default function CompletedJobSummaryPage() {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-slate-500 dark:text-white/60">
-                The customer receives an email with a secure link to sign from any phone or
-                device. Link expires in 7 days.
+                The customer receives an email (and SMS if phone is provided) with a secure
+                link to sign from any device. Link expires in 7 days.
               </p>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-white/80 mb-1">
