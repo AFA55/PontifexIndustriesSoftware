@@ -160,16 +160,12 @@ function LoginPageInner() {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="flex flex-col items-center"
           >
-            {/* Prefer square icon for login header; fall back to full logo; then SVG placeholder */}
-            {(branding.logo_icon_url || branding.logo_url) ? (
-              <img
-                src={branding.logo_icon_url || branding.logo_url!}
-                alt={branding.company_name}
-                className="h-20 w-20 object-contain rounded-2xl"
-              />
-            ) : (
-              <Logo />
-            )}
+            {/* Tenant logo (loaded after company code entered) → else Pontifex platform logo */}
+            <img
+              src={branding.logo_icon_url || branding.logo_url || '/logo.svg'}
+              alt={branding.company_name || 'Pontifex Industries'}
+              className="h-20 w-20 object-contain rounded-2xl"
+            />
           </motion.div>
           <motion.h1
             initial={{ opacity: 0 }}

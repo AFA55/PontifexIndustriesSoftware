@@ -43,13 +43,13 @@ export interface TenantBranding {
 
 const DEFAULT_BRANDING: TenantBranding = {
   id: '',
-  company_name: 'Patriot Concrete Cutting',
-  company_short_name: 'Patriot',
+  company_name: 'Pontifex Industries',
+  company_short_name: 'Pontifex',
   tagline: 'Concrete Cutting Management Software',
-  logo_url: null,
-  logo_dark_url: null,
-  favicon_url: null,
-  logo_icon_url: null,
+  logo_url: '/logo.svg',         // Pontifex bridge logo — shown before tenant loads
+  logo_dark_url: '/logo.svg',
+  favicon_url: '/favicon.svg',
+  logo_icon_url: '/logo.svg',
   primary_color: '#DC2626',
   primary_color_dark: '#B91C1C',
   secondary_color: '#1E3A5F',
