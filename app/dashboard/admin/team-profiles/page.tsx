@@ -12,6 +12,7 @@ import {
   Loader2, ChevronRight, Activity, Clock, UserCheck, Pencil,
   Wrench, Save, CheckCircle, Award, Truck,
   Plus, Trash2, IdCard, ShieldCheck, Percent,
+  MessageSquare, BarChart3, XCircle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
@@ -1670,12 +1671,13 @@ function BadgesTab({
 
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 
-type DetailTab = 'info' | 'skills' | 'credentials' | 'badges' | 'permissions';
+type DetailTab = 'info' | 'skills' | 'credentials' | 'badges' | 'permissions' | 'peer_ratings';
 
 function MemberDetailPanel({
   member,
   isSuperAdmin,
   currentUserId,
+  currentUserRole,
   onClose,
   onGrantSuperAdmin,
   onToggleActive,
@@ -1685,6 +1687,7 @@ function MemberDetailPanel({
   member: TeamMember;
   isSuperAdmin: boolean;
   currentUserId: string;
+  currentUserRole?: string;
   onClose: () => void;
   onGrantSuperAdmin: (member: TeamMember) => void;
   onToggleActive: (member: TeamMember) => void;
@@ -1732,7 +1735,11 @@ function MemberDetailPanel({
   const showPermissionsTab = member.role !== 'super_admin';
   const showSkillsTab = member.role === 'operator' || member.role === 'apprentice';
   const showCredentialsTab = member.role === 'operator' || member.role === 'apprentice';
-  const showTabBar = showPermissionsTab || showSkillsTab || showCredentialsTab || showBadgesTab;
+  // Peer ratings tab: visible to admin/ops/super when viewing operator or apprentice
+  const showPeerRatingsTab = isSuperAdmin ||
+    ['admin', 'operations_manager'].includes(currentUserRole ?? '') ||
+    isOwnProfile;
+  const showTabBar = showPermissionsTab || showSkillsTab || showCredentialsTab || showBadgesTab || showPeerRatingsTab;
   const showSalesSettings = ['salesman', 'admin', 'operations_manager', 'super_admin'].includes(member.role);
 
   const visibleTabs: DetailTab[] = [
@@ -1740,6 +1747,7 @@ function MemberDetailPanel({
     ...(showSkillsTab ? (['skills'] as DetailTab[]) : []),
     ...(showCredentialsTab ? (['credentials'] as DetailTab[]) : []),
     ...(showBadgesTab ? (['badges'] as DetailTab[]) : []),
+    ...(showPeerRatingsTab ? (['peer_ratings'] as DetailTab[]) : []),
     ...(showPermissionsTab ? (['permissions'] as DetailTab[]) : []),
   ];
 
@@ -1748,6 +1756,7 @@ function MemberDetailPanel({
     skills: 'Skills',
     credentials: 'Credentials',
     badges: 'Badges',
+    peer_ratings: 'Peer Ratings',
     permissions: 'Feature Permissions',
   };
 
@@ -1866,6 +1875,10 @@ function MemberDetailPanel({
           <BadgesTab memberId={member.id} getAuthHeaders={getAuthHeaders} />
         )}
 
+        {tab === 'peer_ratings' && showPeerRatingsTab && (
+          <PeerRatingsTab memberId={member.id} memberName={member.full_name} getAuthHeaders={getAuthHeaders} />
+        )}
+
         {tab === 'permissions' && showPermissionsTab && (
           <div>
             {loadingFlags ? (
@@ -1882,6 +1895,176 @@ function MemberDetailPanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Peer Ratings Tab ─────────────────────────────────────────────────────────
+
+interface ReceivedRating {
+  id: string;
+  form_title: string;
+  overall_score: number | null;
+  submitted_at: string;
+  rater_display_name: string;
+  responses: Record<string, any>;
+  questions: Array<{ id: string; text: string; type: string; required: boolean }>;
+  job: { id: string; job_number: string; customer_name: string } | null;
+}
+
+function PeerRatingResponseDisplay({ question, value }: { question: any; value: any }) {
+  if (question.type === 'rating_5') {
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <div key={n} className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold border ${n <= (value || 0) ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-300'}`}>{n}</div>
+        ))}
+      </div>
+    );
+  }
+  if (question.type === 'rating_10') {
+    const pct = Math.min(((Number(value) || 0) / 10) * 100, 100);
+    const barColor = pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500';
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+        </div>
+        <span className="text-xs font-bold text-gray-700">{value || 0}/10</span>
+      </div>
+    );
+  }
+  if (question.type === 'yes_no') {
+    const isYes = value === true || value === 'true' || value === 'yes';
+    return (
+      <div className="flex items-center gap-1.5">
+        {isYes ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-red-500" />}
+        <span className={`text-xs font-semibold ${isYes ? 'text-emerald-600' : 'text-red-600'}`}>{isYes ? 'Yes' : 'No'}</span>
+      </div>
+    );
+  }
+  return <p className="text-xs text-gray-700 italic">{value ? String(value) : <span className="text-gray-400">No response</span>}</p>;
+}
+
+function PeerRatingsTab({
+  memberId,
+  memberName,
+  getAuthHeaders,
+}: {
+  memberId: string;
+  memberName: string;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+}) {
+  const [ratings, setRatings] = useState<ReceivedRating[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/ratings/received?user_id=${memberId}`, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          setRatings(json.data ?? []);
+        }
+      } catch {
+        // silent
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [memberId, getAuthHeaders]);
+
+  const scores = ratings.filter((r) => r.overall_score !== null).map((r) => r.overall_score as number);
+  const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+
+  return (
+    <div className="space-y-4">
+      {/* Summary header */}
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Star className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Peer Ratings</p>
+            <p className="text-sm text-gray-700 dark:text-slate-300">Anonymized reviews from coworkers</p>
+          </div>
+          <div className="ml-auto text-right">
+            {avgScore !== null ? (
+              <div className="flex items-center gap-1 justify-end">
+                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                <span className="text-lg font-bold text-gray-900 dark:text-white">{avgScore.toFixed(1)}</span>
+                <span className="text-xs text-gray-400">/10</span>
+              </div>
+            ) : (
+              <span className="text-xs text-gray-400">No score yet</span>
+            )}
+            <p className="text-xs text-gray-500">{ratings.length} review{ratings.length !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Ratings list */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+        </div>
+      ) : ratings.length === 0 ? (
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-8 text-center">
+          <BarChart3 className="w-10 h-10 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-gray-600 dark:text-slate-400 mb-1">No ratings yet</p>
+          <p className="text-xs text-gray-400 dark:text-slate-500">Ratings will appear here after coworkers submit reviews after jobs</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {ratings.map((rating) => (
+            <div key={rating.id} className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setExpandedId(expandedId === rating.id ? null : rating.id)}
+                className="w-full flex items-start gap-3 p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors text-left"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">{rating.form_title}</p>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(rating.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3" />
+                      {rating.rater_display_name}
+                    </span>
+                    {rating.job && (
+                      <span className="text-xs text-blue-600 dark:text-blue-400">{rating.job.job_number}</span>
+                    )}
+                  </div>
+                </div>
+                {rating.overall_score !== null && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    <span className="text-sm font-bold text-gray-800 dark:text-white">{rating.overall_score.toFixed(1)}</span>
+                    <span className="text-xs text-gray-400">/10</span>
+                  </div>
+                )}
+              </button>
+
+              {expandedId === rating.id && (
+                <div className="border-t border-gray-100 dark:border-slate-700 px-4 py-3 space-y-3 bg-gray-50 dark:bg-slate-900/50">
+                  {rating.questions.map((q) => (
+                    <div key={q.id}>
+                      <p className="text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5">{q.text}</p>
+                      <PeerRatingResponseDisplay question={q} value={rating.responses[q.id]} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2255,6 +2438,7 @@ export default function TeamProfilesPage() {
                 member={selectedMember}
                 isSuperAdmin={isSuperAdmin}
                 currentUserId={userId || ''}
+                currentUserRole={userRole}
                 onClose={() => setSelectedMember(null)}
                 onGrantSuperAdmin={setGrantTarget}
                 onToggleActive={handleToggleActive}

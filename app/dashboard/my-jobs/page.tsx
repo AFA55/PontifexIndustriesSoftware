@@ -5,12 +5,25 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle, PauseCircle, PlayCircle, RefreshCw, ChevronDown, ChevronUp, ChevronRight, History } from 'lucide-react';
+import { ArrowLeft, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle, PauseCircle, PlayCircle, RefreshCw, ChevronDown, ChevronUp, ChevronRight, History, Star } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DayNavigator from './_components/DayNavigator';
 import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
 import NotificationBanner from './_components/NotificationBanner';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
+import SubmitRatingModal from './_components/SubmitRatingModal';
+
+interface PendingRating {
+  ratee: { id: string; name: string; role: string };
+  job: { id: string; job_number: string; scheduled_date: string; customer_name: string };
+  form_id: string;
+  form_title: string;
+}
+
+interface RatingForm {
+  id: string;
+  questions: any[];
+}
 
 function toDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -40,6 +53,13 @@ export default function MyJobsPage() {
   const [pastJobsOpen, setPastJobsOpen] = useState(false);
   const [pastJobsLoading, setPastJobsLoading] = useState(false);
   const [doneTodayMap, setDoneTodayMap] = useState<Record<string, boolean>>({});
+
+  // Peer ratings
+  const [pendingRatings, setPendingRatings] = useState<PendingRating[]>([]);
+  const [ratingsOpen, setRatingsOpen] = useState(false);
+  const [ratingForms, setRatingForms] = useState<Record<string, RatingForm>>({});
+  const [ratingModalItem, setRatingModalItem] = useState<PendingRating | null>(null);
+  const [dismissedRatings, setDismissedRatings] = useState<Set<string>>(new Set());
 
   const isHelper = userRole === 'apprentice';
 
@@ -261,6 +281,44 @@ export default function MyJobsPage() {
     }
   }, []);
 
+  // Fetch pending peer ratings
+  const fetchPendingRatings = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch('/api/ratings/pending', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const pending: PendingRating[] = json.data ?? [];
+      setPendingRatings(pending);
+
+      // Pre-fetch form questions for each unique form_id
+      const formIds = [...new Set(pending.map((p) => p.form_id))];
+      const formData: Record<string, RatingForm> = {};
+      await Promise.all(
+        formIds.map(async (fid) => {
+          try {
+            const fRes = await fetch(`/api/admin/rating-forms/${fid}`, {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            if (fRes.ok) {
+              const fJson = await fRes.json();
+              if (fJson.data) formData[fid] = fJson.data;
+            }
+          } catch {
+            // silent — form may not be accessible
+          }
+        })
+      );
+      setRatingForms(formData);
+    } catch {
+      // silent — ratings are optional feature
+    }
+  }, []);
+
   // Fetch active shop ticket for today (helpers only)
   const fetchShopTicket = useCallback(async () => {
     if (!isHelper) return;
@@ -317,7 +375,8 @@ export default function MyJobsPage() {
     checkLongDurationJobs();
     fetchContinuingProjects();
     fetchPastJobs();
-  }, [checkLongDurationJobs, fetchContinuingProjects, fetchPastJobs]);
+    fetchPendingRatings();
+  }, [checkLongDurationJobs, fetchContinuingProjects, fetchPastJobs, fetchPendingRatings]);
 
   useEffect(() => {
     fetchShopTicket();
@@ -665,7 +724,78 @@ export default function MyJobsPage() {
             </div>
           )}
         </div>
+
+        {/* Rate Your Crew — shown when there are pending ratings */}
+        {(() => {
+          const visibleRatings = pendingRatings.filter(
+            (p) => !dismissedRatings.has(`${p.form_id}:${p.ratee.id}:${p.job.id}`)
+          );
+          if (visibleRatings.length === 0) return null;
+          return (
+            <div className="mt-4 mb-2">
+              <button
+                onClick={() => setRatingsOpen((o) => !o)}
+                className="w-full flex items-center gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-2xl px-4 py-3 shadow-sm hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all"
+                aria-expanded={ratingsOpen}
+              >
+                <div className="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Star className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 text-left">
+                  <span className="text-sm font-bold text-amber-800 dark:text-amber-300">Rate Your Crew</span>
+                  <span className="ml-2 text-xs px-2 py-0.5 bg-amber-200 dark:bg-amber-700 text-amber-800 dark:text-amber-200 rounded-full font-semibold">
+                    {visibleRatings.length}
+                  </span>
+                </div>
+                {ratingsOpen ? (
+                  <ChevronUp className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                )}
+              </button>
+
+              {ratingsOpen && (
+                <div className="mt-2 bg-white dark:bg-white/5 border border-amber-200 dark:border-amber-700/50 rounded-2xl overflow-hidden shadow-sm divide-y divide-amber-100 dark:divide-amber-900/40">
+                  {visibleRatings.map((item) => {
+                    const key = `${item.form_id}:${item.ratee.id}:${item.job.id}`;
+                    return (
+                      <div key={key} className="flex items-center gap-3 px-4 py-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {item.ratee.name?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">{item.ratee.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-white/50 truncate">{item.job.job_number} &bull; {item.job.customer_name}</p>
+                        </div>
+                        <button
+                          onClick={() => setRatingModalItem(item)}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold transition-all min-h-[40px] flex-shrink-0"
+                        >
+                          <Star className="w-3.5 h-3.5" />
+                          Rate
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
+
+      {/* Submit Rating Modal */}
+      {ratingModalItem && ratingForms[ratingModalItem.form_id] && (
+        <SubmitRatingModal
+          pending={ratingModalItem}
+          questions={ratingForms[ratingModalItem.form_id].questions || []}
+          onClose={() => setRatingModalItem(null)}
+          onSubmitted={(formId, rateeId, jobId) => {
+            setDismissedRatings((prev) => new Set([...prev, `${formId}:${rateeId}:${jobId}`]));
+            setRatingModalItem(null);
+          }}
+        />
+      )}
     </div>
   );
 }

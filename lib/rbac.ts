@@ -243,6 +243,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     iconBg: 'bg-indigo-500',
     features: ['Pre-use checklists', 'Delegate to shop help', 'Status tracking', 'Critical-fail flagging'],
   },
+  {
+    key: 'peer_ratings',
+    title: 'Peer Ratings',
+    description: 'Manage team performance reviews and rating forms',
+    icon: '⭐',
+    href: '/dashboard/admin/peer-ratings',
+    bgColor: 'from-amber-500 to-orange-600',
+    iconBg: 'bg-amber-500',
+    features: ['Rating form builder', 'Team performance scores', 'Anonymized feedback', 'Job-based reviews'],
+  },
 ];
 
 // All card keys for iteration
@@ -321,6 +331,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     billing: 'view',
     customer_profiles: 'full',
     site_visits: 'view',
+    peer_ratings: 'full',
   }),
   supervisor: preset({
     schedule_form: 'submit',
