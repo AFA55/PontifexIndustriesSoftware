@@ -9,6 +9,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import type { User } from '@/lib/auth';
 import NfcClockInModal from '@/components/NfcClockInModal';
+import DailyEquipmentNeeds from './DailyEquipmentNeeds';
 
 /**
  * Shop Manager dashboard — Phase 1A skeleton.
@@ -310,6 +311,9 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
           tone="purple"
         />
       </div>
+
+      {/* Daily Equipment Needs — morning staging view */}
+      <DailyEquipmentNeeds />
 
       {/* Phase 1A footer note */}
       <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/40 rounded-2xl p-4 text-sm text-violet-700 dark:text-violet-300">
