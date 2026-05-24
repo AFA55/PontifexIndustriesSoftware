@@ -29,6 +29,8 @@ import {
   CheckCircle,
   TrendingUp,
   MessageSquareOff,
+  ClipboardCheck,
+  Clock,
 } from 'lucide-react';
 
 interface Invoice {
@@ -55,6 +57,9 @@ interface Invoice {
   created_at: string;
   created_by: string | null;
   completion_pdf_url: string | null;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  confirm_notes: string | null;
 }
 
 interface InvoiceDetail extends Invoice {
@@ -115,6 +120,8 @@ interface PreviewData {
 const STATUS_COLORS: Record<string, string> = {
   draft:
     'bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white/80 dark:ring-white/10',
+  confirmed:
+    'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30',
   sent:
     'bg-blue-100 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-400/30',
   paid:
@@ -128,6 +135,7 @@ const STATUS_COLORS: Record<string, string> = {
 // Top-accent bar hue per status.
 const STATUS_ACCENT: Record<string, string> = {
   draft: 'from-slate-300 to-slate-400',
+  confirmed: 'from-emerald-400 to-teal-500',
   sent: 'from-sky-400 to-blue-500',
   paid: 'from-emerald-400 to-teal-500',
   overdue: 'from-rose-400 to-red-500',
@@ -136,6 +144,7 @@ const STATUS_ACCENT: Record<string, string> = {
 
 const STATUS_ICONS: Record<string, any> = {
   draft: FileText,
+  confirmed: ClipboardCheck,
   sent: Send,
   paid: CheckCircle2,
   overdue: AlertCircle,
@@ -184,6 +193,16 @@ export default function BillingPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [confirmVoid, setConfirmVoid] = useState<string | null>(null);
+
+  // Confirm-invoice modal state (for draft invoices already in the system)
+  const [confirmInvoice, setConfirmInvoice] = useState<Invoice | null>(null);
+  const [confirmInvoiceNotes, setConfirmInvoiceNotes] = useState('');
+  const [confirmInvoiceSaving, setConfirmInvoiceSaving] = useState(false);
+  const [confirmInvoiceError, setConfirmInvoiceError] = useState<string | null>(null);
+
+  // Send-confirmed invoice state
+  const [sendingConfirmed, setSendingConfirmed] = useState<string | null>(null);
+
 
   // SMS configuration warning
   const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
@@ -450,6 +469,71 @@ export default function BillingPage() {
     setEditingDescIdx(new Set());
   };
 
+  // ── Confirm-invoice modal (for draft invoices already created) ──────────────
+
+  const openConfirmInvoiceModal = (inv: Invoice) => {
+    setConfirmInvoice(inv);
+    setConfirmInvoiceNotes('');
+    setConfirmInvoiceError(null);
+  };
+
+  const closeConfirmInvoiceModal = () => {
+    if (confirmInvoiceSaving) return;
+    setConfirmInvoice(null);
+    setConfirmInvoiceNotes('');
+    setConfirmInvoiceError(null);
+  };
+
+  const submitConfirmInvoice = async () => {
+    if (!confirmInvoice) return;
+    setConfirmInvoiceSaving(true);
+    setConfirmInvoiceError(null);
+    try {
+      const res = await apiFetch(`/api/admin/invoices/${confirmInvoice.id}/confirm`, {
+        method: 'PATCH',
+        body: JSON.stringify({ notes: confirmInvoiceNotes }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setSuccessMsg(`Invoice ${confirmInvoice.invoice_number} confirmed. Admin will send it to the customer.`);
+        closeConfirmInvoiceModal();
+        // If the detail modal is open for this invoice, close it too
+        if (selectedInvoice?.id === confirmInvoice.id) setSelectedInvoice(null);
+        fetchData();
+      } else {
+        setConfirmInvoiceError(data.error || 'Failed to confirm invoice.');
+      }
+    } catch (err) {
+      console.error('Error confirming invoice:', err);
+      setConfirmInvoiceError('Failed to confirm invoice. Please try again.');
+    } finally {
+      setConfirmInvoiceSaving(false);
+    }
+  };
+
+  const handleSendConfirmed = async (invoiceId: string) => {
+    setSendingConfirmed(invoiceId);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/admin/invoices/${invoiceId}/send-confirmed`, { method: 'PATCH' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setSuccessMsg(data.message || 'Invoice marked as sent.');
+        fetchData();
+        if (selectedInvoice?.id === invoiceId) setSelectedInvoice(null);
+      } else {
+        setError(data.error || 'Failed to mark invoice as sent.');
+      }
+    } catch (err) {
+      console.error('Error sending confirmed invoice:', err);
+      setError('Failed to mark invoice as sent. Please try again.');
+    } finally {
+      setSendingConfirmed(null);
+    }
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
+
   const updateEditLineItem = (idx: number, patch: Partial<PreviewLineItem>) => {
     setEditLineItems(prev => prev.map((li, i) => (i === idx ? { ...li, ...patch } : li)));
   };
@@ -712,12 +796,22 @@ export default function BillingPage() {
     return <BillingSkeleton />;
   }
 
+  // Count confirmed invoices from the loaded list (stats from server may not include it yet)
+  const confirmedCount = invoices.filter(i => i.status === 'confirmed').length;
+
   const statTiles = [
     {
       label: 'Drafts',
       value: stats.draft || 0,
       icon: FileText,
       iconTile: 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-white/70',
+    },
+    {
+      label: 'Awaiting Send',
+      value: confirmedCount,
+      icon: ClipboardCheck,
+      iconTile: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
+      highlight: confirmedCount > 0,
     },
     {
       label: 'Sent',
@@ -903,25 +997,35 @@ export default function BillingPage() {
 
         {/* Stats Cards */}
         <RevealSection index={1}>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
           {statTiles.map(tile => (
             <div
               key={tile.label}
-              className="
+              className={`
                 rounded-2xl p-4 ring-1 shadow-sm transition-all hover:shadow-md
-                bg-white/90 ring-slate-200
-                dark:bg-white/[0.04] dark:ring-white/10
-              "
+                ${(tile as any).highlight
+                  ? 'bg-emerald-50/80 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30'
+                  : 'bg-white/90 ring-slate-200 dark:bg-white/[0.04] dark:ring-white/10'
+                }
+              `}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider">
+                <span className={`text-xs font-semibold uppercase tracking-wider ${
+                  (tile as any).highlight
+                    ? 'text-emerald-700 dark:text-emerald-300'
+                    : 'text-slate-500 dark:text-white/60'
+                }`}>
                   {tile.label}
                 </span>
                 <span className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${tile.iconTile}`}>
                   <tile.icon className="w-4 h-4" />
                 </span>
               </div>
-              <div className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums">
+              <div className={`text-3xl font-bold tabular-nums ${
+                (tile as any).highlight
+                  ? 'text-emerald-700 dark:text-emerald-300'
+                  : 'text-slate-900 dark:text-white'
+              }`}>
                 {tile.value}
               </div>
             </div>
@@ -1003,6 +1107,7 @@ export default function BillingPage() {
               >
                 <option value="all">All Status</option>
                 <option value="draft">Draft</option>
+                <option value="confirmed">Confirmed (Awaiting Send)</option>
                 <option value="sent">Sent</option>
                 <option value="paid">Paid</option>
                 <option value="overdue">Overdue</option>
@@ -1091,6 +1196,12 @@ export default function BillingPage() {
                           <div className="flex items-center gap-4 mt-2 text-xs text-slate-500 dark:text-white/50 flex-wrap">
                             <span>Invoiced: {formatDate(inv.invoice_date)}</span>
                             {inv.due_date && <span>Due: {formatDate(inv.due_date)}</span>}
+                            {inv.status === 'confirmed' && inv.confirmed_at && (
+                              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                <ClipboardCheck className="w-3 h-3" />
+                                Confirmed {new Date(inv.confirmed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -1098,13 +1209,49 @@ export default function BillingPage() {
                             <div className="text-base font-bold text-slate-900 dark:text-white tabular-nums">
                               ${Number(inv.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </div>
-                            {inv.balance_due > 0 && inv.status !== 'draft' && inv.status !== 'paid' && (
+                            {inv.balance_due > 0 && inv.status !== 'draft' && inv.status !== 'confirmed' && inv.status !== 'paid' && (
                               <div className="text-xs text-amber-600 dark:text-amber-300 font-medium tabular-nums">
                                 Due: ${Number(inv.balance_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
+                            {/* Confirm button for drafts (salesperson/admin) */}
+                            {inv.status === 'draft' && (
+                              <button
+                                type="button"
+                                onClick={() => openConfirmInvoiceModal(inv)}
+                                className="
+                                  inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all
+                                  bg-amber-50 text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100
+                                  dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30 dark:hover:bg-amber-500/25
+                                "
+                                title="Review and confirm this invoice"
+                              >
+                                <ClipboardCheck className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Confirm</span>
+                              </button>
+                            )}
+                            {/* Send to customer button for confirmed invoices (admin only) */}
+                            {inv.status === 'confirmed' && (
+                              <button
+                                type="button"
+                                onClick={() => handleSendConfirmed(inv.id)}
+                                disabled={sendingConfirmed === inv.id}
+                                className="
+                                  inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-50
+                                  bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm shadow-emerald-500/20 hover:shadow-md
+                                "
+                                title="Finalize and mark as sent"
+                              >
+                                {sendingConfirmed === inv.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Send className="w-3.5 h-3.5" />
+                                )}
+                                <span className="hidden sm:inline">Send</span>
+                              </button>
+                            )}
                             {inv.status !== 'paid' && inv.status !== 'void' && (
                               <button
                                 type="button"
@@ -1378,17 +1525,46 @@ export default function BillingPage() {
                   {statusBadge(selectedInvoice.status)}
 
                   {selectedInvoice.status === 'draft' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setSelectedInvoice(null);
+                          openConfirmInvoiceModal(selectedInvoice);
+                        }}
+                        className="
+                          px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1
+                          bg-amber-50 ring-1 ring-amber-200 text-amber-700 hover:bg-amber-100
+                          dark:bg-amber-500/15 dark:ring-amber-400/30 dark:text-amber-200 dark:hover:bg-amber-500/25
+                        "
+                      >
+                        <ClipboardCheck className="w-3 h-3" />
+                        Confirm &amp; Mark Ready
+                      </button>
+                      <button
+                        onClick={() => updateInvoiceStatus(selectedInvoice.id, 'sent')}
+                        disabled={updatingStatus === selectedInvoice.id}
+                        className="
+                          px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1
+                          bg-blue-50 ring-1 ring-blue-200 text-blue-700 hover:bg-blue-100
+                          dark:bg-blue-500/15 dark:ring-blue-400/30 dark:text-blue-200 dark:hover:bg-blue-500/25
+                        "
+                      >
+                        {updatingStatus === selectedInvoice.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                        Mark as Sent
+                      </button>
+                    </>
+                  )}
+                  {selectedInvoice.status === 'confirmed' && (
                     <button
-                      onClick={() => updateInvoiceStatus(selectedInvoice.id, 'sent')}
-                      disabled={updatingStatus === selectedInvoice.id}
+                      onClick={() => handleSendConfirmed(selectedInvoice.id)}
+                      disabled={sendingConfirmed === selectedInvoice.id}
                       className="
-                        px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1
-                        bg-blue-50 ring-1 ring-blue-200 text-blue-700 hover:bg-blue-100
-                        dark:bg-blue-500/15 dark:ring-blue-400/30 dark:text-blue-200 dark:hover:bg-blue-500/25
+                        px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 disabled:opacity-50
+                        bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm shadow-emerald-500/20 hover:shadow-md
                       "
                     >
-                      {updatingStatus === selectedInvoice.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-                      Mark as Sent
+                      {sendingConfirmed === selectedInvoice.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                      Send to Customer
                     </button>
                   )}
                   {['sent', 'overdue'].includes(selectedInvoice.status) && (
@@ -1454,6 +1630,34 @@ export default function BillingPage() {
                     </>
                   )}
                 </div>
+
+                {/* Confirmed-by info banner (shown when status is confirmed or sent with confirmed_at) */}
+                {(selectedInvoice.status === 'confirmed' || selectedInvoice.confirmed_at) && (
+                  <div className="
+                    flex items-start gap-3 p-3 rounded-xl ring-1 -mt-2
+                    bg-emerald-50 ring-emerald-200
+                    dark:bg-emerald-500/10 dark:ring-emerald-400/30
+                  ">
+                    <ClipboardCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-300 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                        {selectedInvoice.status === 'confirmed' ? 'Confirmed — Ready to Send' : 'Previously Confirmed'}
+                      </p>
+                      {selectedInvoice.confirmed_at && (
+                        <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+                          {new Date(selectedInvoice.confirmed_at).toLocaleDateString('en-US', {
+                            month: 'long', day: 'numeric', year: 'numeric',
+                          })}
+                        </p>
+                      )}
+                      {selectedInvoice.confirm_notes && (
+                        <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 italic">
+                          &ldquo;{selectedInvoice.confirm_notes}&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Email send hint / warning */}
                 {emailConfigured === true && selectedInvoice.customer_email && selectedInvoice.status !== 'void' && (
@@ -1630,6 +1834,148 @@ export default function BillingPage() {
                     <p className="text-sm text-slate-700 dark:text-white/80 whitespace-pre-line">{selectedInvoice.notes}</p>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Invoice Confirm Modal */}
+        {confirmInvoice && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+            <div className="
+              w-full max-w-lg rounded-2xl shadow-2xl ring-1
+              bg-white ring-slate-200
+              dark:bg-[#120826] dark:ring-white/10
+            ">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-white/10">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
+                    <ClipboardCheck className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Confirm Invoice</h3>
+                    <p className="text-xs text-slate-500 dark:text-white/60">
+                      {confirmInvoice.invoice_number} · {confirmInvoice.customer_name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeConfirmInvoiceModal}
+                  disabled={confirmInvoiceSaving}
+                  className="
+                    p-1.5 rounded-lg transition-colors disabled:opacity-50
+                    hover:bg-slate-100 text-slate-500
+                    dark:hover:bg-white/10 dark:text-white/70
+                  "
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {confirmInvoiceError && (
+                  <div className="
+                    p-3 rounded-lg flex items-center gap-2 text-sm
+                    bg-rose-50 ring-1 ring-rose-200 text-rose-700
+                    dark:bg-rose-500/10 dark:ring-rose-400/30 dark:text-rose-200
+                  ">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{confirmInvoiceError}</span>
+                  </div>
+                )}
+
+                {/* Invoice summary */}
+                <div className="
+                  rounded-xl p-4 ring-1
+                  bg-slate-50 ring-slate-200
+                  dark:bg-white/[0.03] dark:ring-white/10
+                ">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-0.5">Customer</p>
+                      <p className="text-slate-900 dark:text-white font-medium truncate">{confirmInvoice.customer_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-0.5">Invoice #</p>
+                      <p className="text-slate-900 dark:text-white font-mono font-medium">{confirmInvoice.invoice_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-0.5">Amount</p>
+                      <p className="text-slate-900 dark:text-white font-bold tabular-nums">
+                        ${Number(confirmInvoice.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    {confirmInvoice.due_date && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-0.5">Due Date</p>
+                        <p className="text-slate-900 dark:text-white font-medium">{formatDate(confirmInvoice.due_date)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* What this action means */}
+                <div className="
+                  rounded-xl p-3 ring-1 flex items-start gap-3
+                  bg-amber-50 ring-amber-200
+                  dark:bg-amber-500/10 dark:ring-amber-400/30
+                ">
+                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    Confirming this invoice marks it as <strong>ready to send</strong>. An admin will review and send it to the customer. The invoice won&apos;t be emailed until an admin finalizes it.
+                  </p>
+                </div>
+
+                {/* Optional notes to admin */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider mb-1.5">
+                    Notes for admin <span className="normal-case font-normal text-slate-400 dark:text-white/40">(optional)</span>
+                  </label>
+                  <textarea
+                    value={confirmInvoiceNotes}
+                    onChange={(e) => setConfirmInvoiceNotes(e.target.value)}
+                    placeholder="e.g. Please add 10% materials surcharge, or Double-check the labor hours..."
+                    rows={3}
+                    className="
+                      w-full px-3 py-2 rounded-lg text-sm resize-none transition-all
+                      bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400
+                      focus:border-amber-500 focus:ring-1 focus:ring-amber-200
+                      dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/40
+                      dark:focus:border-amber-400 dark:focus:ring-amber-500/30
+                    "
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-200 dark:border-white/10">
+                <button
+                  onClick={closeConfirmInvoiceModal}
+                  disabled={confirmInvoiceSaving}
+                  className="
+                    px-3 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50
+                    bg-slate-100 text-slate-700 hover:bg-slate-200
+                    dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10
+                  "
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitConfirmInvoice}
+                  disabled={confirmInvoiceSaving}
+                  className="
+                    inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50
+                    bg-gradient-to-r from-emerald-500 to-teal-500 text-white
+                    shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30
+                  "
+                >
+                  {confirmInvoiceSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ClipboardCheck className="w-4 h-4" />
+                  )}
+                  Confirm &amp; Mark Ready
+                </button>
               </div>
             </div>
           </div>
