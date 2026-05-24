@@ -206,6 +206,10 @@ async function updateJobStatus(
       // Customer signature / completion fields
       'completion_signature', 'completion_signer_name', 'completion_signed_at',
       'completion_notes', 'contact_not_on_site',
+      // Canonical customer-signature columns (must mirror the remote-sign path
+      // in app/api/public/signature/[token]/route.ts so onsite-signed jobs are
+      // queryable by the same columns as remote-signed ones).
+      'customer_signature', 'customer_signed_at', 'customer_signature_method',
       'customer_cleanliness_rating', 'customer_communication_rating',
       'customer_overall_rating', 'customer_feedback_comments',
       // Work order agreement fields

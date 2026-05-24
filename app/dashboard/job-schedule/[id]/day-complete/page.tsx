@@ -405,6 +405,11 @@ export default function DayCompletePage() {
           work_completed_at: new Date().toISOString(),
           completion_signer_name: signerName || undefined,
           completion_signature: signatureUrl || undefined,
+          // Canonical customer-signature columns — mirror the remote-sign path
+          // so onsite-signed jobs are queryable by the same columns.
+          customer_signature: signatureUrl || undefined,
+          customer_signed_at: new Date().toISOString(),
+          customer_signature_method: 'onsite',
         })
       });
 
