@@ -1,27 +1,58 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 24, 2026 | **Branch:** `main` | **origin/main:** `a57f7678` (PUSHED ✅) | **Production:** ⚠️ build READY but NOT PROMOTED (serving old build) | **Build:** PASSING ✅ (0 TS errors, full suite + ~46 new tests pass)
+**Date:** May 24, 2026 | **Branch:** `main` | **origin/main:** `1ae67d12` (PUSHED ✅) | **Production:** ✅ LIVE (Vercel restored, deployment limit set) | **Build:** PASSING ✅ (0 TS errors)
 
-> **💰 BUDGET: ~$13 Vercel build credit left ($61.42/$75 used).** Each push to `main` = ~$1–2 build. BATCH commits, push once per session. Confirm before pushing. Spend Management WAS auto-pausing the site — user is switching it to Notify-only.
+> **💰 BUDGET: ~$11–12 Vercel build credit left.** Each push to `main` = ~$1–2 build. BATCH commits, push once per session. See `DEPLOYMENT_COST.md`.
 
-## 🚨 TOP PRIORITY — DEPLOYMENT NOT PROMOTED (blocks everything)
-The 8-commit batch is **pushed and built (READY)** but the Vercel project shows **`live: false`** — the new deployment was never promoted to the live domain, and serverless functions are degraded. **Symptoms:** `/` loads (cached) but `/api/*` functions hang → **LOGIN HANGS on "Signing in…"**, and `/sms-opt-in` 404s (old build serving).
-**FIX (user action in Vercel dashboard):** Deployments → newest Ready/Production deployment → "⋯" → **Promote to Production** (free, no rebuild) + Settings → Billing → Spend Management → turn **"Pause Projects" OFF**. Then login + all 15 features go live. **Verify after promote:** login works, `/sms-opt-in` loads, live status badges/office docs/profile pics all serve.
+## 🎉 ALL 23 FEATURES COMPLETE — WEB APP IS DONE
 
-## ✅ SHIPPED THIS SPRINT (pushed in a57f7678 — live once promoted) — 22 of 23 tasks
-push infra + native push (APNs-ready), notification prefs UI, clock-in reminders (cron), work-performed reminders (cron), SMS opt-in page, **5 real bug fixes** (invoice notification cols, live-status cols, profile-pic bucket missing, time-off-request notification missing, onsite-signature canonical cols), dispatch dedupe, live status badges, out-of-town/hotel, office documents (mgmt-only), time-off→schedule/timecard blocking, directions-to-shop, printable ticket, maintenance→equipment status, shop equipment-needs view, profile pictures, notification inbox, status-transition hardening, signature flow verified. **~46 new Jest tests** (reminder-timing 12, equipment 10, avatar 7, job-status 17).
+### ✅ SHIPPED THIS SESSION (3 commits on top of a57f7678)
 
-## 📋 REMAINING WORK
-- **#22 peer ratings** — last real feature (form builder: ops mgr creates rating forms, operators↔helpers rate each other in-app). Net-new, own focused effort.
-- **#19 invoice confirm-flow UI** — notification half DONE (creator/salesperson notified on completion); remaining = the interactive "confirm invoice details → mark ready → admin finalizes" UI.
-- **Gated on Apple:** #2 verify iOS permission usage strings in Info.plist, #5 TestFlight build + submission.
+**`0f484b24` — iOS submission fixes + login logo wired**
+- `Info.plist`: `armv7` → `arm64` (upload blocker fixed), `ITSAppUsesNonExemptEncryption=false` added
+- `App.entitlements` created with `aps-environment=production` (required for APNs push)
+- Login page logo: now uses `logo_icon_url` (80px), falls back to `logo_url`, then SVG placeholder
+- Branding settings: opened to `admin` role (was `super_admin` only) — Patriot admin can change logo
+- `APP_CHANGES.md`: full 7-step App Store submission guide
 
-### ⏳ Waiting on third parties (user actions)
-- **Apple Developer:** PAID, pending approval → then I add APNs cert (4 env vars: APNS_KEY_ID/TEAM_ID/BUNDLE_ID/PRIVATE_KEY) → native push goes live.
-- **Twilio toll-free:** number `+18336954288` bought, creds in Vercel. Submit toll-free verification: opt-in URL `https://www.pontifexindustries.com/sms-opt-in`, Terms `…/terms`, Privacy `…/privacy` (1–3 day approval). Then SMS reminders work.
-- **Rotate Twilio Auth Token** (was shown in a screenshot) — hygiene.
+**`b28b8497` — #19 Invoice confirm-flow UI (COMPLETE)**
+- Migration applied: `confirmed` status added to `invoices`, `confirmed_by/at/notes` columns + indexes
+- `PATCH /api/admin/invoices/[id]/confirm` — salesperson confirms draft; notifies all admins
+- `PATCH /api/admin/invoices/[id]/send-confirmed` — admin finalizes confirmed→sent; notifies creator
+- Billing page: "Awaiting Send" stat tile, amber Confirm button on drafts, emerald Send button on confirmed, full Confirm modal with notes field
 
-### 🔍 TO REVIEW (after promote)
-End-to-end smoke test on production once promoted: login (all roles) → schedule → dispatch (no duplicate SMS) → operator in-route/arrive/work-performed → day-complete signature → Completed Jobs → invoice notification to creator. Plus: /sms-opt-in form, office docs tab (management only, hidden from operators), profile pic upload, notification inbox, shop equipment-needs view, time-off approval blocking schedule.
+**`1ae67d12` — #22 Peer ratings system (COMPLETE)**
+- Migration applied: `rating_forms` + `rating_submissions` tables, 5 indexes, RLS, seeded "Field Performance Review" form for PATRIOT
+- 5 API routes: CRUD for forms (admin), submit rating (any auth), received ratings, pending ratings
+- Admin page `/dashboard/admin/peer-ratings`: Forms tab (builder modal, 4 question types) + Team Ratings tab (avg scores + slide-over detail)
+- My Jobs page: amber "Rate Your Crew" collapsible card with pending coworker ratings
+- Team Profiles: new "Peer Ratings" tab per member
+- `lib/rbac.ts`: `peer_ratings` card added
+
+## 📋 REMAINING (App Store path only — web feature work is done)
+
+### ⏳ Waiting on user actions
+- **Upload Patriot logo** → Settings → Company Branding → "Icon (Square)" slot → Save. Login page will show it immediately.
+- **Apple App Store submission** (see `APP_CHANGES.md` for full 7-step guide):
+  1. developer.apple.com → create App ID `com.pontifexindustries.app` (enable Push + NFC)
+  2. Create Distribution Certificate + Provisioning Profile
+  3. Create APNs key (.p8) — note Key ID + Team ID
+  4. Add 4 env vars to Vercel: `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_PRIVATE_KEY`
+  5. Xcode: set version 1.0.0 / build 1, add Push Notifications + NFC capabilities
+  6. Take App Store screenshots on iPhone 15 Pro Max simulator (5 screens, 1290×2796px)
+  7. App Store Connect: create listing, fill metadata, archive + upload, TestFlight → submit
+- **Twilio toll-free verification**: submit at twilio.com with opt-in URL `https://www.pontifexindustries.com/sms-opt-in` (1–3 day approval, then SMS reminders activate)
+- **Rotate Twilio Auth Token** (was visible in a screenshot — hygiene)
+- **RESEND_API_KEY** + **NEXT_PUBLIC_APP_URL** + **NEXT_PUBLIC_SITE_URL** — add to Vercel if not already set (email delivery)
+
+### 🔍 End-to-end smoke test (do before App Store submission)
+Login (all roles) → schedule → dispatch → operator in-route/arrive/work-performed → day-complete signature → Completed Jobs → invoice notification → salesperson confirms invoice → admin sends → billing shows paid.
+Plus: profile pic upload, notification inbox, shop equipment-needs, peer rating submission on My Jobs.
+
+### Ongoing / Lower priority
+- Android (Google Play) — after iOS ships: `npx cap add android`, $25 Google Play fee, APK upload
+- Schedule board refactor (page.tsx is 2,850 lines — extract to `_components/`)
+- Apply pending migrations: `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql`
+- `CRON_SECRET` env var in Vercel (auto-clockout + invoice reminders)
 
 ---
 
