@@ -158,9 +158,15 @@ function LoginPageInner() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
+            className="flex flex-col items-center"
           >
-            {branding.logo_url ? (
-              <img src={branding.logo_url} alt={branding.company_name} className="h-12 w-auto object-contain" />
+            {/* Prefer square icon for login header; fall back to full logo; then SVG placeholder */}
+            {(branding.logo_icon_url || branding.logo_url) ? (
+              <img
+                src={branding.logo_icon_url || branding.logo_url!}
+                alt={branding.company_name}
+                className="h-20 w-20 object-contain rounded-2xl"
+              />
             ) : (
               <Logo />
             )}

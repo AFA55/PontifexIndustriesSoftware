@@ -53,33 +53,146 @@ xcrun simctl launch CA1B2D65-5DC0-4C85-A072-3C0BFBE85402 com.pontifexindustries.
 
 ---
 
+## 🚨 App Store Submission — Step-by-Step (Apple Developer APPROVED ✅)
+
+### What's Already Done
+- [x] App icon — opaque 1024×1024, no alpha channel ✅
+- [x] Splash images — `Splash.imageset/` has 2732×2732 PNGs ✅  
+- [x] `CFBundleDisplayName` = "Pontifex Industries" ✅
+- [x] Bundle ID: `com.pontifexindustries.app` ✅
+- [x] All privacy usage strings in Info.plist (Location, Camera, Mic, NFC, Photos) ✅
+- [x] `ITSAppUsesNonExemptEncryption = false` added (HTTPS-only, no EAR issues) ✅
+- [x] `UIRequiredDeviceCapabilities` changed from `armv7` → `arm64` (armv7 causes upload rejection in Xcode 12+) ✅
+- [x] `App.entitlements` created with `aps-environment = production` for push notifications ✅
+- [x] Privacy Policy at `/privacy`, Terms at `/terms` ✅
+
+### Step 1 — Apple Developer Portal (do once)
+1. Go to https://developer.apple.com/account/resources/identifiers/list
+2. **Identifiers → "+" → App IDs → App** 
+   - Description: "Pontifex Industries"
+   - Bundle ID (Explicit): `com.pontifexindustries.app`
+   - Capabilities: check **Push Notifications** + **NFC Tag Reading** + **Associated Domains** (for future universal links)
+   - Save
+
+3. **Certificates → "+" → Apple Distribution** 
+   - Follow the CSR instructions in Keychain Access
+   - Download + double-click to install the .cer file
+
+4. **Profiles → "+" → App Store Connect**
+   - Select the `com.pontifexindustries.app` App ID
+   - Select your Distribution Certificate
+   - Name: "Pontifex App Store Distribution"
+   - Download the .mobileprovision file
+
+5. **Keys → "+" → APNs key** (for push notifications)
+   - Name: "Pontifex APNs"
+   - Check "Apple Push Notifications service (APNs)"
+   - Download the `.p8` file — **SAVE IT, you can only download once**
+   - Note the **Key ID** shown on the page
+   - Find your **Team ID** at: https://developer.apple.com/account → Membership → Team ID
+
+### Step 2 — Xcode (one-time setup before archive)
+1. Open `ios/App/App.xcodeproj` in Xcode
+2. Select "App" target → **General** tab:
+   - Version: `1.0.0`
+   - Build: `1`
+3. **Signing & Capabilities** tab:
+   - Team: select "Andres Altamirano" (or your org)
+   - Bundle Identifier: `com.pontifexindustries.app`
+   - Uncheck "Automatically manage signing"
+   - Provisioning Profile: select "Pontifex App Store Distribution"
+4. **Add capabilities** (click "+" in Signing & Capabilities):
+   - Push Notifications ← Xcode will wire `App.entitlements` automatically
+   - NFC Tag Reading ← already in Info.plist, add capability to match
+
+### Step 3 — Add APNs vars to Vercel (activates native push)
+In Vercel Dashboard → your project → Settings → Environment Variables, add:
+```
+APNS_KEY_ID       = (Key ID from Step 1-5)
+APNS_TEAM_ID      = (Team ID from Step 1-5)
+APNS_BUNDLE_ID    = com.pontifexindustries.app
+APNS_PRIVATE_KEY  = (full contents of the .p8 file, newlines preserved)
+```
+Code is already built in `lib/send-push.ts` — these 4 vars are all it needs.
+
+### Step 4 — App Store Connect (create the listing)
+1. Go to https://appstoreconnect.apple.com → My Apps → "+"
+2. **New App**:
+   - Platform: iOS
+   - Name: `Pontifex Industries`
+   - Primary language: English (U.S.)
+   - Bundle ID: `com.pontifexindustries.app`
+   - SKU: `pontifexindustries001`
+3. Fill in App Information:
+   - Category: **Business**
+   - Secondary: Productivity
+   - Privacy Policy URL: `https://www.pontifexindustries.com/privacy`
+4. **Version Information** (1.0 Prepare for Submission):
+   - Screenshots: minimum 3 for iPhone 6.7" (1290×2796px). Take on iPhone 15 Pro Max simulator:
+     ```bash
+     # In Xcode Simulator → File → Take Screenshot
+     # Or: xcrun simctl io <DEVICE_ID> screenshot screen.png
+     ```
+     Suggested screens to capture: Login, Schedule Board, Job Detail, My Jobs (operator), Admin Dashboard
+   - Description (use this):
+     ```
+     Pontifex Industries is the complete field operations platform for concrete cutting and construction teams.
+     
+     Operators clock in from the job site with GPS verification, receive dispatched tickets, log work performed, capture job photos, and submit digital signatures — all from their phone.
+     
+     Managers schedule jobs, track crews in real-time, manage equipment inventory, approve timecards, and generate invoices.
+     
+     Key features:
+     • GPS-verified clock-in/out with NFC badge support
+     • Digital job tickets and dispatch
+     • Real-time crew tracking
+     • Equipment checkout with voice recognition
+     • Timecard management and payroll export
+     • Invoice generation and customer signatures
+     • Multi-tenant: works for any concrete cutting or construction company
+     ```
+   - Keywords: `concrete cutting,construction,field operations,crew management,timecard,job scheduling,equipment tracking`
+   - Age Rating: **4+**
+   - Copyright: `2026 Pontifex Industries`
+
+### Step 5 — Archive & Upload (Xcode)
+```
+Xcode menu → Product → Archive
+After archive: Window → Organizer → Distribute App → App Store Connect
+→ Upload → accept defaults → Done
+```
+The build will appear in App Store Connect → TestFlight within ~30 minutes.
+
+### Step 6 — TestFlight (test before submitting)
+1. In App Store Connect → TestFlight → select the build
+2. Add yourself as internal tester
+3. Install TestFlight on your iPhone → install the build
+4. Test: login, clock-in, schedule board, my jobs, camera, NFC
+5. If all good → go to App Store Connect → 1.0 Prepare for Submission → "Submit for Review"
+
+### Step 7 — Review Timeline
+- Apple typically reviews in **24-48 hours** for straightforward B2B apps
+- First submission may take longer (1-3 days)
+- Common rejections to avoid:
+  - ✅ All permission strings are already in Info.plist
+  - ✅ Privacy policy URL is live
+  - ✅ ITSAppUsesNonExemptEncryption is set
+  - ⚠️ Make sure screenshots look polished — use the iPhone 15 Pro Max simulator
+
+---
+
 ## Pending App Tasks
 
-### Phase 3 — App Store Prep (next)
-- [ ] **Splash screen** — 2732×2732px opaque PNG with bridge logo centered on `#1e1b4b`
-  - File: `ios/App/App/Assets.xcassets/Splash.imageset/`
-- [ ] **Launch screen storyboard** — verify `LaunchScreen.storyboard` uses asset, not hardcoded color
-- [ ] **App name** — confirm `CFBundleDisplayName` = "Pontifex Industries" in `Info.plist`
-- [ ] **Bundle ID** — currently `com.pontifexindustries.app` ✅
-- [ ] **Version** — set to `1.0.0` for App Store submission
+### Remaining Before Submission
+- [ ] **Set Version 1.0.0 + Build 1** in Xcode → Target → General
+- [ ] **Add Push Notifications + NFC capabilities** in Xcode → Signing & Capabilities
+- [ ] **Add APNs env vars** to Vercel (4 vars from Step 3 above)
+- [ ] **Take App Store screenshots** on iPhone 15 Pro Max simulator (5 screens)
+- [ ] **Archive + upload** via Xcode → Product → Archive
+- [ ] **TestFlight internal test** before submitting for review
 
-### Phase 4 — Apple Developer Program
-- [ ] Enroll at https://developer.apple.com/programs/ ($99/yr)
-- [ ] Create App ID: `com.pontifexindustries.app`
-- [ ] Create provisioning profile (Distribution → App Store)
-- [ ] Configure in Xcode → Signing & Capabilities
-
-### Phase 5 — App Store Submission Checklist
-- [ ] Privacy Policy URL: `https://www.pontifexindustries.com/privacy-policy` (page needs to be built)
-- [ ] Terms of Service URL: `https://www.pontifexindustries.com/terms`
-- [ ] App Store screenshots (iPhone 6.7" required, 6.5" recommended)
-- [ ] App description (copy from landing page value props)
-- [ ] Age rating: 4+ (no objectionable content)
-- [ ] Export compliance: uses HTTPS only (standard encryption exemption)
-
-### Native Features (Planned)
+### Native Features (Planned — post-launch)
 - [ ] **NFC scanning** — `@capacitor-community/nfc` plugin for equipment tagging
-- [ ] **Push notifications** — `@capacitor/push-notifications` + Supabase realtime bridge
 - [ ] **Background location** — GPS clock-in verification (needs Apple entitlement justification)
 - [ ] **Biometric auth** — Face ID / Touch ID for clock-in shortcut
 
