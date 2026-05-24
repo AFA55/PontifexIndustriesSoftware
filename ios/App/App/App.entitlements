@@ -7,5 +7,14 @@
 	     Use "production" for Release builds (TestFlight + App Store). -->
 	<key>aps-environment</key>
 	<string>production</string>
+
+	<!-- NFC Tag Reading — required for employee badge clock-in.
+	     Matches the NFC Tag Reading capability enabled on the App ID.
+	     Without this entitlement the NFCReaderSession API throws an
+	     entitlement error at runtime even though Info.plist declares it. -->
+	<key>com.apple.developer.nfc.readersession.formats</key>
+	<array>
+		<string>TAG</string>
+	</array>
 </dict>
 </plist>

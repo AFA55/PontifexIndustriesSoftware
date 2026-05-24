@@ -52,10 +52,13 @@
 	<true/>
 
 	<!-- Privacy usage descriptions — required by App Store -->
+	<!-- Location: WhenInUse only — one-time GPS check at clock-in to confirm
+	     the employee is physically at the job site. No background tracking.
+	     NSLocationAlwaysAndWhenInUseUsageDescription intentionally omitted —
+	     we never request "always on" location; including it without using it
+	     triggers App Store reviewer questions. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Pontifex uses your location to verify job site clock-ins and track field crew positions.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Pontifex uses your location to verify job site clock-ins and track field crew positions.</string>
+	<string>Pontifex verifies you are at the job site when you clock in. Your location is checked once per clock-in event and is not tracked in the background.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Pontifex uses the camera to capture job site photos and document completed work.</string>
 	<key>NSMicrophoneUsageDescription</key>
