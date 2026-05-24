@@ -1,25 +1,27 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 24, 2026 | **Branch:** `main` | **origin/main:** `48357325` | **Local ahead:** 5 unpushed commits | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅ (0 TS errors, 2820 tests pass)
+**Date:** May 24, 2026 | **Branch:** `main` | **origin/main:** `a57f7678` (PUSHED ✅) | **Production:** ⚠️ build READY but NOT PROMOTED (serving old build) | **Build:** PASSING ✅ (0 TS errors, full suite + ~46 new tests pass)
 
-> **💰 BUDGET: ~$15 Vercel build credit left.** Each push to `main` = ~$1–2 build. BATCHING: commit locally per feature, push once per session. **5 commits are batched locally awaiting a single push** (see below). Confirm with user before pushing.
+> **💰 BUDGET: ~$13 Vercel build credit left ($61.42/$75 used).** Each push to `main` = ~$1–2 build. BATCH commits, push once per session. Confirm before pushing. Spend Management WAS auto-pausing the site — user is switching it to Notify-only.
 
-## 🚧 BATCHED LOCALLY — NOT YET PUSHED (5 commits, one build to deploy all)
-- `c109c72a` #15 Office Documents (management-only contracts/change orders + project cost)
-- `61e2dcb1` #16 Time-off approval blocks schedule + creates PTO/UPTO timecard entries
-- `b590e66f` #13 directions-back-to-shop · #14 printable ticket · #20 maintenance→equipment status
-- `d6618127` test+refactor: tested lib/reminder-timing module (12 tests) + budget docs
-- (#21) shop manager daily equipment-needs view (+10 tests)
+## 🚨 TOP PRIORITY — DEPLOYMENT NOT PROMOTED (blocks everything)
+The 8-commit batch is **pushed and built (READY)** but the Vercel project shows **`live: false`** — the new deployment was never promoted to the live domain, and serverless functions are degraded. **Symptoms:** `/` loads (cached) but `/api/*` functions hang → **LOGIN HANGS on "Signing in…"**, and `/sms-opt-in` 404s (old build serving).
+**FIX (user action in Vercel dashboard):** Deployments → newest Ready/Production deployment → "⋯" → **Promote to Production** (free, no rebuild) + Settings → Billing → Spend Management → turn **"Pause Projects" OFF**. Then login + all 15 features go live. **Verify after promote:** login works, `/sms-opt-in` loads, live status badges/office docs/profile pics all serve.
 
-## 🏗️ BIG MULTI-SESSION ROADMAP IN PROGRESS (23 tracked tasks, 16 done)
-Major build-out kicked off May 23. Native push + reminders + SMS compliance + App Store track + workflow hardening. See task list (TaskList tool) for the 23 items.
-**Done:** push infra, notification prefs, clock-in reminders, work-performed reminders, SMS opt-in page, invoice-notification bug fix, dispatch dedupe, live status badges, out-of-town/hotel, office docs, time-off blocking, directions-to-shop, printable ticket, maintenance→equipment, shop equipment view, reminder-timing tests.
-**Remaining:** #2 iOS permissions verify, #4 profile pictures, #5 TestFlight prep, #10 status-transition hardening, #12 verify signature paths→completed jobs, #17 notification inbox card, #18 timecard self-service, #19 invoice confirm-flow UI (notification half done), #22 peer ratings.
+## ✅ SHIPPED THIS SPRINT (pushed in a57f7678 — live once promoted) — 22 of 23 tasks
+push infra + native push (APNs-ready), notification prefs UI, clock-in reminders (cron), work-performed reminders (cron), SMS opt-in page, **5 real bug fixes** (invoice notification cols, live-status cols, profile-pic bucket missing, time-off-request notification missing, onsite-signature canonical cols), dispatch dedupe, live status badges, out-of-town/hotel, office documents (mgmt-only), time-off→schedule/timecard blocking, directions-to-shop, printable ticket, maintenance→equipment status, shop equipment-needs view, profile pictures, notification inbox, status-transition hardening, signature flow verified. **~46 new Jest tests** (reminder-timing 12, equipment 10, avatar 7, job-status 17).
+
+## 📋 REMAINING WORK
+- **#22 peer ratings** — last real feature (form builder: ops mgr creates rating forms, operators↔helpers rate each other in-app). Net-new, own focused effort.
+- **#19 invoice confirm-flow UI** — notification half DONE (creator/salesperson notified on completion); remaining = the interactive "confirm invoice details → mark ready → admin finalizes" UI.
+- **Gated on Apple:** #2 verify iOS permission usage strings in Info.plist, #5 TestFlight build + submission.
 
 ### ⏳ Waiting on third parties (user actions)
-- **Apple Developer:** paid, pending approval → then APNs cert (4 env vars) activates push
-- **Twilio toll-free:** number `+18336954288` bought, creds in Vercel; submit toll-free verification with opt-in URL `https://www.pontifexindustries.com/sms-opt-in` + Terms/Privacy URLs (1–3 day approval). Then SMS reminders work.
+- **Apple Developer:** PAID, pending approval → then I add APNs cert (4 env vars: APNS_KEY_ID/TEAM_ID/BUNDLE_ID/PRIVATE_KEY) → native push goes live.
+- **Twilio toll-free:** number `+18336954288` bought, creds in Vercel. Submit toll-free verification: opt-in URL `https://www.pontifexindustries.com/sms-opt-in`, Terms `…/terms`, Privacy `…/privacy` (1–3 day approval). Then SMS reminders work.
 - **Rotate Twilio Auth Token** (was shown in a screenshot) — hygiene.
-- **Vercel Spend Management:** site was auto-paused once (DEPLOYMENT_PAUSED) — keep the cap high / notify-only so production doesn't go down.
+
+### 🔍 TO REVIEW (after promote)
+End-to-end smoke test on production once promoted: login (all roles) → schedule → dispatch (no duplicate SMS) → operator in-route/arrive/work-performed → day-complete signature → Completed Jobs → invoice notification to creator. Plus: /sms-opt-in form, office docs tab (management only, hidden from operators), profile pic upload, notification inbox, shop equipment-needs view, time-off approval blocking schedule.
 
 ---
 
