@@ -66,30 +66,53 @@ xcrun simctl launch CA1B2D65-5DC0-4C85-A072-3C0BFBE85402 com.pontifexindustries.
 - [x] `App.entitlements` created with `aps-environment = production` for push notifications ✅
 - [x] Privacy Policy at `/privacy`, Terms at `/terms` ✅
 
-### Step 1 — Apple Developer Portal (do once)
-1. Go to https://developer.apple.com/account/resources/identifiers/list
-2. **Identifiers → "+" → App IDs → App** 
-   - Description: "Pontifex Industries"
-   - Bundle ID (Explicit): `com.pontifexindustries.app`
-   - Capabilities: check **Push Notifications** + **NFC Tag Reading** + **Associated Domains** (for future universal links)
-   - Save
+### Known Values (confirmed May 24, 2026)
+| Field | Value |
+|---|---|
+| Team ID | `MG4K845UH7` |
+| Bundle ID | `com.pontifexindustries.app` |
+| Account | ANDRES FERNANDO ALTAMIRANO (Individual) |
+| App ID | ❌ Not yet created |
+| APNs Key | ❌ Not yet created |
+| Distribution Cert | ❌ Not yet created |
 
-3. **Certificates → "+" → Apple Distribution** 
-   - Follow the CSR instructions in Keychain Access
-   - Download + double-click to install the .cer file
+### Step 1 — Apple Developer Portal (do once, all 4 items from scratch)
 
-4. **Profiles → "+" → App Store Connect**
-   - Select the `com.pontifexindustries.app` App ID
-   - Select your Distribution Certificate
-   - Name: "Pontifex App Store Distribution"
-   - Download the .mobileprovision file
+**A. Create App ID**
+1. https://developer.apple.com/account/resources/identifiers/list → **"+"**
+2. Select **App IDs** → **App** → Continue
+3. Fill in:
+   - Description: `Pontifex Industries`
+   - Bundle ID: **Explicit** → `com.pontifexindustries.app`
+4. Scroll down, check these capabilities:
+   - ✅ **Push Notifications**
+   - ✅ **NFC Tag Reading**
+5. Continue → Register
 
-5. **Keys → "+" → APNs key** (for push notifications)
-   - Name: "Pontifex APNs"
-   - Check "Apple Push Notifications service (APNs)"
-   - Download the `.p8` file — **SAVE IT, you can only download once**
-   - Note the **Key ID** shown on the page
-   - Find your **Team ID** at: https://developer.apple.com/account → Membership → Team ID
+**B. Create Apple Distribution Certificate**
+1. Open **Keychain Access** on your Mac → Menu: Certificate Assistant → **Request a Certificate From a Certificate Authority**
+   - Email: your Apple ID email
+   - Select: **Saved to disk** → Save the `.certSigningRequest` file to Desktop
+2. Back in portal: https://developer.apple.com/account/resources/certificates/list → **"+"**
+3. Select **Apple Distribution** → Continue
+4. Upload the `.certSigningRequest` file → Continue → Download the `.cer` file
+5. Double-click the `.cer` file → installs into Keychain Access automatically
+
+**C. Create APNs Key**
+1. https://developer.apple.com/account/resources/authkeys/list → **"+"**
+2. Name: `Pontifex APNs`
+3. Check: ✅ **Apple Push Notifications service (APNs)**
+4. Continue → Register
+5. **Download the `.p8` file** — ⚠️ YOU CAN ONLY DOWNLOAD ONCE — save it somewhere safe
+6. Note the **Key ID** shown on screen (looks like `ABC123DEF4`)
+
+**D. Create Provisioning Profile**
+1. https://developer.apple.com/account/resources/profiles/list → **"+"**
+2. Select **App Store Connect** (under Distribution) → Continue
+3. App ID: select `com.pontifexindustries.app` → Continue
+4. Certificate: select the Distribution cert you just created → Continue
+5. Profile Name: `Pontifex App Store Distribution` → Generate → Download the `.mobileprovision` file
+6. Double-click the `.mobileprovision` file to install it
 
 ### Step 2 — Xcode (one-time setup before archive)
 1. Open `ios/App/App.xcodeproj` in Xcode
@@ -108,10 +131,10 @@ xcrun simctl launch CA1B2D65-5DC0-4C85-A072-3C0BFBE85402 com.pontifexindustries.
 ### Step 3 — Add APNs vars to Vercel (activates native push)
 In Vercel Dashboard → your project → Settings → Environment Variables, add:
 ```
-APNS_KEY_ID       = (Key ID from Step 1-5)
-APNS_TEAM_ID      = (Team ID from Step 1-5)
+APNS_KEY_ID       = (Key ID from Step 1-C — looks like ABC123DEF4)
+APNS_TEAM_ID      = MG4K845UH7
 APNS_BUNDLE_ID    = com.pontifexindustries.app
-APNS_PRIVATE_KEY  = (full contents of the .p8 file, newlines preserved)
+APNS_PRIVATE_KEY  = (full contents of the .p8 file, including -----BEGIN PRIVATE KEY----- lines)
 ```
 Code is already built in `lib/send-push.ts` — these 4 vars are all it needs.
 
