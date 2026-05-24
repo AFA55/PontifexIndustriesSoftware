@@ -20,26 +20,9 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendReminderOnce } from '@/lib/send-reminder';
+import { parseHHMM, todayInTz, nowMinutesInTz, clockInReminderPhase, minutesToLabel } from '@/lib/reminder-timing';
 
 const ACTIVE_STATUSES = ['scheduled', 'assigned', 'dispatched', 'in_route', 'in_progress', 'on_site'];
-
-function todayInTz(tz: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
-}
-function nowMinutesInTz(tz: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(new Date());
-  const h = Number(parts.find((p) => p.type === 'hour')?.value || '0');
-  const m = Number(parts.find((p) => p.type === 'minute')?.value || '0');
-  return (h % 24) * 60 + m;
-}
-function parseHHMM(t: string | null): number | null {
-  if (!t) return null;
-  const m = /^(\d{1,2}):(\d{2})/.exec(String(t).trim());
-  if (!m) return null;
-  return Number(m[1]) * 60 + Number(m[2]);
-}
 
 export async function GET(request: NextRequest) {
   // Auth — fail closed
@@ -105,10 +88,8 @@ export async function GET(request: NextRequest) {
       // Determine who is in a reminder window
       const candidates: { opId: string; phase: 'pre' | 'post'; startMin: number }[] = [];
       for (const [opId, startMin] of earliestStart) {
-        // pre: 5 min before (window [start-7, start-2])
-        if (nowMin >= startMin - 7 && nowMin <= startMin - 2) candidates.push({ opId, phase: 'pre', startMin });
-        // post: 5 min after (window [start+3, start+8])
-        else if (nowMin >= startMin + 3 && nowMin <= startMin + 8) candidates.push({ opId, phase: 'post', startMin });
+        const phase = clockInReminderPhase(nowMin, startMin);
+        if (phase) candidates.push({ opId, phase, startMin });
       }
       if (candidates.length === 0) continue;
 
@@ -136,9 +117,7 @@ export async function GET(request: NextRequest) {
       for (const c of candidates) {
         if (clockedIn.has(c.opId)) continue; // already clocked in — no reminder needed
 
-        const startH = Math.floor(c.startMin / 60);
-        const startM = c.startMin % 60;
-        const startLabel = `${((startH % 12) || 12)}:${String(startM).padStart(2, '0')} ${startH >= 12 ? 'PM' : 'AM'}`;
+        const startLabel = minutesToLabel(c.startMin);
 
         const title = c.phase === 'pre' ? 'Clock in soon' : 'Time to clock in';
         const message = c.phase === 'pre'

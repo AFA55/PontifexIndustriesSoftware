@@ -19,15 +19,9 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendReminderOnce } from '@/lib/send-reminder';
+import { todayInTz, workReminderPhase } from '@/lib/reminder-timing';
 
 const ACTIVE_STATUSES = ['scheduled', 'assigned', 'dispatched', 'in_route', 'in_progress', 'on_site'];
-const LUNCH_HOURS = 4;       // fire lunch reminder ~4 hrs into shift
-const LUNCH_WINDOW = 0.5;    // within the next 30 min of the 4h mark
-const OVERDUE_HOURS = 7;     // escalation at 7 hrs
-
-function todayInTz(tz: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
-}
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -97,9 +91,7 @@ export async function GET(request: NextRequest) {
         const jobId = jobByOp.get(o.userId);
         if (!jobId) continue; // work already submitted or no dispatched job
 
-        let phase: 'lunch' | 'overdue' | null = null;
-        if (o.hoursIn >= OVERDUE_HOURS) phase = 'overdue';
-        else if (o.hoursIn >= LUNCH_HOURS && o.hoursIn < LUNCH_HOURS + LUNCH_WINDOW) phase = 'lunch';
+        const phase = workReminderPhase(o.hoursIn);
         if (!phase) continue;
 
         const title = phase === 'lunch' ? 'Log your work' : 'Work not logged yet';
