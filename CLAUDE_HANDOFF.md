@@ -1,7 +1,25 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 22, 2026 | **Branch:** `main` | **Last commit:** `a5b74819` | **GitHub:** ✅ pushed | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅ (0 TS errors)
+**Date:** May 24, 2026 | **Branch:** `main` | **origin/main:** `48357325` | **Local ahead:** 5 unpushed commits | **Production:** 🚀 LIVE https://www.pontifexindustries.com | **Build:** PASSING ✅ (0 TS errors, 2820 tests pass)
 
-> **Status as of May 22, 2026.** Session focused on env-var setup, Vercel cost reduction, and hardening. 4 commits shipped: 12 new loading.tsx files, SMS signature delivery, SMS tenant-awareness, production URL fallbacks. Platform fully functional pending RESEND_API_KEY env var addition + redeploy.
+> **💰 BUDGET: ~$15 Vercel build credit left.** Each push to `main` = ~$1–2 build. BATCHING: commit locally per feature, push once per session. **5 commits are batched locally awaiting a single push** (see below). Confirm with user before pushing.
+
+## 🚧 BATCHED LOCALLY — NOT YET PUSHED (5 commits, one build to deploy all)
+- `c109c72a` #15 Office Documents (management-only contracts/change orders + project cost)
+- `61e2dcb1` #16 Time-off approval blocks schedule + creates PTO/UPTO timecard entries
+- `b590e66f` #13 directions-back-to-shop · #14 printable ticket · #20 maintenance→equipment status
+- `d6618127` test+refactor: tested lib/reminder-timing module (12 tests) + budget docs
+- (#21) shop manager daily equipment-needs view (+10 tests)
+
+## 🏗️ BIG MULTI-SESSION ROADMAP IN PROGRESS (23 tracked tasks, 16 done)
+Major build-out kicked off May 23. Native push + reminders + SMS compliance + App Store track + workflow hardening. See task list (TaskList tool) for the 23 items.
+**Done:** push infra, notification prefs, clock-in reminders, work-performed reminders, SMS opt-in page, invoice-notification bug fix, dispatch dedupe, live status badges, out-of-town/hotel, office docs, time-off blocking, directions-to-shop, printable ticket, maintenance→equipment, shop equipment view, reminder-timing tests.
+**Remaining:** #2 iOS permissions verify, #4 profile pictures, #5 TestFlight prep, #10 status-transition hardening, #12 verify signature paths→completed jobs, #17 notification inbox card, #18 timecard self-service, #19 invoice confirm-flow UI (notification half done), #22 peer ratings.
+
+### ⏳ Waiting on third parties (user actions)
+- **Apple Developer:** paid, pending approval → then APNs cert (4 env vars) activates push
+- **Twilio toll-free:** number `+18336954288` bought, creds in Vercel; submit toll-free verification with opt-in URL `https://www.pontifexindustries.com/sms-opt-in` + Terms/Privacy URLs (1–3 day approval). Then SMS reminders work.
+- **Rotate Twilio Auth Token** (was shown in a screenshot) — hygiene.
+- **Vercel Spend Management:** site was auto-paused once (DEPLOYMENT_PAUSED) — keep the cap high / notify-only so production doesn't go down.
 
 ---
 
