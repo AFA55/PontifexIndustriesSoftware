@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { notifySalesperson } from '@/lib/notify-salesperson';
+import { isValidTransition, validateTransitionTimestamp } from '@/lib/job-status';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -124,6 +125,15 @@ async function updateJobStatus(
       );
     }
 
+    // Secondary forward-only guard (defense-in-depth alongside LEGAL_TRANSITIONS).
+    // Conservative: log a warning rather than hard-reject so we never block a
+    // legitimate live operator flow the LEGAL_TRANSITIONS map already permitted.
+    if (!isValidTransition(currentStatus, status)) {
+      console.warn(
+        `[job-status] non-forward transition for job ${jobId}: ${currentStatus} -> ${status} (by ${user.id})`
+      );
+    }
+
     // Prepare update data with automatic timestamp tracking
     const updateData: any = {
       status,
@@ -214,8 +224,25 @@ async function updateJobStatus(
       'job_survey',
     ];
 
+    // Client-supplied timestamp fields that must be validated/clamped against
+    // the server clock — a corrupted/retried request could otherwise write a
+    // far-future or wildly-backdated time. Invalid values fall back to `now`.
+    const clientTimestampFields = new Set<string>([
+      'liability_release_signed_at',
+      'completion_signed_at',
+      'work_order_signed_at',
+      'feedback_submitted_at',
+    ]);
+
+    const nowDate = new Date(now);
     for (const field of allowedExtraFields) {
-      if (additionalFields[field] !== undefined) {
+      if (additionalFields[field] === undefined) continue;
+      if (clientTimestampFields.has(field)) {
+        // Prefer the validated client time; if it's corrupt/out-of-range,
+        // stamp server-side now() instead of trusting the client.
+        updateData[field] =
+          validateTransitionTimestamp(additionalFields[field], nowDate) ?? now;
+      } else {
         updateData[field] = additionalFields[field];
       }
     }
@@ -286,6 +313,31 @@ async function updateJobStatus(
     if (historyUpsertError) {
       // operator_status_history is optional — log but never block
       console.log('Operator status history skipped (table may not exist):', historyUpsertError.message || historyUpsertError.code || 'unknown');
+    }
+
+    // Always record an authoritative job_status_history row on a real status
+    // change. Canonical columns (verified against the live schema):
+    //   job_id, old_status, new_status, changed_by, changed_at, notes
+    // Non-blocking, but failures are logged (NOT swallowed silently) so a
+    // missing history row is observable rather than invisible.
+    if (currentStatus !== status) {
+      const { error: jobHistoryError } = await supabaseAdmin
+        .from('job_status_history')
+        .insert({
+          job_id: jobId,
+          old_status: currentStatus,
+          new_status: status,
+          changed_by: user.id,
+          changed_at: now,
+        });
+
+      if (jobHistoryError) {
+        console.error(
+          `[job-status] FAILED to write job_status_history for job ${jobId} ` +
+            `(${currentStatus} -> ${status}):`,
+          jobHistoryError.message || jobHistoryError.code || jobHistoryError
+        );
+      }
     }
 
     // Fire-and-forget salesperson notifications on key status transitions.

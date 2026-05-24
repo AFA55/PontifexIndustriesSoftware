@@ -206,11 +206,13 @@ export async function POST(
           .in('status', ['pending_completion', 'in_progress'])
       ).then(() => {}).catch(() => {});
 
-      // 2. Record status history
+      // 2. Record status history. NOTE: canonical columns are
+      //    job_id / new_status (NOT job_order_id / status) — the previous
+      //    insert silently failed because those columns don't exist.
       Promise.resolve(
         supabaseAdmin.from('job_status_history').insert({
-          job_order_id: sigRequest.job_order_id,
-          status: 'completed',
+          job_id: sigRequest.job_order_id,
+          new_status: 'completed',
           changed_at: now,
           notes: `Remote signature by ${signer_name || 'customer'}`,
         })

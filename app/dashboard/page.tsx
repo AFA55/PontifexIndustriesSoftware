@@ -1180,6 +1180,15 @@ export default function Dashboard() {
                 </svg>
                 Time Off
               </Link>
+              <Link
+                href="/dashboard/notifications"
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                Inbox
+              </Link>
             </div>
           </div>
         </div>

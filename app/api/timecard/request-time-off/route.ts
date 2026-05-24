@@ -96,6 +96,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fire-and-forget: notify admins / ops managers in the tenant of the new request.
+    if (auth.tenantId) {
+      void (async () => {
+        try {
+          const { data: requester } = await supabaseAdmin
+            .from('profiles')
+            .select('full_name')
+            .eq('id', auth.userId)
+            .single();
+          const requesterName = requester?.full_name ?? 'An operator';
+          const label = timeOffType.replace(/\b\w/g, (c: string) => c.toUpperCase());
+          const sorted = [...newDates].sort();
+          const range = sorted.length === 1
+            ? sorted[0]
+            : `${sorted[0]} – ${sorted[sorted.length - 1]} (${sorted.length} days)`;
+          const msg = `${requesterName} requested ${label} time off for ${range}${reason ? ` — ${reason}` : ''}`;
+
+          const { data: admins } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('tenant_id', auth.tenantId)
+            .in('role', ['admin', 'super_admin', 'operations_manager']);
+
+          if (admins && admins.length > 0) {
+            const notifRows = admins.map((a: { id: string }) => ({
+              user_id: a.id,
+              tenant_id: auth.tenantId,
+              type: 'info',
+              notification_type: 'time_off_request',
+              title: 'New Time-Off Request',
+              message: msg,
+              action_url: '/dashboard/admin/time-off',
+              related_entity_type: 'operator_time_off',
+              read: false,
+              is_read: false,
+            }));
+            await supabaseAdmin.from('notifications').insert(notifRows);
+          }
+        } catch {
+          /* non-fatal */
+        }
+      })();
+    }
+
     const skippedCount = dates.length - newDates.length;
 
     return NextResponse.json({

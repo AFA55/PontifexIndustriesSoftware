@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import Avatar from '@/components/Avatar';
 
 interface MyProfile {
   id: string;
@@ -187,19 +188,11 @@ export default function MyProfilePage() {
             {/* Profile Header Card */}
             <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-6 flex items-center gap-5 shadow-sm">
               <div className="relative flex-shrink-0">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center overflow-hidden">
-                  {(avatarPreview || profile.profile_picture_url) ? (
-                    <img
-                      src={avatarPreview || profile.profile_picture_url!}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-white font-bold text-2xl">
-                      {profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                    </span>
-                  )}
-                </div>
+                <Avatar
+                  src={avatarPreview || profile.profile_picture_url}
+                  name={profile.full_name}
+                  size={80}
+                />
                 {/* Clickable camera overlay */}
                 <button
                   onClick={() => avatarInputRef.current?.click()}

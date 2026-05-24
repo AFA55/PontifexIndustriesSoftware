@@ -279,10 +279,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // ── 6. Status history (gracefully skip if table absent) ──────────────────
+    // job_status_history columns: id, job_id, old_status, new_status, changed_by, changed_at, notes
     const { data: historyRows, error: historyErr } = await supabaseAdmin
       .from('job_status_history')
-      .select('status, changed_at, changed_by')
-      .eq('job_order_id', jobId)
+      .select('new_status, changed_at, changed_by')
+      .eq('job_id', jobId)
       .order('changed_at', { ascending: false })
       .limit(20);
 
@@ -292,8 +293,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
         (historyErr.message ?? '').includes('does not exist'));
 
     const statusHistory = (!historyTableMissing && historyRows)
-      ? (historyRows as Array<{ status: string; changed_at: string; changed_by?: string | null }>).map((h) => ({
-          status: h.status,
+      ? (historyRows as Array<{ new_status: string; changed_at: string; changed_by?: string | null }>).map((h) => ({
+          status: h.new_status,
           changed_at: h.changed_at,
           changed_by: h.changed_by ?? null,
         }))
