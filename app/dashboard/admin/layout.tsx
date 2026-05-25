@@ -175,7 +175,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* ---------------------------------------------------------------- */}
         {/* Scrollable page content                                          */}
         {/* ---------------------------------------------------------------- */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#0b0618]">
+        {/* overflow-y-scroll (not auto) keeps the scrollbar track always present so
+            the content area never shifts horizontally when navigating between a
+            long page (scrollbar visible) and a short page (no scrollbar).       */}
+        <main className="flex-1 overflow-y-scroll overflow-x-hidden bg-gray-50 dark:bg-[#0b0618]">
           {children}
         </main>
 

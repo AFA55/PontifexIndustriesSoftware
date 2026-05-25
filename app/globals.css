@@ -294,11 +294,41 @@ select {
     }
   }
 
-  /* View Transitions default crossfade tuning */
+  /* ── View Transitions: pure crossfade, no lateral slide ─────────────────
+   * The browser default already crossfades — we just tune the duration.
+   * Explicitly set transform: none so that no slide effect can sneak in
+   * from browser defaults or third-party stylesheets.
+   * ──────────────────────────────────────────────────────────────────────── */
   ::view-transition-old(root),
   ::view-transition-new(root) {
-    animation-duration: 320ms;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    animation-duration: 250ms;
+    animation-timing-function: ease-out;
+    /* Ensure no positional movement — opacity crossfade only */
+    transform: none !important;
+    mix-blend-mode: normal;
+  }
+
+  /* ── Standard page content wrapper ────────────────────────────────────
+   * Apply .page-content to the outermost div inside any dashboard page to
+   * get consistent horizontal centering across all routes.
+   * The schedule board (full-width) intentionally does NOT use this class.
+   * max-w-7xl = 1280px — wide enough for tables, narrow enough to stay
+   * centered on large monitors so content doesn't bounce side-to-side.
+   * ──────────────────────────────────────────────────────────────────────── */
+  .page-content {
+    width: 100%;
+    max-width: 80rem; /* 1280px — same as Tailwind max-w-7xl */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;   /* px-4 */
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .page-content {
+      padding-left: 1.5rem;  /* sm:px-6 */
+      padding-right: 1.5rem;
+    }
   }
 
   /* Landing page dark theme utilities */
@@ -322,6 +352,20 @@ select {
 
 html {
   scroll-behavior: smooth;
+  /* ── Scrollbar gutter ────────────────────────────────────────────────────
+   * Reserves space for the scrollbar even when it is not visible.
+   * This prevents the 15px horizontal layout shift that occurs when
+   * navigating between a page that needs a scrollbar and one that doesn't.
+   * On mobile / iOS / Capacitor there is no scrollbar — env returns 0, no change.
+   * ──────────────────────────────────────────────────────────────────────── */
+  scrollbar-gutter: stable;
+  /* Belt-and-suspenders: never let the root element scroll horizontally. */
+  overflow-x: hidden;
+}
+
+body {
+  /* Prevent any accidental horizontal overflow from escaping the viewport. */
+  overflow-x: hidden;
 }
 
 /* ─── iOS / Capacitor safe-area utilities ──────────────────────────────────
