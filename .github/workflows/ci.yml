@@ -29,7 +29,11 @@ jobs:
       run: npm ci
 
     - name: Run linter
-      run: npm run lint
+      # Use ESLint CLI directly — `next lint` is deprecated in Next.js 15 and
+      # its interactive prompt causes failures in non-TTY CI environments.
+      # --no-error-on-unmatched-pattern prevents false failures when a glob
+      # matches no files. Warnings are allowed; only errors block the build.
+      run: npx eslint . --ext .ts,.tsx --no-error-on-unmatched-pattern --max-warnings 9999
 
     - name: Run tests
       run: npm run test:ci

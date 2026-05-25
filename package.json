@@ -8,7 +8,7 @@
     "dev:webpack": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .ts,.tsx --no-error-on-unmatched-pattern --max-warnings 9999",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

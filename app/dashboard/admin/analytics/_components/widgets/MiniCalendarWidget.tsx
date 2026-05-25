@@ -27,26 +27,11 @@ export default function MiniCalendarWidget({ data, isLoading }: WidgetProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  if (isLoading) return <LoadingSkeleton className="h-full" />;
-
+  // All hooks must run unconditionally — before any early return.
   const dates: Record<string, DayData> = data?.dates ?? {};
 
-  const year = currentMonth.getFullYear();
-  const month = currentMonth.getMonth();
-
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-
-  const calendarCells: (number | null)[] = [];
-  for (let i = 0; i < firstDay; i++) calendarCells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d);
-
-  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
-  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
-
-  const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   // Upcoming jobs (next 5 from today)
   const upcomingJobs = useMemo(() => {
@@ -60,6 +45,23 @@ export default function MiniCalendarWidget({ data, isLoading }: WidgetProps) {
     }
     return allJobs.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
   }, [dates, todayStr]);
+
+  if (isLoading) return <LoadingSkeleton className="h-full" />;
+
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const calendarCells: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) calendarCells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d);
+
+  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
+
+  const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const selectedDayData = selectedDay ? dates[selectedDay] : null;
 
