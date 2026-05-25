@@ -23,8 +23,13 @@ export default function NetworkMonitor() {
   const healthCheckRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Initial state
-    setIsOffline(!navigator.onLine);
+    // Do NOT trust navigator.onLine on initial mount — it is unreliable in:
+    //   - iOS WKWebView / Capacitor (returns false even on live connections)
+    //   - Xcode simulators
+    //   - Some corporate proxies / VPNs
+    // If the page loaded, we were online. Only flag offline when a real event
+    // fires or when fetches fail consistently (handled below).
+    // setIsOffline(!navigator.onLine) intentionally removed.
 
     const handleOffline = () => {
       setIsOffline(true);
@@ -205,7 +210,7 @@ export default function NetworkMonitor() {
   if (!isOffline && !bannerVisible) return null;
 
   return (
-    <div className={`fixed top-0 left-0 right-0 z-[10000] ${
+    <div className={`fixed top-0 left-0 right-0 z-[10000] pt-safe ${
       isOffline
         ? 'bg-gray-900 text-white'
         : 'bg-amber-500 text-amber-950'
