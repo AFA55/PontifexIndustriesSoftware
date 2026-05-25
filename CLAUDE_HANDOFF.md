@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 25, 2026 (2AM session) | **Branch:** `main` | **origin/main:** `1ae67d12` (PUSHED ✅) | **Production:** ✅ LIVE | **Build:** PASSING ✅ (0 TS errors)
+**Date:** May 25, 2026 (continued session) | **Branch:** `main` | **Last commit:** `08b54de7` (NOT pushed — save Vercel budget) | **Production:** ✅ LIVE | **Build:** PASSING ✅ (0 TS errors)
 
 > **💰 BUDGET: ~$11–12 Vercel build credit left.** Each push to `main` = ~$1–2 build. BATCH commits, push once per session. See `DEPLOYMENT_COST.md`.
 
@@ -32,7 +32,27 @@
 
 ### 🚨 iOS — CURRENT STATE (May 25, 2026 2AM)
 
-### ✅ What's Done This Session
+### ✅ What's Done This Session (May 25 continued — compliance fixes)
+
+**`08b54de7` — security: compliance audit fixes (NOT yet pushed to origin/main)**
+- `profiles/route.ts`: replaced hardcoded `'Patriot2026!'` password with `crypto.getRandomValues` temp password — was CRITICAL-1 in audit
+- `tenant-by-code/route.ts`: service role key removed from public endpoint; replaced with anon key + SECURITY DEFINER RPC `lookup_tenant_by_code` — was CRITICAL-3
+- `middleware.ts`: added `Strict-Transport-Security: max-age=31536000; includeSubDomains` (HSTS) — was HIGH-3
+- `middleware.ts`: `unsafe-eval` now excluded from production CSP (`process.env.NODE_ENV !== 'production'` guard) — was HIGH-4
+- `middleware.ts`: `/api/sms-opt-in` added to rate-limited public paths — was HIGH-1
+- Legal docs already committed in `a0f1650d`: privacy-policy.ts, gps-consent.ts, terms-of-service.ts, esign-consent.ts all rebranded to Pontifex Industries with accurate GPS disclosure (one-time clock-in, no background tracking)
+- Build passes ✅ (0 TS errors, 0 ESLint errors)
+
+**iOS App Store submission — state at end of session:**
+- Build 3 (CURRENT_PROJECT_VERSION=2) delivered via Transporter ✅ — shows READY FOR INTERNAL TESTING in App Store Connect
+- TestFlight: internal tester AndresAFA55@icloud.com added (needs email acceptance on iPhone)
+- App Store Connect 1.0 metadata: most fields filled. Still needs:
+  - Screenshots: drag 5 PNGs from ~/Desktop/PontifexScreenshots/ to 6.9" Display slot in Media Manager
+  - App Review credentials: username=zack@demopontifex.com, password=Patriot2026!, Code=PATRIOT
+  - Attach Build 2 to version (click "Add Build")
+  - Phone number for contact info
+
+### ✅ What Was Done Earlier This Session (May 25 2AM)
 - **Removed Operator Skill Levels from Admin Settings** — was redundant with Team Profiles → Skills tab. `settings/page.tsx` cleaned up.
 - **Migrations applied to prod**: `20260427_utility_waiver_fields.sql` (utility waiver fields on job_orders) + `20260427_operator_badges.sql` (operator_badges table with RLS)
 - **Login page logo** — now uses Pontifex bridge logo (`/logo.svg`) instead of inline "P" SVG placeholder
