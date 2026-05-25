@@ -67,10 +67,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate a cryptographically random temporary password (never hardcoded).
+    // The invite email flow will prompt the user to set their own password.
+    const tempPassword = Array.from(crypto.getRandomValues(new Uint8Array(18)))
+      .map(b => b.toString(36))
+      .join('')
+      .slice(0, 20);
+
     // Create auth user
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: 'Patriot2026!', // Default password — user should change on first login
+      password: tempPassword,
       email_confirm: true,
       user_metadata: { full_name: fullName },
     });

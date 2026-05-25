@@ -47,8 +47,9 @@ const RATE_LIMITED_PATHS = [
   '/api/access-requests',
   '/api/auth/login',
   '/api/auth/forgot-password',
-  '/api/public/tenant-by-code',   // HIGH-1: unauthenticated tenant lookup (login page)
-  '/api/auth/lookup-company',      // HIGH-1: unauthenticated company code lookup
+  '/api/public/tenant-by-code',   // unauthenticated tenant lookup (login page)
+  '/api/auth/lookup-company',      // unauthenticated company code lookup
+  '/api/sms-opt-in',               // unauthenticated SMS opt-in endpoint
 ];
 
 export function middleware(request: NextRequest) {
@@ -75,6 +76,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set(
     'Permissions-Policy',
@@ -82,11 +84,15 @@ export function middleware(request: NextRequest) {
   );
   // Content-Security-Policy: restrict where scripts/frames/connections can originate.
   // 'unsafe-inline' required for Next.js inline scripts; nonce-based CSP is a future upgrade.
+  // 'unsafe-eval' is only included in development (Next.js hot reload requires it).
+  const isDev = process.env.NODE_ENV !== 'production';
   response.headers.set(
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // Next.js requires unsafe-eval in dev
+      isDev
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"  // hot reload needs unsafe-eval in dev
+        : "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",

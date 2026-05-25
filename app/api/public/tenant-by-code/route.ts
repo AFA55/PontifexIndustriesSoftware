@@ -3,45 +3,42 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/public/tenant-by-code?code=PATRIOT
  * No auth required — used by the company-login page before any session exists.
- * Uses direct Supabase REST fetch (no client lib) to avoid cold-start hangs.
+ *
+ * Uses the anon key + a SECURITY DEFINER RPC (`lookup_tenant_by_code`) so the
+ * service role key is never exposed on a public endpoint.
+ * Migration 20260521_public_tenant_lookup_fn created the RPC.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /**
- * Fetch from Supabase REST API and return the parsed JSON body.
- * The AbortController timer stays active through BOTH the network round-trip
- * AND the response body read — so a stalled body stream is aborted just like
- * a stalled connection.  Timer is cleared only after data is fully in memory.
- *
- * Returns the parsed array, or throws on timeout / non-2xx / parse error.
+ * Fetch from Supabase REST API with a hard timeout covering both
+ * the network round-trip and the response body read.
  */
-async function supabaseFetch<T = any>(path: string, timeoutMs: number): Promise<T[]> {
+async function supabaseFetch<T = any>(path: string, options: RequestInit, timeoutMs: number): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      ...options,
       signal: controller.signal,
       headers: {
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
+        apikey: ANON_KEY,
+        Authorization: `Bearer ${ANON_KEY}`,
         'Content-Type': 'application/json',
-        Prefer: 'return=representation',
+        ...(options.headers as Record<string, string> | undefined),
       },
     });
-    // Do NOT clearTimeout here — abort signal must stay live during body read.
     if (!res.ok) {
       clearTimeout(timer);
       throw Object.assign(new Error(`HTTP ${res.status}`), { httpStatus: res.status });
     }
-    // Body read is covered by the same abort signal — if Supabase stalls mid-stream,
-    // the timer fires, signal aborts, and res.json() throws an AbortError.
     const data = await res.json();
     clearTimeout(timer);
-    return data as T[];
+    return data as T;
   } catch (err: any) {
     clearTimeout(timer);
     throw err;
@@ -58,41 +55,44 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate format: alphanumeric only, 2–20 chars.
-    // Rejects SQL special chars, slashes, spaces — defense-in-depth beyond encodeURIComponent.
     if (!/^[A-Z0-9]{2,20}$/.test(code)) {
       return NextResponse.json({ error: 'Invalid company code format' }, { status: 400 });
     }
 
-    // Direct REST call — 8 second hard cap, abort fires if connection OR body stalls
-    let tenants: any[];
+    // Call SECURITY DEFINER RPC with anon key — returns only {id, name, company_code}
+    // RLS is bypassed safely inside the function which only exposes non-sensitive fields.
+    let tenant: { id: string; name: string; company_code: string } | null = null;
     try {
-      tenants = await supabaseFetch(
-        `tenants?company_code=eq.${encodeURIComponent(code)}&select=id,name,slug,company_code,logo_url,primary_color&limit=1`,
+      tenant = await supabaseFetch<{ id: string; name: string; company_code: string }>(
+        'rpc/lookup_tenant_by_code',
+        {
+          method: 'POST',
+          body: JSON.stringify({ p_code: code }),
+        },
         8000
       );
     } catch (err: any) {
       const isAbort = err?.name === 'AbortError';
-      console.error('[tenant-by-code] tenant query failed:', err?.message);
+      console.error('[tenant-by-code] tenant RPC failed:', err?.message);
       return NextResponse.json(
         { error: isAbort ? 'Lookup timed out — please try again.' : 'Company lookup failed. Please try again.' },
         { status: isAbort ? 503 : 502 }
       );
     }
 
-    const tenant = tenants[0] ?? null;
-
-    if (!tenant) {
+    if (!tenant || !tenant.id) {
       return NextResponse.json({ error: 'Company not found. Please check your company code.' }, { status: 404 });
     }
 
-    // Branding — non-fatal, separate 5s timeout
+    // Branding — non-fatal, separate 5s timeout, anon key subject to RLS
     let branding: any = null;
     try {
-      const rows = await supabaseFetch(
+      const rows = await supabaseFetch<any[]>(
         `tenant_branding?tenant_id=eq.${tenant.id}&is_active=eq.true&select=company_name,logo_url,primary_color,secondary_color,login_bg_gradient_from,login_bg_gradient_to,login_welcome_text,tagline&limit=1`,
+        { method: 'GET' },
         5000
       );
-      branding = rows[0] ?? null;
+      branding = Array.isArray(rows) ? (rows[0] ?? null) : null;
     } catch {
       // branding is optional — login page works without it
     }
