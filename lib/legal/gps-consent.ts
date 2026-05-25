@@ -1,50 +1,47 @@
 /**
- * Patriot Concrete Cutting — GPS Location Tracking Consent
+ * Pontifex Industries — GPS Location Consent (iOS Clock-In Verification)
  */
 
-export const GPS_CONSENT_VERSION = 'v1.0';
+export const GPS_CONSENT_VERSION = 'v1.1';
 
-export const GPS_CONSENT_TEXT = `## GPS Location Tracking Disclosure
+export const GPS_CONSENT_TEXT = `## Location Access Disclosure
 
-Patriot Concrete Cutting uses GPS location tracking as part of our operations management platform. By consenting, you acknowledge and agree to the following:
+Pontifex Industries requests access to your device location **only at the moment you clock in** to verify that you are physically present at the assigned job site. By consenting, you acknowledge and agree to the following:
 
-### What We Track
-- Your GPS coordinates when you clock in and clock out
-- Your location when marking "en route" to a job site
-- Your location when arriving at and departing from job sites
-- Location data associated with job completion and signatures
+### What We Access
+- Your GPS coordinates at the exact moment you tap "Clock In"
+- One location point per clock-in event — no continuous monitoring
 
-### When We Track
-- GPS tracking is active **only during your work hours** (from clock-in to clock-out)
-- We do **not** track your location outside of work hours
-- We do **not** track your location when you are not actively using the Platform
+### What We Do NOT Do
+- We do **not** track your location continuously or in the background
+- We do **not** access your location when the app is closed
+- We do **not** access your location outside of the single clock-in verification check
+- We do **not** share your location with third parties
 
-### How We Use Location Data
-- To verify clock-in/clock-out at designated work locations
-- To confirm arrival at job sites for dispatch purposes
-- To calculate drive times for scheduling optimization
-- To provide location context for signed documents and job records
+### How We Use This Data
+- To verify you are within the required radius of your assigned job site at clock-in
+- To attach a location record to your timecard for that shift
+- To support dispute resolution for attendance records
 
 ### Data Storage & Retention
 - Location data is stored securely with encryption at rest and in transit
-- GPS records are retained for 3 years per company policy
-- You may request a copy of your location data at any time
+- GPS clock-in records are retained for 3 years per company policy
+- You may request a copy of your location records at any time
 
 ### Your Rights
-- You may **withdraw this consent at any time** by contacting your supervisor or support@patriotconcretecutting.com
-- Withdrawing consent may disable certain Platform features (clock-in/out, en-route tracking)
-- Withdrawing consent will not affect previously collected data
-- Your consent is voluntary, but GPS features are integral to the Platform's time-tracking functionality`;
+- You may **withdraw this consent at any time** by disabling location access in your iPhone Settings → Privacy & Security → Location Services
+- Withdrawing location access will prevent the GPS clock-in verification feature from working; you may be able to use a PIN-based alternative if your employer has enabled it
+- Withdrawing consent will not affect previously collected data`;
 
 export function getGpsConsentHTML(): string {
   return `
     <div>
-      <p><strong>GPS Location Tracking</strong></p>
+      <p><strong>Location Access</strong></p>
       <ul>
-        <li>Tracks your location <strong>only during work hours</strong> (clock-in to clock-out)</li>
-        <li>Used for time verification, job site arrival, and dispatch</li>
-        <li>Data encrypted and retained for 3 years</li>
-        <li>You can withdraw consent at any time (may disable clock-in/out features)</li>
+        <li>Location is accessed <strong>once at clock-in only</strong> to verify job site presence</li>
+        <li>No continuous or background tracking — ever</li>
+        <li>One GPS point stored per clock-in event, encrypted, retained 3 years</li>
+        <li>You can disable location in iPhone Settings at any time</li>
       </ul>
     </div>
   `;

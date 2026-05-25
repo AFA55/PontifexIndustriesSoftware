@@ -1,5 +1,5 @@
 /**
- * Patriot Concrete Cutting — Terms of Service
+ * Pontifex Industries — Terms of Service
  */
 
 export const TERMS_OF_SERVICE_VERSION = 'v1.0';
@@ -10,7 +10,7 @@ export const TERMS_OF_SERVICE_FULL = `
 **Effective Date:** March 22, 2026
 **Version:** ${TERMS_OF_SERVICE_VERSION}
 
-These Terms of Service ("Terms") govern your use of the Patriot Concrete Cutting operations management platform (the "Platform"). By accessing or using the Platform, you agree to be bound by these Terms.
+These Terms of Service ("Terms") govern your use of the Pontifex Industries operations management platform (the "Platform"). By accessing or using the Platform, you agree to be bound by these Terms.
 
 ---
 
@@ -103,7 +103,7 @@ TO THE MAXIMUM EXTENT PERMITTED BY LAW:
 
 ## 10. Indemnification
 
-You agree to indemnify, defend, and hold harmless Patriot Concrete Cutting and its officers, employees, and agents from any claims, damages, or expenses arising from your use of the Platform or violation of these Terms.
+You agree to indemnify, defend, and hold harmless Pontifex Industries and its officers, employees, and agents from any claims, damages, or expenses arising from your use of the Platform or violation of these Terms.
 
 ---
 
@@ -130,9 +130,9 @@ These Terms are governed by the laws of the State of South Carolina, without reg
 
 ## 14. Contact Us
 
-**Patriot Concrete Cutting**
-Email: support@patriotconcretecutting.com
-Website: https://patriotconcretecutting.com
+**Pontifex Industries**
+Email: pontifexindustries@gmail.com
+Website: https://www.pontifexindustries.com
 `;
 
 export function getTermsOfServiceSummaryHTML(): string {
