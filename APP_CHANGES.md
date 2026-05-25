@@ -66,15 +66,17 @@ xcrun simctl launch CA1B2D65-5DC0-4C85-A072-3C0BFBE85402 com.pontifexindustries.
 - [x] `App.entitlements` created with `aps-environment = production` for push notifications ✅
 - [x] Privacy Policy at `/privacy`, Terms at `/terms` ✅
 
-### Known Values (confirmed May 24, 2026)
+### Known Values (confirmed May 25, 2026)
 | Field | Value |
 |---|---|
 | Team ID | `MG4K845UH7` |
 | Bundle ID | `com.pontifexindustries.app` |
-| Account | ANDRES FERNANDO ALTAMIRANO (Individual) |
-| App ID | ❌ Not yet created |
-| APNs Key | ❌ Not yet created |
-| Distribution Cert | ❌ Not yet created |
+| Account (iCloud) | `andresa.t55@icloud.com` — ANDRES FERNANDO ALTAMIRANO (Individual, $99/yr paid) |
+| App ID | ✅ Created — `com.pontifexindustries.app` (Push + NFC enabled) |
+| APNs Key ID | `M44JJFDG6G` (Sandbox & Production) ✅ |
+| Distribution Cert | ✅ Created — "Apple Distribution: ANDRES FERNANDO ALTAMIR..." (5/24/26, in Keychain) |
+| Provisioning Profile | ✅ Created — "Pontifex App Store Distribution" (installed in Xcode) |
+| Exported IPA | ✅ `~/Desktop/PontifexExport/App.ipa` (1.7 MB, correctly signed) |
 
 ### Step 1 — Apple Developer Portal (do once, all 4 items from scratch)
 
@@ -131,7 +133,7 @@ xcrun simctl launch CA1B2D65-5DC0-4C85-A072-3C0BFBE85402 com.pontifexindustries.
 ### Step 3 — Add APNs vars to Vercel (activates native push)
 In Vercel Dashboard → your project → Settings → Environment Variables, add:
 ```
-APNS_KEY_ID       = (Key ID from Step 1-C — looks like ABC123DEF4)
+APNS_KEY_ID       = M44JJFDG6G
 APNS_TEAM_ID      = MG4K845UH7
 APNS_BUNDLE_ID    = com.pontifexindustries.app
 APNS_PRIVATE_KEY  = (full contents of the .p8 file, including -----BEGIN PRIVATE KEY----- lines)
@@ -206,13 +208,40 @@ The build will appear in App Store Connect → TestFlight within ~30 minutes.
 
 ## Pending App Tasks
 
+### 🚨 CURRENT BLOCKER — Xcode Team Dropdown Bug
+Xcode's Team dropdown shows only "Andres Altamirano (Personal Team)" even though:
+- The paid account `andresa.t55@icloud.com` IS logged into Xcode Accounts
+- Team ID MG4K845UH7 IS the paid account ($99/yr, Individual)
+- Both Apple Developer agreements are accepted (May 23, 2026)
+- The Distribution cert and Provisioning Profile are both created and installed
+
+**Root cause:** Xcode cached the account as "not enrolled" before the $99 payment was processed.
+**Fix to try next session:** Xcode → Settings → Accounts → remove `andresa.t55@icloud.com` → re-add it → Download Manual Profiles → the paid team should then appear in the Team dropdown.
+
+**Bypass already available:** IPA is exported at `~/Desktop/PontifexExport/App.ipa` (signed correctly via CLI). Can be uploaded directly with Transporter (free Mac App Store app) OR via `xcrun altool`.
+
+### 🆕 Claude Agent for Xcode (MCP)
+Xcode 26 Intelligence → Agents → **Claude Agent by Anthropic** was downloading at 48% end of session.
+- Once it finishes: Xcode → Settings → Intelligence → toggle ON "Allow external agents to use Xcode tools"
+- In a new Claude Code session, Claude can directly control Xcode via MCP tools — can fix signing, trigger archives, run builds, all without screenshots
+- **This will make future iOS work dramatically faster**
+
 ### Remaining Before Submission
-- [ ] **Set Version 1.0.0 + Build 1** in Xcode → Target → General
-- [ ] **Add Push Notifications + NFC capabilities** in Xcode → Signing & Capabilities
-- [ ] **Add APNs env vars** to Vercel (4 vars from Step 3 above)
-- [ ] **Take App Store screenshots** on iPhone 15 Pro Max simulator (5 screens)
-- [ ] **Archive + upload** via Xcode → Product → Archive
+- [x] **App ID created** — `com.pontifexindustries.app` (Push + NFC) ✅
+- [x] **Distribution Certificate** — "Apple Distribution: ANDRES FERNANDO ALTAMIR..." in Keychain ✅
+- [x] **APNs Key** — `M44JJFDG6G`, .p8 file downloaded ✅
+- [x] **Provisioning Profile** — "Pontifex App Store Distribution" installed ✅
+- [x] **Version 1.0.0 + Build 1** — set in Xcode General tab ✅
+- [x] **Push Notifications + NFC capabilities** — added in Signing & Capabilities ✅
+- [x] **IPA exported** — `~/Desktop/PontifexExport/App.ipa` (1.7MB, signed) ✅
+- [x] **project.pbxproj** — `DEVELOPMENT_TEAM = MG4K845UH7` hardcoded ✅
+- [ ] **Fix Xcode Team dropdown** — sign out/in with `andresa.t55@icloud.com` OR use Transporter
+- [ ] **Add APNs env vars** to Vercel (4 vars: APNS_KEY_ID, APNS_TEAM_ID, APNS_BUNDLE_ID, APNS_PRIVATE_KEY)
+- [ ] **Create App Store Connect listing** — appstoreconnect.apple.com → My Apps → "+" → New App
+- [ ] **Take App Store screenshots** on iPhone 15 Pro Max simulator (5 screens, 1290×2796px)
+- [ ] **Upload IPA** — via Xcode Distribute App OR Transporter (drag App.ipa → Deliver)
 - [ ] **TestFlight internal test** before submitting for review
+- [ ] **Submit for review** — App Store Connect → 1.0 Prepare for Submission → Submit
 
 ### Native Features (Planned — post-launch)
 - [ ] **NFC scanning** — `@capacitor-community/nfc` plugin for equipment tagging

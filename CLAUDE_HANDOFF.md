@@ -1,5 +1,5 @@
 # CLAUDE CODE AGENT HANDOFF DOCUMENT
-**Date:** May 24, 2026 | **Branch:** `main` | **origin/main:** `1ae67d12` (PUSHED ✅) | **Production:** ✅ LIVE (Vercel restored, deployment limit set) | **Build:** PASSING ✅ (0 TS errors)
+**Date:** May 25, 2026 (2AM session) | **Branch:** `main` | **origin/main:** `1ae67d12` (PUSHED ✅) | **Production:** ✅ LIVE | **Build:** PASSING ✅ (0 TS errors)
 
 > **💰 BUDGET: ~$11–12 Vercel build credit left.** Each push to `main` = ~$1–2 build. BATCH commits, push once per session. See `DEPLOYMENT_COST.md`.
 
@@ -30,16 +30,56 @@
 
 ## 📋 REMAINING (App Store path only — web feature work is done)
 
-### ⏳ Waiting on user actions
-- **Upload Patriot logo** → Settings → Company Branding → "Icon (Square)" slot → Save. Login page will show it immediately.
-- **Apple App Store submission** (see `APP_CHANGES.md` for full 7-step guide):
-  1. developer.apple.com → create App ID `com.pontifexindustries.app` (enable Push + NFC)
-  2. Create Distribution Certificate + Provisioning Profile
-  3. Create APNs key (.p8) — note Key ID + Team ID
-  4. Add 4 env vars to Vercel: `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_PRIVATE_KEY`
-  5. Xcode: set version 1.0.0 / build 1, add Push Notifications + NFC capabilities
-  6. Take App Store screenshots on iPhone 15 Pro Max simulator (5 screens, 1290×2796px)
-  7. App Store Connect: create listing, fill metadata, archive + upload, TestFlight → submit
+### 🚨 iOS — CURRENT STATE (May 25, 2026 2AM)
+
+### ✅ What's Done This Session
+- **Removed Operator Skill Levels from Admin Settings** — was redundant with Team Profiles → Skills tab. `settings/page.tsx` cleaned up.
+- **Migrations applied to prod**: `20260427_utility_waiver_fields.sql` (utility waiver fields on job_orders) + `20260427_operator_badges.sql` (operator_badges table with RLS)
+- **Login page logo** — now uses Pontifex bridge logo (`/logo.svg`) instead of inline "P" SVG placeholder
+- **DEFAULT_BRANDING updated** — Pontifex bridge logo shown before any tenant loads (logo_url, logo_icon_url, favicon_url all point to `/logo.svg`)
+- **Info.plist fixed** — removed `NSLocationAlwaysAndWhenInUseUsageDescription` (App Store rejection risk), updated location string to explain one-time GPS check
+- **App.entitlements** — NFC entitlement (`com.apple.developer.nfc.readersession.formats = [TAG]`) added
+- **project.pbxproj** — `DEVELOPMENT_TEAM = MG4K845UH7` hardcoded in both Debug + Release configs; `PROVISIONING_PROFILE_SPECIFIER = "Pontifex App Store Distribution"` set unconditionally
+- **ExportOptions.plist** created at `ios/ExportOptions.plist` — used by CLI export
+- **IPA exported via CLI** ✅ — `~/Desktop/PontifexExport/App.ipa` (1.7 MB), signed with Team MG4K845UH7, Apple Distribution cert, Pontifex App Store Distribution profile
+
+### 🔴 Current Blocker — Xcode Team Dropdown
+Xcode's Team dropdown shows **"Andres Altamirano (Personal Team)"** only. The paid team (MG4K845UH7) doesn't appear.
+
+**What we know:**
+- Paid developer account: `andresa.t55@icloud.com` — enrolled as Individual, $99/yr, Team MG4K845UH7
+- Both Apple Developer agreements accepted (May 23, 2026) — NOT the cause
+- The account IS in Xcode Accounts (shows as "Developer Team" in Manage Certificates)
+- Distribution cert "Apple Distribution: ANDRES FERNANDO ALTAMIR..." is in Keychain ✅
+- Provisioning profile "Pontifex App Store Distribution" is installed ✅
+
+**Root cause:** Xcode cached the account's enrollment status as "free" before the $99 payment was processed. The cache didn't clear even after running `defaults delete com.apple.dt.Xcode DVTDeveloperAccountManager` (domain not found in Xcode 26 — key moved).
+
+**Fix to try FIRST in next session:**
+1. Xcode → Settings → Accounts → select `andresa.t55@icloud.com` → click **"–" minus** to remove
+2. Click **"+"** → re-add `andresa.t55@icloud.com`
+3. Download Manual Profiles
+4. Check Team dropdown — should now show paid team
+
+**Bypass (IPA already ready):**
+- `~/Desktop/PontifexExport/App.ipa` is correctly signed. Upload via Transporter (free, Mac App Store) or `xcrun altool`.
+
+### 🆕 Claude Agent for Xcode (MCP) — GAME CHANGER
+- Xcode 26.5 → Settings → Intelligence → Agents → **Claude Agent by Anthropic** was downloading at 48% when session ended
+- Once download completes: toggle ON "Allow external agents to use Xcode tools" 
+- In new Claude Code session, Claude can **directly control Xcode** — fix signing, trigger archives, read build logs — no more screenshots
+- **Enable this before starting next session** — it will make iOS work dramatically faster
+
+### ⏳ Remaining Before App Store Submission
+1. **Fix Xcode Team dropdown** OR use Transporter to upload `~/Desktop/PontifexExport/App.ipa`
+2. **Create App Store Connect listing**: appstoreconnect.apple.com → My Apps → "+" → New App → Name: "Pontifex Industries", Bundle ID: `com.pontifexindustries.app`, SKU: `pontifex-001`
+3. **Take screenshots**: 5 screens on iPhone 15 Pro Max simulator (1290×2796px) — Login, Schedule Board, Job Detail, My Jobs, Admin Dashboard
+4. **Add 4 APNs env vars to Vercel**: `APNS_KEY_ID=M44JJFDG6G`, `APNS_TEAM_ID=MG4K845UH7`, `APNS_BUNDLE_ID=com.pontifexindustries.app`, `APNS_PRIVATE_KEY=<.p8 file contents>`
+5. **Upload IPA** → TestFlight → internal test → Submit for Review
+
+### ⏳ Other Waiting on user
+- **Upload Patriot logo** → Settings → Company Branding → "Icon (Square)" slot → Save
+- **Twilio toll-free verification**: submit at twilio.com
 - **Twilio toll-free verification**: submit at twilio.com with opt-in URL `https://www.pontifexindustries.com/sms-opt-in` (1–3 day approval, then SMS reminders activate)
 - **Rotate Twilio Auth Token** (was visible in a screenshot — hygiene)
 - **RESEND_API_KEY** + **NEXT_PUBLIC_APP_URL** + **NEXT_PUBLIC_SITE_URL** — add to Vercel if not already set (email delivery)
