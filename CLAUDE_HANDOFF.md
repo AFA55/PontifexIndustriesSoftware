@@ -43,13 +43,16 @@
 - Legal docs already committed in `a0f1650d`: privacy-policy.ts, gps-consent.ts, terms-of-service.ts, esign-consent.ts all rebranded to Pontifex Industries with accurate GPS disclosure (one-time clock-in, no background tracking)
 - Build passes ✅ (0 TS errors, 0 ESLint errors)
 
-**iOS App Store submission — state at end of session:**
-- Build 3 (CURRENT_PROJECT_VERSION=2) delivered via Transporter ✅ — shows READY FOR INTERNAL TESTING in App Store Connect
+**iOS App Store submission — state at end of May 25 session (SIGNING FIXED ✅):**
+- **Build 1.0.0 (2) successfully uploaded to App Store Connect via Transporter** ✅
+- Status in TestFlight: **"Ready to Submit"** (will become "Ready to Test" after Apple processing, ~15-30min)
+- Signing fix: downloaded `Pontifex_App_Store_Distribution.mobileprovision` from developer.apple.com, installed to `~/Library/MobileDevice/Provisioning Profiles/`, switched project to Manual + Apple Distribution + MG4K845UH7
+- project.pbxproj: Release config now `CODE_SIGN_STYLE=Manual`, `CODE_SIGN_IDENTITY="Apple Distribution"`, `PROVISIONING_PROFILE_SPECIFIER="Pontifex App Store Distribution"`
 - TestFlight: internal tester AndresAFA55@icloud.com added (needs email acceptance on iPhone)
-- App Store Connect 1.0 metadata: most fields filled. Still needs:
-  - Screenshots: drag 5 PNGs from ~/Desktop/PontifexScreenshots/ to 6.9" Display slot in Media Manager
+- App Store Connect 1.0 metadata still needs:
+  - Screenshots: drag 5 PNGs to 6.9" Display slot in Media Manager
   - App Review credentials: username=zack@demopontifex.com, password=Patriot2026!, Code=PATRIOT
-  - Attach Build 2 to version (click "Add Build")
+  - Attach Build 1.0.0(2) to version 1.0 (click "Add Build" in App Store tab)
   - Phone number for contact info
 
 ### ✅ What Was Done Earlier This Session (May 25 2AM)
@@ -59,24 +62,22 @@
 - **DEFAULT_BRANDING updated** — Pontifex bridge logo shown before any tenant loads (logo_url, logo_icon_url, favicon_url all point to `/logo.svg`)
 - **Info.plist fixed** — removed `NSLocationAlwaysAndWhenInUseUsageDescription` (App Store rejection risk), updated location string to explain one-time GPS check
 - **App.entitlements** — NFC entitlement (`com.apple.developer.nfc.readersession.formats = [TAG]`) added
-- **project.pbxproj** — `DEVELOPMENT_TEAM = MG4K845UH7` hardcoded in both Debug + Release configs; `PROVISIONING_PROFILE_SPECIFIER = "Pontifex App Store Distribution"` set unconditionally
-- **ExportOptions.plist** created at `ios/ExportOptions.plist` — used by CLI export
-- **IPA exported via CLI** ✅ — `~/Desktop/PontifexExport/App.ipa` (1.7 MB), signed with Team MG4K845UH7, Apple Distribution cert, Pontifex App Store Distribution profile
+- **Provisioning profile** — `Pontifex_App_Store_Distribution.mobileprovision` installed at `~/Library/MobileDevice/Provisioning Profiles/05e3d217-dc7b-4db5-8431-5b79743a971a.mobileprovision`
 
-### 🔴 Current Blocker — Xcode Team Dropdown
-Xcode's Team dropdown shows **"Andres Altamirano (Personal Team)"** only. The paid team (MG4K845UH7) doesn't appear.
+### ✅ SIGNING BLOCKER RESOLVED (May 25 afternoon)
+**Problem:** Xcode Organizer kept distributing with "Personal Team" — archives were signed correctly with MG4K845UH7 but the Organizer's re-signing step fell back to Personal Team.
+**Root cause:** No provisioning profile installed on disk — even though it existed on Apple's servers.
+**Fix:**
+1. Navigated to developer.apple.com → Certificates, Identifiers & Profiles → Profiles
+2. Downloaded "Pontifex App Store Distribution" (iOS App Store, expires 2027/05/24)
+3. Extracted UUID `05e3d217-dc7b-4db5-8431-5b79743a971a`, installed to `~/Library/MobileDevice/Provisioning Profiles/`
+4. project.pbxproj Release config: `CODE_SIGN_STYLE=Manual`, `CODE_SIGN_IDENTITY="Apple Distribution"`, `PROVISIONING_PROFILE_SPECIFIER="Pontifex App Store Distribution"`, `DEVELOPMENT_TEAM=MG4K845UH7`
+5. `xcodebuild archive` — succeeded with `Signing Identity: "Apple Distribution: ANDRES FERNANDO ALTAMIRANO (MG4K845UH7)"`
+6. `xcodebuild -exportArchive` — exported to `/tmp/PontifexExport/App.ipa`
+7. Transporter.app — opened IPA, clicked DELIVER → "ALL PACKAGES VALIDATED AND PROCESSING"
+8. App Store Connect confirmed: Build 1.0.0(2) **Ready to Submit** ✅
 
-**What we know:**
-- Paid developer account: `andresa.t55@icloud.com` — enrolled as Individual, $99/yr, Team MG4K845UH7
-- Both Apple Developer agreements accepted (May 23, 2026) — NOT the cause
-- The account IS in Xcode Accounts (shows as "Developer Team" in Manage Certificates)
-- Distribution cert "Apple Distribution: ANDRES FERNANDO ALTAMIR..." is in Keychain ✅
-- Provisioning profile "Pontifex App Store Distribution" is installed ✅
-
-**Root cause:** Xcode cached the account's enrollment status as "free" before the $99 payment was processed. The cache didn't clear even after running `defaults delete com.apple.dt.Xcode DVTDeveloperAccountManager` (domain not found in Xcode 26 — key moved).
-
-**Fix to try FIRST in next session:**
-1. Xcode → Settings → Accounts → select `andresa.t55@icloud.com` → click **"–" minus** to remove
+**For future re-archives:** use `xcodebuild archive -project App.xcodeproj -scheme App -configuration Release -destination "generic/platform=iOS" -archivePath /tmp/PontifexArchive.xcarchive` from `ios/App/` directory. No extra signing flags needed — all in project.pbxproj now.
 2. Click **"+"** → re-add `andresa.t55@icloud.com`
 3. Download Manual Profiles
 4. Check Team dropdown — should now show paid team
