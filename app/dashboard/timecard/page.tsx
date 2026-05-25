@@ -7,7 +7,7 @@ import { getCurrentUser, logout, type User } from '@/lib/auth';
 import {
   ArrowLeft, Clock, Calendar, CheckCircle, AlertTriangle,
   ChevronLeft, ChevronRight, Moon, Factory, Briefcase, TrendingUp,
-  LogOut, Loader2, FileText, CalendarOff, Wifi, MapPin, Edit2, X, Send
+  LogOut, Loader2, FileText, CalendarOff, Wifi, MapPin, Edit2, X, Send, ClipboardList
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import NFCClockIn, { type ClockInResult } from '@/components/NFCClockIn';
@@ -75,6 +75,9 @@ function TimecardPage() {
   const [bypassNfc, setBypassNfc] = useState(false);
   const [locationErrorKind, setLocationErrorKind] = useState<LocationErrorKind | null>(null);
   const [pendingClockInAfterLocationFix, setPendingClockInAfterLocationFix] = useState(false);
+
+  const [showDailyReportGate, setShowDailyReportGate] = useState(false);
+  const [dailyReportSubmitted, setDailyReportSubmitted] = useState<boolean | null>(null); // null = not checked yet
 
   // Correction request modal state
   const [correctionTarget, setCorrectionTarget] = useState<TimecardEntry | null>(null);
@@ -197,6 +200,34 @@ function TimecardPage() {
   const handleClockOut = useCallback(async () => {
     setClockingAction(true);
     try {
+      // Gate: check if daily report was submitted today (operator/apprentice/shop_help/shop_manager)
+      const REPORT_ROLES = ['operator', 'apprentice', 'shop_help', 'shop_manager'];
+      const currentUser = getCurrentUser();
+      if (currentUser && REPORT_ROLES.includes(currentUser.role) && dailyReportSubmitted !== true) {
+        // Haven't confirmed report yet — check the API
+        try {
+          const { data: { session: sess } } = await supabase.auth.getSession();
+          if (sess) {
+            const today = new Date().toISOString().slice(0, 10);
+            const r = await fetch(`/api/operator/daily-report?date=${today}`, {
+              headers: { Authorization: `Bearer ${sess.access_token}` },
+            });
+            if (r.ok) {
+              const j = await r.json();
+              const submitted = j.data?.is_draft === false && !!j.data?.submitted_at;
+              if (!submitted) {
+                setClockingAction(false);
+                setShowDailyReportGate(true);
+                return;
+              }
+              setDailyReportSubmitted(true);
+            }
+          }
+        } catch {
+          // On error, allow clock-out (don't hard block)
+        }
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
@@ -226,7 +257,7 @@ function TimecardPage() {
     }
     setClockingAction(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dailyReportSubmitted]);
 
   const fetchTimecards = useCallback(async () => {
     if (isRedirecting.current) return;
@@ -980,6 +1011,42 @@ function TimecardPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Daily Report Gate ──────────────────────────────────────── */}
+        {showDailyReportGate && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 mb-4">
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
+                  <ClipboardList className="w-7 h-7 text-amber-600 dark:text-amber-400" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Daily Report Required</h3>
+                <p className="text-sm text-gray-600 dark:text-white/70">
+                  Please complete your daily report before clocking out. It only takes a minute!
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDailyReportGate(false);
+                  router.push('/dashboard/daily-report?redirect=timecard');
+                }}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-sm shadow-md"
+              >
+                Complete Daily Report
+              </button>
+              <button
+                onClick={() => {
+                  setShowDailyReportGate(false);
+                  setDailyReportSubmitted(true); // allow skip once
+                  handleClockOut();
+                }}
+                className="w-full py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/50 text-sm"
+              >
+                Clock Out Anyway
+              </button>
             </div>
           </div>
         )}
