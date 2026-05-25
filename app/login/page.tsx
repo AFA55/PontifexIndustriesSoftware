@@ -150,10 +150,10 @@ function LoginPageInner() {
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative z-10 backdrop-blur-xl bg-white/95 rounded-3xl shadow-2xl p-8 w-full max-w-md border border-gray-200"
+        className="relative z-10 backdrop-blur-xl bg-white/95 rounded-3xl shadow-2xl p-5 sm:p-8 w-full max-w-md border border-gray-200"
       >
         {/* Logo and Header */}
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-4 sm:mb-8">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -164,14 +164,14 @@ function LoginPageInner() {
             <img
               src={branding.logo_icon_url || branding.logo_url || '/logo.svg'}
               alt={branding.company_name || 'Pontifex Industries'}
-              className="h-20 w-20 object-contain rounded-2xl"
+              className="h-14 w-14 sm:h-20 sm:w-20 object-contain rounded-2xl rounded-xl"
             />
           </motion.div>
           <motion.h1
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-red-700 bg-clip-text text-transparent mt-6 mb-2 tracking-tight"
+            className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-red-700 bg-clip-text text-transparent mt-3 mb-1 sm:mt-6 sm:mb-2 tracking-tight"
           >
             {branding.login_welcome_text || 'Welcome Back'}
           </motion.h1>
@@ -184,19 +184,19 @@ function LoginPageInner() {
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 sm:space-y-5">
           <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
             className="relative group"
           >
-            <Mail className="absolute left-4 top-4 text-blue-600 group-focus-within:text-blue-700 transition-colors" size={20} />
+            <Mail className="absolute left-4 top-3.5 sm:top-4 text-blue-600 group-focus-within:text-blue-700 transition-colors" size={20} />
             <input
               type="email"
               placeholder="Email"
               {...register('email')}
-              className="w-full pl-12 pr-4 py-4 rounded-xl bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all duration-200 text-gray-800 placeholder-gray-400"
+              className="w-full pl-12 pr-4 py-3 sm:py-4 rounded-xl bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all duration-200 text-gray-800 placeholder-gray-400"
               autoComplete="email"
               required
             />
@@ -208,18 +208,18 @@ function LoginPageInner() {
             transition={{ delay: 0.5 }}
             className="relative group"
           >
-            <Lock className="absolute left-4 top-4 text-blue-600 group-focus-within:text-blue-700 transition-colors" size={20} />
+            <Lock className="absolute left-4 top-3.5 sm:top-4 text-blue-600 group-focus-within:text-blue-700 transition-colors" size={20} />
             <input
               type={showPassword ? 'text' : 'password'}
               placeholder="Password"
               {...register('password')}
-              className="w-full pl-12 pr-12 py-4 rounded-xl bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all duration-200 text-gray-800 placeholder-gray-400"
+              className="w-full pl-12 pr-12 py-3 sm:py-4 rounded-xl bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all duration-200 text-gray-800 placeholder-gray-400"
               autoComplete="current-password"
               required
             />
             <button
               type="button"
-              className="absolute right-4 top-4 text-gray-400 hover:text-blue-600 focus:outline-none transition-colors"
+              className="absolute right-4 top-3.5 sm:top-4 text-gray-400 hover:text-blue-600 focus:outline-none transition-colors"
               onClick={() => setShowPassword((v) => !v)}
               tabIndex={-1}
             >
@@ -257,7 +257,7 @@ function LoginPageInner() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.7 }}
             type="submit"
-            className="w-full py-4 rounded-xl text-white font-bold shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500/30 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="w-full py-3 sm:py-4 rounded-xl text-white font-bold shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500/30 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             style={{
               background: `linear-gradient(to right, ${branding.primary_color || '#2563eb'}, ${branding.secondary_color || '#dc2626'})`,
             }}
@@ -291,7 +291,7 @@ function LoginPageInner() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.9 }}
-          className="mt-6"
+          className="mt-3 sm:mt-6"
         >
           <button
             type="button"
