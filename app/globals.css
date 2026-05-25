@@ -323,3 +323,37 @@ select {
 html {
   scroll-behavior: smooth;
 }
+
+/* ─── iOS / Capacitor safe-area utilities ──────────────────────────────────
+ * Requires viewport-fit=cover (set in app/layout.tsx viewport export).
+ * env() returns 0px on Android / desktop browsers — no visual change there.
+ *
+ * .pt-safe          — sets padding-top to just the safe area inset
+ * .pt-safe-3        — safe area inset PLUS 12px (Tailwind's py-3 / pt-3).
+ *                     Use this on sticky headers that also have py-3 so you
+ *                     keep the normal 12px spacing on desktop while clearing
+ *                     the Dynamic Island / notch on iOS.
+ * .pb-safe          — padding-bottom for home-indicator clearance
+ * .top-safe-3       — for fixed elements: top-3 (12px) + safe area offset
+ * ────────────────────────────────────────────────────────────────────────── */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pt-safe-3 {
+  /* safe area + 12px (0.75rem) — preserves original py-3 spacing on desktop */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* top-safe-3: equivalent to top-3 (12px) shifted down by the status bar height */
+.top-safe-3 {
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+}

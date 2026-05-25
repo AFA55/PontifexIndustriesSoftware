@@ -791,8 +791,10 @@ export default function Dashboard() {
       </div>
 
       {/* Modern Header with Professional Gradient */}
-      <div className="bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
+      {/* pt-safe: pushes content below iOS status bar / Dynamic Island.     */}
+      {/* pb-4 preserves original bottom padding (previously py-4).          */}
+      <div className="bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm pt-safe">
+        <div className="container mx-auto px-4 py-4 pb-4">
           <div className="flex items-center justify-between">
             {/* Company Logo with Animation */}
             <div className="transform hover:scale-105 transition-transform duration-200">

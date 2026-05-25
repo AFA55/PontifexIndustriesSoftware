@@ -609,8 +609,10 @@ export default function DashboardSidebar() {
       {/* ------------------------------------------------------------------ */}
       {/* Mobile: hamburger trigger (rendered inline — callers can use       */}
       {/* MobileMenuButton instead if they prefer it in the header)          */}
+      {/* top-safe-3 = top-3 (12px) + env(safe-area-inset-top) so the       */}
+      {/* button clears the iPhone Dynamic Island / notch / status bar.      */}
       {/* ------------------------------------------------------------------ */}
-      <div className="lg:hidden fixed top-3 left-3 z-50">
+      <div className="lg:hidden fixed top-safe-3 left-3 z-50">
         {!mobileOpen && (
           <button
             onClick={() => setMobileOpen(true)}
@@ -634,13 +636,15 @@ export default function DashboardSidebar() {
             aria-hidden="true"
           />
 
-          {/* Drawer panel */}
-          <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 dark:bg-slate-900 dark:border-slate-800 flex flex-col shadow-2xl">
-            {/* Close button */}
+          {/* Drawer panel — pt-safe pushes content below the status bar so  */}
+          {/* the close button and top nav links are not behind the notch.    */}
+          <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 dark:bg-slate-900 dark:border-slate-800 flex flex-col shadow-2xl pt-safe">
+            {/* Close button — top-3 is relative to the padded content area */}
             <button
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation menu"
               className="absolute top-3 right-3 p-1.5 rounded-md text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-white dark:hover:bg-slate-700 transition-colors z-10"
+              style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
             >
               <X className="w-4 h-4" />
             </button>

@@ -89,10 +89,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* ---------------------------------------------------------------- */}
         {/* Sticky top header                                                */}
+        {/* pt-safe pushes the header content below the iOS status bar /    */}
+        {/* Dynamic Island so buttons are tappable. On non-iOS devices       */}
+        {/* env() returns 0px — no visual change.                           */}
         {/* ---------------------------------------------------------------- */}
+        {/* pt-safe-3 = safe-area-inset-top + 12px. On desktop env() returns 0  */}
+        {/* so padding-top stays 12px. On iOS it clears the Dynamic Island.  */}
         <header className="
           sticky top-0 z-30 flex-shrink-0 flex items-center justify-between
-          px-4 sm:px-6 py-3 shadow-sm border-b
+          px-4 sm:px-6 pb-3 pt-safe-3 shadow-sm border-b
           bg-white border-gray-200
           dark:bg-[#0e0720]/90 dark:border-white/10 dark:backdrop-blur
         ">

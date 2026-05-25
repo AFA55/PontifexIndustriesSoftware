@@ -1,5 +1,14 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+
+// viewport-fit=cover lets the WebView extend to the full screen (including under
+// the iPhone notch / Dynamic Island / status bar) so that env(safe-area-inset-top)
+// returns the correct clearance value in CSS.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 import { BrandingProvider } from '@/lib/branding-context';
