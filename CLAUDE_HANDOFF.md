@@ -1,5 +1,5 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** May 25, 2026 | **Branch:** `main` | **HEAD:** `08b54de7` (pending push) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🍎 Waiting for Review
+**Last updated:** May 26, 2026 | **Branch:** `main` | **HEAD:** `5e71b5c6` (pending push — batch with Stripe work) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🍎 Waiting for Review
 
 > **💰 VERCEL BUDGET: ~$11–12 build credit remaining.** Each `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. `claude/*` and `feature/*` branches do NOT trigger builds (blocked in `vercel.json`). See `DEPLOYMENT_COST.md`.
 
@@ -17,24 +17,39 @@
 
 ---
 
-## Current State (May 25, 2026)
+## Current State (May 26, 2026)
 
 | Layer | Status | Notes |
 |---|---|---|
 | Web app | ✅ Complete | All 23 features shipped |
+| Security audit | ✅ Complete | CRIT-1, MED-2, HIGH-3 closed; CRIT-2 confirmed false positive |
 | Production deploy | ✅ Live | https://www.pontifexindustries.com |
 | iOS app | 🍎 Waiting for Review | Submitted May 25 9:15 PM, App ID 6772996692 |
-| Pending git push | ⏳ `08b54de7` | Compliance audit fixes — NOT yet pushed (save build budget) |
+| Pending git push | ⏳ `5e71b5c6` | Security fixes — batch with Stripe work before pushing |
+| **Stripe billing** | 🔨 Next feature | Paywall for Patriot offer page — recurring subscriptions |
 | APNs push notifications | ✅ Vars set in Vercel | Server-side send logic not yet wired in `/api/push` |
 | Cron jobs | ✅ Active | `CRON_SECRET` set in Vercel May 22 |
 | Twilio SMS | ⏳ Pending | Toll-free verification required at twilio.com |
 | Android | ⏳ Not started | After iOS approval: `npx cap add android`, $25 Google Play fee |
 
-### Commit `08b54de7` — Security/compliance fixes (NOT yet pushed)
-- `profiles/route.ts`: replaced hardcoded `'Patriot2026!'` temp password with `crypto.getRandomValues`
-- `tenant-by-code/route.ts`: removed service role key from public endpoint; uses anon key + SECURITY DEFINER RPC
-- `middleware.ts`: added HSTS header, excluded `unsafe-eval` from production CSP, added `/api/sms-opt-in` to rate-limited paths
-- Legal docs: `privacy-policy.ts`, `gps-consent.ts`, `terms-of-service.ts`, `esign-consent.ts` — all rebranded to Pontifex Industries with accurate GPS disclosure (one-time clock-in, no background tracking)
+### Recent commits (not yet pushed to origin/main)
+| Commit | Summary |
+|---|---|
+| `5e71b5c6` | **security:** CRIT-1 tenant isolation (10 job-orders routes), MED-2 clock-out auth, HIGH-3 portal injection |
+
+### Previously pushed security fixes (in production)
+- `08b54de7` — `profiles/route.ts` hardcoded password → crypto.getRandomValues; service role key removed from public endpoint; HSTS + CSP hardening; legal docs rebranded
+- `1d86f164` / `2dbabd58` — iOS signing: Manual + Apple Distribution + MG4K845UH7 provisioning profile
+
+### Security audit summary (May 25–26, 2026)
+A full security audit was run by the `security-auditor` agent. Results:
+- **CRIT-1 ✅ FIXED** — 10 job-orders API routes had `if (tenantId)` conditional that silently skipped tenant filter when null → replaced with hard 403 assertion
+- **CRIT-2 ✅ FALSE POSITIVE** — Audit agent read old migration files; live `pg_policies` has zero `user_metadata` references; `capacity_skill_settings`/`operator_skill_rankings` tables don't exist in production
+- **MED-2 ✅ FIXED** — `clock-out/route.ts` refactored from inline auth → `requireAuth()` + tenant-scoped UPDATE
+- **HIGH-3 ✅ FIXED** — Customer portal `.or()` string interpolation replaced with two parameterized `Promise.all` queries
+- **HIGH-2 ⏳ OPEN** — In-memory rate limiter doesn't survive cold starts; fix = enable Supabase Auth rate limits in dashboard (user action, 5 min)
+- **MED-5 ⏳ OPEN** — CSP `unsafe-inline`; fix = nonce-based CSP (next sprint)
+- **LOW items** — `signOut({ scope: 'global' })`, PII in console.log, personal email in seed SQL
 
 ---
 
@@ -463,23 +478,154 @@ Defined in `vercel.json`. Require `CRON_SECRET` env var in Vercel (✅ set May 2
 
 ## What's Next
 
-### Immediate (next session — batch with `08b54de7` before pushing)
-1. **Wire up APNs push notification logic** — vars are set in Vercel. Implement server-side send in `/api/push` using `apns2` or `node-apns`. Then push the combined commit to `main`.
-2. **Watch for Apple review email** at pontifexindustries@gmail.com — within 48 hours of May 25 9:15 PM. If approved, App Store Connect → auto-releases (already configured as "automatically release").
+### 🔨 NEXT FEATURE: Stripe Billing / Paywall
+Full subscription billing system for the Pontifex Industries platform. Patriot Concrete Cutting will pay through the web app.
+
+**Context:**
+- User has a Stripe account with API keys already set up
+- A custom offer page at `/patriot` already exists (Patriot-specific landing)
+- Web-only for now (iOS app is under review — no in-app purchases yet)
+- Need: recurring subscriptions with 3 plans (Monthly / 6-Month / Annual), a paywall, and a management portal
+
+**See the full Stripe integration plan prompt at the bottom of this file.**
+
+**Key files to know before building:**
+- `app/patriot/page.tsx` — existing Patriot offer/landing page (start here for the paywall CTA)
+- `app/company-login/page.tsx` — login page (add post-payment redirect/unlock)
+- `lib/supabase-admin.ts` — use this for all server-side Stripe webhook DB writes
+- `public.tenants` table — add `stripe_customer_id`, `stripe_subscription_id`, `subscription_status`, `plan_type` columns
+- Stripe keys go in Vercel env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+
+### Immediate (batch with Stripe work before push)
+1. **Push `5e71b5c6`** — batch with Stripe commits and push once when billing is done
+2. **Watch for Apple review email** at pontifexindustries@gmail.com — if approved, auto-releases
+3. **Supabase Auth rate limits** (HIGH-2 fix) — Dashboard → Auth → Settings → enable rate limits (5 min user action)
 
 ### Short-term (user action required)
-3. **Twilio toll-free verification** — submit at twilio.com with opt-in URL `https://www.pontifexindustries.com/sms-opt-in` (1–3 day approval → SMS reminders activate)
-4. **Rotate Twilio Auth Token** — was visible in a screenshot (hygiene)
-5. **Upload Patriot logo** → Settings → Company Branding → "Icon (Square)" slot → Save
-6. **Verify email env vars** in Vercel: `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`
+4. **Twilio toll-free verification** — twilio.com with opt-in URL `https://www.pontifexindustries.com/sms-opt-in`
+5. **Rotate Twilio Auth Token** — hygiene, was briefly visible in a screenshot
+6. **Upload Patriot logo** → Settings → Company Branding → "Icon (Square)" slot → Save
+7. **Verify email env vars** in Vercel: `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`
 
 ### Backlog
-7. **Schedule board refactor** — `app/dashboard/admin/schedule-board/page.tsx` is 2,850 lines / 137KB. Extract `OperatorRow`, `JobCard`, `EditModal`, `DispatchModal` to `_components/`. Refactor-only (no logic change).
-8. **Android (Google Play)** — after iOS approval: `npx cap add android`, $25 fee, APK upload
-9. **iOS splash screen** — 2732×2732 opaque purple + bridge logo (for iPad + older iPhones)
-10. **Apple Developer Program renewal** — confirm $99/yr is current for continued TestFlight + App Store
-11. **End-to-end smoke test** — schedule → dispatch → in-route → work-performed → day-complete → invoice → paid
-12. **Loading states audit** — check remaining pages for missing `loading.tsx` skeletons
+8. **Schedule board refactor** — `schedule-board/page.tsx` is 2,850 lines. Extract `OperatorRow`, `JobCard`, `EditModal`, `DispatchModal` to `_components/`
+9. **APNs push logic** — vars set in Vercel; implement server-side send in `/api/push`
+10. **Android** — after iOS approval: `npx cap add android`, $25 Google Play fee
+11. **CSP nonce-based** (MED-5) — replace `unsafe-inline` with nonce-based CSP
+
+---
+
+## 🚀 Stripe Billing — Next Session Prompt
+
+Use this prompt verbatim to start the billing integration session:
+
+```
+You are building a complete Stripe billing / paywall system for the Pontifex Industries 
+platform. This is a multi-tenant SaaS (Next.js 15 App Router + Supabase + Tailwind) with 
+a live trial customer — Patriot Concrete Cutting — who needs to start paying.
+
+REPO: /Users/afa55/Documents/Pontifex Industres/pontifex-platform/
+PRODUCTION: https://www.pontifexindustries.com
+STACK: Next.js 15 App Router, React 19, TypeScript, Supabase (PostgreSQL + RLS), Tailwind CSS
+STRIPE: Account exists. API keys are ready. Publishable key and secret key on hand.
+
+--- WHAT TO BUILD ---
+
+1. SUBSCRIPTION PLANS (3 tiers for Patriot)
+   - Monthly: $X/mo (exact price TBD by user)
+   - 6-Month: $X/6mo (~10-15% discount)
+   - Annual: $X/yr (~20-25% discount)
+   Create these as Stripe Products + Prices (recurring). Store price IDs in env vars or DB.
+
+2. PAYWALL / OFFER PAGE INTEGRATION
+   - File: app/patriot/page.tsx — existing Patriot landing page
+   - Add a pricing section with 3 plan cards (Monthly / 6-Month / Annual)
+   - "Get Started" CTA on each plan → Stripe Checkout Session (hosted checkout)
+   - After successful payment → redirect to /company-login with ?activated=true param
+   - Show a success banner on login: "Your account is now active — sign in to get started"
+
+3. STRIPE CHECKOUT + WEBHOOKS
+   - POST /api/stripe/create-checkout-session — creates Stripe Checkout session
+     - Accepts: { priceId, tenantId, email, companyCode }
+     - Creates/retrieves Stripe Customer linked to tenant
+     - Sets success_url and cancel_url
+   - POST /api/stripe/webhook — receives Stripe events
+     - checkout.session.completed → activate tenant subscription in DB
+     - customer.subscription.updated → update plan/status
+     - customer.subscription.deleted → mark subscription as cancelled
+     - invoice.payment_failed → flag tenant for payment failure
+   - Webhook must verify Stripe signature using STRIPE_WEBHOOK_SECRET
+
+4. DATABASE SCHEMA (migration required)
+   New columns on public.tenants:
+   - stripe_customer_id text
+   - stripe_subscription_id text  
+   - subscription_status text (trialing|active|past_due|cancelled|unpaid)
+   - plan_type text (monthly|biannual|annual)
+   - current_period_end timestamptz
+   - trial_ends_at timestamptz (for future trial support)
+   Migration must be idempotent (ADD COLUMN IF NOT EXISTS). RLS: these columns 
+   only readable by super_admin or the tenant's own users.
+
+5. ACCESS CONTROL / PAYWALL GATE
+   - Add subscription check to middleware.ts or layout: if tenant.subscription_status 
+     NOT IN ('active','trialing') AND route is /dashboard/* → redirect to /patriot?upgrade=true
+   - Super_admin bypass (never blocked)
+   - Grace period: past_due gets 7-day grace before redirect kicks in
+   - Show a banner on dashboard when subscription is past_due
+
+6. BILLING PORTAL (self-service)
+   - POST /api/stripe/create-portal-session — creates Stripe Customer Portal session
+   - Link in admin dashboard: Settings → Billing → "Manage Subscription" button
+   - Opens Stripe-hosted portal where customer can: upgrade/downgrade plan, 
+     update payment method, view invoice history, cancel subscription
+
+7. ADMIN VISIBILITY
+   - Settings page → new "Billing" tab showing: current plan, status, next billing date, 
+     payment method last 4 digits (from Stripe Customer object), "Manage Subscription" button
+   - Super_admin view: list of all tenants with subscription_status + plan_type + MRR
+
+--- CONVENTIONS (follow exactly) ---
+- API routes: use requireAuth() / requireAdmin() from lib/api-auth.ts
+- DB writes in webhooks: use supabaseAdmin from lib/supabase-admin.ts (bypasses RLS)
+- Tenant columns: use SECURITY DEFINER helpers for RLS (NEVER auth.jwt()->'user_metadata')
+- All new tables/columns must have tenant_id + RLS
+- Fire-and-forget logging: Promise.resolve(supabaseAdmin.from('audit_logs').insert({...})).catch(()=>{})
+- API response format: { success: true, data: {} } or { error: 'message' } with HTTP status
+- Mobile-first: all new UI must work at 375px, tap targets ≥ 44px
+- After all code: npm run build from repo root — must pass 0 TypeScript errors
+
+--- ENV VARS TO ADD TO VERCEL ---
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_PRICE_ID_MONTHLY=price_...
+STRIPE_PRICE_ID_BIANNUAL=price_...
+STRIPE_PRICE_ID_ANNUAL=price_...
+
+--- WHAT EXISTS ALREADY ---
+- app/patriot/page.tsx — Patriot landing page (red/crimson brand, add pricing section here)
+- app/company-login/page.tsx — login (handle ?activated=true banner)
+- public.tenants table — add Stripe columns via migration
+- lib/supabase-admin.ts — use for webhook DB writes
+- lib/api-auth.ts — requireAuth(), requireAdmin(), requireSuperAdmin()
+- middleware.ts — add subscription gate here
+- app/dashboard/admin/settings/ — add Billing tab here
+
+--- BUILD ORDER (parallel where possible) ---
+1. [supabase-migration-author agent] Write + apply tenants Stripe columns migration
+2. [backend-dev agent] POST /api/stripe/create-checkout-session
+3. [backend-dev agent] POST /api/stripe/webhook (all 4 event types)
+4. [backend-dev agent] POST /api/stripe/create-portal-session
+5. [coder agent] Pricing section on app/patriot/page.tsx (3 plan cards)
+6. [coder agent] Billing tab in Settings + success banner on login
+7. [coder agent] Subscription gate in middleware.ts
+8. Run npm run build → 0 errors → commit → push to origin/main
+
+Start by asking the user for: (1) the 3 plan prices, (2) their Stripe publishable key and 
+secret key so you can set up the Stripe Products/Prices and get the price IDs, and (3) 
+whether Patriot is currently on a free trial or needs to pay immediately.
+```
 
 ---
 
