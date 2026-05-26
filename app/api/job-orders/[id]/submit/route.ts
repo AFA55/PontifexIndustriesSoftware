@@ -44,6 +44,20 @@ export async function PUT(
 
     // Check if job exists and user has permission (scoped to tenant)
     const tenantId = await getTenantId(user.id);
+
+    // Resolve role to determine whether tenantId null is acceptable (super_admin only)
+    const { data: submitCallerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!tenantId && submitCallerProfile?.role !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Tenant context required' },
+        { status: 403 }
+      );
+    }
+
     let jobCheckQuery = supabaseAdmin
       .from('job_orders')
       .select('*')

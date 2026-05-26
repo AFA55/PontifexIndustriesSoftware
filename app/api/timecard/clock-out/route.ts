@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isTableNotFoundError } from '@/lib/api-auth';
+import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import {
   isWithinShopRadiusForClockout,
   SHOP_LOCATION,
@@ -20,26 +20,10 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user from Supabase session (server-side)
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
-        { status: 401 }
-      );
-    }
+    // Authenticate via the shared requireAuth helper (validates token, loads
+    // profile role + tenantId, enforces tenant presence for non-super_admin).
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
     const { latitude, longitude, accuracy, clock_out_method, nfc_tag_uid, nfc_tag_id } = body;
@@ -56,7 +40,7 @@ export async function POST(request: NextRequest) {
     const { data: recentOut } = await supabaseAdmin
       .from('timecards')
       .select('id, clock_out_time')
-      .eq('user_id', user.id)
+      .eq('user_id', auth.userId)
       .not('clock_out_time', 'is', null)
       .order('clock_out_time', { ascending: false })
       .limit(1)
@@ -74,24 +58,18 @@ export async function POST(request: NextRequest) {
 
     const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
 
-    // Check for incomplete dispatched jobs (work-performed hard block)
-    const { data: userProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('role, tenant_id')
-      .eq('id', user.id)
-      .single();
-
-    const userRole = userProfile?.role || '';
+    // role and tenantId are already resolved by requireAuth — no extra profile fetch needed.
+    const userRole = auth.role || '';
 
     // Timezone-aware "today" + per-tenant shop GPS pin for clock-out radius check.
     let tenantTz = 'America/New_York';
     let shopOverride: ShopOverride | undefined;
     try {
-      if (userProfile?.tenant_id) {
+      if (auth.tenantId) {
         const { data: tenantRow } = await supabaseAdmin
           .from('tenants')
           .select('timezone, shop_latitude, shop_longitude, shop_name, clock_in_radius_meters, clock_out_radius_meters')
-          .eq('id', userProfile.tenant_id)
+          .eq('id', auth.tenantId)
           .maybeSingle();
         if (tenantRow?.timezone) tenantTz = tenantRow.timezone;
         if (tenantRow?.shop_latitude != null && tenantRow?.shop_longitude != null) {
@@ -120,7 +98,7 @@ export async function POST(request: NextRequest) {
         const { data: incompleteJobs } = await supabaseAdmin
           .from('job_orders')
           .select('id, job_number, customer_name')
-          .eq('assigned_to', user.id)
+          .eq('assigned_to', auth.userId)
           .eq('scheduled_date', today)
           .not('dispatched_at', 'is', null)
           .is('work_completed_at', null)
@@ -147,7 +125,7 @@ export async function POST(request: NextRequest) {
         const { data: helperJobs } = await supabaseAdmin
           .from('job_orders')
           .select('id, job_number, customer_name')
-          .eq('helper_assigned_to', user.id)
+          .eq('helper_assigned_to', auth.userId)
           .eq('scheduled_date', today)
           .not('dispatched_at', 'is', null)
           .neq('status', 'cancelled');
@@ -158,7 +136,7 @@ export async function POST(request: NextRequest) {
           const { data: workLogs } = await supabaseAdmin
             .from('helper_work_logs')
             .select('job_order_id')
-            .eq('helper_id', user.id)
+            .eq('helper_id', auth.userId)
             .eq('log_date', today)
             .in('job_order_id', jobIds);
 
@@ -187,7 +165,7 @@ export async function POST(request: NextRequest) {
     const { data: activeTimecard, error: fetchError } = await supabaseAdmin
       .from('timecards')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', auth.userId)
       .is('clock_out_time', null)
       .maybeSingle();
 
@@ -245,13 +223,14 @@ export async function POST(request: NextRequest) {
     // Otherwise read timecard_settings_v2 (current) → timecard_settings (legacy) for tenant default.
     let breakMinutesDeducted = 0;
     try {
+      // Fetch only default_lunch_minutes — role and tenantId come from requireAuth above.
       const { data: profileRow } = await supabaseAdmin
         .from('profiles')
-        .select('tenant_id, role, default_lunch_minutes')
-        .eq('id', user.id)
+        .select('default_lunch_minutes')
+        .eq('id', auth.userId)
         .single();
-      const tenantId = profileRow?.tenant_id;
-      const userRoleForLunch: string = profileRow?.role || '';
+      const tenantId = auth.tenantId;
+      const userRoleForLunch: string = auth.role || '';
       const userLunchOverride: number | null = profileRow?.default_lunch_minutes ?? null;
 
       // Query timecard_settings_v2 first (current table), fall back to legacy timecard_settings.
@@ -323,7 +302,7 @@ export async function POST(request: NextRequest) {
       const { data: openLogs } = await supabaseAdmin
         .from('helper_work_logs')
         .select('id, started_at')
-        .eq('helper_id', user.id)
+        .eq('helper_id', auth.userId)
         .eq('log_date', today)
         .is('completed_at', null)
         .not('started_at', 'is', null);
@@ -366,6 +345,8 @@ export async function POST(request: NextRequest) {
         auto_lunch_applied: breakMinutesDeducted > 0,
       })
       .eq('id', activeTimecard.id)
+      .eq('user_id', auth.userId)
+      .eq('tenant_id', auth.tenantId)
       .select()
       .single();
 
@@ -381,10 +362,10 @@ export async function POST(request: NextRequest) {
     const { data: profileForName } = await supabaseAdmin
       .from('profiles')
       .select('full_name')
-      .eq('id', user.id)
+      .eq('id', auth.userId)
       .single();
 
-    console.log(`Clock out: ${profileForName?.full_name || user.email} at ${now.toLocaleTimeString()}, ${totalHours.toFixed(2)} hrs`);
+    console.log(`Clock out: ${profileForName?.full_name || auth.userEmail} at ${now.toLocaleTimeString()}, ${totalHours.toFixed(2)} hrs`);
 
     return NextResponse.json(
       {

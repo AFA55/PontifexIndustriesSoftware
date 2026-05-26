@@ -22,7 +22,6 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
 import { sendSMS, formatPhoneNumber } from '@/lib/sms';
 import { sendEmail } from '@/lib/email';
 
@@ -59,8 +58,9 @@ export async function POST(
       );
     }
 
-    // Resolve tenant for the caller (super_admin may be null)
-    const tenantId = await getTenantId(auth.userId);
+    // auth.tenantId is guaranteed non-null for non-super-admins by requireAuth();
+    // super_admin intentionally has null and sees all tenants.
+    const tenantId = auth.tenantId;
 
     // Fetch job — tenant-filter when caller has a tenant
     let jobQuery = supabaseAdmin

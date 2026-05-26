@@ -9,7 +9,6 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
 import crypto from 'crypto';
 
 export async function GET(
@@ -21,8 +20,9 @@ export async function GET(
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
-    // Tenant filtering
-    const tenantId = await getTenantId(auth.userId);
+    // auth.tenantId is guaranteed non-null for non-super-admins by requireAuth();
+    // super_admin intentionally has null and sees all tenants.
+    const tenantId = auth.tenantId;
 
     // Verify job belongs to tenant
     let jobCheck = supabaseAdmin
@@ -63,8 +63,9 @@ export async function POST(
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
-    // Tenant filtering
-    const postTenantId = await getTenantId(auth.userId);
+    // auth.tenantId is guaranteed non-null for non-super-admins by requireAuth();
+    // super_admin intentionally has null and sees all tenants.
+    const postTenantId = auth.tenantId;
 
     const body = await request.json();
     const { contact_name, contact_phone, contact_email, request_type, form_template_id } = body;

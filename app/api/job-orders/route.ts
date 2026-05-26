@@ -53,6 +53,15 @@ export async function GET(request: NextRequest) {
     const isAdmin = ['super_admin', 'operations_manager', 'admin', 'salesman', 'shop_manager', 'inventory_manager'].includes(userRole);
     const tenantId = await getTenantId(user.id);
 
+    // Non-super-admins must have a resolved tenant; null means the profile lookup
+    // failed silently and proceeding would expose all tenants' data.
+    if (!tenantId && userRole !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Tenant context required' },
+        { status: 403 }
+      );
+    }
+
     // If ID is provided, fetch that specific job
     if (id) {
       let specificJobQuery = supabaseAdmin
@@ -127,7 +136,7 @@ export async function GET(request: NextRequest) {
       .from('active_job_orders')
       .select('*');
 
-    // Scope to tenant
+    // Scope to tenant (super_admin with null tenantId intentionally sees all tenants)
     if (tenantId) {
       query = query.eq('tenant_id', tenantId);
     }

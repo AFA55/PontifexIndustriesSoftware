@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
   request: NextRequest,
@@ -23,7 +22,9 @@ export async function POST(
     );
   }
 
-  const tenantId = await getTenantId(auth.userId);
+  // auth.tenantId is guaranteed non-null for non-super-admins by requireAuth();
+  // super_admin intentionally has null and sees all tenants.
+  const tenantId = auth.tenantId;
 
   // Verify job belongs to tenant
   let jobQ = supabaseAdmin
@@ -66,7 +67,8 @@ export async function GET(
   if (!auth.authorized) return auth.response;
 
   const { id: jobId } = await params;
-  const tenantId = await getTenantId(auth.userId);
+  // auth.tenantId is guaranteed non-null for non-super-admins by requireAuth()
+  const tenantId = auth.tenantId;
 
   let q = supabaseAdmin
     .from('job_orders')

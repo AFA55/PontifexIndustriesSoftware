@@ -145,8 +145,14 @@ export async function DELETE(
       );
     }
 
-    // Scope delete to tenant
+    // Scope delete to tenant — non-super-admins must have a resolved tenantId
     const tenantId = await getTenantId(user.id);
+    if (!tenantId && profile?.role !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Tenant context required' },
+        { status: 403 }
+      );
+    }
     let deleteQuery = supabaseAdmin
       .from('job_orders')
       .delete()

@@ -109,28 +109,68 @@ export async function GET(
       }
     }
 
-    // Fetch job history for this customer within this tenant
-    // Match by email OR customer_name (case-insensitive)
-    let historyQuery = supabaseAdmin
-      .from('job_orders')
-      .select(
-        'id, job_number, project_name, scheduled_date, status, address, location, customer_signature, customer_signed_at, total_cost, completed_at'
-      )
-      .eq('tenant_id', portalToken.tenant_id)
-      .order('scheduled_date', { ascending: false })
-      .limit(20);
+    // Fetch job history for this customer within this tenant.
+    // Match by email OR customer_name (case-insensitive).
+    //
+    // SECURITY: Do NOT interpolate customer_email / customer_name directly into
+    // a PostgREST .or() string — values stored in the DB could contain PostgREST
+    // filter syntax and manipulate which rows are returned (query injection).
+    // Instead, run two separate parameterised queries and merge in TypeScript.
+    const jobSelectColumns =
+      'id, job_number, project_name, scheduled_date, status, address, location, customer_signature, customer_signed_at, total_cost, completed_at';
+
+    let jobHistory: Record<string, any>[] = [];
 
     if (portalToken.customer_email && portalToken.customer_name) {
-      historyQuery = historyQuery.or(
-        `customer_email.eq.${portalToken.customer_email},customer_name.ilike.${portalToken.customer_name}`
-      );
-    } else if (portalToken.customer_email) {
-      historyQuery = historyQuery.eq('customer_email', portalToken.customer_email);
-    } else {
-      historyQuery = historyQuery.ilike('customer_name', portalToken.customer_name);
-    }
+      // Two strict-parameter queries — no string interpolation of user values.
+      const [byEmail, byName] = await Promise.all([
+        supabaseAdmin
+          .from('job_orders')
+          .select(jobSelectColumns)
+          .eq('tenant_id', portalToken.tenant_id)
+          .eq('customer_email', portalToken.customer_email)
+          .order('scheduled_date', { ascending: false })
+          .limit(20),
+        supabaseAdmin
+          .from('job_orders')
+          .select(jobSelectColumns)
+          .eq('tenant_id', portalToken.tenant_id)
+          .ilike('customer_name', portalToken.customer_name)
+          .order('scheduled_date', { ascending: false })
+          .limit(20),
+      ]);
 
-    const { data: jobHistory } = await historyQuery;
+      // Merge and deduplicate by id, then re-sort and cap at 20.
+      const seen = new Set<string>();
+      const combined = [...(byEmail.data ?? []), ...(byName.data ?? [])].filter((r) => {
+        if (seen.has(r.id)) return false;
+        seen.add(r.id);
+        return true;
+      });
+      combined.sort(
+        (a, b) =>
+          new Date(b.scheduled_date ?? 0).getTime() - new Date(a.scheduled_date ?? 0).getTime()
+      );
+      jobHistory = combined.slice(0, 20);
+    } else if (portalToken.customer_email) {
+      const { data } = await supabaseAdmin
+        .from('job_orders')
+        .select(jobSelectColumns)
+        .eq('tenant_id', portalToken.tenant_id)
+        .eq('customer_email', portalToken.customer_email)
+        .order('scheduled_date', { ascending: false })
+        .limit(20);
+      jobHistory = data ?? [];
+    } else if (portalToken.customer_name) {
+      const { data } = await supabaseAdmin
+        .from('job_orders')
+        .select(jobSelectColumns)
+        .eq('tenant_id', portalToken.tenant_id)
+        .ilike('customer_name', portalToken.customer_name)
+        .order('scheduled_date', { ascending: false })
+        .limit(20);
+      jobHistory = data ?? [];
+    }
 
     return NextResponse.json({
       success: true,

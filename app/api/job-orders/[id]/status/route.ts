@@ -72,6 +72,22 @@ async function updateJobStatus(
     // Resolve tenant scope — supabaseAdmin bypasses RLS, must scope manually
     const tenantId = await getTenantId(user.id);
 
+    // Role is resolved after this point; fetch it early to gate the tenantId null check.
+    // We must guard before any DB query so a null tenantId never returns cross-tenant data.
+    const { data: earlyProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const earlyRole = earlyProfile?.role || 'operator';
+
+    if (!tenantId && earlyRole !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Tenant context required' },
+        { status: 403 }
+      );
+    }
+
     // Check if job exists and user has permission (scoped to tenant)
     let jobQuery = supabaseAdmin
       .from('job_orders')
@@ -87,12 +103,8 @@ async function updateJobStatus(
       );
     }
 
-    // Get user's role
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    // Use the role already fetched for the tenantId guard above (avoids a second profile query)
+    const profile = earlyProfile;
 
     // Check permissions: operator/helper can update their own jobs, admin roles can update any
     const adminRoles = ['admin', 'super_admin', 'operations_manager'];

@@ -51,6 +51,20 @@ export async function POST(
 
     // Get job order (scoped to tenant)
     const tenantId = await getTenantId(user.id);
+
+    // Resolve role to determine whether tenantId null is acceptable (super_admin only)
+    const { data: callerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!tenantId && callerProfile?.role !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Tenant context required' },
+        { status: 403 }
+      );
+    }
+
     let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
@@ -345,13 +359,33 @@ export async function GET(
 
     // Verify job belongs to user's tenant
     const tenantIdGet = await getTenantId(user.id);
+
+    // Resolve role to determine whether tenantId null is acceptable (super_admin only)
+    const { data: getCallerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!tenantIdGet && getCallerProfile?.role !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Tenant context required' },
+        { status: 403 }
+      );
+    }
+
+    // Always verify job ownership; when tenantId is non-null, scope it; super_admin sees all
+    const jobCheckQuery = supabaseAdmin
+      .from('job_orders')
+      .select('id')
+      .eq('id', jobId);
     if (tenantIdGet) {
-      const { data: jobCheck } = await supabaseAdmin
-        .from('job_orders')
-        .select('id')
-        .eq('id', jobId)
-        .eq('tenant_id', tenantIdGet)
-        .maybeSingle();
+      const { data: jobCheck } = await jobCheckQuery.eq('tenant_id', tenantIdGet).maybeSingle();
+      if (!jobCheck) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      }
+    } else {
+      // super_admin: verify job exists (no tenant scope)
+      const { data: jobCheck } = await jobCheckQuery.maybeSingle();
       if (!jobCheck) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 });
       }
