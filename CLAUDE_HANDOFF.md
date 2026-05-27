@@ -1,5 +1,5 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** May 26, 2026 | **Branch:** `main` | **HEAD:** `5e71b5c6` (pending push — batch with Stripe work) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🍎 Waiting for Review
+**Last updated:** May 26, 2026 | **Branch:** `main` | **HEAD:** `f2fc6bb0` (pending push — batch security + Stripe) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🍎 Waiting for Review
 
 > **💰 VERCEL BUDGET: ~$11–12 build credit remaining.** Each `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. `claude/*` and `feature/*` branches do NOT trigger builds (blocked in `vercel.json`). See `DEPLOYMENT_COST.md`.
 
@@ -26,7 +26,7 @@
 | Production deploy | ✅ Live | https://www.pontifexindustries.com |
 | iOS app | 🍎 Waiting for Review | Submitted May 25 9:15 PM, App ID 6772996692 |
 | Pending git push | ⏳ `5e71b5c6` | Security fixes — batch with Stripe work before pushing |
-| **Stripe billing** | 🔨 Next feature | Paywall for Patriot offer page — recurring subscriptions |
+| **Stripe billing** | ✅ Built — needs Vercel env vars | Checkout, webhook, portal, paywall gate, pricing UI all done |
 | APNs push notifications | ✅ Vars set in Vercel | Server-side send logic not yet wired in `/api/push` |
 | Cron jobs | ✅ Active | `CRON_SECRET` set in Vercel May 22 |
 | Twilio SMS | ⏳ Pending | Toll-free verification required at twilio.com |
@@ -35,6 +35,7 @@
 ### Recent commits (not yet pushed to origin/main)
 | Commit | Summary |
 |---|---|
+| `f2fc6bb0` | **feat:** Stripe billing — checkout, webhook, portal, paywall gate, pricing UI, migration |
 | `5e71b5c6` | **security:** CRIT-1 tenant isolation (10 job-orders routes), MED-2 clock-out auth, HIGH-3 portal injection |
 
 ### Previously pushed security fixes (in production)
@@ -478,23 +479,40 @@ Defined in `vercel.json`. Require `CRON_SECRET` env var in Vercel (✅ set May 2
 
 ## What's Next
 
-### 🔨 NEXT FEATURE: Stripe Billing / Paywall
-Full subscription billing system for the Pontifex Industries platform. Patriot Concrete Cutting will pay through the web app.
+### ✅ Stripe Billing — COMPLETE (needs Vercel env vars + webhook registration)
 
-**Context:**
-- User has a Stripe account with API keys already set up
-- A custom offer page at `/patriot` already exists (Patriot-specific landing)
-- Web-only for now (iOS app is under review — no in-app purchases yet)
-- Need: recurring subscriptions with 3 plans (Monthly / 6-Month / Annual), a paywall, and a management portal
+Built May 26, 2026. All code is committed in `f2fc6bb0`. **Build passes 0 errors.**
 
-**See the full Stripe integration plan prompt at the bottom of this file.**
+**Stripe objects (live mode, acct_1THphn0WWq11qMKi):**
+- Product: `prod_UagOHFDdm4Tw2N` — "Pontifex Industries Platform"
+- 6-Month price: `price_1TbV2E0WWq11qMKimnEXVElP` — $3,747 / 6 months
+- Annual price: `price_1TbV2E0WWq11qMKidsCGCrl8` — $6,997 / year
 
-**Key files to know before building:**
-- `app/patriot/page.tsx` — existing Patriot offer/landing page (start here for the paywall CTA)
-- `app/company-login/page.tsx` — login page (add post-payment redirect/unlock)
-- `lib/supabase-admin.ts` — use this for all server-side Stripe webhook DB writes
-- `public.tenants` table — add `stripe_customer_id`, `stripe_subscription_id`, `subscription_status`, `plan_type` columns
-- Stripe keys go in Vercel env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+**What was built:**
+- `supabase/migrations/20260526_stripe_billing_columns.sql` — applied; 6 Stripe columns on `public.tenants` (`subscription_status` defaults to `'trialing'`)
+- `app/api/stripe/create-checkout-session/route.ts` — creates Stripe Customer + hosted checkout
+- `app/api/stripe/webhook/route.ts` — handles 4 events (checkout.completed, subscription.updated/deleted, payment_failed)
+- `app/api/stripe/create-portal-session/route.ts` — Stripe self-service billing portal
+- `app/patriot/page.tsx` — pricing section (2 plan cards + upgrade banner)
+- `app/company-login/page.tsx` — activated success banner (`?activated=true`)
+- `components/SubscriptionGate.tsx` — client-side paywall (null/trialing=allowed, past_due=7-day grace)
+- `app/dashboard/admin/settings/page.tsx` — Billing tab (plan name, status chip, Manage Subscription button)
+- `middleware.ts` — CSP allows `api.stripe.com`
+
+**⚠️ USER ACTION REQUIRED before pushing:**
+1. Add these env vars to Vercel dashboard:
+   ```
+   STRIPE_SECRET_KEY=sk_live_...
+   STRIPE_WEBHOOK_SECRET=whsec_...
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+   STRIPE_PRICE_ID_BIANNUAL=price_1TbV2E0WWq11qMKimnEXVElP
+   STRIPE_PRICE_ID_ANNUAL=price_1TbV2E0WWq11qMKidsCGCrl8
+   ```
+2. Register webhook in Stripe dashboard → Developers → Webhooks → Add endpoint:
+   - URL: `https://www.pontifexindustries.com/api/stripe/webhook`
+   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+   - Copy the `whsec_...` signing secret → paste as `STRIPE_WEBHOOK_SECRET` in Vercel
+3. Tell Claude when Patriot's trial ends to activate the paywall gate
 
 ### Immediate (batch with Stripe work before push)
 1. **Push `5e71b5c6`** — batch with Stripe commits and push once when billing is done
