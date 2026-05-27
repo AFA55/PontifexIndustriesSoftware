@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   FileText,
   Clock,
@@ -14,6 +15,10 @@ import {
   Star,
   ChevronDown,
   Layers,
+  Loader2,
+  AlertTriangle,
+  X,
+  Zap,
 } from 'lucide-react';
 
 // ─── Scroll-triggered fade-in ────────────────────────────────────────────────
@@ -253,9 +258,218 @@ function ValueCard({
   );
 }
 
+// ─── Pricing card ─────────────────────────────────────────────────────────────
+function PricingCard({
+  title,
+  priceId,
+  price,
+  period,
+  perMonth,
+  badge,
+  featured,
+  features,
+}: {
+  title: string;
+  priceId: string;
+  price: string;
+  period: string;
+  perMonth: string;
+  badge?: string;
+  featured?: boolean;
+  features: string[];
+}) {
+  const [loading, setLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  const handleGetStarted = async () => {
+    setLoading(true);
+    setCheckoutError(null);
+    try {
+      const res = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId,
+          tenantId: '',
+          email: '',
+          companyCode: 'PATRIOT',
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.data?.url) {
+        setCheckoutError(json?.error || 'Unable to start checkout. Please try again.');
+        return;
+      }
+      window.location.href = json.data.url;
+    } catch {
+      setCheckoutError('Network error — please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className={`relative rounded-2xl flex flex-col h-full transition-all ${
+        featured
+          ? 'bg-gradient-to-br from-red-950/70 to-zinc-900/90 border-2 border-red-600/50 shadow-2xl shadow-red-900/30'
+          : 'bg-zinc-800/60 border border-zinc-700/60 hover:border-red-700/40'
+      }`}
+    >
+      {/* Top gradient bar */}
+      <div className={`h-1 rounded-t-2xl ${featured ? 'bg-gradient-to-r from-red-600 via-red-500 to-violet-500' : 'bg-gradient-to-r from-zinc-600 to-zinc-500'}`} />
+
+      {/* Badge */}
+      {badge && (
+        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-red-600 to-red-500 text-white text-xs font-bold shadow-lg shadow-red-900/40 whitespace-nowrap">
+            <Zap className="w-3 h-3" />
+            {badge}
+          </span>
+        </div>
+      )}
+
+      <div className="p-7 flex flex-col flex-1 gap-6">
+        {/* Title & price */}
+        <div className="space-y-3">
+          <h3 className="text-zinc-300 font-semibold text-sm uppercase tracking-wider">{title}</h3>
+          <div className="flex items-end gap-2">
+            <span className={`text-4xl font-black leading-none ${featured ? 'text-white' : 'text-zinc-100'}`}>{price}</span>
+            <span className="text-zinc-400 text-sm pb-1">/ {period}</span>
+          </div>
+          <p className={`text-sm font-medium ${featured ? 'text-red-400' : 'text-zinc-500'}`}>{perMonth}</p>
+        </div>
+
+        {/* Feature list */}
+        <ul className="space-y-2.5 flex-1">
+          {features.map((f) => (
+            <li key={f} className="flex items-start gap-2.5 text-sm text-zinc-300">
+              <CheckCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+              {f}
+            </li>
+          ))}
+        </ul>
+
+        {/* Error */}
+        {checkoutError && (
+          <div className="flex items-start gap-2 rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-2.5 text-rose-300 text-xs">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            {checkoutError}
+          </div>
+        )}
+
+        {/* CTA */}
+        <button
+          onClick={handleGetStarted}
+          disabled={loading}
+          className={`min-h-[52px] w-full flex items-center justify-center gap-2 rounded-2xl font-bold text-base transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+            featured
+              ? 'bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white shadow-xl shadow-red-900/40'
+              : 'bg-zinc-700/80 hover:bg-zinc-600/80 text-white border border-zinc-600/60'
+          }`}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Setting up checkout…
+            </>
+          ) : (
+            <>
+              Get Started
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Pricing section ──────────────────────────────────────────────────────────
+function PricingSection() {
+  const SHARED_FEATURES = [
+    'Unlimited jobs & job history',
+    'Full operator mobile app',
+    'Schedule board & dispatch',
+    'Timecard & NFC clock-in',
+    'Customer signatures & photos',
+    'Invoicing & QuickBooks CSV export',
+    'Inventory & equipment management',
+    'All future platform updates',
+  ];
+
+  return (
+    <section id="pricing" className="relative py-24 px-5 overflow-hidden">
+      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-red-700/20 to-transparent" />
+      <Orb color="radial-gradient(circle, #b91c1c, transparent)" size={600} top="0%" left="20%" opacity={0.08} />
+      <Orb color="radial-gradient(circle, #7c3aed, transparent)" size={500} top="40%" left="70%" opacity={0.07} />
+
+      <div className="max-w-4xl mx-auto">
+        <FadeIn>
+          <div className="text-center mb-14 space-y-3">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-700/15 border border-red-700/30 text-red-400 text-xs font-bold uppercase tracking-widest">
+              <Zap className="w-3.5 h-3.5" />
+              Pricing
+            </div>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black">
+              Simple, Transparent{' '}
+              <span className="bg-gradient-to-r from-red-500 to-violet-400 bg-clip-text text-transparent">
+                Pricing
+              </span>
+            </h2>
+            <p className="text-zinc-400 text-lg max-w-xl mx-auto">
+              Full platform access. No per-seat fees. No surprises.
+            </p>
+          </div>
+        </FadeIn>
+
+        <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+          <FadeIn delay={0}>
+            <PricingCard
+              title="6-Month Plan"
+              priceId="price_1TbV2E0WWq11qMKimnEXVElP"
+              price="$3,747"
+              period="6 months"
+              perMonth="~$625/month"
+              features={SHARED_FEATURES}
+            />
+          </FadeIn>
+          <FadeIn delay={0.1}>
+            <PricingCard
+              title="Annual Plan"
+              priceId="price_1TbV2E0WWq11qMKidsCGCrl8"
+              price="$6,997"
+              period="year"
+              perMonth="~$583/month"
+              badge="Best Value — Save $497"
+              featured
+              features={SHARED_FEATURES}
+            />
+          </FadeIn>
+        </div>
+
+        <FadeIn delay={0.2}>
+          <p className="text-center text-zinc-600 text-sm mt-8">
+            Questions?{' '}
+            <a href="mailto:pontifexindustries@gmail.com" className="text-violet-400 hover:text-violet-300 transition-colors">
+              pontifexindustries@gmail.com
+            </a>
+          </p>
+        </FadeIn>
+      </div>
+    </section>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function PatriotPage() {
+function PatriotPageContent() {
+  const searchParams = useSearchParams();
   const [scrolled, setScrolled] = useState(false);
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('upgrade') === 'true') setShowUpgradeBanner(true);
+  }, [searchParams]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 48);
@@ -270,6 +484,23 @@ export default function PatriotPage() {
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white overflow-x-hidden">
+
+      {/* ── Upgrade banner ──────────────────────────────────────────────────── */}
+      {showUpgradeBanner && (
+        <div className="relative z-[60] flex items-center justify-between gap-3 px-5 py-3 bg-amber-500/15 border-b border-amber-500/30 text-amber-300 text-sm font-medium">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+            Your trial has ended. Choose a plan below to restore access.
+          </div>
+          <button
+            onClick={() => setShowUpgradeBanner(false)}
+            className="p-1 hover:bg-amber-500/20 rounded-lg transition-colors shrink-0"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ── Sticky nav ──────────────────────────────────────────────────────── */}
       <header
@@ -301,6 +532,9 @@ export default function PatriotPage() {
             </button>
             <button onClick={() => scrollTo('your-dashboard')} className="hover:text-white transition-colors min-h-[44px] flex items-center">
               Dashboard
+            </button>
+            <button onClick={() => scrollTo('pricing')} className="hover:text-white transition-colors min-h-[44px] flex items-center">
+              Pricing
             </button>
           </nav>
 
@@ -604,7 +838,12 @@ export default function PatriotPage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          SECTION 6 — BOTTOM CTA
+          SECTION 6 — PRICING
+      ════════════════════════════════════════════════════════════════════════ */}
+      <PricingSection />
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SECTION 7 — BOTTOM CTA
       ════════════════════════════════════════════════════════════════════════ */}
       <section className="relative py-28 px-5 overflow-hidden">
         <Orb color="radial-gradient(circle, #b91c1c, transparent)" size={700} top="-20%" left="30%" opacity={0.1} />
@@ -673,5 +912,13 @@ export default function PatriotPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function PatriotPage() {
+  return (
+    <Suspense>
+      <PatriotPageContent />
+    </Suspense>
   );
 }

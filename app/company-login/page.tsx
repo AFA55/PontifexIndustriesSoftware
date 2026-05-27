@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Building2, ArrowRight, Loader2 } from 'lucide-react';
+import { Building2, ArrowRight, Loader2, CheckCircle, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 function PontifexLogo() {
@@ -14,8 +14,11 @@ function PontifexLogo() {
   );
 }
 
-export default function CompanyLoginPage() {
+function CompanyLoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activated = searchParams.get('activated') === 'true';
+  const [showActivatedBanner, setShowActivatedBanner] = useState(activated);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +82,28 @@ export default function CompanyLoginPage() {
         transition={{ duration: 0.5 }}
         className="relative z-10 w-full max-w-sm px-4"
       >
+        {/* Activated banner */}
+        {showActivatedBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm font-medium"
+          >
+            <div className="flex items-center gap-2.5">
+              <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+              Your account is now active — sign in to get started.
+            </div>
+            <button
+              onClick={() => setShowActivatedBanner(false)}
+              className="p-1 hover:bg-emerald-500/20 rounded-lg transition-colors shrink-0"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+
         {/* Card */}
         <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-8">
           {/* Logo + title */}
@@ -143,5 +168,13 @@ export default function CompanyLoginPage() {
         </p>
       </motion.div>
     </div>
+  );
+}
+
+export default function CompanyLoginPage() {
+  return (
+    <Suspense>
+      <CompanyLoginContent />
+    </Suspense>
   );
 }

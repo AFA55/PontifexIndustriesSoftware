@@ -8,10 +8,194 @@ import Link from 'next/link';
 import {
   ChevronLeft, Settings, Calendar, Save, Loader2,
   LayoutGrid, StickyNote, AlertTriangle, CheckCircle,
-  Hash, Bell, Minus, Plus, Palette, ChevronRight
+  Hash, Bell, Minus, Plus, Palette, ChevronRight,
+  CreditCard, ExternalLink, ArrowUpRight,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
+
+// ─── Billing section types ─────────────────────────────────────────────────
+interface TenantBilling {
+  subscription_status: string | null;
+  plan_type: string | null;
+  subscription_plan: string | null;
+  current_period_end: string | null;
+}
+
+function formatPlanName(billing: TenantBilling): string {
+  const pt = billing.plan_type || billing.subscription_plan || null;
+  if (!pt) {
+    const s = billing.subscription_status;
+    if (!s || s === 'trialing') return 'Free Trial';
+    return 'No plan';
+  }
+  if (pt === 'biannual' || pt === 'starter') return '6-Month Plan';
+  if (pt === 'annual' || pt === 'professional' || pt === 'enterprise') return 'Annual Plan';
+  // price_id based
+  if (pt.includes('biannual')) return '6-Month Plan';
+  if (pt.includes('annual')) return 'Annual Plan';
+  return pt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatBillingDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+type StatusVariant = 'green' | 'amber' | 'red';
+function statusConfig(status: string | null): { label: string; variant: StatusVariant } {
+  switch (status) {
+    case 'active':    return { label: 'Active', variant: 'green' };
+    case 'trialing':  return { label: 'Free Trial', variant: 'amber' };
+    case 'past_due':  return { label: 'Past Due', variant: 'amber' };
+    case 'canceled':  return { label: 'Canceled', variant: 'red' };
+    case 'incomplete':return { label: 'Incomplete', variant: 'red' };
+    case 'paused':    return { label: 'Paused', variant: 'amber' };
+    default:          return { label: 'Trial', variant: 'amber' };
+  }
+}
+
+const VARIANT_CLASSES: Record<StatusVariant, string> = {
+  green: 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/15 dark:border-emerald-400/30 dark:text-emerald-300',
+  amber: 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/15 dark:border-amber-400/30 dark:text-amber-300',
+  red:   'bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-500/15 dark:border-rose-400/30 dark:text-rose-300',
+};
+
+// ─── Billing section component ─────────────────────────────────────────────
+function BillingSection({ userRole }: { userRole: string }) {
+  const BILLING_ROLES = ['admin', 'super_admin', 'operations_manager'];
+  if (!BILLING_ROLES.includes(userRole)) return null;
+
+  const [billing, setBilling] = useState<TenantBilling | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const { data } = await supabase
+          .from('tenants')
+          .select('subscription_status, plan_type, subscription_plan, current_period_end')
+          .limit(1)
+          .maybeSingle();
+        if (data) setBilling(data as TenantBilling);
+      } catch {
+        // non-fatal — billing section just shows dashes
+      }
+    };
+    load();
+  }, []);
+
+  const handleManage = async () => {
+    setPortalLoading(true);
+    setPortalError(null);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+      const res = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.data?.url) {
+        setPortalError(json?.error || 'Unable to open billing portal. Please try again.');
+        return;
+      }
+      window.location.href = json.data.url;
+    } catch {
+      setPortalError('Network error — please try again.');
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  const isTrialOrNull = !billing?.subscription_status ||
+    billing.subscription_status === 'trialing';
+
+  const { label, variant } = statusConfig(billing?.subscription_status ?? null);
+
+  return (
+    <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+      <div className="bg-gradient-to-r from-violet-600 to-indigo-700 px-6 py-4 text-white">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <CreditCard className="w-5 h-5" />
+          Billing &amp; Subscription
+        </h2>
+        <p className="text-violet-100 text-sm mt-0.5">Manage your Pontifex Industries subscription</p>
+      </div>
+
+      <div className="p-6 space-y-5">
+        {/* Status row */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
+            <p className="text-xs font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">Current Plan</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-white">
+              {billing ? formatPlanName(billing) : '—'}
+            </p>
+          </div>
+          <span className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold border ${VARIANT_CLASSES[variant]}`}>
+            {label}
+          </span>
+        </div>
+
+        {/* Next billing date */}
+        {billing?.current_period_end && !isTrialOrNull && (
+          <div className="rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 px-4 py-3 flex items-center justify-between gap-3">
+            <span className="text-sm text-gray-500 dark:text-white/50">Next billing date</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+              {formatBillingDate(billing.current_period_end)}
+            </span>
+          </div>
+        )}
+
+        {/* Error */}
+        {portalError && (
+          <div className="flex items-start gap-2 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-400/30 px-3 py-2.5 text-rose-700 dark:text-rose-300 text-xs">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            {portalError}
+          </div>
+        )}
+
+        {/* Actions */}
+        {isTrialOrNull ? (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-400/30 px-4 py-3 text-sm text-amber-700 dark:text-amber-300 font-medium">
+              You&apos;re on a free trial. Upgrade to a paid plan to keep access after your trial ends.
+            </div>
+            <Link
+              href="/patriot#pricing"
+              className="flex items-center justify-center gap-2 min-h-[44px] w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold text-sm transition-all shadow-lg"
+            >
+              View Plans &amp; Pricing
+              <ArrowUpRight className="w-4 h-4" />
+            </Link>
+          </div>
+        ) : (
+          <button
+            onClick={handleManage}
+            disabled={portalLoading}
+            className="flex items-center justify-center gap-2 min-h-[44px] w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all shadow-lg"
+          >
+            {portalLoading ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Opening portal…</>
+            ) : (
+              <><ExternalLink className="w-4 h-4" /> Manage Subscription</>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface ScheduleSettings {
   max_slots: number;
@@ -28,6 +212,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [userRole, setUserRole] = useState('');
   const [settings, setSettings] = useState<ScheduleSettings>({
     max_slots: 10,
     warning_threshold: 8,
@@ -41,6 +226,7 @@ export default function SettingsPage() {
       const user = getCurrentUser();
       if (!user) { router.push('/login'); return; }
       setIsSuperAdmin(user.role === 'super_admin');
+      setUserRole(user.role);
       const bypassRoles = ['super_admin', 'operations_manager'];
       if (bypassRoles.includes(user.role)) return;
 
@@ -518,6 +704,11 @@ export default function SettingsPage() {
               </Link>
             </div>
           </div>
+
+          {/* ══════════════════════════════════════════════
+              BILLING & SUBSCRIPTION
+             ══════════════════════════════════════════════ */}
+          <BillingSection userRole={userRole} />
 
           {/* ══════════════════════════════════════════════
               QUICK REFERENCE
