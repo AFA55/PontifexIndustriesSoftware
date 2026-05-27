@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
-import { supabase } from '@/lib/supabase';
 import OperatorRow from './_components/OperatorRow';
 import Toast from './_components/Toast';
 import NotificationBell from './_components/NotificationBell';
@@ -27,6 +26,19 @@ import type { ToastData } from './_components/Toast';
 import type { NoteData } from './_components/NotesDrawer';
 import DndBoardWrapper from './_components/DndBoardWrapper';
 import ViewToggle from './_components/ViewToggle';
+import CapacitySettingsModal from './_components/CapacitySettingsModal';
+import DispatchConfirmationModal from './_components/DispatchConfirmationModal';
+import AutoScheduleResultsModal from './_components/AutoScheduleResultsModal';
+import type { AutoScheduleResults } from './_components/AutoScheduleResultsModal';
+import DailyCodeModal from './_components/DailyCodeModal';
+import WillCallFolder from './_components/WillCallFolder';
+import WeeklyView from './_components/WeeklyView';
+import UnassignedSection from './_components/UnassignedSection';
+import BoardLoadingSkeleton from './_components/BoardLoadingSkeleton';
+import NextAvailableBanner from './_components/NextAvailableBanner';
+import { OPERATOR_COLORS, SALESMEN } from './_components/constants';
+import { parseLocalDate, toDateString, formatDisplayDate, daysAgo, apiFetch, toJobCard } from './_components/helpers';
+import type { ConflictData, RowChangeConflict } from './_components/types';
 
 // ─── Heavy components — dynamic-imported (rendered conditionally) ─────────
 const PendingQueueSidebar = dynamic(() => import('./_components/PendingQueueSidebar'), { ssr: false, loading: () => null });
@@ -43,120 +55,6 @@ const OperatorRowView = dynamic(() => import('./_components/OperatorRowView'), {
 const CrewScheduleGrid = dynamic(() => import('./_components/CrewScheduleGrid'), { ssr: false, loading: () => null });
 const CancelJobModal = dynamic(() => import('./_components/CancelJobModal'), { ssr: false, loading: () => null });
 const MarkOutModal = dynamic(() => import('./_components/MarkOutModal'), { ssr: false, loading: () => null });
-
-// ─── Operator color palette ─────────────────────────────────────────────
-const OPERATOR_COLORS = [
-  { border: 'border-purple-500', bg: 'bg-purple-100', text: 'text-purple-700', badge: 'bg-purple-500', icon: 'text-purple-600' },
-  { border: 'border-blue-500', bg: 'bg-blue-100', text: 'text-blue-700', badge: 'bg-blue-500', icon: 'text-blue-600' },
-  { border: 'border-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-700', badge: 'bg-emerald-500', icon: 'text-emerald-600' },
-  { border: 'border-rose-500', bg: 'bg-rose-100', text: 'text-rose-700', badge: 'bg-rose-500', icon: 'text-rose-600' },
-  { border: 'border-indigo-500', bg: 'bg-indigo-100', text: 'text-indigo-700', badge: 'bg-indigo-500', icon: 'text-indigo-600' },
-  { border: 'border-cyan-500', bg: 'bg-cyan-100', text: 'text-cyan-700', badge: 'bg-cyan-500', icon: 'text-cyan-600' },
-  { border: 'border-amber-600', bg: 'bg-amber-100', text: 'text-amber-700', badge: 'bg-amber-600', icon: 'text-amber-600' },
-  { border: 'border-pink-500', bg: 'bg-pink-100', text: 'text-pink-700', badge: 'bg-pink-500', icon: 'text-pink-600' },
-];
-
-// ─── Helpers ─────────────────────────────────────────────────────────────
-function parseLocalDate(dateString: string) {
-  const [year, month, day] = dateString.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function toDateString(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function formatDisplayDate(dateString: string) {
-  const date = parseLocalDate(dateString);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-  const dateOnly = new Date(date); dateOnly.setHours(0, 0, 0, 0);
-  if (dateOnly.getTime() === today.getTime()) return 'Today';
-  if (dateOnly.getTime() === tomorrow.getTime()) return 'Tomorrow';
-  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-}
-
-function daysAgo(dateString: string) {
-  const added = parseLocalDate(dateString);
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  return Math.floor((now.getTime() - added.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-// ─── API helper ──────────────────────────────────────────────────────────
-async function getToken() {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || '';
-}
-
-async function apiFetch(url: string, opts?: RequestInit) {
-  const token = await getToken();
-  return fetch(url, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts?.headers },
-  });
-}
-
-// ─── Convert API job to JobCardData ──────────────────────────────────────
-function toJobCard(job: any, viewDate?: string): JobCardData {
-  return {
-    id: job.id,
-    job_number: job.job_number,
-    customer_name: job.customer_name,
-    job_type: job.job_type,
-    location: job.location || '',
-    address: job.address || '',
-    equipment_needed: job.equipment_needed || [],
-    description: job.description || null,
-    scheduled_date: job.scheduled_date || '',
-    end_date: job.end_date || null,
-    arrival_time: job.arrival_time || null,
-    is_will_call: job.is_will_call || false,
-    difficulty_rating: job.difficulty_rating || null,
-    notes_count: job.notes_count || 0,
-    change_requests_count: job.pending_change_requests_count || 0,
-    helper_names: job.helper_name ? [job.helper_name] : [],
-    po_number: job.po_number || null,
-    day_label: computeDayLabel(job, viewDate),
-    status: job.status || null,
-    // Live operator-progress timestamps (already in job_orders select('*'))
-    in_route_at: job.in_route_at ?? null,
-    arrived_at_jobsite_at: job.arrived_at_jobsite_at ?? null,
-    work_started_at: job.work_started_at ?? null,
-    work_completed_at: job.work_completed_at ?? null,
-  };
-}
-
-function computeDayLabel(job: any, viewDate?: string): string | undefined {
-  if (!job.scheduled_date || !job.end_date) return undefined;
-  if (job.scheduled_date === job.end_date) return undefined; // single-day job
-  const start = parseLocalDate(job.scheduled_date);
-  const end = parseLocalDate(job.end_date);
-  // Use the date currently being viewed on the board, not today's real date
-  const current = viewDate ? parseLocalDate(viewDate) : (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
-  const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const currentDay = Math.round((current.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  if (currentDay >= 1 && currentDay <= totalDays) return `Day ${currentDay} of ${totalDays}`;
-  return undefined;
-}
-
-// ─── Conflict data type ─────────────────────────────────────────────────
-interface ConflictData {
-  personName: string;
-  personRole: 'operator' | 'helper';
-  currentJobName: string;
-  newJob: JobCardData;
-  newJobSource: 'unassigned' | 'willcall';
-  targetRowIndex: number;
-  helperName: string | null;
-}
-
-// ─── Row-change conflict (inline dropdown) ──────────────────────────────
-interface RowChangeConflict {
-  operatorName: string;
-  sourceRowIndex: number;   // row where operator currently has jobs
-  targetRowIndex: number;   // row where user wants to place operator
-  currentJobNames: string[];
-}
 
 // ─── Main Component ─────────────────────────────────────────────────────
 export default function ScheduleBoardPage() {
@@ -253,14 +151,7 @@ export default function ScheduleBoardPage() {
 
   // ═══ AI AUTO-SCHEDULE STATE ═══
   const [autoScheduleLoading, setAutoScheduleLoading] = useState(false);
-  const [autoScheduleResults, setAutoScheduleResults] = useState<{
-    assignments: { jobNumber: string; customerName: string; operatorName: string; matchQuality: string; reason: string; travelDistance?: number | null }[];
-    skipped: { jobNumber: string; customerName: string; reason: string }[];
-    totalAssigned: number;
-    totalUnassigned: number;
-    totalSkipped: number;
-    message: string;
-  } | null>(null);
+  const [autoScheduleResults, setAutoScheduleResults] = useState<AutoScheduleResults | null>(null);
 
   // ═══ TOAST HELPER ═══
   const addToast = useCallback((type: ToastData['type'], title: string, message?: string) => {
@@ -994,7 +885,6 @@ export default function ScheduleBoardPage() {
     }
 
     // ── SERVER-SIDE CAPACITY CHECK ──
-    // Double-check capacity right before approving (in case it changed since modal opened)
     if (!job.is_will_call) {
       try {
         const endDate = job.end_date || data.scheduledDate;
@@ -1005,13 +895,11 @@ export default function ScheduleBoardPage() {
         if (capRes.ok) {
           const capJson = await capRes.json();
           if (capJson.summary) {
-            // Multi-day
             if (capJson.summary.fullDates.length > 0) {
               addToast('error', 'Schedule Full', `Cannot approve — ${capJson.summary.fullDates.length} date(s) are at full capacity. Use the approval modal to find available dates.`);
               return;
             }
           } else {
-            // Single date
             const info = capJson.data?.[data.scheduledDate];
             if (info?.isFull) {
               addToast('error', 'Schedule Full', `${data.scheduledDate} is at full capacity (${info.maxSlots}/${info.maxSlots}). Choose another date.`);
@@ -1340,7 +1228,6 @@ export default function ScheduleBoardPage() {
 
   // --- Change Request (success callback — modal handles the API call) ---
   const handleChangeRequestSuccess = () => {
-    // May be called from ChangeRequestModal (changeRequestTarget set) or EditJobPanel (editTarget set)
     const targetJob = changeRequestTarget || editTarget?.job;
     if (!targetJob) return;
 
@@ -1359,7 +1246,6 @@ export default function ScheduleBoardPage() {
       addToast('success', 'Change Request Submitted', `${targetJob.customer_name} — Supervisor will review`);
       setChangeRequestTarget(null);
     }
-    // If called from EditJobPanel, the panel handles its own toast/close
   };
 
   // --- Notes (from API) ---
@@ -1630,7 +1516,6 @@ export default function ScheduleBoardPage() {
     for (let i = 0; i < NUM_ROWS; i++) {
       if (i === rowIndex) continue;
       if (rowAssignments[i]?.operator === newOperator && (operatorJobs[i] || []).length > 0) {
-        // Operator already has jobs in row i — show conflict
         const jobNames = (operatorJobs[i] || []).map(j => j.customer_name);
         setRowChangeConflict({
           operatorName: newOperator,
@@ -1651,7 +1536,6 @@ export default function ScheduleBoardPage() {
     if (!rowChangeConflict) return;
     const { operatorName, sourceRowIndex, targetRowIndex } = rowChangeConflict;
 
-    // Unassign all jobs from the source row (put them back to unassigned)
     const existingJobs = operatorJobs[sourceRowIndex] || [];
     for (const j of existingJobs) {
       try {
@@ -1664,7 +1548,6 @@ export default function ScheduleBoardPage() {
     setUnassignedJobs(prev => [...prev, ...existingJobs.map(j => ({ ...j, helper_names: [] }))]);
     setOperatorJobs(prev => ({ ...prev, [sourceRowIndex]: [] }));
 
-    // Clear operator from source row
     setRowAssignments(prev => prev.map((r, i) =>
       i === sourceRowIndex ? { operator: null, helper: null } :
       i === targetRowIndex ? { ...r, operator: operatorName } : r
@@ -1693,7 +1576,6 @@ export default function ScheduleBoardPage() {
     const operatorId = operatorName ? operatorIdMap[operatorName] : null;
     const newHelperId = newHelper ? helperIdMap[newHelper] : null;
 
-    // Persist helper change to DB for all jobs in this row
     const rowJobs = operatorJobs[rowIndex] || [];
     for (const j of rowJobs) {
       try {
@@ -1763,61 +1645,9 @@ export default function ScheduleBoardPage() {
     setShowQuickAdd(false);
   };
 
-  // Salesmen list — used for Quick Add
-  const SALESMEN = ['Andres A', 'Adam I', 'Jey Y', 'Doug R', 'David S'];
-
   // ═══ LOADING STATE ═══
   if (loading && Object.keys(operatorJobs).length === 0 && unassignedJobs.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720]">
-        {/* Skeleton header */}
-        <div className="backdrop-blur-xl bg-white/90 dark:bg-[#0e0720]/95 border-b border-gray-200 dark:border-white/10 sticky top-0 z-30 shadow-lg">
-          <div className="container mx-auto px-4 md:px-6 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
-                <div className="h-6 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-              </div>
-              <div className="flex gap-2">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-9 w-9 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
-                ))}
-                <div className="h-9 w-28 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Date nav */}
-        <div className="container mx-auto px-4 md:px-6 py-3 flex items-center gap-3">
-          <div className="h-9 w-9 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
-          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-          <div className="h-9 w-9 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
-        </div>
-        {/* Operator rows skeleton */}
-        <div className="container mx-auto px-4 md:px-6 space-y-3 pt-2">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
-              {/* Operator header */}
-              <div className="flex items-center gap-3 p-3 border-b border-gray-100 dark:border-white/5">
-                <div className="h-9 w-9 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-                <div className="space-y-1.5 flex-1">
-                  <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                  <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                </div>
-                <div className="h-7 w-20 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-              </div>
-              {/* Job slots */}
-              <div className="p-3 flex gap-2 flex-wrap">
-                {[...Array(i % 2 === 0 ? 2 : 1)].map((_, j) => (
-                  <div key={j} className="h-16 w-44 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <BoardLoadingSkeleton />;
   }
 
   return (
@@ -2043,70 +1873,12 @@ export default function ScheduleBoardPage() {
 
       {/* ═══ WILL CALL FOLDER ══════════════════════════════════════════════ */}
       {showWillCall && (
-        <div className="container mx-auto px-4 md:px-6 pb-4">
-          <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/10 rounded-2xl border-2 border-amber-200 dark:border-amber-500/30 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <FolderOpen className="w-5 h-5 text-amber-600" />
-                <h3 className="font-bold text-gray-900 dark:text-white">Will Call Folder</h3>
-                <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-bold">{willCallJobs.length} jobs</span>
-              </div>
-              <p className="text-xs text-amber-600">Jobs waiting for an open slot — schedule when availability opens up</p>
-            </div>
-            {willCallJobs.length === 0 ? (
-              <div className="text-center py-8 text-amber-500">
-                <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="font-semibold">No will-call jobs</p>
-                <p className="text-xs">Salesmen can mark jobs as will-call when submitting the schedule form</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {willCallJobs.map((job) => {
-                  const daysWaiting = job.scheduled_date ? daysAgo(job.scheduled_date) : 0;
-                  return (
-                    <div key={job.id} className="bg-white dark:bg-white/5 rounded-xl border-2 border-amber-300 dark:border-amber-500/30 p-3 hover:shadow-md transition-all">
-                      <div className="flex items-start justify-between mb-1">
-                        <h4 className="font-bold text-gray-900 dark:text-white text-sm">{job.customer_name}</h4>
-                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold whitespace-nowrap">WILL CALL</span>
-                      </div>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 mb-1">{job.job_type}</span>
-                      <p className="text-xs text-gray-500 dark:text-white/60 flex items-center gap-1 mb-1"><MapPin className="w-3 h-3" /> {job.location}</p>
-
-                      <div className="flex items-center justify-between mt-2 mb-2">
-                        <span className="text-xs text-gray-400 dark:text-white/40">
-                          Tentative: {job.scheduled_date ? parseLocalDate(job.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
-                        </span>
-                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          daysWaiting >= 7 ? 'bg-red-100 text-red-700' : daysWaiting >= 3 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          <Timer className="w-3 h-3" />
-                          {daysWaiting === 0 ? 'Today' : `${daysWaiting}d waiting`}
-                        </span>
-                      </div>
-
-                      {canEdit && (
-                        <div className="flex gap-2 mt-1">
-                          <button
-                            onClick={() => handleMoveWillCallToSchedule(job)}
-                            className="flex-1 py-1.5 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
-                          >
-                            Schedule Now
-                          </button>
-                          <button
-                            onClick={() => setAssignTarget({ job, source: 'willcall' })}
-                            className="py-1.5 px-2.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors"
-                          >
-                            <Users className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+        <WillCallFolder
+          willCallJobs={willCallJobs}
+          canEdit={canEdit}
+          onMoveToSchedule={handleMoveWillCallToSchedule}
+          onAssign={(job) => setAssignTarget({ job, source: 'willcall' })}
+        />
       )}
 
       {/* ═══ CREW GRID VIEW ═══════════════════════════════════════════════ */}
@@ -2123,76 +1895,13 @@ export default function ScheduleBoardPage() {
 
       {/* ═══ WEEKLY VIEW ═══════════════════════════════════════════════════ */}
       {viewMode === 'week' && boardViewMode !== 'crew-grid' && (
-        <div className="container mx-auto px-4 md:px-6 pb-6">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-x-auto">
-            <div className="grid grid-cols-1 md:grid-cols-7 divide-x divide-gray-200 dark:divide-slate-700 min-w-0 md:min-w-[1000px]">
-              {Object.entries(weekData).sort(([a], [b]) => a.localeCompare(b)).map(([date, jobs]) => {
-                const d = parseLocalDate(date);
-                const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-                const dayNum = d.getDate();
-                const monthName = d.toLocaleDateString('en-US', { month: 'short' });
-                const isToday = toDateString(new Date()) === date;
-                const isSelected = selectedDate === date;
-                return (
-                  <div key={date} className="min-w-0">
-                    {/* Day header */}
-                    <button
-                      onClick={() => { setSelectedDate(date); setViewMode('day'); }}
-                      className={`w-full px-3 py-2.5 text-center border-b-2 transition-all ${
-                        isToday ? 'bg-purple-50 dark:bg-purple-500/15 border-purple-500' :
-                        isSelected ? 'bg-blue-50 dark:bg-blue-500/15 border-blue-400' :
-                        'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
-                      }`}
-                    >
-                      <p className={`text-xs font-bold uppercase ${isToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-white/60'}`}>{dayName}</p>
-                      <p className={`text-lg font-bold ${isToday ? 'text-purple-700 dark:text-purple-300' : 'text-gray-900 dark:text-white'}`}>{monthName} {dayNum}</p>
-                      <p className={`text-[10px] font-semibold ${
-                        jobs.length === 0 ? 'text-green-500 dark:text-green-400' :
-                        jobs.length >= capacityMaxSlots ? 'text-red-500 dark:text-red-400' :
-                        'text-gray-400 dark:text-white/50'
-                      }`}>
-                        {jobs.length} job{jobs.length !== 1 ? 's' : ''}
-                      </p>
-                    </button>
-                    {/* Jobs list */}
-                    <div className="p-2 space-y-1.5 max-h-[60vh] overflow-y-auto">
-                      {jobs.length === 0 ? (
-                        <p className="text-xs text-gray-400 dark:text-white/50 text-center py-6 italic">No jobs</p>
-                      ) : (
-                        jobs.map(job => (
-                          <div
-                            key={job.id}
-                            draggable={canEdit}
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('application/job-card', JSON.stringify({ jobId: job.id, sourceRowIndex: -1 }));
-                              e.dataTransfer.effectAllowed = 'move';
-                            }}
-                            onClick={() => { setSelectedDate(date); setViewMode('day'); }}
-                            className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800 hover:shadow-md transition-all cursor-pointer group"
-                          >
-                            <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{job.customer_name}</p>
-                            <p className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold truncate">{job.job_type?.split(',')[0]?.trim()}</p>
-                            {job.arrival_time && (
-                              <p className="text-[10px] text-gray-400 mt-0.5">⏰ {job.arrival_time}</p>
-                            )}
-                            <div className="flex flex-wrap gap-0.5 mt-1">
-                              {job.equipment_needed.slice(0, 3).map(eq => (
-                                <span key={eq} className="px-1 py-0.5 bg-indigo-50 rounded text-[8px] text-indigo-600 font-medium">{eq}</span>
-                              ))}
-                              {job.equipment_needed.length > 3 && (
-                                <span className="text-[8px] text-gray-400">+{job.equipment_needed.length - 3}</span>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <WeeklyView
+          weekData={weekData}
+          selectedDate={selectedDate}
+          capacityMaxSlots={capacityMaxSlots}
+          canEdit={canEdit}
+          onDayClick={(date) => { setSelectedDate(date); setViewMode('day'); }}
+        />
       )}
 
       {/* ═══ CHANGE REQUEST BANNER (admin/salesman) ════════════════════════ */}
@@ -2282,57 +1991,13 @@ export default function ScheduleBoardPage() {
         )}
 
         {/* ═══ UNASSIGNED SECTION ═══════════════════════════════════════ */}
-        {boardViewMode === 'slots' && unassignedJobs.length > 0 && (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border-2 border-dashed border-orange-300 dark:border-orange-500/40 overflow-hidden">
-            <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-5 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-white">
-                  <AlertCircle className="w-5 h-5" />
-                  <h3 className="font-bold">Unassigned Jobs for This Date</h3>
-                  <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">{unassignedJobs.length}</span>
-                </div>
-                <p className="text-orange-100 text-xs hidden sm:block">Approved but no operator assigned yet</p>
-              </div>
-            </div>
-            <div className="p-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {unassignedJobs.map((job) => (
-                  <div
-                    key={job.id}
-                    draggable={canEdit}
-                    onDragStart={(e) => {
-                      if (!canEdit) return;
-                      e.dataTransfer.setData('application/job-card', JSON.stringify({ jobId: job.id, sourceRowIndex: -1 }));
-                      e.dataTransfer.effectAllowed = 'move';
-                      (e.currentTarget as HTMLElement).style.opacity = '0.5';
-                    }}
-                    onDragEnd={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-                    onClick={() => setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null })}
-                    className={`rounded-xl border-2 border-orange-200 dark:border-orange-500/40 bg-orange-50/50 dark:bg-orange-500/10 p-4 hover:shadow-md transition-all cursor-pointer ${canEdit ? 'active:cursor-grabbing' : ''}`}
-                  >
-                    <h4 className="font-bold text-gray-900 dark:text-white text-sm mb-1">{job.customer_name}</h4>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mb-2">{job.job_type?.split(',')[0]?.trim()}</span>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mb-2"><MapPin className="w-3 h-3 text-gray-400" /> {job.location}</p>
-                    {job.equipment_needed.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {job.equipment_needed.map(eq => (
-                          <span key={eq} className="px-2 py-0.5 bg-indigo-50 rounded text-xs text-indigo-600 font-medium">{eq}</span>
-                        ))}
-                      </div>
-                    )}
-                    {canEdit && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setAssignTarget({ job, source: 'unassigned' }); }}
-                        className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md"
-                      >
-                        <Users className="w-3.5 h-3.5 inline mr-1.5" /> Assign Operator
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        {boardViewMode === 'slots' && (
+          <UnassignedSection
+            jobs={unassignedJobs}
+            canEdit={canEdit}
+            onJobClick={(job) => setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null })}
+            onAssign={(job) => setAssignTarget({ job, source: 'unassigned' })}
+          />
         )}
 
         {/* ═══ DAILY NOTES ═══════════════════════════════════════════════ */}
@@ -2411,104 +2076,10 @@ export default function ScheduleBoardPage() {
 
       {/* ═══ AI AUTO-SCHEDULE RESULTS MODAL ═══ */}
       {autoScheduleResults && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setAutoScheduleResults(null)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-            {/* Header */}
-            <div className="bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Brain className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">AI Auto-Schedule Results</h2>
-                  <p className="text-violet-200 text-sm">{autoScheduleResults.message}</p>
-                </div>
-              </div>
-              <button onClick={() => setAutoScheduleResults(null)} className="p-2 hover:bg-white/20 rounded-lg transition-all">
-                <X className="w-5 h-5 text-white" />
-              </button>
-            </div>
-
-            {/* Stats */}
-            <div className="px-6 py-4 grid grid-cols-3 gap-3 border-b border-gray-100 dark:border-white/10">
-              <div className="text-center p-3 bg-green-50 dark:bg-green-500/10 rounded-xl">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{autoScheduleResults.totalAssigned}</div>
-                <div className="text-xs font-semibold text-green-500 dark:text-green-500 uppercase">Assigned</div>
-              </div>
-              <div className="text-center p-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl">
-                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{autoScheduleResults.totalSkipped}</div>
-                <div className="text-xs font-semibold text-amber-500 dark:text-amber-500 uppercase">Skipped</div>
-              </div>
-              <div className="text-center p-3 bg-purple-50 dark:bg-purple-500/10 rounded-xl">
-                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{autoScheduleResults.totalUnassigned}</div>
-                <div className="text-xs font-semibold text-purple-500 dark:text-purple-500 uppercase">Total Jobs</div>
-              </div>
-            </div>
-
-            {/* Assignments list */}
-            <div className="px-6 py-4 overflow-y-auto max-h-[45vh] space-y-2">
-              {autoScheduleResults.assignments.length > 0 && (
-                <>
-                  <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase flex items-center gap-2 mb-2">
-                    <Zap className="w-4 h-4 text-green-500" /> Assignments
-                  </h3>
-                  {autoScheduleResults.assignments.map((a, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700 rounded-xl border border-gray-100 dark:border-white/10">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">{a.customerName}</div>
-                        <div className="text-xs text-gray-500 dark:text-white/60">{a.jobNumber}</div>
-                      </div>
-                      <div className="flex items-center gap-2 ml-3">
-                        <span className="text-sm font-medium text-gray-700 dark:text-white/70">→ {a.operatorName}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                          a.matchQuality === 'good' ? 'bg-green-100 text-green-700' :
-                          a.matchQuality === 'stretch' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {a.matchQuality === 'good' ? '✓ Good' : a.matchQuality === 'stretch' ? '~ Stretch' : '✗ Over'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {autoScheduleResults.skipped.length > 0 && (
-                <>
-                  <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase flex items-center gap-2 mt-4 mb-2">
-                    <AlertCircle className="w-4 h-4 text-amber-500" /> Skipped
-                  </h3>
-                  {autoScheduleResults.skipped.map((s, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl border border-amber-100 dark:border-amber-500/20">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">{s.customerName}</div>
-                        <div className="text-xs text-gray-500 dark:text-white/50">{s.jobNumber}</div>
-                      </div>
-                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium ml-3">{s.reason}</span>
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {autoScheduleResults.assignments.length === 0 && autoScheduleResults.skipped.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <Sparkles className="w-8 h-8 text-gray-300 dark:text-white/20 mx-auto mb-2" />
-                  <p className="dark:text-white/50">No unassigned jobs to schedule</p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex justify-end">
-              <button
-                onClick={() => setAutoScheduleResults(null)}
-                className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
+        <AutoScheduleResultsModal
+          results={autoScheduleResults}
+          onClose={() => setAutoScheduleResults(null)}
+        />
       )}
 
       {conflictData && (
@@ -2558,115 +2129,23 @@ export default function ScheduleBoardPage() {
 
       {/* ═══ NEXT AVAILABLE DATE BANNER ════════════════════════════════ */}
       {nextAvailableDate && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-white dark:bg-[#0e0720] dark:border-white/10 rounded-2xl shadow-2xl border-2 border-purple-200 p-4 flex items-center gap-4 max-w-md">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
-              <CalendarDays className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-gray-900 dark:text-white">Next Available Date</p>
-              <p className="text-xs text-gray-600 dark:text-white/60">
-                {new Date(nextAvailableDate.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                <span className="text-purple-600 font-semibold"> — {nextAvailableDate.availableSlots} slots open</span>
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setSelectedDate(nextAvailableDate.date); setNextAvailableDate(null); }}
-                className="px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl text-xs font-bold transition-all hover:shadow-md"
-              >
-                Go
-              </button>
-              <button
-                onClick={() => setNextAvailableDate(null)}
-                className="px-2 py-2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <NextAvailableBanner
+          date={nextAvailableDate.date}
+          availableSlots={nextAvailableDate.availableSlots}
+          onGo={() => { setSelectedDate(nextAvailableDate.date); setNextAvailableDate(null); }}
+          onDismiss={() => setNextAvailableDate(null)}
+        />
       )}
 
       {/* ═══ DISPATCH CONFIRMATION MODAL ═══════════════════════════════ */}
       {showDispatchModal && (
-        <>
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={() => !dispatchLoading && setShowDispatchModal(false)} />
-          <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200">
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-t-2xl text-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold flex items-center gap-2">
-                      <Megaphone className="w-5 h-5" />
-                      Push Job Tickets
-                    </h2>
-                    <p className="text-orange-100 text-sm">Dispatch tickets for {formatDisplayDate(selectedDate)}</p>
-                  </div>
-                  <button onClick={() => !dispatchLoading && setShowDispatchModal(false)} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-5 space-y-4">
-                {dispatchInfo ? (
-                  <>
-                    <div className="flex justify-center">
-                      <div className="text-center p-4 bg-gray-50 dark:bg-slate-700 rounded-xl min-w-[120px]">
-                        <div className="text-3xl font-bold text-gray-900 dark:text-white">{dispatchInfo.total}</div>
-                        <div className="text-xs text-gray-500 dark:text-white/60 font-medium mt-1">Assigned Jobs</div>
-                      </div>
-                    </div>
-
-                    {dispatchInfo.total === 0 ? (
-                      <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-white/10 rounded-xl">
-                        <AlertCircle className="w-6 h-6 text-gray-400 dark:text-white/50 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-bold text-gray-700 dark:text-white/70">No assigned jobs for this date</p>
-                          <p className="text-xs text-gray-500 dark:text-white/60">Assign operators to jobs on the board first.</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3 p-4 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded-xl">
-                        <Megaphone className="w-6 h-6 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-bold text-orange-800 dark:text-orange-400">{dispatchInfo.total} job(s) will be dispatched</p>
-                          <p className="text-xs text-orange-600 dark:text-orange-500">All assigned operators and helpers will be notified.</p>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => setShowDispatchModal(false)}
-                    disabled={dispatchLoading}
-                    className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl text-gray-700 dark:text-white/70 font-semibold hover:bg-gray-50 dark:hover:bg-white/10 transition-all disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleDispatchJobs(selectedDate)}
-                    disabled={dispatchLoading || !dispatchInfo || dispatchInfo.total === 0}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {dispatchLoading ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Dispatching...</>
-                    ) : (
-                      <><Megaphone className="w-4 h-4" /> Push {dispatchInfo?.total || 0} Tickets</>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
+        <DispatchConfirmationModal
+          selectedDate={selectedDate}
+          dispatchInfo={dispatchInfo}
+          dispatchLoading={dispatchLoading}
+          onDispatch={() => handleDispatchJobs(selectedDate)}
+          onClose={() => setShowDispatchModal(false)}
+        />
       )}
 
       {/* ═══ CAPACITY SETTINGS MODAL (Super Admin only) ═════════════════ */}
@@ -2681,176 +2160,18 @@ export default function ScheduleBoardPage() {
 
       {/* ═══ DAILY CODE MODAL ═══════════════════════════════════════════ */}
       {showDailyCode && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDailyCode(false)}>
-          <div className="bg-white dark:bg-[#0e0720] rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
-                  <KeyRound className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 dark:text-white">Today&apos;s Shop Code</h3>
-                  <p className="text-xs text-gray-500 dark:text-white/50">Share with your team each morning</p>
-                </div>
-              </div>
-              <button onClick={() => setShowDailyCode(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors">
-                <X className="w-5 h-5 text-gray-500 dark:text-white/50" />
-              </button>
-            </div>
-
-            {codeLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-              </div>
-            ) : dailyCode ? (
-              <>
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 rounded-2xl border-2 border-indigo-200 dark:border-indigo-500/30 p-6 text-center mb-4">
-                  <p className="text-4xl font-black tracking-[0.3em] text-indigo-700 dark:text-indigo-300 font-mono">{dailyCode}</p>
-                  <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-2">Valid today only • Resets at midnight</p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { navigator.clipboard.writeText(dailyCode); addToast('success', 'Copied', 'Code copied to clipboard'); }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 rounded-xl text-indigo-700 dark:text-indigo-300 text-sm font-semibold transition-all"
-                  >
-                    <Copy className="w-4 h-4" /> Copy
-                  </button>
-                  <button
-                    onClick={regenerateDailyCode}
-                    disabled={codeLoading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-50 dark:bg-orange-500/15 hover:bg-orange-100 dark:hover:bg-orange-500/25 border border-orange-200 dark:border-orange-500/30 rounded-xl text-orange-700 dark:text-orange-300 text-sm font-semibold transition-all"
-                  >
-                    <RefreshCw className="w-4 h-4" /> Regenerate
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 dark:text-white/30 text-center mt-3">⚠️ Regenerating invalidates the old code immediately</p>
-              </>
-            ) : (
-              <div className="text-center py-6">
-                <p className="text-gray-500 dark:text-white/50 mb-4 text-sm">No code set for today yet.</p>
-                <button
-                  onClick={regenerateDailyCode}
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm transition-all flex items-center gap-2 mx-auto"
-                >
-                  <KeyRound className="w-4 h-4" /> Generate Today&apos;s Code
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <DailyCodeModal
+          dailyCode={dailyCode}
+          codeLoading={codeLoading}
+          onCopy={() => { if (dailyCode) { navigator.clipboard.writeText(dailyCode); addToast('success', 'Copied', 'Code copied to clipboard'); } }}
+          onRegenerate={regenerateDailyCode}
+          onClose={() => setShowDailyCode(false)}
+        />
       )}
 
       {/* ═══ TOASTS ═══════════════════════════════════════════════════ */}
       <Toast toasts={toasts} onRemove={removeToast} />
 
     </div>
-  );
-}
-
-// ─── Capacity Settings Modal ──────────────────────────────────────────
-function CapacitySettingsModal({
-  currentMax,
-  currentWarning,
-  onSave,
-  onClose,
-}: {
-  currentMax: number;
-  currentWarning: number;
-  onSave: (maxSlots: number, warningThreshold: number) => void;
-  onClose: () => void;
-}) {
-  const [maxSlots, setMaxSlots] = useState(currentMax);
-  const [warningThreshold, setWarningThreshold] = useState(currentWarning);
-  const isValid = maxSlots >= 1 && maxSlots <= 50 && warningThreshold >= 1 && warningThreshold <= maxSlots;
-
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
-      <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-200">
-          <div className="bg-gradient-to-r from-purple-600 to-pink-500 p-5 rounded-t-2xl text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Capacity Settings
-                </h2>
-                <p className="text-purple-200 text-sm">Adjust crew slots as your team grows</p>
-              </div>
-              <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="p-5 space-y-5">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">
-                Max Crew Slots
-              </label>
-              <p className="text-xs text-gray-500 dark:text-white/60 mb-2">Total number of crew rows on the schedule board</p>
-              <input
-                type="number"
-                min={1}
-                max={50}
-                value={maxSlots}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value) || 1;
-                  setMaxSlots(v);
-                  if (warningThreshold > v) setWarningThreshold(v);
-                }}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 dark:bg-slate-700 dark:text-white rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-lg font-bold text-gray-900 bg-white transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-700 dark:text-white/70 mb-1.5">
-                Warning Threshold
-              </label>
-              <p className="text-xs text-gray-500 dark:text-white/60 mb-2">Show capacity warning when this many slots are filled</p>
-              <input
-                type="number"
-                min={1}
-                max={maxSlots}
-                value={warningThreshold}
-                onChange={(e) => setWarningThreshold(Math.min(parseInt(e.target.value) || 1, maxSlots))}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 dark:bg-slate-700 dark:text-white rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-lg font-bold text-gray-900 bg-white transition-all"
-              />
-            </div>
-
-            {/* Preview */}
-            <div className="bg-gray-50 dark:bg-slate-700 rounded-xl p-3 border border-gray-200 dark:border-white/10">
-              <p className="text-xs text-gray-600 dark:text-white/60">
-                <strong>Preview:</strong> {maxSlots} total slots. Warning at {warningThreshold}+ jobs.
-                {warningThreshold < maxSlots && (
-                  <span className="block mt-1 text-amber-600 dark:text-amber-400">
-                    Slots {warningThreshold}-{maxSlots - 1}: amber warning shown
-                  </span>
-                )}
-                <span className="block mt-0.5 text-red-600 dark:text-red-400">
-                  At {maxSlots}: schedule marked full, approval blocked
-                </span>
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-white/15 text-gray-700 dark:text-white/70 rounded-xl font-bold text-sm transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => onSave(maxSlots, warningThreshold)}
-                disabled={!isValid}
-                className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Save Settings
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
