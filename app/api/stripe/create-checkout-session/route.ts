@@ -14,11 +14,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 export async function POST(request: NextRequest) {
   // Public endpoint — no auth required. This is called from the /patriot
   // sales page by prospective customers who don't have a session yet.
+
+  // Initialise Stripe inside the handler so the module can be imported at
+  // build time without STRIPE_SECRET_KEY being present in the build env.
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
   let body: { priceId?: string; tenantId?: string; email?: string; companyCode?: string };
   try {

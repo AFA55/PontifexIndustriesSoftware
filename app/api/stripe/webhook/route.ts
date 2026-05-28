@@ -19,8 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
+// Price IDs are safe at module level — they have hard-coded fallbacks.
 const BIANNUAL_PRICE_ID = process.env.STRIPE_PRICE_ID_BIANNUAL ?? 'price_1TbV2E0WWq11qMKimnEXVElP';
 const ANNUAL_PRICE_ID = process.env.STRIPE_PRICE_ID_ANNUAL ?? 'price_1TbV2E0WWq11qMKidsCGCrl8';
 
@@ -56,6 +55,10 @@ function fireAuditLog(eventType: string, stripeCustomerId: string, payload: Reco
 }
 
 export async function POST(request: NextRequest) {
+  // Initialise Stripe inside the handler so the module can be imported at
+  // build time without STRIPE_SECRET_KEY being present in the build env.
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     console.error('[stripe-webhook] STRIPE_WEBHOOK_SECRET is not set.');

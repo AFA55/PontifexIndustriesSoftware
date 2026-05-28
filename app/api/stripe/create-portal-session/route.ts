@@ -14,9 +14,11 @@ import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 export async function POST(request: NextRequest) {
+  // Initialise Stripe inside the handler so the module can be imported at
+  // build time without STRIPE_SECRET_KEY being present in the build env.
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
   const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
 
