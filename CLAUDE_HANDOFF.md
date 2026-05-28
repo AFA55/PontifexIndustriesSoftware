@@ -1,7 +1,7 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** May 26, 2026 | **Branch:** `main` | **HEAD:** `f2fc6bb0` (pending push — batch security + Stripe) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🍎 Waiting for Review
+**Last updated:** May 27, 2026 | **Branch:** `main` | **HEAD:** `9978a42b` (pushed ✅) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🍎 Waiting for Review
 
-> **💰 VERCEL BUDGET: ~$11–12 build credit remaining.** Each `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. `claude/*` and `feature/*` branches do NOT trigger builds (blocked in `vercel.json`). See `DEPLOYMENT_COST.md`.
+> **💰 VERCEL BUDGET: ~$8–9 build credit remaining.** (3 pushes since last estimate) Each `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. `claude/*` and `feature/*` branches do NOT trigger builds (blocked in `vercel.json`). See `DEPLOYMENT_COST.md`.
 
 ---
 
@@ -26,15 +26,16 @@
 | Production deploy | ✅ Live | https://www.pontifexindustries.com |
 | iOS app | 🍎 Waiting for Review | Submitted May 25 9:15 PM, App ID 6772996692 |
 | Pending git push | ⏳ `5e71b5c6` | Security fixes — batch with Stripe work before pushing |
-| **Stripe billing** | ✅ Built — needs Vercel env vars | Checkout, webhook, portal, paywall gate, pricing UI all done |
+| **Stripe billing** | ✅ FULLY LIVE | Webhook Active (we_1TbrUh0WWq11qMKi43RmaRgC), 4 events, env vars set |
 | APNs push notifications | ✅ Vars set in Vercel | Server-side send logic not yet wired in `/api/push` |
 | Cron jobs | ✅ Active | `CRON_SECRET` set in Vercel May 22 |
 | Twilio SMS | ⏳ Pending | Toll-free verification required at twilio.com |
 | Android | ⏳ Not started | After iOS approval: `npx cap add android`, $25 Google Play fee |
 
-### Recent commits (not yet pushed to origin/main)
+### Recent commits (all pushed ✅)
 | Commit | Summary |
 |---|---|
+| `9978a42b` | **feat:** APNs push notifications + schedule board component extraction |
 | `f2fc6bb0` | **feat:** Stripe billing — checkout, webhook, portal, paywall gate, pricing UI, migration |
 | `5e71b5c6` | **security:** CRIT-1 tenant isolation (10 job-orders routes), MED-2 clock-out auth, HIGH-3 portal injection |
 
@@ -499,20 +500,12 @@ Built May 26, 2026. All code is committed in `f2fc6bb0`. **Build passes 0 errors
 - `app/dashboard/admin/settings/page.tsx` — Billing tab (plan name, status chip, Manage Subscription button)
 - `middleware.ts` — CSP allows `api.stripe.com`
 
-**⚠️ USER ACTION REQUIRED before pushing:**
-1. Add these env vars to Vercel dashboard:
-   ```
-   STRIPE_SECRET_KEY=sk_live_...
-   STRIPE_WEBHOOK_SECRET=whsec_...
-   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
-   STRIPE_PRICE_ID_BIANNUAL=price_1TbV2E0WWq11qMKimnEXVElP
-   STRIPE_PRICE_ID_ANNUAL=price_1TbV2E0WWq11qMKidsCGCrl8
-   ```
-2. Register webhook in Stripe dashboard → Developers → Webhooks → Add endpoint:
-   - URL: `https://www.pontifexindustries.com/api/stripe/webhook`
-   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
-   - Copy the `whsec_...` signing secret → paste as `STRIPE_WEBHOOK_SECRET` in Vercel
-3. Tell Claude when Patriot's trial ends to activate the paywall gate
+**✅ ALL DONE — Stripe is fully live.**
+- Env vars set in Vercel (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, both price IDs)
+- Webhook registered and Active: `we_1TbrUh0WWq11qMKi43RmaRgC` → `https://www.pontifexindustries.com/api/stripe/webhook`
+- 4 events listening: checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed
+- Patriot is on trial (`subscription_status = 'trialing'`) — paywall gate allows full access until told otherwise
+- **Tell Claude when Patriot's trial ends** → flip `subscription_status` to `'active'` and the gate activates
 
 ### Immediate (batch with Stripe work before push)
 1. **Push `5e71b5c6`** — batch with Stripe commits and push once when billing is done
