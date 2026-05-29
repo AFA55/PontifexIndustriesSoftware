@@ -124,7 +124,7 @@ Depending on your jurisdiction, you may have the right to:
 - **Withdraw consent** for location access (this will prevent the GPS clock-in verification feature from working)
 - **Data portability** — receive your data in a machine-readable format
 
-To exercise any of these rights, contact your employer's account administrator or contact us directly at the information below.
+You can delete your account and personal data at any time directly in the app: sign in, then go to **My Profile → Delete My Account**. This permanently removes your account record and personal profile data (subject to legal retention requirements such as OSHA and IRS for certain work records). To exercise any other right, contact your employer's account administrator or contact us directly at the information below.
 
 ---
 

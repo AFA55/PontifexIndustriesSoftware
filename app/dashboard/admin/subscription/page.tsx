@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { isNativeApp } from '@/lib/is-native';
 import { PLANS, type PlanId } from '@/lib/billing-plans';
 import {
   CreditCard,
@@ -336,6 +337,33 @@ function SubscriptionPageInner() {
   const currentPlan = sub?.plan as PlanId | undefined;
   const trialDays = daysUntil(sub?.trialEndsAt ?? null);
   const opLimit = currentPlan ? operatorLimit(currentPlan) : null;
+
+  // App Store 3.1.1: the native app must not surface external (non-IAP)
+  // purchasing. Billing — plans, prices, Stripe checkout, and the billing
+  // portal — is managed on the website only. The website is unaffected.
+  if (isNativeApp()) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-purple-100 flex items-center justify-center">
+            <CreditCard className="w-6 h-6 text-purple-600" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Manage billing on the web</h1>
+          <p className="text-sm text-gray-500 mb-6">
+            Subscription and billing are managed from your computer at{' '}
+            <span className="font-semibold text-gray-700">pontifexindustries.com</span>. Sign in
+            there to view your plan, update payment, or change your subscription.
+          </p>
+          <Link
+            href="/dashboard/admin"
+            className="inline-flex items-center justify-center gap-2 w-full py-3 min-h-[44px] bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

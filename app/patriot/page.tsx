@@ -2,6 +2,8 @@
 
 import { useRef, useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { isNativeApp } from '@/lib/is-native';
+import NativeWebOnlyNotice from '@/components/NativeWebOnlyNotice';
 import {
   FileText,
   Clock,
@@ -916,6 +918,8 @@ function PatriotPageContent() {
 }
 
 export default function PatriotPage() {
+  // App Store 3.1.1: no in-app pricing/checkout in the native shell.
+  if (isNativeApp()) return <NativeWebOnlyNotice />;
   return (
     <Suspense>
       <PatriotPageContent />

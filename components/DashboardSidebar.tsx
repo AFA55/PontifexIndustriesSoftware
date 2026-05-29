@@ -38,6 +38,7 @@ import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
 import { supabase } from '@/lib/supabase';
 import { useFeatureFlags, type UserFeatureFlags } from '@/lib/feature-flags';
+import { isNativeApp } from '@/lib/is-native';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -389,12 +390,16 @@ function SidebarContent({
                 if (item.superAdminOnly && userRole !== 'super_admin') return false;
                 if (item.roles && (!userRole || !item.roles.includes(userRole))) return false;
                 if (item.excludeRoles && userRole && item.excludeRoles.includes(userRole)) return false;
+                // App Store 3.1.1: hide Billing in the native app (purchasing is web-only)
+                if (isNativeApp() && item.href === '/dashboard/admin/subscription') return false;
                 return true;
               })
             : section.items.filter(item => {
                 if (item.superAdminOnly && userRole !== 'super_admin') return false;
                 if (item.roles && (!userRole || !item.roles.includes(userRole))) return false;
                 if (item.excludeRoles && userRole && item.excludeRoles.includes(userRole)) return false;
+                // App Store 3.1.1: hide Billing in the native app (purchasing is web-only)
+                if (isNativeApp() && item.href === '/dashboard/admin/subscription') return false;
                 if (!item.flagKey) return true; // no flag = always visible
                 return flags[item.flagKey] !== false;
               });

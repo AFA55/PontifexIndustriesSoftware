@@ -7,9 +7,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ChevronLeft, User, Phone, Calendar, Shield, Save,
-  Loader2, CheckCircle, Camera, Upload, Bell, ChevronRight
+  Loader2, CheckCircle, Camera, Upload, Bell, ChevronRight,
+  Trash2, AlertTriangle
 } from 'lucide-react';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, logout } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import Avatar from '@/components/Avatar';
 
@@ -63,6 +64,32 @@ export default function MyProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState('');
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Account deletion (App Store 5.1.1(v) — in-app account deletion)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirm.trim().toUpperCase() !== 'DELETE') return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await apiFetch('/api/account/delete', { method: 'POST' });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        await logout();
+        router.replace('/company-login');
+      } else {
+        setDeleteError(json.error || 'Failed to delete account. Please try again.');
+        setDeleting(false);
+      }
+    } catch {
+      setDeleteError('Network error. Please try again.');
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -374,6 +401,23 @@ export default function MyProfilePage() {
                 <><Save className="w-4 h-4" /> Save Changes</>
               )}
             </button>
+
+            {/* Danger Zone — in-app account deletion (App Store 5.1.1(v)) */}
+            <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-red-200 dark:border-red-500/30 p-6 shadow-sm">
+              <h3 className="text-sm font-bold text-red-600 dark:text-red-400 uppercase tracking-wider flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-4 h-4" />
+                Danger Zone
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                Permanently delete your account and personal data. This cannot be undone.
+              </p>
+              <button
+                onClick={() => { setShowDeleteModal(true); setDeleteConfirm(''); setDeleteError(''); }}
+                className="w-full py-3 min-h-[44px] bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" /> Delete My Account
+              </button>
+            </div>
           </div>
         ) : (
           <div className="text-center py-20">
@@ -382,6 +426,55 @@ export default function MyProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Delete account confirmation modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-red-200 dark:border-red-500/30 p-6 shadow-2xl">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Delete your account?</h2>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              This permanently deletes your account and personal data and signs you out. This
+              action cannot be undone. Type <span className="font-bold">DELETE</span> to confirm.
+            </p>
+            <input
+              type="text"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder="DELETE"
+              autoFocus
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all mb-3"
+            />
+            {deleteError && (
+              <p className="text-xs text-red-600 dark:text-red-400 mb-3">{deleteError}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="flex-1 py-3 min-h-[44px] bg-gray-100 dark:bg-white/[0.07] hover:bg-gray-200 dark:hover:bg-white/[0.12] text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting || deleteConfirm.trim().toUpperCase() !== 'DELETE'}
+                className="flex-1 py-3 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
+                ) : (
+                  <><Trash2 className="w-4 h-4" /> Delete</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { isNativeApp } from '@/lib/is-native';
+import NativeWebOnlyNotice from '@/components/NativeWebOnlyNotice';
 import {
   Shield,
   CheckCircle,
@@ -472,6 +474,8 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 // MAIN PAGE
 // ===========================
 export default function OfferPage() {
+  // App Store 3.1.1: no in-app pricing/checkout in the native shell.
+  if (isNativeApp()) return <NativeWebOnlyNotice />;
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       {/* Top nav bar */}

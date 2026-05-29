@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { isNativeApp } from '@/lib/is-native';
+import NativeWebOnlyNotice from '@/components/NativeWebOnlyNotice';
 import {
   Check,
   Star,
@@ -145,6 +147,9 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 export default function PricingPage() {
   const [annual, setAnnual] = useState(false);
+
+  // App Store 3.1.1: no in-app pricing/checkout in the native shell.
+  if (isNativeApp()) return <NativeWebOnlyNotice />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/30 to-slate-950">

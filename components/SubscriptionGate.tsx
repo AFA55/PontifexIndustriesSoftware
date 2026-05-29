@@ -18,6 +18,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
+import { isNativeApp } from '@/lib/is-native';
 
 const GRACE_DAYS = 7;
 
@@ -28,6 +29,12 @@ export default function SubscriptionGate() {
   useEffect(() => {
     // Only run on /dashboard/* routes
     if (!pathname?.startsWith('/dashboard')) return;
+
+    // App Store 3.1.1: never auto-redirect to the purchase/upgrade page inside
+    // the native shell — Apple rejects apps that steer users to external
+    // (non-IAP) purchasing. Subscription enforcement still runs on the website,
+    // where the admin re-subscribes via Stripe. Fail open in the app.
+    if (isNativeApp()) return;
 
     const check = async () => {
       const user = getCurrentUser();
