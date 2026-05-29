@@ -35,9 +35,10 @@ All gating uses a runtime `Capacitor.isNativePlatform()` check (`lib/is-native.t
 - `app/patriot/page.tsx`, `app/pricing/page.tsx`, `app/offer/page.tsx` — native renders `components/NativeWebOnlyNotice.tsx` instead of pricing/checkout.
 
 **5.1.1(v) — in-app account deletion:**
-- `app/api/account/delete/route.ts` — new self-scoped route (`requireAuth` → deletes only `auth.userId`). Deletes the profile (or scrubs PII if a FK blocks it) + deletes the Supabase Auth user; fire-and-forget cleanup of access-requests + push tokens.
+- `app/api/account/delete/route.ts` — new self-scoped route (`requireAuth` → only ever acts on `auth.userId`). Strategy is **full anonymization + permanent login lockout**, not row deletion — because ~30 tables FK to `auth.users` (some NO ACTION would block a hard delete; some CASCADE like `timecards` would destroy legally-required payroll). Step 1 calls the `close_account()` DB function (migration `20260529_account_deletion_infrastructure`): anonymizes the profile, purges personal records (notifications/push tokens/access requests), revokes sessions. Step 2 anonymizes + 100-year-bans the auth identity (tombstone email, random password, cleared metadata). Net: no login, no personal data; payroll/timecards retained de-identified per the privacy policy.
 - `app/dashboard/my-profile/page.tsx` — "Danger Zone → Delete My Account" with a type-`DELETE`-to-confirm modal; logs out + redirects to `/company-login` on success.
 - `lib/legal/privacy-policy.ts` — added the in-app deletion path (My Profile → Delete My Account) for Guideline 5.1.1(i).
+- **DB (already applied to prod):** `profiles.deleted_at` column + `public.close_account(uuid)` SECURITY DEFINER function. ⚠️ Post-deploy, run one real e2e test: create a throwaway operator in-app → Delete My Account → confirm you cannot log back in and the profile shows anonymized + `deleted_at` set.
 
 `npm run build` passes with 0 errors; `/api/account/delete` is registered.
 
