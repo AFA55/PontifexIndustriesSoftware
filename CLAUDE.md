@@ -9,7 +9,7 @@ Next.js 15 (App Router) + React 19 + TypeScript + Supabase (PostgreSQL) + Tailwi
 - Apply database migrations via Supabase MCP when ready
 - Run `npm run build` after significant changes to verify no errors
 - Commit work in logical chunks with descriptive messages
-- **💰 BUDGET (May 2026): ~$15 Vercel build credit left. Each push to `main` = ~$1–2 build. BATCH commits and push only ONCE per session/batch — never per-feature or docs-only. Commits are free; pushes cost money. Confirm before pushing unless told "push it." See `DEPLOYMENT_COST.md`.**
+- **💰 BUDGET (May 2026): ~$5–6 Vercel build credit left. Each push to `main` = ~$1–2 build. BATCH commits and push only ONCE per session/batch — never per-feature or docs-only. Commits are free; pushes cost money. Confirm before pushing unless told "push it." See `DEPLOYMENT_COST.md`.**
 - Push to feature branch when commits are ready
 - When starting a new session, read CLAUDE_HANDOFF.md first to resume context
 - At the END of every session, update CLAUDE_HANDOFF.md with what was done and what's next
@@ -308,19 +308,29 @@ For now, the auto-preview URL per branch is enough.
 - [x] Migration `20260521_public_tenant_lookup_fn` — SECURITY DEFINER RPC callable by anon, returns only `id/name/company_code`
 - [x] Migration `20260521_drop_redundant_duplicate_indexes` — dropped 31 redundant indexes
 
-### Next Session — C(iii) / C(iv) / C(v) (per SHOP_MANAGER_PLAN.md)
-- [ ] **C(iii)** — Fleet maintenance history + oil/filter change tracking (`vehicle_service_records` table; service history panel; auto-create from completed maintenance_request)
-- [ ] **C(iv)** — Operator/Helper Maintenance Request 3-tap form at `/dashboard/maintenance/new` (currently a placeholder); Maintenance Inbox triage UI; shop_help dashboard also exposes the form
-- [ ] **C(v)** — Visit-wizard equipment-issues conversion hook (auto-create maintenance_request when supervisor logs an issue inside a visit report)
+### Session — May 26–27, 2026 — Stripe Billing + Security + APNs ✅ COMPLETE
+- [x] Full security audit — CRIT-1, MED-2, HIGH-3 closed; CRIT-2 false positive confirmed
+- [x] Stripe billing fully live — checkout, webhook (4 events), portal, paywall gate, pricing UI, migration
+- [x] APNs push notifications — server-side logic (`lib/send-push.ts`), env vars set in Vercel
+- [x] iOS app built + submitted to App Store — Build 1.0.0 (3), App ID 6772996692
+- [x] Fix: Stripe `new Stripe()` moved inside handlers — unblocks Vercel build
+
+### Session — May 29, 2026 — Google Maps Fix + Apple Rejection Fix ✅ COMMITTED (not yet pushed)
+- [x] `GoogleMapsProvider` refactored — guards against missing API key, silences console error spam on every page
+- [x] `Info.plist` — added `NSLocationAlwaysAndWhenInUseUsageDescription` (Apple ITMS-90683 fix)
+- [ ] **PENDING:** Push both commits to main → rebuild iOS archive → increment Build to 4 → resubmit to App Store
 
 ### Ongoing / As-Needed
-- [ ] SMS integration for signature request delivery
-- [ ] Schedule board performance optimization
+- [ ] **🔴 iOS resubmission** — commit Info.plist fix, push, rebuild archive (Build 4), resubmit to App Store. See CLAUDE_HANDOFF.md top section.
+- [ ] **APNs push server logic** — `lib/send-push.ts` exists + Vercel vars set; wire to `/api/push/route.ts` to actually send notifications
+- [ ] Android app — after iOS approval: `npx cap add android`, $25 Google Play fee
+- [ ] Supabase Auth rate limits (HIGH-2 fix) — Dashboard → Auth → Settings → enable (user action, 5 min)
+- [ ] Twilio toll-free verification — twilio.com with opt-in URL at `/sms-opt-in`
+- [ ] Rotate Twilio Auth Token (hygiene)
+- [ ] Upload Patriot logo → Settings → Company Branding → Icon (Square)
 - [ ] Apply pending migrations: `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql`
-- [ ] Set `CRON_SECRET` env var in Vercel dashboard (required for `/api/cron/auto-clockout` and `/api/cron/invoice-30d-reminders`)
+- [ ] Schedule board extraction — `schedule-board/page.tsx` ~2850 lines, extract OperatorRow/JobCard/EditModal/DispatchModal
+- [ ] CSP nonce-based (replace unsafe-inline, MED-5)
+- [ ] Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in Vercel → restores address autocomplete
+- [ ] Mobile responsive audit: maintenance wizard, maintenance inbox, inventory new-item modal
 - [ ] Patriot-specific visual assets (logos, custom colors)
-- [ ] Loading states & error handling audit across remaining pages
-- [ ] Mobile responsive audit: maintenance wizard, maintenance inbox, inventory new-item modal, duplicate job modal
-- [ ] iOS splash screen (2732×2732 opaque purple + bridge logo)
-- [ ] Apple Developer Program enrollment ($99/yr) — required for TestFlight + App Store
-- [ ] App Store metadata: screenshots, description, privacy policy page at `/privacy-policy`

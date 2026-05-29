@@ -1,7 +1,63 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** May 27, 2026 | **Branch:** `main` | **HEAD:** `eda221f4` (pushed ✅) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🍎 Waiting for Review
+**Last updated:** May 29, 2026 | **Branch:** `main` | **HEAD:** `f78a76af` (NOT yet pushed) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🔴 Needs Resubmission (Apple rejection fix ready)
 
-> **💰 VERCEL BUDGET: ~$6–7 build credit remaining.** (4 pushes since last estimate) Each `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. `claude/*` and `feature/*` branches do NOT trigger builds (blocked in `vercel.json`). See `DEPLOYMENT_COST.md`.
+> **💰 VERCEL BUDGET: ~$5–6 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. `claude/*` and `feature/*` branches do NOT trigger builds (blocked in `vercel.json`). See `DEPLOYMENT_COST.md`.
+
+---
+
+## ⚡ START HERE — What Needs To Happen This Session
+
+### 1. 🍎 Apple Rejection Fix (HIGHEST PRIORITY)
+Apple rejected Build 1.0.0 (3) due to **ITMS-90683** — missing `NSLocationAlwaysAndWhenInUseUsageDescription` key. Apple's automated binary scanner requires BOTH location keys whenever any linked SDK (Capacitor Geolocation plugin) references location APIs, even when "always on" is never actually requested by the app.
+
+**The fix is already applied** — `ios/App/App/Info.plist` has `NSLocationAlwaysAndWhenInUseUsageDescription` added (it's a staged change, not yet committed). Verify with `git diff ios/App/App/Info.plist`.
+
+**Steps to resolve:**
+```bash
+# Step 1 — Commit the Info.plist fix
+cd "/Users/afa55/Documents/Pontifex Industres/pontifex-platform"
+git add ios/App/App/Info.plist
+git commit -m "fix(ios): add NSLocationAlwaysAndWhenInUseUsageDescription for Apple ITMS-90683"
+
+# Step 2 — Push all pending commits to prod (Google Maps fix + Info.plist fix)
+# Ask user first: "Can I push to main? 2 commits, ~$1-2 cost"
+git push origin main
+
+# Step 3 — Rebuild the iOS archive with updated Info.plist
+cd ios/App
+xcodebuild archive \
+  -project App.xcodeproj \
+  -scheme App \
+  -configuration Release \
+  -destination "generic/platform=iOS" \
+  -archivePath /tmp/PontifexArchive.xcarchive
+
+xcodebuild -exportArchive \
+  -archivePath /tmp/PontifexArchive.xcarchive \
+  -exportOptionsPlist ExportOptions.plist \
+  -exportPath /tmp/PontifexExport
+
+# Step 4 — Upload new IPA via Transporter.app (free, Mac App Store)
+# Drag ~/Desktop/PontifexExport/App.ipa into Transporter → Deliver
+# NOTE: Increment Build number in Xcode General tab before archiving
+#   Version: 1.0.0 → stays same
+#   Build:   3 → 4  (must be higher than previously rejected build)
+
+# Step 5 — In App Store Connect: go to the rejected submission,
+# select the new build (4), and click "Submit for Review" again
+```
+
+**Check email first:** Apple sends a rejection email with specific reasons to pontifexindustries@gmail.com. Read it before rebuilding — there may be additional rejection reasons beyond ITMS-90683.
+
+### 2. Push Pending Web Commits
+Two commits are ready and need to be pushed to `main` together (ask user first):
+- `f78a76af` — fix: silence Google Maps console errors when API key is not configured
+- `ios/App/App/Info.plist` change (once committed per Step 1 above)
+
+### 3. Set Google Maps API Key (Optional but Recommended)
+Address autocomplete is currently degraded to plain text input everywhere. If you want it working:
+- Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIza...` in Vercel → project → Settings → Environment Variables
+- The code is already guarded to load Maps only when the key is present
 
 ---
 
@@ -14,46 +70,37 @@
 - **Repo:** `/Users/afa55/Documents/Pontifex Industres/pontifex-platform/`
 - **Production URL:** https://www.pontifexindustries.com
 - **Login:** https://www.pontifexindustries.com/company-login (company code + email + password)
+- **iOS App:** Capacitor wrapper — app loads `https://www.pontifexindustries.com` in a native webview
 
 ---
 
-## Current State (May 26, 2026)
+## Current State (May 29, 2026)
 
 | Layer | Status | Notes |
 |---|---|---|
-| Web app | ✅ Complete | All 23 features shipped |
-| Security audit | ✅ Complete | CRIT-1, MED-2, HIGH-3 closed; CRIT-2 confirmed false positive |
-| Production deploy | ✅ Live | https://www.pontifexindustries.com |
-| iOS app | 🍎 Waiting for Review | Submitted May 25 9:15 PM, App ID 6772996692 |
-| Pending git push | ⏳ `5e71b5c6` | Security fixes — batch with Stripe work before pushing |
-| **Stripe billing** | ✅ FULLY LIVE | Webhook Active (we_1TbrUh0WWq11qMKi43RmaRgC), 4 events, env vars set |
-| APNs push notifications | ✅ Vars set in Vercel | Server-side send logic not yet wired in `/api/push` |
+| Web app | ✅ Complete | All 23 features shipped, live at pontifexindustries.com |
+| Production build | ✅ Passing | Last push: `eda221f4` — Stripe handler fix |
+| **Pending push** | ⚠️ `f78a76af` | Google Maps fix — batch with Info.plist commit, push once |
+| **iOS app** | 🔴 Resubmit needed | Apple rejected — ITMS-90683 (NSLocationAlwaysAndWhenInUseUsageDescription missing) |
+| iOS Info.plist fix | ✅ Staged | `git diff ios/App/App/Info.plist` shows fix applied, needs commit + rebuild |
+| Stripe billing | ✅ FULLY LIVE | Webhook Active (we_1TbrUh0WWq11qMKi43RmaRgC), 4 events, env vars set |
+| APNs push notifications | ✅ Vars set in Vercel | Server-side send in `/api/push` not yet wired |
 | Cron jobs | ✅ Active | `CRON_SECRET` set in Vercel May 22 |
+| Google Maps | ⚠️ No API key | Address autocomplete degraded to plain text input; fix committed (f78a76af) silences console errors |
 | Twilio SMS | ⏳ Pending | Toll-free verification required at twilio.com |
 | Android | ⏳ Not started | After iOS approval: `npx cap add android`, $25 Google Play fee |
+| Ruflo | ✅ Installed | `agentdb.rvf` + `.claude-flow/` present in repo root — multi-agent orchestration active |
 
-### Recent commits (all pushed ✅)
-| Commit | Summary |
-|---|---|
-| `eda221f4` | **fix:** Move Stripe `new Stripe()` inside handlers — unblocks Vercel build (was failing since billing integration added) |
-| `a013bd58` | **fix(stripe):** Checkout session is public — remove requireAuth(), resolve tenant by companyCode |
-| `9978a42b` | **feat:** APNs push notifications + schedule board component extraction |
-| `f2fc6bb0` | **feat:** Stripe billing — checkout, webhook, portal, paywall gate, pricing UI, migration |
-| `5e71b5c6` | **security:** CRIT-1 tenant isolation (10 job-orders routes), MED-2 clock-out auth, HIGH-3 portal injection |
-
-### Previously pushed security fixes (in production)
-- `08b54de7` — `profiles/route.ts` hardcoded password → crypto.getRandomValues; service role key removed from public endpoint; HSTS + CSP hardening; legal docs rebranded
-- `1d86f164` / `2dbabd58` — iOS signing: Manual + Apple Distribution + MG4K845UH7 provisioning profile
-
-### Security audit summary (May 25–26, 2026)
-A full security audit was run by the `security-auditor` agent. Results:
-- **CRIT-1 ✅ FIXED** — 10 job-orders API routes had `if (tenantId)` conditional that silently skipped tenant filter when null → replaced with hard 403 assertion
-- **CRIT-2 ✅ FALSE POSITIVE** — Audit agent read old migration files; live `pg_policies` has zero `user_metadata` references; `capacity_skill_settings`/`operator_skill_rankings` tables don't exist in production
-- **MED-2 ✅ FIXED** — `clock-out/route.ts` refactored from inline auth → `requireAuth()` + tenant-scoped UPDATE
-- **HIGH-3 ✅ FIXED** — Customer portal `.or()` string interpolation replaced with two parameterized `Promise.all` queries
-- **HIGH-2 ⏳ OPEN** — In-memory rate limiter doesn't survive cold starts; fix = enable Supabase Auth rate limits in dashboard (user action, 5 min)
-- **MED-5 ⏳ OPEN** — CSP `unsafe-inline`; fix = nonce-based CSP (next sprint)
-- **LOW items** — `signOut({ scope: 'global' })`, PII in console.log, personal email in seed SQL
+### Recent Commits
+| Commit | Status | Summary |
+|---|---|---|
+| `f78a76af` | ⏳ NOT PUSHED | fix: silence Google Maps console errors (GoogleMapsProvider guard) |
+| `eda221f4` | ✅ Production | fix: move Stripe client init inside handlers — unblocked Vercel build |
+| `a013bd58` | ✅ Production | fix(stripe): checkout is public — no auth, resolve tenant by companyCode |
+| `432f5469` | ✅ Production | docs: handoff — Stripe fully live, webhook active, APNs pushed |
+| `9978a42b` | ✅ Production | feat: APNs push notifications + schedule board component extraction |
+| `f2fc6bb0` | ✅ Production | feat: Stripe billing — checkout, webhook, portal, paywall gate, pricing UI |
+| `5e71b5c6` | ✅ Production | security: close CRIT-1, MED-2, HIGH-3 from audit |
 
 ---
 
@@ -68,17 +115,18 @@ A full security audit was run by the `security-auditor` agent. Results:
 | Shop Help | shophelp@pontifex.com | Help1234! |
 | Operator | zack@demopontifex.com | Patriot2026! |
 | Operator | aiden@demopontifex.com | Patriot2026! |
-| Helper/Apprentice | lucas@demopontifex.com | Patriot2026! |
-| Helper/Apprentice | javi@demopontifex.com | Patriot2026! |
+| Apprentice | lucas@demopontifex.com | Patriot2026! |
+| Apprentice | javi@demopontifex.com | Patriot2026! |
 
-**Login URL:** https://www.pontifexindustries.com/company-login
-**Company Code:** `PATRIOT`
+**Login URL:** https://www.pontifexindustries.com/company-login  
+**Company Code:** `PATRIOT`  
 **Demo gate password:** `PontifexDemo2026` (unlocks demo account dropdown on login page)
 
 ### iOS / App Store
 | Item | Value |
 |---|---|
 | Apple ID | pontifexindustries@gmail.com |
+| iCloud (dev account) | andresa.t55@icloud.com |
 | Team ID | MG4K845UH7 |
 | Bundle ID | com.pontifexindustries.app |
 | App Store App ID | 6772996692 |
@@ -88,6 +136,8 @@ A full security audit was run by the `security-auditor` agent. Results:
 | TestFlight tester | AndresAFA55@icloud.com |
 | APNs Key ID | M44JJFDG6G |
 | APNs Key file | /Users/afa55/Documents/Software documents/AuthKey_M44JJFDG6G.p8 |
+| Exported IPA (last good build) | ~/Desktop/PontifexExport/App.ipa (1.7MB) |
+| Simulator Device ID | CA1B2D65-5DC0-4C85-A072-3C0BFBE85402 (iPhone 17 Pro) |
 
 ### Supabase
 | Item | Value |
@@ -109,92 +159,81 @@ A full security audit was run by the `security-auditor` agent. Results:
 | `APNS_TEAM_ID` | ✅ MG4K845UH7 | Sensitive, Production+Preview |
 | `APNS_BUNDLE_ID` | ✅ com.pontifexindustries.app | Sensitive, Production+Preview |
 | `APNS_PRIVATE_KEY` | ✅ Full PEM set | From AuthKey_M44JJFDG6G.p8, Sensitive |
+| `STRIPE_SECRET_KEY` | ✅ Set | Live mode |
+| `STRIPE_WEBHOOK_SECRET` | ✅ Set | we_1TbrUh0WWq11qMKi43RmaRgC |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | ✅ Set | pk_live_... |
+| `STRIPE_PRICE_ID_BIANNUAL` | ✅ Set | price_1TbV2E0WWq11qMKimnEXVElP |
+| `STRIPE_PRICE_ID_ANNUAL` | ✅ Set | price_1TbV2E0WWq11qMKidsCGCrl8 |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | ❌ NOT SET | Address autocomplete degraded — add if you have a Maps API key |
 | `RESEND_API_KEY` | ⚠️ Verify | Email delivery — check resend.com dashboard |
 | `NEXT_PUBLIC_APP_URL` | ⚠️ Verify | Should = https://www.pontifexindustries.com |
 | `NEXT_PUBLIC_SITE_URL` | ⚠️ Verify | Should = https://www.pontifexindustries.com |
 
 ---
 
-## Development Workflow — How We Build With Claude
+## Ruflo — AI Orchestration Layer
 
-### Session Pattern
-1. **Start every session:** Read this file (`CLAUDE_HANDOFF.md`) to resume context
-2. **Check build state:** `git log --oneline -5` + `npm run build` (must be 0 errors)
-3. **Work through sprint tasks** top-to-bottom unless user reprioritizes
-4. **After each feature:** `npm run build` to verify, commit with descriptive message
-5. **End of session:** Update this file + confirm before pushing `main`
+**Ruflo is installed.** Evidence: `agentdb.rvf`, `agentdb.rvf.lock`, `.claude-flow/` directory, `ruvector.db` all present in the repo root.
 
-### Git / Branch Discipline
+Ruflo is a multi-agent AI orchestration layer that runs on top of Claude Code. It provides:
+- **AgentDB** — HNSW vector memory that persists learned patterns across sessions
+- **Swarm coordination** — hierarchical/mesh/ring topologies for parallel agents
+- **Self-learning routing** — routes tasks to best agent based on prior success
+- **30+ Claude Code skills** — pre-built workflows for common patterns
+
+**Reference file:** `RUFLO_REFERENCE.md` — full install guide, commands, plugin list
+
+**How we use Ruflo in this project:**
+- The AgentDB (`.claude-flow/` + `agentdb.rvf`) stores our migration patterns, RLS conventions, API response format so agents know our stack without re-explaining every session
+- Background workers may auto-analyze code quality between sessions
+- Use `ruflo hive status` to check swarm health
+
+**Key Ruflo commands:**
 ```bash
-# Check recent commits and pending push
-git log --oneline -10
-git log origin/main..HEAD --oneline
-
-# Build check (always before committing significant changes)
-npm run build
-
-# Push ONLY when explicitly told to — each push to main = ~$1-2 build cost
-git push origin main
+ruflo hive status                    # Check if swarm is healthy
+ruflo sparc modes                    # List available SPARC modes
+ruflo orchestrate "task desc" --parallel  # Run task with parallel agents
+ruflo memory status                  # Check vector memory state
 ```
 
-### Parallel Agents — How We Build Fast
+---
 
-Claude spawns multiple specialized agents simultaneously for independent work layers. This is how large features get built in a single session.
+## iOS Apple Rejection — Full Technical Context
 
-**Standard parallel pattern:**
-1. `supabase-migration-author` → writes migration SQL (idempotent DDL, SECURITY DEFINER helpers, correct RLS)
-2. `rls-policy-auditor` → validates RLS policies in parallel with migration writing
-3. `backend-dev` → writes API routes (`app/api/`)
-4. `coder` → writes UI pages and components (runs concurrently with API routes)
-5. `mobile-responsive-auditor` → sweeps all new operator-facing pages at 375px and 414px before push
+### What Happened
+App Build 1.0.0 (3) was submitted May 25, 2026. Apple's automated binary analysis returned **ITMS-90683** (or similar location-related rejection). The issue: Apple's scanner detects that Capacitor's Geolocation plugin references the CoreLocation framework's "always" location APIs internally, so Apple requires BOTH `NSLocationWhenInUseUsageDescription` AND `NSLocationAlwaysAndWhenInUseUsageDescription` to be present in `Info.plist`, even though the app never explicitly requests "always on" permission.
 
-**Worktree isolation** (for large multi-file features):
-- Claude creates isolated git worktrees via `Agent({ isolation: "worktree" })`
-- Each agent works in its own temp branch with no shared file conflicts
-- Results merged back to main at session end
-- **CRITICAL:** Worktrees do NOT inherit `.env.local` — copy it before Supabase calls will work
-
-**When to use parallel agents:**
-- Multiple independent features (different pages/routes)
-- Frontend + backend written simultaneously
-- Migration + RLS review simultaneously
-- Any time user says "build this fast" or "parallel"
-
-### Key Agents Used in This Project
-| Agent | When to use |
-|---|---|
-| `supabase-migration-author` | Any new table, column, index, RLS policy, function |
-| `rls-policy-auditor` | Before merging any migration that touches RLS |
-| `mobile-responsive-auditor` | Before pushing any operator-facing UI change |
-| `backend-dev` | New API routes under `app/api/` |
-| `coder` | UI pages and components |
-| `security-auditor` | Full security sweeps, compliance checks |
-| `sparc-orchestrator` | Complex multi-phase features needing spec → architecture → code |
-| `researcher` | Exploring unfamiliar APIs, researching competing products |
-
-Custom agent definitions (encoded to our exact stack) live in `.claude/agents/`:
-- `supabase-migration-author.md` — knows our idempotent DDL pattern + SECURITY DEFINER helpers
-- `rls-policy-auditor.md` — catches `user_metadata` RLS bugs (CRITICAL) + missing tenant_id checks
-- `mobile-responsive-auditor.md` — sweeps operator pages at 375px/414px with inline eval script
-
-### iOS Build Commands
-```bash
-# From ios/App/ directory:
-xcodebuild archive \
-  -project App.xcodeproj \
-  -scheme App \
-  -configuration Release \
-  -destination "generic/platform=iOS" \
-  -archivePath /tmp/PontifexArchive.xcarchive
-
-xcodebuild -exportArchive \
-  -archivePath /tmp/PontifexArchive.xcarchive \
-  -exportOptionsPlist ExportOptions.plist \
-  -exportPath /tmp/PontifexExport
-
-# Then upload /tmp/PontifexExport/App.ipa via Transporter.app (free, Mac App Store)
-# All signing is already configured in project.pbxproj — no extra flags needed
+### The Fix (Already Applied)
+`ios/App/App/Info.plist` now includes both keys:
+```xml
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Pontifex verifies you are at the job site when you clock in. Your location is checked once per clock-in event and is not tracked in the background.</string>
+<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>Pontifex verifies you are at the job site when you clock in. Your location is only used during the clock-in check and is never tracked in the background.</string>
 ```
+
+### Resubmission Checklist
+```
+[ ] git add ios/App/App/Info.plist && git commit -m "fix(ios): add NSLocationAlwaysAndWhenInUseUsageDescription for ITMS-90683"
+[ ] git push origin main (batch with f78a76af — ask user first, costs ~$1-2)
+[ ] Open ios/App/App.xcodeproj in Xcode
+[ ] Increment Build number: General tab → Build: 3 → 4
+[ ] Product → Archive
+[ ] Window → Organizer → Distribute App → App Store Connect → Upload
+[ ] App Store Connect → select new build (4) → Submit for Review
+```
+
+**Check email first!** Apple may list more than one issue. Read the rejection email at pontifexindustries@gmail.com before resubmitting.
+
+### Common Apple Rejection Reasons for Capacitor Apps (Watch For These)
+1. **ITMS-90683** — missing privacy usage description key ← FIXED
+2. **Guideline 4.0** — app is a web wrapper without native functionality (mitigation: show GPS clock-in, NFC, camera features prominently in screenshots/description)
+3. **Guideline 2.1** — app crashes on launch (test with TestFlight on real device first)
+4. **Missing screenshots** — must have minimum 3 screenshots at 1290×2796 (iPhone 6.7")
+5. **Demo account required** — Apple reviewer needs login credentials. Include in App Review Information:
+   - Company Code: PATRIOT
+   - Email: admin@pontifex.com
+   - Password: PontifexDemo2026!
 
 ---
 
@@ -206,6 +245,12 @@ super_admin → operations_manager → admin → salesman → shop_manager → i
 ```
 Plus parallel roles: `supervisor` (field oversight), `shop_help` (shop assistant)
 
+### Provider Stack (Root Layout)
+```
+ThemeProvider > BrandingProvider > NotificationProvider > ErrorBoundary > NetworkMonitor > GoogleMapsProvider > App
+```
+- `GoogleMapsProvider` — NOW guards against missing API key. Only calls `useJsApiLoader` when `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is set. When missing, renders children with `{ isLoaded: false }` (no errors, components degrade to plain text inputs).
+
 ### Auth Pattern
 - **Server-side:** `requireAuth()`, `requireAdmin()`, `requireSuperAdmin()`, `requireScheduleBoardAccess()` from `lib/api-auth.ts`
 - **Client-side:** `getCurrentUser()` from `lib/auth.ts` with role array check in `useEffect`
@@ -216,9 +261,9 @@ Plus parallel roles: `supervisor` (field oversight), `shop_help` (shop assistant
 - Every table has `tenant_id` (UUID, FK to `public.tenants`)
 - Login uses company code → `lookup_tenant_by_code()` SECURITY DEFINER RPC (called from browser directly — no Lambda hop)
 - White-label branding: `BrandingProvider` reads `tenants.logo_url`, `tenants.primary_color`, etc.
+- Branding cached in localStorage (`'patriot-branding'` key, 5-minute TTL)
 
 ### RLS Pattern — CRITICAL RULES
-
 ```sql
 -- ✅ CORRECT — reads from public.profiles via SECURITY DEFINER helper
 USING (
@@ -250,174 +295,242 @@ return NextResponse.json({ error: 'message' }, { status: 400 }) // error
 Promise.resolve(supabaseAdmin.from('audit_logs').insert({...})).then(() => {}).catch(() => {})
 ```
 
-### Job Number Format
-- Schedule form: `JOB-{year}-{6 digits}` (e.g., `JOB-2026-000042`)
-- Quick add: `QA-{year}-{6 digits}`
+### Stripe Init Pattern (CRITICAL — never put at module level)
+Stripe must be initialized inside route handlers, not at module top-level. Module-level code runs during `npm run build` when `STRIPE_SECRET_KEY` is not present in the build environment.
+```typescript
+// ✅ CORRECT — inside the handler
+export async function POST(request: NextRequest) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  ...
+}
+
+// ❌ WRONG — breaks Vercel build
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+export async function POST(request: NextRequest) { ... }
+```
+
+---
+
+## Development Workflow
+
+### Session Pattern
+1. **Start every session:** Read `CLAUDE_HANDOFF.md` (this file) + run quick sanity checks
+2. **Check pending work:** `git log origin/main..HEAD --oneline`
+3. **Build check:** `npm run build` (must be 0 errors before doing anything)
+4. **Work through the "Start Here" section** at the top of this file
+5. **After each feature:** `npm run build`, commit with descriptive message
+6. **End of session:** Update this file, confirm before pushing `main`
+
+### Quick Sanity Checks (Run at Session Start)
+```bash
+# 1. Confirm branch + pending commits
+git log --oneline -5
+git log origin/main..HEAD --oneline
+git status --short
+
+# 2. Verify build passes (must be 0 errors)
+npm run build
+
+# 3. Start dev server if doing UI work
+npm run dev   # port 3000
+```
+
+### Git / Cost Discipline
+```bash
+# NEVER push without asking: "Can I push? ~$1-2 cost"
+# Each push to main = Vercel build = $1-2
+git push origin main   # only after user confirms
+
+# Safe — never triggers a build
+git commit -m "..."
+```
+
+### Parallel Agent Pattern (How to Build Fast)
+Claude spawns multiple specialized agents simultaneously. Standard pattern:
+1. `supabase-migration-author` → migration SQL (idempotent DDL + SECURITY DEFINER + RLS)
+2. `rls-policy-auditor` → validates policies in parallel
+3. `backend-dev` → API routes under `app/api/`
+4. `coder` → UI pages/components (concurrently with API)
+5. `mobile-responsive-auditor` → sweeps operator pages at 375px/414px before push
+
+Use `Agent({ isolation: "worktree" })` for large multi-file features to prevent conflicts. **CRITICAL:** Worktrees do NOT inherit `.env.local` — copy it before making Supabase calls.
+
+### iOS Build Commands
+```bash
+# Archive for App Store
+cd ios/App
+xcodebuild archive \
+  -project App.xcodeproj \
+  -scheme App \
+  -configuration Release \
+  -destination "generic/platform=iOS" \
+  -archivePath /tmp/PontifexArchive.xcarchive
+
+# Export IPA
+xcodebuild -exportArchive \
+  -archivePath /tmp/PontifexArchive.xcarchive \
+  -exportOptionsPlist ExportOptions.plist \
+  -exportPath /tmp/PontifexExport
+
+# Upload via Transporter.app (Mac App Store — free)
+# Drag /tmp/PontifexExport/App.ipa → Deliver
+
+# NOTE: Build number MUST increment each submission
+# Version stays 1.0.0, Build: 3 → 4 → 5 etc.
+```
+
+---
+
+## Security Audit Summary (May 25–26, 2026)
+
+| Finding | Severity | Status |
+|---|---|---|
+| 10 job-orders routes: `if (tenantId)` silently skipped tenant filter | CRIT-1 | ✅ FIXED |
+| `user_metadata` RLS references (audit agent false positive — not in prod) | CRIT-2 | ✅ FALSE POSITIVE |
+| `clock-out/route.ts` missing `requireAuth()` | MED-2 | ✅ FIXED |
+| Customer portal `.or()` string interpolation (SQL injection vector) | HIGH-3 | ✅ FIXED |
+| In-memory rate limiter doesn't survive cold starts | HIGH-2 | ⏳ OPEN — fix: enable Supabase Auth rate limits in dashboard (5 min user action) |
+| CSP `unsafe-inline` | MED-5 | ⏳ OPEN — nonce-based CSP (next sprint) |
+| `signOut({ scope: 'global' })` instead of local | LOW | ⏳ OPEN |
+
+---
+
+## Stripe Billing (FULLY LIVE)
+
+**Stripe account:** acct_1THphn0WWq11qMKi (live mode)
+
+| Object | ID/Value |
+|---|---|
+| Product | prod_UagOHFDdm4Tw2N — "Pontifex Industries Platform" |
+| 6-Month price | price_1TbV2E0WWq11qMKimnEXVElP — $3,747 / 6 months |
+| Annual price | price_1TbV2E0WWq11qMKidsCGCrl8 — $6,997 / year |
+| Webhook | we_1TbrUh0WWq11qMKi43RmaRgC → /api/stripe/webhook |
+| Events | checkout.session.completed, subscription.updated/deleted, invoice.payment_failed |
+
+Patriot is on `subscription_status = 'trialing'` — paywall gate allows full access. Tell Claude when trial ends → flip to `'active'`.
 
 ---
 
 ## Complete Feature Inventory
 
 ### 1. Multi-Tenant Architecture
-- Company code login (`lookup_tenant_by_code` SECURITY DEFINER RPC — browser calls Supabase directly, no Vercel Lambda)
-- White-label branding per tenant (`BrandingProvider`, `primary_color`, `logo_url`)
-- All tables have `tenant_id` + RLS using SECURITY DEFINER helpers
-- `DEFAULT_BRANDING` shows Pontifex bridge logo before tenant loads
+- Company code login → `lookup_tenant_by_code()` SECURITY DEFINER RPC (browser calls Supabase directly — no Lambda)
+- White-label branding per tenant (`BrandingProvider`, logo, colors)
+- Every table has `tenant_id` + RLS via SECURITY DEFINER helpers
 
-### 2. Role-Based Access Control (RBAC)
-- 10 roles with permission presets in `lib/rbac.ts`
-- `ADMIN_CARDS` array drives dashboard card visibility per role
-- Dashboard sidebar role-filtered with `excludeRoles` + `roles` fields on nav items
+### 2. RBAC (10 roles)
+- `ADMIN_CARDS` array in `lib/rbac.ts` drives dashboard card visibility
+- `ROLE_PERMISSION_PRESETS` for sidebar filtering
 
-### 3. Schedule Board
-- Full operator view with time-off blocking, skill warnings, realtime color-coded status
-- Capacity view, crew grid
-- Inline editing: scope, operators, notes; Mark Out (rose) blocks operator row
+### 3. Schedule Board (`app/dashboard/admin/schedule-board/` — ~2850 lines)
+- Operator rows with time-off blocking, skill warnings, real-time status colors
+- Inline editing: scope, operators, notes, Mark Out (rose) to block operator
 - Dispatch modal with PDF ticket generation
-- Smart scheduling: per-scope skill matching with availability panel (good / stretch / under-skilled / busy)
+- Smart scheduling: per-scope skill matching (good / stretch / under-skilled / busy panels)
 
-### 4. Schedule Form (Job Creation)
-- Multi-step wizard: Customer → Project → Scope → Equipment → Difficulty → Scheduling → Site Compliance
-- Customer-first flow with smart contact dropdown
-- Linear Ft + Cut Depth calculator (auto-computes LF from dimensions + cross-cut spacing + overcut)
-- Edit mode via `?editJobId=<uuid>&jumpTo=scope` — prefills from existing job, PATCHes on submit
+### 4. Schedule Form (Multi-step job creation)
+- Steps: Customer → Project → Scope → Equipment → Difficulty → Scheduling → Site Compliance
+- Linear Ft + Cut Depth calculator (auto LF from dimensions + cross-cut spacing + overcut)
+- Edit mode via `?editJobId=<uuid>&jumpTo=scope`
 
 ### 5. Operator Workflow
-- `My Jobs` → `Jobsite` (in-route → arrived) → `Work Performed` → `Day Complete` → Done/Complete
-- Helper (apprentice) simplified view with HelperWorkLog
-- Past 7-day job history (collapsible); "Continuing Tomorrow" amber section for multi-day jobs
-- Green highlights: emerald border (done-for-today), full emerald (completed)
-- Real-time live status panel on admin job detail (30s poll)
-- Duplicate job tickets (cyan Copy button on job cards)
+- `My Jobs` → `Jobsite` → `Work Performed` → `Day Complete` → Done/Complete
+- Past 7-day history, "Continuing Tomorrow" amber section, green highlights
+- Real-time live status panel on admin job detail (30s poll via `useVisiblePoll`)
 
 ### 6. Dispatch & Tickets
-- PDF dispatch ticket generation (`@react-pdf/renderer`)
-- Send via email + SMS (Telnyx→Twilio via `lib/sms.ts`)
-- Idempotent dispatch (skips operators already dispatched for the date)
+- PDF dispatch ticket (`@react-pdf/renderer`)
+- Email + SMS delivery (Telnyx→Twilio via `lib/sms.ts`)
+- Idempotent dispatch (skips already-dispatched operators)
 
 ### 7. Timecard System
-- Clock-in with GPS geofence (100ft radius, shop at 34.768775, -82.435642)
-- NFC clock-in/clock-out (NFC tag UID → timecard, bypass GPS requirement)
-- Three-layer lunch deduction: per-shift admin override > per-user default > tenant default (30min for field, 60min for shop)
-- Auto-deduct when shift > 6h threshold (configurable in `timecard_settings_v2`)
-- Admin manual time entry: PTO, sick, holiday, manual hours, admin_adjustment
-- Split date/time picker in admin edit modal (prevents datetime-local mis-clicks on mobile)
-- Weekly team payroll view with late arrivals summary card
-- Operator detail: segments, GPS, coworkers, notes, PTO balance card, punctuality tile
-- Auto clock-out cron (midnight + noon runs)
-- Time correction request flow (operator submit → admin approve → auto-patch timecard)
-- Timezone-aware "today" using `tenants.timezone` (no UTC midnight split)
+- GPS clock-in (100ft radius, shop at 34.768775, -82.435642)
+- NFC clock-in/clock-out (bypass GPS)
+- 3-layer lunch deduction: admin override > per-user default > tenant default
+- Admin manual entries: PTO, sick, holiday, admin_adjustment
+- Auto clock-out cron, time correction request flow
+- Timezone-aware using `tenants.timezone`
 
-### 8. NFC System
-- NFC tag management (create, assign to operator/location)
-- Clock-in bypass via NFC scan (`timecard_settings_v2` configures bypass)
-- NFC kiosk page at `/nfc-clock`
+### 8. Time-Off & Attendance
+- Request → Approve/Deny flow
+- PTO balance tracking (`operator_pto_balance` table)
+- Late clock-in tracking (`is_late`, `late_minutes` flags)
+- Callout counts in attendance metrics
 
-### 9. Time-Off & Attendance
-- Request Time Off flow (operator submit → admin approve/deny)
-- Admin 2-tab view: Requests + Attendance Metrics
-- PTO balance tracking (`operator_pto_balance` table, per-year allocation)
-- Late clock-in tracking: `is_late`, `late_minutes` flagged at clock-in → fire-and-forget admin notification
-- Callout count per operator in attendance metrics
+### 9. Team Profiles & Skills
+- Skills taxonomy (`lib/skills-taxonomy.ts`) — cutting 0–10, equipment 0–5
+- Peer ratings (`rating_forms` + `rating_submissions`)
+- "Rate Your Crew" card on My Jobs
 
-### 10. Team Profiles & Skills
-- Operator skills taxonomy (`lib/skills-taxonomy.ts`) — cutting 0–10, equipment 0–5
-- Skills stored in `profiles.skill_levels` JSONB
-- "Skills & Proficiency" tab in Team Profiles right panel
-- Peer ratings system (`rating_forms` + `rating_submissions`): 4 question types, avg scores, slide-over detail
-- "Rate Your Crew" amber card on My Jobs (pending coworker ratings)
-- Admin peer ratings page: Forms tab (builder modal) + Team Ratings tab
+### 10. Job Execution & Progress
+- Change Orders (`change_orders` table, CO-NNN auto-numbered)
+- Daily progress analytics, operator notes
+- Work items with quantity, LF, cut depth
 
-### 11. Job Execution & Progress
-- Work Performed gate (blocks completion without logging work items)
-- Work items logged with quantity, linear feet, cut depth
-- Change Orders (`change_orders` table, auto-numbered `CO-NNN`, approve/reject flow)
-- Daily progress analytics (per-day hours, timestamps, cumulative quantities)
-- Operator notes with type badges (done_for_day, completion, amendment)
-- Admin job detail: Daily Progress cards, Operator Notes panel, notes count badge on active jobs list
+### 11. Customer Portal
+- Public signature page (no auth), e-sign consent, NPS survey
+- Customer satisfaction flow
 
-### 12. Customer Portal
-- Public signature page (no auth required, accessed via SMS/email link)
-- E-sign consent with GPS disclosure
-- Customer satisfaction survey / NPS system
-- Service completion agreement
-
-### 13. Billing & Invoices
-- Invoice pipeline: draft → confirmed (salesperson) → sent (admin) → paid
-- Confirm modal with notes; Send notifies original creator
-- "Awaiting Send" stat tile + amber Confirm button + emerald Send button on billing page
-- QuickBooks CSV export
-- PDF invoice generation
+### 12. Billing & Invoices
+- Invoice pipeline: draft → confirmed → sent → paid
+- QuickBooks CSV export, PDF invoice
 - 30-day overdue reminder cron
 
-### 14. Facilities & Badging
-- Facility CRUD (`facilities` table)
-- Badge tracking with auto-expiration
-- Operator badge assignment
+### 13. Facilities & Badging
+- Facility CRUD, badge tracking, auto-expiration
 
-### 15. Notifications
-- In-app notification bell (admin + operator dashboards)
-- Email notifications (Resend API)
-- SMS notifications (Telnyx primary → Twilio fallback, `lib/sms.ts`)
+### 14. Notifications
+- In-app bell, email (Resend), SMS (Telnyx→Twilio)
 - Auto-reminders: late clock-in, signature requests, invoice overdue
-- All notifications fire-and-forget — never block main operations
 
-### 16. Shop Manager Module
-- `shop_manager` + `shop_help` roles with separate dashboards
-- Equipment CRUD (`/dashboard/admin/equipment`) with smart location display ("with Carlos · truck #5")
-- Fleet CRUD (`/dashboard/admin/fleet`) with vehicle service history tab
-- Unified Inventory Control (`/dashboard/admin/inventory-control`) — 4 tabs: Inventory / Checkout / Check-In / History
-- Voice checkout: speak equipment name → pg_trgm fuzzy match (6-tier scoring) → auto-fill fields
-- Voice corrections learning loop (`voice_recognition_corrections` table → alias suggestions after 3+ uses)
-- Audio recording of voice checkouts (30-day signed URL in `equipment_checkouts.voice_note_url`)
-- Equipment storage location dropdown (🏭 Shop or 🚚 Truck · Operator)
-- Per-role lunch default: shop roles = 60min, field roles = 30min
+### 15. Shop Manager Module
+- Equipment CRUD with smart location display
+- Fleet CRUD with service history
+- Inventory Control page (4 tabs: Inventory / Checkout / Check-In / History)
+- Voice checkout: speak equipment name → pg_trgm fuzzy match → auto-fill
+- Voice correction learning loop → alias suggestions
 
-### 17. Maintenance Module
-- Operator 3-tap mobile maintenance request wizard (`/dashboard/maintenance/new`)
-- Maintenance Inbox 3-tab view: Inbox / In Progress / Closed (triage actions inline)
-- Fleet service history (`vehicle_service_records` table, next-service ribbon)
-- Visit-wizard → maintenance conversion hook (supervisor equipment issues auto-create maintenance_requests)
+### 16. Maintenance Module
+- Operator 3-tap mobile request wizard (`/dashboard/maintenance/new`)
+- Maintenance Inbox 3-tab triage view
+- Fleet service history (`vehicle_service_records`)
+- Visit-wizard → maintenance auto-conversion hook
 
-### 18. Supervisor Module
-- Site visit reports (jobsite + per-issue equipment photos stored in `maintenance-photos` bucket)
-- Site visit detail page with star ratings, lightbox, follow-up tracking
-- Supervisor dashboard: clock-in/out widget, KPI tiles, Recent Visits, My Active Jobs, Quick Actions
-- Schedule Board, Active Jobs, and Daily Clock-In Code access for supervisors
-- GPS clock-in with `field` method (no shop GPS enforcement)
+### 17. Supervisor Module
+- Site visit reports with per-issue photos
+- Supervisor dashboard: KPI tiles, visits, active jobs, quick actions
 
-### 19. Legal & Compliance
-- Privacy Policy (`/privacy-policy`), Terms of Service (`/terms-of-service`)
-- GPS Consent (`/gps-consent`), E-Sign Consent (`/esign-consent`)
-- SMS Opt-In page (`/sms-opt-in`) — required for Twilio toll-free verification
+### 18. Legal & Compliance Pages
+- `/privacy-policy`, `/terms-of-service`, `/gps-consent`, `/esign-consent`, `/sms-opt-in`
 
-### 20. Security
-- HSTS header (`Strict-Transport-Security: max-age=31536000; includeSubDomains`) in middleware
-- CSP: `unsafe-eval` excluded from production, allowed in dev
-- Rate limiting: 60s on clock-in, on `/api/sms-opt-in`
-- GPS suspicious jump detection (>80km + <2hr gap → audit log, fire-and-forget)
-- Tenant-scoped GPS reads from `tenants.shop_latitude/longitude`
-- Duplicate open timecard guard (409 before DB unique index)
-- SECURITY DEFINER RPC for public tenant lookup (anon key only — no service role on public endpoints)
-- 31 redundant indexes dropped (May 21) — was paying for duplicate B-tree maintenance
+### 19. Security Hardening
+- HSTS header, CSP (unsafe-eval excluded in prod)
+- Rate limiting on clock-in + `/api/sms-opt-in`
+- GPS suspicious jump detection
+- SECURITY DEFINER RPC for public tenant lookup
+- 31 redundant indexes dropped
 
-### 21. iOS App (Capacitor)
-- Same Next.js codebase wrapped in Capacitor (zero React Native rewrite)
-- App icon: 1024×1024 opaque PNG, bridge logo on `#1e1b4b` (no alpha channel)
-- `App.entitlements`: `aps-environment=production` (APNs) + NFC readersession.formats = [TAG]
-- `Info.plist`: arm64 only, `ITSAppUsesNonExemptEncryption=false`, no background location
-- Build 1.0.0 (3) submitted May 25 9:15 PM — "Waiting for Review"
+### 20. iOS App (Capacitor)
+- Same Next.js codebase in native webview — zero React Native rewrite
+- App icon: 1024×1024 opaque PNG, bridge logo on `#1e1b4b`
+- Entitlements: APNs (production) + NFC readersession
+- Build 1.0.0 (3) submitted May 25 — rejected by Apple (ITMS-90683, fix applied)
+
+### 21. Stripe Billing
+- Checkout, webhook (4 events), billing portal
+- Subscription gate in middleware (trialing/active = allowed, past_due = 7-day grace)
+- Billing tab in admin settings
 
 ### 22. Marketing & Landing Pages
-- `app/page.tsx` — Pontifex Industries homepage (story-driven, targets construction companies, non-compete safe)
-- `app/patriot/page.tsx` — Patriot Concrete Cutting operator landing page (red/crimson brand)
-- Request Demo funnel (3-step with API, leads → Supabase)
+- `app/page.tsx` — Pontifex Industries homepage (Framer Motion animations)
+- `app/patriot/page.tsx` — Patriot landing + pricing plans
+- Request Demo funnel (3-step)
 
 ### 23. Admin Utilities
-- Real-time live status panel on job detail (30s poll: in-route, arrived, standby, work performed)
-- Job soft-delete (trash icon + confirmation modal → `status: 'cancelled'`, FK is RESTRICT not CASCADE)
-- Light/dark mode toggle (factory-reset sentinel wipes stale `theme=dark` from localStorage)
-- `useVisiblePoll` hook — polls only when tab is visible + device is online (~80% fewer invocations)
+- Real-time live status panel (30s poll)
+- Job soft-delete (trash icon + confirmation modal)
+- Light/dark mode toggle (factory-reset sentinel)
+- `useVisiblePoll` hook — polls only when tab visible + online
 
 ---
 
@@ -427,51 +540,53 @@ Promise.resolve(supabaseAdmin.from('audit_logs').insert({...})).then(() => {}).c
 - **Migrations:** 70+ in `supabase/migrations/`
 - **Tables:** 90+ in production
 - **Rule:** Every table has `tenant_id` FK to `public.tenants` + RLS enabled
-- **Migration convention:** Idempotent DDL (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `CREATE POLICY ... EXCEPTION WHEN duplicate_object`)
+- **Migration convention:** Idempotent DDL (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`)
 
 ### Key Tables
 | Table | Purpose |
 |---|---|
-| `tenants` | Multi-tenant root — company_code, branding, plan, GPS shop coordinates, timezone |
+| `tenants` | Multi-tenant root — company_code, branding, plan, GPS shop coordinates, timezone, Stripe fields |
 | `profiles` | User profiles — role, tenant_id, skill_levels JSONB, default_lunch_minutes |
 | `job_orders` | Jobs — job_number, status, scope_details, customer, tenant_id |
-| `job_daily_assignments` | Per-day operator assignments (unique partial index: operator+date) |
+| `job_daily_assignments` | Per-day operator assignments (unique partial index) |
 | `timecards` | Clock-in/out — GPS, NFC, entry_type, lunch deduction, audit columns |
 | `timecard_settings_v2` | Tenant timecard config (break threshold, auto-deduct, NFC bypass) |
-| `equipment` | Shop equipment — status, current_custodian_id, aliases JSONB, asset_tag |
-| `equipment_checkouts` | Equipment custody log — operator, truck, job, voice_note_url |
+| `equipment` | Shop equipment — status, current_custodian_id, aliases JSONB |
+| `equipment_checkouts` | Equipment custody log — voice_note_url |
 | `voice_recognition_corrections` | Voice checkout learning loop |
 | `vehicles` | Fleet — VIN, plate, compliance dates, odometer |
 | `vehicle_service_records` | Fleet maintenance history |
-| `maintenance_requests` | Equipment issue tickets — priority, status, supervisor_visit FK |
-| `supervisor_visits` | Site visit reports — observations, equipment_issues JSONB, photos, ratings |
-| `change_orders` | Job change orders — CO-NNN auto-numbered, approve/reject |
-| `invoices` | Billing — status: draft→confirmed→sent→paid |
-| `rating_forms` | Peer review form definitions |
-| `rating_submissions` | Peer review responses |
-| `operator_pto_balance` | PTO allocation/used per operator per year |
+| `maintenance_requests` | Equipment issue tickets |
+| `supervisor_visits` | Site visit reports |
+| `change_orders` | Job change orders — CO-NNN auto-numbered |
+| `invoices` | Billing pipeline — draft→confirmed→sent→paid |
+| `rating_forms` + `rating_submissions` | Peer review system |
+| `operator_pto_balance` | PTO allocation per operator per year |
 | `audit_logs` | Security/admin audit trail |
 
-### Recent Migrations (all applied to production)
+### Stripe Columns (on `public.tenants`)
+```sql
+stripe_customer_id        text
+stripe_subscription_id    text
+subscription_status       text  -- 'trialing' | 'active' | 'past_due' | 'cancelled' | 'unpaid'
+plan_type                 text  -- 'biannual' | 'annual'
+current_period_end        timestamptz
+trial_ends_at             timestamptz
+```
+
+### Applied Migrations (most recent)
 | Migration | Purpose |
 |---|---|
+| `20260526_stripe_billing_columns` | Stripe columns on tenants |
 | `20260521_public_tenant_lookup_fn` | SECURITY DEFINER RPC for anon tenant lookup |
 | `20260521_drop_redundant_duplicate_indexes` | Dropped 31 redundant indexes |
 | `20260517_job_assignments_no_cascade` | FK RESTRICT + soft-delete pattern |
 | `20260516_timecard_uniqueness_and_timezone` | Unique index for open timecards + tenant timezone |
 | `20260510_voice_checkouts_bucket` | Non-public Supabase Storage bucket for audio |
-| `20260510_voice_recognition_corrections` | Voice learning loop table + pg_trgm indexes |
-| `20260508_timecards_entry_type_extend` | Added pto, sick, manual, admin_adjustment to CHECK |
-| `20260507_profiles_default_lunch_minutes` | Per-user lunch default column |
-| `20260507_timecards_lunch_override_audit` | Admin lunch override audit columns |
-| `20260427_utility_waiver_fields` | Utility waiver fields on job_orders |
-| `20260427_operator_badges` | operator_badges table with RLS |
 
 ---
 
-## Cron Jobs
-
-Defined in `vercel.json`. Require `CRON_SECRET` env var in Vercel (✅ set May 22). Only fire on production (`main` branch).
+## Cron Jobs (Active in Production)
 
 | Route | Schedule | Purpose |
 |---|---|---|
@@ -480,165 +595,26 @@ Defined in `vercel.json`. Require `CRON_SECRET` env var in Vercel (✅ set May 2
 
 ---
 
-## What's Next
+## What's Next (Prioritized Backlog)
 
-### ✅ Stripe Billing — COMPLETE (needs Vercel env vars + webhook registration)
+### 🔴 Immediate (This Session)
+1. **Commit + push iOS Info.plist fix** → rebuild iOS archive → resubmit to App Store (see top of file)
+2. **Push `f78a76af`** (Google Maps fix) — batch with iOS commit
 
-Built May 26, 2026. All code is committed in `f2fc6bb0`. **Build passes 0 errors.**
-
-**Stripe objects (live mode, acct_1THphn0WWq11qMKi):**
-- Product: `prod_UagOHFDdm4Tw2N` — "Pontifex Industries Platform"
-- 6-Month price: `price_1TbV2E0WWq11qMKimnEXVElP` — $3,747 / 6 months
-- Annual price: `price_1TbV2E0WWq11qMKidsCGCrl8` — $6,997 / year
-
-**What was built:**
-- `supabase/migrations/20260526_stripe_billing_columns.sql` — applied; 6 Stripe columns on `public.tenants` (`subscription_status` defaults to `'trialing'`)
-- `app/api/stripe/create-checkout-session/route.ts` — creates Stripe Customer + hosted checkout
-- `app/api/stripe/webhook/route.ts` — handles 4 events (checkout.completed, subscription.updated/deleted, payment_failed)
-- `app/api/stripe/create-portal-session/route.ts` — Stripe self-service billing portal
-- `app/patriot/page.tsx` — pricing section (2 plan cards + upgrade banner)
-- `app/company-login/page.tsx` — activated success banner (`?activated=true`)
-- `components/SubscriptionGate.tsx` — client-side paywall (null/trialing=allowed, past_due=7-day grace)
-- `app/dashboard/admin/settings/page.tsx` — Billing tab (plan name, status chip, Manage Subscription button)
-- `middleware.ts` — CSP allows `api.stripe.com`
-
-**✅ ALL DONE — Stripe is fully live.**
-- Env vars set in Vercel (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, both price IDs)
-- Webhook registered and Active: `we_1TbrUh0WWq11qMKi43RmaRgC` → `https://www.pontifexindustries.com/api/stripe/webhook`
-- 4 events listening: checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed
-- Patriot is on trial (`subscription_status = 'trialing'`) — paywall gate allows full access until told otherwise
-- **Tell Claude when Patriot's trial ends** → flip `subscription_status` to `'active'` and the gate activates
-
-### Immediate (batch with Stripe work before push)
-1. **Push `5e71b5c6`** — batch with Stripe commits and push once when billing is done
-2. **Watch for Apple review email** at pontifexindustries@gmail.com — if approved, auto-releases
-3. **Supabase Auth rate limits** (HIGH-2 fix) — Dashboard → Auth → Settings → enable rate limits (5 min user action)
-
-### Short-term (user action required)
-4. **Twilio toll-free verification** — twilio.com with opt-in URL `https://www.pontifexindustries.com/sms-opt-in`
-5. **Rotate Twilio Auth Token** — hygiene, was briefly visible in a screenshot
-6. **Upload Patriot logo** → Settings → Company Branding → "Icon (Square)" slot → Save
+### 🟡 Short-Term (User Actions Required)
+3. **Supabase Auth rate limits** (HIGH-2) — Dashboard → Auth → Settings → enable rate limits (5 min, user does this)
+4. **Twilio toll-free verification** — twilio.com → opt-in URL: `https://www.pontifexindustries.com/sms-opt-in`
+5. **Rotate Twilio Auth Token** — was briefly visible in a screenshot (hygiene)
+6. **Upload Patriot logo** → Settings → Company Branding → Icon (Square) → Save
 7. **Verify email env vars** in Vercel: `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`
+8. **Add Google Maps API key** in Vercel → restores address autocomplete
 
-### Backlog
-8. **Schedule board refactor** — `schedule-board/page.tsx` is 2,850 lines. Extract `OperatorRow`, `JobCard`, `EditModal`, `DispatchModal` to `_components/`
-9. **APNs push logic** — vars set in Vercel; implement server-side send in `/api/push`
-10. **Android** — after iOS approval: `npx cap add android`, $25 Google Play fee
-11. **CSP nonce-based** (MED-5) — replace `unsafe-inline` with nonce-based CSP
-
----
-
-## 🚀 Stripe Billing — Next Session Prompt
-
-Use this prompt verbatim to start the billing integration session:
-
-```
-You are building a complete Stripe billing / paywall system for the Pontifex Industries 
-platform. This is a multi-tenant SaaS (Next.js 15 App Router + Supabase + Tailwind) with 
-a live trial customer — Patriot Concrete Cutting — who needs to start paying.
-
-REPO: /Users/afa55/Documents/Pontifex Industres/pontifex-platform/
-PRODUCTION: https://www.pontifexindustries.com
-STACK: Next.js 15 App Router, React 19, TypeScript, Supabase (PostgreSQL + RLS), Tailwind CSS
-STRIPE: Account exists. API keys are ready. Publishable key and secret key on hand.
-
---- WHAT TO BUILD ---
-
-1. SUBSCRIPTION PLANS (3 tiers for Patriot)
-   - Monthly: $X/mo (exact price TBD by user)
-   - 6-Month: $X/6mo (~10-15% discount)
-   - Annual: $X/yr (~20-25% discount)
-   Create these as Stripe Products + Prices (recurring). Store price IDs in env vars or DB.
-
-2. PAYWALL / OFFER PAGE INTEGRATION
-   - File: app/patriot/page.tsx — existing Patriot landing page
-   - Add a pricing section with 3 plan cards (Monthly / 6-Month / Annual)
-   - "Get Started" CTA on each plan → Stripe Checkout Session (hosted checkout)
-   - After successful payment → redirect to /company-login with ?activated=true param
-   - Show a success banner on login: "Your account is now active — sign in to get started"
-
-3. STRIPE CHECKOUT + WEBHOOKS
-   - POST /api/stripe/create-checkout-session — creates Stripe Checkout session
-     - Accepts: { priceId, tenantId, email, companyCode }
-     - Creates/retrieves Stripe Customer linked to tenant
-     - Sets success_url and cancel_url
-   - POST /api/stripe/webhook — receives Stripe events
-     - checkout.session.completed → activate tenant subscription in DB
-     - customer.subscription.updated → update plan/status
-     - customer.subscription.deleted → mark subscription as cancelled
-     - invoice.payment_failed → flag tenant for payment failure
-   - Webhook must verify Stripe signature using STRIPE_WEBHOOK_SECRET
-
-4. DATABASE SCHEMA (migration required)
-   New columns on public.tenants:
-   - stripe_customer_id text
-   - stripe_subscription_id text  
-   - subscription_status text (trialing|active|past_due|cancelled|unpaid)
-   - plan_type text (monthly|biannual|annual)
-   - current_period_end timestamptz
-   - trial_ends_at timestamptz (for future trial support)
-   Migration must be idempotent (ADD COLUMN IF NOT EXISTS). RLS: these columns 
-   only readable by super_admin or the tenant's own users.
-
-5. ACCESS CONTROL / PAYWALL GATE
-   - Add subscription check to middleware.ts or layout: if tenant.subscription_status 
-     NOT IN ('active','trialing') AND route is /dashboard/* → redirect to /patriot?upgrade=true
-   - Super_admin bypass (never blocked)
-   - Grace period: past_due gets 7-day grace before redirect kicks in
-   - Show a banner on dashboard when subscription is past_due
-
-6. BILLING PORTAL (self-service)
-   - POST /api/stripe/create-portal-session — creates Stripe Customer Portal session
-   - Link in admin dashboard: Settings → Billing → "Manage Subscription" button
-   - Opens Stripe-hosted portal where customer can: upgrade/downgrade plan, 
-     update payment method, view invoice history, cancel subscription
-
-7. ADMIN VISIBILITY
-   - Settings page → new "Billing" tab showing: current plan, status, next billing date, 
-     payment method last 4 digits (from Stripe Customer object), "Manage Subscription" button
-   - Super_admin view: list of all tenants with subscription_status + plan_type + MRR
-
---- CONVENTIONS (follow exactly) ---
-- API routes: use requireAuth() / requireAdmin() from lib/api-auth.ts
-- DB writes in webhooks: use supabaseAdmin from lib/supabase-admin.ts (bypasses RLS)
-- Tenant columns: use SECURITY DEFINER helpers for RLS (NEVER auth.jwt()->'user_metadata')
-- All new tables/columns must have tenant_id + RLS
-- Fire-and-forget logging: Promise.resolve(supabaseAdmin.from('audit_logs').insert({...})).catch(()=>{})
-- API response format: { success: true, data: {} } or { error: 'message' } with HTTP status
-- Mobile-first: all new UI must work at 375px, tap targets ≥ 44px
-- After all code: npm run build from repo root — must pass 0 TypeScript errors
-
---- ENV VARS TO ADD TO VERCEL ---
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
-STRIPE_PRICE_ID_MONTHLY=price_...
-STRIPE_PRICE_ID_BIANNUAL=price_...
-STRIPE_PRICE_ID_ANNUAL=price_...
-
---- WHAT EXISTS ALREADY ---
-- app/patriot/page.tsx — Patriot landing page (red/crimson brand, add pricing section here)
-- app/company-login/page.tsx — login (handle ?activated=true banner)
-- public.tenants table — add Stripe columns via migration
-- lib/supabase-admin.ts — use for webhook DB writes
-- lib/api-auth.ts — requireAuth(), requireAdmin(), requireSuperAdmin()
-- middleware.ts — add subscription gate here
-- app/dashboard/admin/settings/ — add Billing tab here
-
---- BUILD ORDER (parallel where possible) ---
-1. [supabase-migration-author agent] Write + apply tenants Stripe columns migration
-2. [backend-dev agent] POST /api/stripe/create-checkout-session
-3. [backend-dev agent] POST /api/stripe/webhook (all 4 event types)
-4. [backend-dev agent] POST /api/stripe/create-portal-session
-5. [coder agent] Pricing section on app/patriot/page.tsx (3 plan cards)
-6. [coder agent] Billing tab in Settings + success banner on login
-7. [coder agent] Subscription gate in middleware.ts
-8. Run npm run build → 0 errors → commit → push to origin/main
-
-Start by asking the user for: (1) the 3 plan prices, (2) their Stripe publishable key and 
-secret key so you can set up the Stripe Products/Prices and get the price IDs, and (3) 
-whether Patriot is currently on a free trial or needs to pay immediately.
-```
+### 🟢 Code Backlog
+9. **APNs push logic** — vars are set in Vercel; implement server-side send in `/api/push/route.ts` (client already calls `/api/push/register` on APNs token registration — server side just needs to store token + send via `lib/send-push.ts`)
+10. **Android app** — after iOS approval: `npx cap add android` + $25 Google Play fee
+11. **Schedule board refactor** — `schedule-board/page.tsx` is ~2850 lines; extract `OperatorRow`, `JobCard`, `EditModal`, `DispatchModal` to `_components/`
+12. **CSP nonce-based** (MED-5) — replace `unsafe-inline` with nonce injection
+13. **Apply pending migrations:** `20260427_utility_waiver_fields.sql`, `20260427_operator_badges.sql`
 
 ---
 
@@ -659,83 +635,95 @@ pontifex-platform/
 │   │   │   ├── supervisor-visits/          # Site visit reports
 │   │   │   ├── invoices/                   # Invoice CRUD + confirm + send
 │   │   │   └── peer-ratings/              # Rating forms + submissions
+│   │   ├── stripe/
+│   │   │   ├── create-checkout-session/   # Public endpoint — creates Stripe checkout
+│   │   │   ├── webhook/route.ts           # 4 events: checkout, sub update/delete, payment_failed
+│   │   │   └── create-portal-session/     # Admin only — Stripe self-service portal
+│   │   ├── push/
+│   │   │   └── register/route.ts          # Store APNs device token (server side NOT yet wired)
 │   │   ├── timecard/
-│   │   │   ├── clock-in/route.ts          # GPS + NFC clock-in (100ft geofence, rate-limited)
-│   │   │   └── clock-out/route.ts         # GPS clock-out + lunch deduction
-│   │   ├── public/tenant-by-code/route.ts  # DEAD CODE — login calls RPC directly now
+│   │   │   ├── clock-in/route.ts          # GPS + NFC (100ft geofence, rate-limited)
+│   │   │   └── clock-out/route.ts         # GPS + lunch deduction
 │   │   └── cron/                          # Auto-clockout + invoice reminders
 │   ├── company-login/page.tsx             # Main login — calls supabase.rpc() directly (fast)
 │   ├── dashboard/
 │   │   ├── admin/
 │   │   │   ├── active-jobs/               # Job cards with duplicate + delete
-│   │   │   ├── schedule-board/            # 2850-line main board
+│   │   │   ├── schedule-board/            # ~2850-line board (needs extraction)
 │   │   │   ├── schedule-form/             # Multi-step job creation + edit mode
 │   │   │   ├── equipment/                 # Equipment list + detail
 │   │   │   ├── fleet/                     # Vehicle list + service history
-│   │   │   ├── inventory-control/         # 4-tab unified inventory page (voice checkout here)
+│   │   │   ├── inventory-control/         # 4-tab unified (voice checkout)
 │   │   │   ├── maintenance/               # Maintenance inbox
 │   │   │   ├── site-visits/               # Supervisor visit reports
 │   │   │   ├── timecards/                 # Team payroll + operator detail
 │   │   │   ├── peer-ratings/              # Rating forms + team ratings
+│   │   │   ├── settings/page.tsx          # Billing tab + Company Branding
 │   │   │   └── billing/                   # Invoice pipeline
-│   │   ├── my-jobs/                       # Operator job list + job detail tickets
+│   │   ├── my-jobs/                       # Operator job list
 │   │   ├── timecard/                      # Operator personal timecard
-│   │   └── maintenance/new/              # Operator maintenance request wizard (3-tap)
+│   │   └── maintenance/new/              # Operator maintenance request wizard
 │   └── page.tsx                          # Pontifex Industries homepage
 ├── lib/
-│   ├── api-auth.ts                        # requireAuth, requireAdmin, requireSuperAdmin, etc.
+│   ├── api-auth.ts                        # requireAuth, requireAdmin, etc.
 │   ├── auth.ts                            # getCurrentUser() + useAuthUser hook
 │   ├── rbac.ts                            # ADMIN_CARDS + ROLE_PERMISSION_PRESETS
 │   ├── supabase-admin.ts                  # Service-role client (bypasses RLS)
 │   ├── supabase.ts                        # Anon client (client-side)
-│   ├── sms.ts                             # sendSMSAny() Telnyx→Twilio + sendSignatureRequestSMS()
-│   ├── geolocation.ts                     # SHOP_LOCATION + radius constants (single source of truth)
-│   ├── skills-taxonomy.ts                 # Operator skills definitions (cutting/equipment scopes)
+│   ├── sms.ts                             # sendSMSAny() Telnyx→Twilio fallback
+│   ├── geolocation.ts                     # SHOP_LOCATION + radius (single source of truth)
+│   ├── send-push.ts                       # APNs push send logic (vars set, needs wiring)
+│   ├── skills-taxonomy.ts                 # Operator skills definitions
 │   └── hooks/
-│       ├── useAuthUser.ts                 # Async-safe auth hook, Supabase session as ground truth
+│       ├── useAuthUser.ts                 # Async-safe auth hook (Supabase session as ground truth)
 │       └── useVisiblePoll.ts              # Polls only when tab visible + online
 ├── components/
-│   ├── BrandingProvider.tsx               # White-label tenant branding
-│   ├── DashboardSidebar.tsx               # Role-aware navigation (excludeRoles + roles fields)
+│   ├── providers/
+│   │   └── GoogleMapsProvider.tsx         # Guards against missing API key (fixed May 29)
+│   ├── BrandingProvider.tsx               # White-label tenant branding (5-min localStorage cache)
+│   ├── DashboardSidebar.tsx               # Role-aware navigation
 │   ├── NfcClockInModal.tsx                # NFC + GPS + PIN clock-in flow
-│   └── NotificationBell.tsx              # In-app notification bell (admin + operator)
+│   ├── NotificationBell.tsx              # In-app notification bell
+│   └── SubscriptionGate.tsx              # Client-side Stripe paywall
 ├── ios/App/
-│   ├── App/Info.plist                     # arm64, ITSAppUsesNonExemptEncryption=false
+│   ├── App/Info.plist                     # arm64, ITSAppUsesNonExemptEncryption=false, BOTH location keys
 │   ├── App/App.entitlements               # aps-environment=production + NFC entitlement
-│   └── App/Assets.xcassets/AppIcon.appiconset/  # 1024×1024 opaque PNG
+│   ├── App/Assets.xcassets/AppIcon.appiconset/  # 1024×1024 opaque PNG
+│   └── ExportOptions.plist               # App Store export config
 ├── supabase/migrations/                   # 70+ migration files (all idempotent)
-├── CLAUDE.md                              # Project conventions + sprint backlog (update checkboxes)
-├── CLAUDE_HANDOFF.md                      # ← THIS FILE (update at end of every session)
-├── CLAUDE_CONTEXT.md                      # Full architecture reference
+├── CLAUDE.md                              # Project conventions + sprint backlog
+├── CLAUDE_HANDOFF.md                      # ← THIS FILE
+├── CLAUDE_CONTEXT.md                      # Full architecture reference (last updated March 2026)
 ├── CLAUDE_SESSION_CONTEXT.md             # Detailed schema + patterns + business rules
-├── SHOP_MANAGER_PLAN.md                   # Shop manager module plan (C-phases all shipped)
-├── APP_CHANGES.md                         # Native iOS-only changes + App Store submission guide
-├── DEPLOYMENT_COST.md                     # Vercel build cost discipline (read before pushing)
-└── vercel.json                            # maxDuration, cron config, blocked branch deploys
+├── RUFLO_REFERENCE.md                     # Ruflo install guide, commands, plugins
+├── APP_CHANGES.md                         # iOS-only changes + App Store submission guide
+├── APP_STORE_PLAN.md                      # Phase-by-phase App Store publication plan
+├── SHOP_MANAGER_PLAN.md                   # Shop manager module plan (all C-phases shipped)
+├── DEPLOYMENT_COST.md                     # Vercel build cost discipline (READ before pushing)
+└── vercel.json                            # maxDuration, cron, blocked branch deploys
 ```
 
 ---
 
-## Quick Sanity Checks (Run at Start of Every Session)
+## Important MD Files Reference
 
-```bash
-# 1. Confirm branch and recent commits
-git log --oneline -5
-git status
+| File | What's In It | When to Read |
+|---|---|---|
+| `CLAUDE_HANDOFF.md` | **This file** — current state, pending work, credentials | Every session start |
+| `CLAUDE.md` | Project conventions, sprint backlog checkboxes, parallel agent patterns | When starting new features |
+| `CLAUDE_CONTEXT.md` | Full architecture reference — DB schema, API routes, views, business rules | When working on unfamiliar parts of the system |
+| `CLAUDE_SESSION_CONTEXT.md` | Detailed schema + patterns + role business rules | When writing DB migrations or API routes |
+| `RUFLO_REFERENCE.md` | Ruflo install, commands, plugin list, Pontifex-specific setup | When working with swarm agents or memory features |
+| `APP_CHANGES.md` | iOS-only changes, Xcode setup, App Store submission steps | When doing iOS builds or App Store submission |
+| `APP_STORE_PLAN.md` | Phase-by-phase iOS + Android publication plan | When starting Android work |
+| `DEPLOYMENT_COST.md` | Vercel build cost breakdown — why we batch pushes | Before any `git push origin main` |
+| `SHOP_MANAGER_PLAN.md` | Shop Manager C-phases — all shipped, use as reference | When extending shop/inventory features |
 
-# 2. Verify build passes (must be 0 errors)
-npm run build
+---
 
-# 3. Check what's pending push
-git log origin/main..HEAD --oneline
-
-# 4. Start dev server if doing UI work
-npm run dev   # port 3000
-```
-
-**Expected state:**
-- `git log` shows HEAD at `08b54de7` (compliance fixes) or later
-- `npm run build` exits 0 with no TS errors
-- `git log origin/main..HEAD` shows `08b54de7` pending (or empty if already pushed)
-- https://www.pontifexindustries.com returns 200
-- Apple review email may have arrived at pontifexindustries@gmail.com
+## Vercel Build Notes
+- `claude/*` and `feature/*` branches are blocked from triggering builds in `vercel.json`
+- Only `main` triggers a production build
+- Builds take ~60-120s and cost ~$1-2 each
+- Current deployment URL: https://www.pontifexindustries.com
+- Deployment ID for last push: `dpl_FkNPZvhb9tRE91jEVpu2xfUxtrRL` (commit `eda221f4`)
