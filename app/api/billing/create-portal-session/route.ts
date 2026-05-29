@@ -1,12 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSuperAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getStripe } from '@/lib/stripe';
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  // Billing is super_admin only.
+  const auth = await requireSuperAdmin(request);
   if (!auth.authorized) return auth.response;
 
   try {

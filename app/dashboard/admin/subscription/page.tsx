@@ -264,13 +264,10 @@ function SubscriptionPageInner() {
     }
   }, [router]);
 
-  // Auth guard
+  // Auth guard — billing is super_admin only (see also requireSuperAdmin on the APIs)
   useEffect(() => {
     const user = getCurrentUser();
-    if (
-      !user ||
-      !['admin', 'super_admin', 'operations_manager'].includes(user.role)
-    ) {
+    if (!user || user.role !== 'super_admin') {
       router.push('/dashboard/admin');
       return;
     }
