@@ -1,11 +1,23 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** May 29, 2026 | **Branch:** `main` | **HEAD:** `f78a76af` (NOT yet pushed) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🔴 Needs Resubmission (Apple rejection fix ready)
+**Last updated:** May 29, 2026 | **Branch:** `main` | **HEAD:** `57a27e80` (✅ pushed, prod READY) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🟡 Code ready — needs Build 4 archive + resubmit
 
-> **💰 VERCEL BUDGET: ~$5–6 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. `claude/*` and `feature/*` branches do NOT trigger builds (blocked in `vercel.json`). See `DEPLOYMENT_COST.md`.
+> **💰 VERCEL BUDGET: ~$3–4 build credit remaining** (spent one ~$1–2 build this session). Every `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. See `DEPLOYMENT_COST.md`.
 
 ---
 
-## ⚡ START HERE — What Needs To Happen This Session
+## ⚡ START HERE (May 29, 2026 session) — App Store approval hardening DONE in code
+
+**👉 The authoritative resubmission plan is [`APP_STORE_RESUBMISSION.md`](APP_STORE_RESUBMISSION.md)** — runbook + ready-to-paste App Review notes (demo creds: Company Code `PATRIOT` / `zack@demopontifex.com` / `Patriot2026!`).
+
+A 4-agent Apple-guideline audit found the real (human-review) rejection risks beyond the location string, and they are now **fixed in code and live in prod**:
+- **3.1.1 IAP** — all Stripe purchasing hidden in the native shell via `lib/is-native.ts` (`isNativeApp()`); web billing untouched. Killed the `SubscriptionGate` auto-redirect to checkout.
+- **5.1.1(v) Account deletion** — built durable infra: migration `20260529_account_deletion_infrastructure` (`profiles.deleted_at` + `public.close_account()`), route anonymizes + 100-yr-bans the auth identity (NOT a hard delete — ~30 tables FK to auth.users; CASCADE would destroy payroll). UI: My Profile → Danger Zone → Delete My Account.
+
+**Remaining (Apple-side, user must do):** ① confirm last build # in App Store Connect → TestFlight (use **4**); ② archive Build 4 + upload via Transporter (CLI in APP_STORE_RESUBMISSION.md §3); ③ paste App Review notes (§4) — the actual 2.1 blocker fix; ④ post-deploy e2e test of account deletion with a throwaway operator.
+
+---
+
+## ⚡ (Prior session notes) — iOS ITMS-90683 fix
 
 ### 1. 🍎 Apple Rejection Fix (HIGHEST PRIORITY)
 Apple rejected Build 1.0.0 (3) due to **ITMS-90683** — missing `NSLocationAlwaysAndWhenInUseUsageDescription` key. Apple's automated binary scanner requires BOTH location keys whenever any linked SDK (Capacitor Geolocation plugin) references location APIs, even when "always on" is never actually requested by the app.
