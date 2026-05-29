@@ -64,8 +64,8 @@
 	<string>Pontifex uses the camera to capture job site photos and document completed work.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Pontifex uses the microphone for voice-based equipment checkout and job notes.</string>
-	<key>NFCReaderUsageDescription</key>
-	<string>Pontifex uses NFC to scan employee badges for time tracking and clock-in verification.</string>
+	<!-- NFCReaderUsageDescription removed: the iOS app has no native NFC (badge
+	     scanning is Android-only via Web NFC; iOS uses a PIN fallback). -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Pontifex saves job site photos to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

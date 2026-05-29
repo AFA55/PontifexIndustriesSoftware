@@ -8,13 +8,11 @@
 	<key>aps-environment</key>
 	<string>production</string>
 
-	<!-- NFC Tag Reading — required for employee badge clock-in.
-	     Matches the NFC Tag Reading capability enabled on the App ID.
-	     Without this entitlement the NFCReaderSession API throws an
-	     entitlement error at runtime even though Info.plist declares it. -->
-	<key>com.apple.developer.nfc.readersession.formats</key>
-	<array>
-		<string>TAG</string>
-	</array>
+	<!-- NFC entitlement intentionally removed. The iOS app has NO native NFC:
+	     badge scanning uses the Web NFC API (NDEFReader), which is Android-only
+	     and unavailable in iOS WKWebView, so iOS always uses the PIN fallback.
+	     Declaring an unused NFC entitlement triggered Apple's request for an NFC
+	     hardware demo video (Guideline 2.1). Re-add only when native CoreNFC is
+	     actually implemented (with a demo video at submission). -->
 </dict>
 </plist>
