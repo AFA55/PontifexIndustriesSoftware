@@ -1,7 +1,7 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** May 27, 2026 | **Branch:** `main` | **HEAD:** `9978a42b` (pushed ✅) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🍎 Waiting for Review
+**Last updated:** May 27, 2026 | **Branch:** `main` | **HEAD:** `eda221f4` (pushed ✅) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🍎 Waiting for Review
 
-> **💰 VERCEL BUDGET: ~$8–9 build credit remaining.** (3 pushes since last estimate) Each `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. `claude/*` and `feature/*` branches do NOT trigger builds (blocked in `vercel.json`). See `DEPLOYMENT_COST.md`.
+> **💰 VERCEL BUDGET: ~$6–7 build credit remaining.** (4 pushes since last estimate) Each `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. `claude/*` and `feature/*` branches do NOT trigger builds (blocked in `vercel.json`). See `DEPLOYMENT_COST.md`.
 
 ---
 
@@ -35,6 +35,8 @@
 ### Recent commits (all pushed ✅)
 | Commit | Summary |
 |---|---|
+| `eda221f4` | **fix:** Move Stripe `new Stripe()` inside handlers — unblocks Vercel build (was failing since billing integration added) |
+| `a013bd58` | **fix(stripe):** Checkout session is public — remove requireAuth(), resolve tenant by companyCode |
 | `9978a42b` | **feat:** APNs push notifications + schedule board component extraction |
 | `f2fc6bb0` | **feat:** Stripe billing — checkout, webhook, portal, paywall gate, pricing UI, migration |
 | `5e71b5c6` | **security:** CRIT-1 tenant isolation (10 job-orders routes), MED-2 clock-out auth, HIGH-3 portal injection |

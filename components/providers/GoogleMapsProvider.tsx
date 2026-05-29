@@ -23,9 +23,14 @@ interface GoogleMapsProviderProps {
   children: ReactNode;
 }
 
-export function GoogleMapsProvider({ children }: GoogleMapsProviderProps) {
+/**
+ * Inner loader — only rendered when NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is set.
+ * Keeping the hook call here (not in the outer component) avoids a conditional
+ * hook violation while still letting us skip the load entirely when no key exists.
+ */
+function GoogleMapsLoader({ children }: GoogleMapsProviderProps) {
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
     libraries,
   });
 
@@ -34,4 +39,19 @@ export function GoogleMapsProvider({ children }: GoogleMapsProviderProps) {
       {children}
     </GoogleMapsContext.Provider>
   );
+}
+
+export function GoogleMapsProvider({ children }: GoogleMapsProviderProps) {
+  // If no API key is configured, skip loading entirely to avoid console error
+  // spam on every page. Components that call useGoogleMaps() receive
+  // { isLoaded: false } and gracefully degrade (plain text input fallback).
+  if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+    return (
+      <GoogleMapsContext.Provider value={{ isLoaded: false, loadError: undefined }}>
+        {children}
+      </GoogleMapsContext.Provider>
+    );
+  }
+
+  return <GoogleMapsLoader>{children}</GoogleMapsLoader>;
 }
