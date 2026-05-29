@@ -117,14 +117,16 @@ On a real iPhone: login, GPS clock-in, NFC, camera, schedule board, **My Profile
 
 ## 4. App Review notes — paste into App Store Connect
 
-> ⚠️ **Fill the `<COMPANY CODE>` placeholder before submitting** — the demo accounts (`@demopontifex.com`) need their tenant's company code. Recommended demo account: an operator (best shows native hardware features).
+Demo account verified in DB: tenant **Patriot Concrete Cutting**, company code **PATRIOT**, status `trialing` (so the subscription gate never triggers for the reviewer). `zack@demopontifex.com` is an **operator** — the best role for showing the native hardware features.
+
+> ⚠️ **Deletion-test caveat:** the demo accounts are shared and live in the real Patriot tenant. The notes below tell the reviewer where account deletion *is* (which is what Apple checks) but ask them NOT to execute it on the shared account. If you'd rather let them actually run it, create a throwaway account first (see §6) and swap it in.
 
 ```
 This is a B2B field-operations app for concrete-cutting / construction crews. It is
 used internally by a company's employees (operator and admin roles), not by the public.
 
 DEMO ACCOUNT (login requires Company Code + Email + Password):
-  Company Code: <COMPANY CODE>
+  Company Code: PATRIOT
   Email:        zack@demopontifex.com
   Password:     Patriot2026!
 
@@ -136,14 +138,21 @@ NATIVE DEVICE FEATURES (this is not a website — it uses iPhone hardware):
   • Push notifications — job assignments and clock-in reminders.
 
 HOW TO EXERCISE CORE FLOWS:
-  1. Log in with the demo account above.
+  1. Log in with the demo account above (Company Code PATRIOT).
   2. Operator: "My Jobs" → open a job → clock in (GPS) → log work performed → take a photo.
-  3. Account deletion: tap the profile/avatar → "My Profile" → scroll to "Danger Zone" →
-     "Delete My Account" → type DELETE → confirm. (Permanently deletes the account + personal data.)
+  3. Account deletion is available in-app at: profile/avatar → "My Profile" → "Danger Zone"
+     → "Delete My Account" (type DELETE to confirm). Please note this is a shared demo
+     account — the deletion control is fully functional but we ask you not to execute it on
+     this shared login.
 
 BILLING: Subscriptions are sold only to companies (enterprise B2B) and are managed on the
 website, not in the app — the app contains no in-app purchase UI.
 ```
+
+## 6. Optional — dedicated deletion-test account
+If you want the reviewer to actually run deletion, create a disposable operator in the PATRIOT
+tenant (Admin → Team → Add User, or ask Claude to insert one), e.g. `appreview@demopontifex.com`,
+and swap it into the notes' step 3. It can be recreated freely if deleted.
 
 ---
 
