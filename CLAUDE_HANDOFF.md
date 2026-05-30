@@ -1,7 +1,43 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** May 29, 2026 | **Branch:** `main` | **HEAD:** `57a27e80` (✅ pushed, prod READY) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🟡 Code ready — needs Build 4 archive + resubmit
+**Last updated:** May 30, 2026 | **Branch:** `main` | **HEAD:** `c1735cdc` (✅ pushed, prod deploying) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🟡 Build 5 submitted, awaiting Apple review
 
-> **💰 VERCEL BUDGET: ~$3–4 build credit remaining** (spent one ~$1–2 build this session). Every `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. See `DEPLOYMENT_COST.md`.
+> **💰 VERCEL BUDGET: ~$2–3 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. See `DEPLOYMENT_COST.md`.
+
+---
+
+## ⚡ START HERE (May 30, 2026 session) — Scaling analysis + rollout-hardening (10 agents, 3 rounds)
+
+Patriot is about to onboard ~25 users. This session did a capacity analysis and a 3-round
+parallel-agent hardening pass. **All pushed to prod in one build (`ef4b618b..c1735cdc`).**
+
+**Scaling:** [`SCALING.md`](SCALING.md) — 25 users is trivial (DB 30 MB, 13/60 conns, all hot
+tables tenant-indexed). **The one action that matters: upgrade Supabase Free → Pro ($25/mo)** for
+automated backups of payroll data (Free has none), no auto-pause, dedicated compute, and it unlocks
+leaked-password protection. **← user action, highest priority before rollout.**
+
+**Hardening shipped (10 subagents, each verified — disjoint file sets, build green, diffs reviewed):**
+- **Push notifications now fire across the ENTIRE notification surface** (11 API routes +
+  `notify-salesperson`): job dispatch, completion approve/reject, change-requests, time-off,
+  maintenance, callouts. Every call is ADDITIVE + fire-and-forget (`.catch(() => {})`) — a push
+  failure can never break an API response. Also removed an undeclared `jsonwebtoken` dep risk in
+  `lib/send-push.ts` (now delegates to `lib/apns.ts`) and hardened `/api/push` (userId targeting,
+  self-vs-admin authz, tenant isolation, 503 on unconfigured).
+- **Load-error + retry UI** on ~13 daily-traffic pages (operator: notifications, daily-report,
+  in-route, jobsite, job-survey, settings/notifications; admin: timecards, completed-jobs, billing,
+  time-off, team-management, team-profiles, schedule-form-history). Pattern ref: `active-jobs/page.tsx`.
+  ~6 pages correctly left alone (no blocking fetch / already had it).
+- **Mobile (375/414px):** maintenance/new, admin/maintenance, inventory-control, + `NewInventoryModal`
+  — 44px tap targets, iOS focus-zoom fix (`text-base sm:text-sm`), overflow, safe-area padding.
+- **Migrations applied to prod:** `20260427_utility_waiver_fields` + `20260427_operator_badges`.
+  Caught + fixed a cross-tenant RLS leak in operator_badges before applying (was "any admin manages
+  all badges" → tenant-scoped + WITH CHECK + updated_at trigger). Verified live.
+
+**Pending / next:**
+- 🔴 **Supabase Free → Pro upgrade** (user action — backups on payroll data).
+- Push wiring is code-complete but **only delivers once devices register tokens** — confirm the
+  iOS app registers APNs tokens into `push_tokens` (TestFlight/Build 5) before relying on push.
+- Optional round 4: remaining ~45 low-traffic admin/settings/debug pages (diminishing returns).
+- Schedule-board still 2,850 lines — extraction still on backlog.
 
 ---
 
