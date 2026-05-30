@@ -518,7 +518,10 @@ export async function POST(request: NextRequest) {
 
       if (lineError) {
         console.error('Error creating line items:', lineError);
-        // Invoice was created but line items failed - don't fail the whole request
+        // Roll back the header so we never leave an invoice with a total but zero
+        // line items (a billable-looking invoice with nothing backing it).
+        await supabaseAdmin.from('invoices').delete().eq('id', invoice.id);
+        return NextResponse.json({ error: 'Failed to create invoice line items' }, { status: 500 });
       }
     }
 

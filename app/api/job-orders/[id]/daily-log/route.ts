@@ -155,7 +155,9 @@ export async function POST(
     let dailyLog = null;
     const { data: logData, error: logError } = await supabaseAdmin
       .from('daily_job_logs')
-      .insert({
+      // Upsert on the (job_order_id, operator_id, log_date) unique key so a legitimate
+      // resubmit (corrected work, draft -> final) updates the row instead of failing 500.
+      .upsert({
         job_order_id: jobId,
         operator_id: user.id,
         log_date: today,
@@ -173,7 +175,7 @@ export async function POST(
         work_start_longitude: job.work_start_longitude,
         day_end_latitude: latitude,
         day_end_longitude: longitude
-      })
+      }, { onConflict: 'job_order_id,operator_id,log_date' })
       .select()
       .single();
 
@@ -192,12 +194,16 @@ export async function POST(
       dailyLog = logData;
     }
 
-    // Persist work items to work_items table for billing
+    // Persist work items to work_items table for billing.
+    // These feed invoice generation, so the write is BLOCKING (not fire-and-forget) and
+    // idempotent: clear this day's prior rows first so a resubmit replaces rather than
+    // double-bills, and surface failures instead of silently producing a $0 invoice.
     if (workPerformed && Array.isArray(workPerformed) && workPerformed.length > 0) {
+      const dayNum = dailyLog?.day_number ?? 1;
       const workItemRows = workPerformed.map((item: any) => ({
         job_order_id: jobId,
         operator_id: user.id,
-        day_number: dailyLog?.day_number ?? 1,
+        day_number: dayNum,
         work_type: item.work_type || item.type || 'General',
         quantity: Number(item.quantity) || 1,
         core_quantity: item.core_quantity ? Number(item.core_quantity) : null,
@@ -211,12 +217,19 @@ export async function POST(
         notes: item.notes || null,
       }));
 
-      // Fire-and-forget — don't block the response on this
-      Promise.resolve(
-        supabaseAdmin.from('work_items').insert(workItemRows)
-      ).then(({ error: wiError }) => {
-        if (wiError) console.error('Error saving work items to DB:', wiError);
-      }).catch(() => {});
+      // Replace any prior rows for this job/operator/day (idempotent resubmit, no double-billing).
+      await supabaseAdmin
+        .from('work_items')
+        .delete()
+        .eq('job_order_id', jobId)
+        .eq('operator_id', user.id)
+        .eq('day_number', dayNum);
+
+      const { error: wiError } = await supabaseAdmin.from('work_items').insert(workItemRows);
+      if (wiError) {
+        console.error('Error saving work items to DB:', wiError);
+        return NextResponse.json({ error: 'Failed to save work items' }, { status: 500 });
+      }
     }
 
     if (continueNextDay) {
