@@ -563,24 +563,6 @@ export async function uploadEquipmentPhoto(equipmentId: string, file: File) {
 }
 
 // =====================================================
-// REAL-TIME SUBSCRIPTIONS
-// =====================================================
-
-export function subscribeToJobs(callback: (payload: any) => void) {
-  return supabase
-    .channel('jobs-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, callback)
-    .subscribe();
-}
-
-export function subscribeToEquipment(callback: (payload: any) => void) {
-  return supabase
-    .channel('equipment-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'equipment' }, callback)
-    .subscribe();
-}
-
-// =====================================================
 // ACCESS REQUEST FUNCTIONS
 // =====================================================
 
