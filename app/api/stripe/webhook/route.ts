@@ -29,18 +29,32 @@ function derivePlanType(priceId: string): string {
   return 'unknown';
 }
 
+/**
+ * Update the tenant matching a Stripe customer.
+ * Returns { ok, matched }:
+ *  - ok=false  → a real DB error (transient): caller should return 500 so Stripe retries.
+ *  - matched=false → no tenant has this stripe_customer_id (data gap, e.g. an untracked
+ *    customer): logged loudly, but caller should ack 200 since retrying won't create the row.
+ */
 async function updateTenantByCustomer(
   stripeCustomerId: string,
   fields: Record<string, unknown>
-): Promise<void> {
-  const { error } = await supabaseAdmin
+): Promise<{ ok: boolean; matched: boolean }> {
+  const { data, error } = await supabaseAdmin
     .from('tenants')
     .update(fields)
-    .eq('stripe_customer_id', stripeCustomerId);
+    .eq('stripe_customer_id', stripeCustomerId)
+    .select('id');
 
   if (error) {
     console.error('[stripe-webhook] Failed to update tenant:', error, { stripeCustomerId, fields });
+    return { ok: false, matched: false };
   }
+  const matched = Array.isArray(data) && data.length > 0;
+  if (!matched) {
+    console.error('[stripe-webhook] No tenant matched stripe_customer_id:', stripeCustomerId, fields);
+  }
+  return { ok: true, matched };
 }
 
 function fireAuditLog(eventType: string, stripeCustomerId: string, payload: Record<string, unknown>): void {
@@ -82,6 +96,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Webhook signature invalid: ${message}` }, { status: 400 });
   }
 
+  // ── Idempotency ───────────────────────────────────────────────────────────
+  // Stripe delivers at-least-once and retries on non-2xx. Record event.id; if we've
+  // already processed it, ack without re-applying.
+  const { error: dedupError } = await supabaseAdmin
+    .from('stripe_webhook_events')
+    .insert({ event_id: event.id, event_type: event.type });
+  if (dedupError) {
+    if (dedupError.code === '23505') {
+      // Already processed — safe to ack.
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+    // Unexpected insert error: log and continue (don't block a legitimate event).
+    console.error('[stripe-webhook] dedup insert error:', dedupError);
+  }
+
   // ── Event handlers ──────────────────────────────────────────────────────────
 
   if (event.type === 'checkout.session.completed') {
@@ -111,10 +140,14 @@ export async function POST(request: NextRequest) {
       subscription_status: 'active',
       plan_type: planType,
       current_period_end: currentPeriodEnd,
+      // Keep the legacy column pair in sync — /api/billing/subscription reads these.
+      subscription_plan: planType,
+      subscription_period_end: currentPeriodEnd,
     };
 
-    await updateTenantByCustomer(customerId, fields);
-    fireAuditLog('checkout.session.completed', customerId, { subscriptionId, planType, currentPeriodEnd });
+    const res = await updateTenantByCustomer(customerId, fields);
+    if (!res.ok) return NextResponse.json({ error: 'tenant update failed' }, { status: 500 });
+    fireAuditLog('checkout.session.completed', customerId, { subscriptionId, planType, currentPeriodEnd, matched: res.matched });
   }
 
   else if (event.type === 'customer.subscription.updated') {
@@ -148,10 +181,14 @@ export async function POST(request: NextRequest) {
       subscription_status: subscriptionStatus,
       plan_type: planType,
       current_period_end: currentPeriodEnd,
+      // Keep legacy column pair in sync.
+      subscription_plan: planType,
+      subscription_period_end: currentPeriodEnd,
     };
 
-    await updateTenantByCustomer(customerId, fields);
-    fireAuditLog('customer.subscription.updated', customerId, { subscriptionStatus, planType, currentPeriodEnd });
+    const res = await updateTenantByCustomer(customerId, fields);
+    if (!res.ok) return NextResponse.json({ error: 'tenant update failed' }, { status: 500 });
+    fireAuditLog('customer.subscription.updated', customerId, { subscriptionStatus, planType, currentPeriodEnd, matched: res.matched });
   }
 
   else if (event.type === 'customer.subscription.deleted') {
@@ -160,8 +197,9 @@ export async function POST(request: NextRequest) {
       ? subscription.customer
       : subscription.customer.id;
 
-    await updateTenantByCustomer(customerId, { subscription_status: 'canceled' });
-    fireAuditLog('customer.subscription.deleted', customerId, { subscription_status: 'canceled' });
+    const res = await updateTenantByCustomer(customerId, { subscription_status: 'canceled' });
+    if (!res.ok) return NextResponse.json({ error: 'tenant update failed' }, { status: 500 });
+    fireAuditLog('customer.subscription.deleted', customerId, { subscription_status: 'canceled', matched: res.matched });
   }
 
   else if (event.type === 'invoice.payment_failed') {
@@ -171,8 +209,9 @@ export async function POST(request: NextRequest) {
       : (invoice.customer as Stripe.Customer | null)?.id ?? '';
 
     if (customerId) {
-      await updateTenantByCustomer(customerId, { subscription_status: 'past_due' });
-      fireAuditLog('invoice.payment_failed', customerId, { subscription_status: 'past_due' });
+      const res = await updateTenantByCustomer(customerId, { subscription_status: 'past_due' });
+      if (!res.ok) return NextResponse.json({ error: 'tenant update failed' }, { status: 500 });
+      fireAuditLog('invoice.payment_failed', customerId, { subscription_status: 'past_due', matched: res.matched });
     }
   }
 
