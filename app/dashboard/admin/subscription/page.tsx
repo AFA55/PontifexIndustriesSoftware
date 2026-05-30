@@ -527,45 +527,37 @@ function SubscriptionPageInner() {
               </button>
               {!sub.hasStripeCustomer && (
                 <p className="text-xs text-gray-400 mt-2">
-                  Select a plan below to add your payment method.
+                  Visit the pricing page below to start a subscription.
                 </p>
               )}
             </div>
 
-            {/* Upgrade section — show if not enterprise */}
-            {sub.plan !== 'enterprise' && (
-              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-gray-900 mb-1">
-                  {sub.status === 'trialing' || !sub.hasStripeCustomer
-                    ? 'Choose Your Plan'
-                    : 'Upgrade or Change Plan'}
-                </h2>
-                <p className="text-sm text-gray-500 mb-6">
-                  {sub.status === 'trialing'
-                    ? 'Select a plan to continue after your trial ends. You won\'t be charged until the trial is over.'
-                    : 'Upgrades take effect immediately. Downgrades apply at the next billing cycle.'}
-                </p>
-                <div className="grid md:grid-cols-3 gap-4">
-                  {(Object.values(PLANS) as (typeof PLANS)[keyof typeof PLANS][]).map((plan) => (
-                    <CompactPlanCard
-                      key={plan.id}
-                      plan={plan}
-                      isCurrent={plan.id === sub.plan}
-                      onSelect={handleCheckout}
-                      loading={checkoutLoading === plan.id}
-                    />
-                  ))}
-                </div>
+            {/* Start or change a plan — Pontifex bills annually / semi-annually,
+                sold via the pricing flow and managed through the Stripe portal above.
+                (Monthly self-serve checkout is intentionally not offered here.) */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-gray-900 mb-1">Change your plan</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Pontifex is billed annually or semi-annually. To start a new subscription or change plans,
+                view our plans or contact our team. Existing subscriptions are managed anytime through the
+                billing portal above.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/pricing"
+                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-medium px-5 py-2.5 rounded-xl transition-colors text-sm"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View Plans
+                </Link>
+                <Link
+                  href="/request-demo"
+                  className="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-5 py-2.5 rounded-xl transition-colors text-sm"
+                >
+                  Contact Sales
+                </Link>
               </div>
-            )}
-
-            {/* Link to full pricing page */}
-            <p className="text-center text-sm text-gray-400">
-              View full feature comparison on the{' '}
-              <Link href="/pricing" className="text-purple-600 hover:text-purple-700 underline">
-                pricing page
-              </Link>
-            </p>
+            </div>
           </div>
         ) : (
           <div className="text-center py-20 text-gray-500">
