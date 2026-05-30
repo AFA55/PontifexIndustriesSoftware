@@ -41,10 +41,10 @@ prompts the app shows (location, camera) and the privacy policy. ASC → **App P
 - **Diagnostics / Usage Data** — only if you actually collect analytics (you log errors → "Diagnostics").
 If the label currently says "Data Not Collected," that's an automatic mismatch → fix it.
 
-### 2. 🟡 Support URL must resolve to a working page
-There is **no `/support` route** in the app. Confirm the **Support URL** in ASC points to a live page
-(e.g. `https://www.pontifexindustries.com/` or a contact/request-demo page). A dead Support URL is a
-1.5 / metadata rejection. *(Optional: add a lightweight `/support` or `/contact` page.)*
+### 2. ✅ Support URL — RESOLVED
+Built a dedicated **`/support`** page (contact email `pontifexindustries@gmail.com`, common-questions
+FAQ, account-deletion pointer, privacy/terms links — mobile-first). Set the **Support URL** in ASC to
+`https://www.pontifexindustries.com/support` (live after the next deploy).
 
 ### 3. 🟡 Review notes + demo account
 Keep the App Review notes (in `APP_STORE_RESUBMISSION.md`) attached: demo login
