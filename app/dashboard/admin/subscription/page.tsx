@@ -264,10 +264,11 @@ function SubscriptionPageInner() {
     }
   }, [router]);
 
-  // Auth guard — billing is super_admin only (see also requireSuperAdmin on the APIs)
+  // Auth guard — billing is managed by the tenant's admin/ops/super_admin (per-tenant).
+  // The API routes resolve the tenant (admin -> own; super_admin -> ?tenantId / sole tenant).
   useEffect(() => {
     const user = getCurrentUser();
-    if (!user || user.role !== 'super_admin') {
+    if (!user || !['admin', 'super_admin', 'operations_manager'].includes(user.role)) {
       router.push('/dashboard/admin');
       return;
     }

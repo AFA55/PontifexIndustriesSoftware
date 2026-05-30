@@ -1,20 +1,24 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requireAdmin, resolveBillingTenant } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getStripe } from '@/lib/stripe';
 
 export async function POST(request: NextRequest) {
-  // Billing is super_admin only.
-  const auth = await requireSuperAdmin(request);
+  // Billing is per-tenant: a tenant admin manages their own; super_admin can target any tenant.
+  const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
+
+  const scope = await resolveBillingTenant(request, auth);
+  if ('response' in scope) return scope.response;
+  const tenantId = scope.tenantId;
 
   try {
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
       .select('stripe_customer_id')
-      .eq('id', auth.tenantId)
+      .eq('id', tenantId)
       .single();
 
     if (tenantError || !tenant) {

@@ -1,12 +1,17 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdmin, resolveBillingTenant } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
+
+  // Billing is per-tenant: tenant admin -> own tenant; super_admin -> ?tenantId or sole tenant.
+  const scope = await resolveBillingTenant(request, auth);
+  if ('response' in scope) return scope.response;
+  const tenantId = scope.tenantId;
 
   try {
     const { data: tenant, error: tenantError } = await supabaseAdmin
@@ -14,7 +19,7 @@ export async function GET(request: NextRequest) {
       .select(
         'subscription_status, subscription_plan, subscription_period_end, trial_ends_at, stripe_customer_id'
       )
-      .eq('id', auth.tenantId)
+      .eq('id', tenantId)
       .single();
 
     if (tenantError || !tenant) {
@@ -25,7 +30,7 @@ export async function GET(request: NextRequest) {
     const { count: operatorCount } = await supabaseAdmin
       .from('profiles')
       .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', auth.tenantId)
+      .eq('tenant_id', tenantId)
       .in('role', ['operator', 'apprentice']);
 
     return NextResponse.json({

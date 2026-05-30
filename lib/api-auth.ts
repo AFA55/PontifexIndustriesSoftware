@@ -383,6 +383,28 @@ export async function resolveTenantScope(
 }
 
 /**
+ * Tenant resolution for billing/subscription routes.
+ *
+ * Billing is a per-tenant action: a tenant admin manages their OWN tenant's
+ * subscription (auth.tenantId); a platform super_admin can act on any tenant.
+ * Same as resolveTenantScope, but for a super_admin with no ?tenantId and no
+ * profile tenant, falls back to the sole tenant when exactly one exists
+ * (the single-tenant trial). With multiple tenants, super_admin must pass ?tenantId.
+ */
+export async function resolveBillingTenant(
+  request: NextRequest,
+  auth: AuthSuccess
+): Promise<{ tenantId: string } | { response: NextResponse }> {
+  const scope = await resolveTenantScope(request, auth);
+  if ('tenantId' in scope) return scope;
+  if (auth.role === 'super_admin') {
+    const { data } = await supabaseAdmin.from('tenants').select('id').limit(2);
+    if (data && data.length === 1) return { tenantId: data[0].id };
+  }
+  return scope;
+}
+
+/**
  * Check if a Supabase/PostgREST error indicates a missing table.
  * Handles all known error code formats:
  * - PostgreSQL 42P01 (undefined_table)
