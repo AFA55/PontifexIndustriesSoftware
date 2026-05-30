@@ -951,16 +951,17 @@ function OperatorTimecardDetailPageInner() {
           </div>
           <h2 className="text-lg font-bold text-gray-900 mb-2">Could not load operator</h2>
           <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">{fetchError}</p>
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center gap-3 flex-wrap">
             <button
               onClick={() => fetchData()}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-semibold transition-colors"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-semibold transition-colors"
             >
+              <RefreshCw size={16} />
               Try Again
             </button>
             <Link
               href="/dashboard/admin/timecards"
-              className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-semibold border border-gray-200 transition-colors"
+              className="inline-flex items-center justify-center min-h-[44px] py-3 px-4 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-semibold border border-gray-200 transition-colors"
             >
               Back to Timecards
             </Link>

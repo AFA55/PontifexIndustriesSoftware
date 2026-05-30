@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, AlertTriangle,
   Search, TrendingUp, Users, Loader2, Shield, Zap,
   Bell, DollarSign, Coffee, Eye, ChevronDown, Moon, Settings, Save, X,
-  Edit2, AlertCircle, Timer, Plus, ClipboardEdit, CheckSquare, XSquare
+  Edit2, AlertCircle, Timer, Plus, ClipboardEdit, CheckSquare, XSquare, RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -133,6 +133,7 @@ function getDayCellClasses(info: DayInfo): string {
 export default function AdminTimecardsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [totals, setTotals] = useState<TeamTotals>({
     totalPayrollHours: 0, totalRegularHours: 0, totalOvertimeHours: 0,
@@ -205,6 +206,7 @@ export default function AdminTimecardsPage() {
     if (isRedirecting.current) return;
     try {
       setLoading(true);
+      setLoadError(false);
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) { redirectToLogin(); return; }
 
@@ -213,14 +215,18 @@ export default function AdminTimecardsPage() {
       });
 
       if (response.status === 401) { redirectToLogin(); return; }
+      if (!response.ok) { setLoadError(true); return; }
       const result = await response.json();
 
       if (result.success) {
         setTeamMembers(result.data.teamMembers);
         setTotals(result.data.totals);
+      } else {
+        setLoadError(true);
       }
     } catch (error) {
       console.error('Error fetching team summary:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -976,6 +982,20 @@ export default function AdminTimecardsPage() {
                   <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse flex-shrink-0" />
                 </div>
               ))}
+            </div>
+          ) : loadError && teamMembers.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 bg-red-50 dark:bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="text-red-500 dark:text-red-400" size={28} />
+              </div>
+              <p className="text-gray-700 dark:text-red-300 font-semibold mb-1">Couldn&apos;t load team payroll</p>
+              <p className="text-gray-400 dark:text-white/40 text-sm mb-5">Check your connection and try again.</p>
+              <button
+                onClick={fetchTeamSummary}
+                className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" /> Try again
+              </button>
             </div>
           ) : filteredMembers.length === 0 ? (
             <div className="p-16 text-center">

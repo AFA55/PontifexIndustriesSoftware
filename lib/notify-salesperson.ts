@@ -12,6 +12,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmail } from '@/lib/email';
+import { sendPushToUser } from '@/lib/send-push';
 
 export type SalespersonEvent =
   | 'job_active'
@@ -172,6 +173,15 @@ export async function notifySalesperson(args: NotifyArgs): Promise<void> {
     } catch {
       // swallow — fire-and-forget
     }
+
+    // Parallel native push — fire-and-forget, never blocks or throws.
+    // Mirrors the in-app row above; the bespoke notifications row shape is
+    // left untouched.
+    sendPushToUser(args.recipientUserId, {
+      title,
+      body: message,
+      data: { route: action_url },
+    }).catch(() => {});
 
     // Best-effort email — look up auth user email; never block on failure.
     try {

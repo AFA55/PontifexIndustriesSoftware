@@ -31,6 +31,7 @@ import {
   MessageSquareOff,
   ClipboardCheck,
   Clock,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface Invoice {
@@ -178,6 +179,7 @@ async function apiFetch(url: string, opts?: RequestInit) {
 export default function BillingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [completedJobs, setCompletedJobs] = useState<CompletedJob[]>([]);
   const [stats, setStats] = useState<any>({});
@@ -358,8 +360,10 @@ export default function BillingPage() {
   const fetchData = async () => {
     setLoading(true);
     setError(null);
+    setLoadError(false);
     const safetyTimer = setTimeout(() => {
       setLoading(false);
+      setLoadError(true);
       setError('Request timed out. Please refresh the page.');
     }, 30000);
     try {
@@ -377,6 +381,7 @@ export default function BillingPage() {
         setInvoices(invoiceData.data || []);
         setStats(invoiceData.stats || {});
       } else {
+        setLoadError(true);
         setError('Failed to load invoices.');
       }
 
@@ -395,6 +400,7 @@ export default function BillingPage() {
       }
     } catch (err) {
       console.error('Error fetching billing data:', err);
+      setLoadError(true);
       setError('Failed to load billing data. Please try again.');
     } finally {
       clearTimeout(safetyTimer);
@@ -1073,6 +1079,25 @@ export default function BillingPage() {
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-8 h-8 text-violet-500 animate-spin mb-3" />
             <p className="text-slate-500 dark:text-white/60 text-sm">Loading billing data...</p>
+          </div>
+        ) : loadError && invoices.length === 0 ? (
+          <div className="
+            rounded-2xl p-10 text-center ring-1 shadow-sm
+            bg-white/90 ring-red-200
+            dark:bg-white/[0.04] dark:ring-red-500/30
+          ">
+            <AlertTriangle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Couldn&apos;t load billing data</h3>
+            <p className="text-sm text-slate-500 dark:text-white/60 mb-5">Check your connection and try again.</p>
+            <button
+              onClick={fetchData}
+              className="
+                inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl text-sm font-semibold transition-colors
+                bg-red-600 hover:bg-red-700 text-white
+              "
+            >
+              <RefreshCw className="w-4 h-4" /> Try again
+            </button>
           </div>
         ) : activeTab === 'invoices' ? (
           <>

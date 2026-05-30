@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { sendPushToUser } from '@/lib/send-push';
 
 // Canonical type list (matches DB constraint)
 export const VALID_TYPES = [
@@ -211,6 +212,16 @@ export async function POST(request: NextRequest) {
         }));
         Promise.resolve(supabaseAdmin.from('notifications').insert(notifRows))
           .catch(() => {});
+
+        // Parallel native push to each notified admin — fire-and-forget,
+        // never blocks or alters the API response.
+        for (const a of admins as { id: string }[]) {
+          sendPushToUser(a.id, {
+            title: 'Callout / Absence Logged',
+            body: msg,
+            data: { route: '/dashboard/admin/time-off' },
+          }).catch(() => {});
+        }
       }
     }
 

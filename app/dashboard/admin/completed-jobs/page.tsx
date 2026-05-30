@@ -25,6 +25,8 @@ import {
   ExternalLink,
   Eye,
   HardHat,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 
 interface CompletedJob {
@@ -88,6 +90,7 @@ interface JobDetails {
 export default function CompletedJobsArchivePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [jobs, setJobs] = useState<CompletedJob[]>([]);
   const [selectedJobDetails, setSelectedJobDetails] = useState<JobDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -162,6 +165,8 @@ export default function CompletedJobsArchivePage() {
   };
 
   const loadCompletedJobs = async () => {
+    setLoading(true);
+    setLoadError(false);
     try {
       const { data, error } = await supabase
         .from('job_orders')
@@ -177,6 +182,7 @@ export default function CompletedJobsArchivePage() {
       if (error?.message) {
         console.error('Error loading completed jobs:', error.message);
       }
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -411,7 +417,23 @@ export default function CompletedJobsArchivePage() {
           </div>
         </div>
 
-        {jobs.length === 0 ? (
+        {loadError && jobs.length === 0 ? (
+          <div className="rounded-2xl p-10 text-center shadow-sm bg-white border border-red-200 dark:bg-white/5 dark:border-red-500/30">
+            <AlertTriangle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-3" />
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+              Couldn&apos;t load completed jobs
+            </h3>
+            <p className="text-slate-500 dark:text-white/60 text-sm mb-5">
+              Check your connection and try again.
+            </p>
+            <button
+              onClick={loadCompletedJobs}
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" /> Try again
+            </button>
+          </div>
+        ) : jobs.length === 0 ? (
           <div className="rounded-2xl p-12 text-center shadow-sm bg-white border border-slate-200 dark:bg-white/5 dark:border-white/10">
             <FileText className="w-12 h-12 text-slate-300 dark:text-white/20 mx-auto mb-3" />
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">

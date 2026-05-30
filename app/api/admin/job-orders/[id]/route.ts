@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { sendPushToUser } from '@/lib/send-push';
 
 export async function PATCH(
   request: NextRequest,
@@ -201,6 +202,18 @@ export async function PATCH(
           } else {
             console.error('Error creating change_log note:', noteError);
           }
+        }
+
+        // Native push to the newly-assigned operator — only when the
+        // assignment actually changed (a genuine dispatch/assignment), and
+        // only to a real recipient that the update just resolved.
+        // Fire-and-forget: never blocks or alters the API response.
+        if ('assigned_to' in changes && jobOrder.assigned_to) {
+          sendPushToUser(jobOrder.assigned_to, {
+            title: 'New job assigned 📋',
+            body: `${jobOrder.job_number || 'A job'} for ${jobOrder.customer_name || 'a customer'} has been assigned to you.`,
+            data: { route: '/dashboard/my-jobs' },
+          }).catch(() => {});
         }
       }
     }

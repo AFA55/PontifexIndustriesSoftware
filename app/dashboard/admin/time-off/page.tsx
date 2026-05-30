@@ -15,6 +15,8 @@ import {
   ChevronDown,
   ChevronUp,
   Sun,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -174,6 +176,7 @@ function StatCard({
 function RequestsTab({ token, onRefresh }: { token: string; onRefresh?: () => void }) {
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [actioning, setActioning] = useState<string | null>(null);
@@ -181,14 +184,17 @@ function RequestsTab({ token, onRefresh }: { token: string; onRefresh?: () => vo
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await fetch('/api/admin/time-off?limit=300', {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok) { setLoadError(true); setLoading(false); return; }
       const json = await res.json();
       if (json.success) setRequests(json.data ?? []);
+      else setLoadError(true);
     } catch {
-      // silent
+      setLoadError(true);
     }
     setLoading(false);
   }, [token]);
@@ -275,6 +281,18 @@ function RequestsTab({ token, onRefresh }: { token: string; onRefresh?: () => vo
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+          </div>
+        ) : loadError && requests.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
+            <AlertTriangle className="w-10 h-10 mb-3 text-red-500 dark:text-red-400" />
+            <p className="text-sm font-semibold text-gray-700 dark:text-white/80 mb-1">Couldn&apos;t load time-off requests</p>
+            <p className="text-xs text-gray-400 dark:text-white/40 mb-5">Check your connection and try again.</p>
+            <button
+              onClick={fetchRequests}
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" /> Try again
+            </button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
@@ -370,36 +388,43 @@ function ScorecardsTab({ token }: { token: string }) {
   const [stats, setStats] = useState<OperatorStats[]>([]);
   const [teamSummary, setTeamSummary] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const today = new Date();
-        const monday = new Date(today);
-        monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-        const weekStart = monday.toISOString().split('T')[0];
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const today = new Date();
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+      const weekStart = monday.toISOString().split('T')[0];
 
-        const [statsRes, teamRes] = await Promise.allSettled([
-          fetch('/api/admin/time-off/stats', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
-          fetch(`/api/admin/timecards/team-summary?weekStart=${weekStart}`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
-        ]);
+      const [statsRes, teamRes] = await Promise.allSettled([
+        fetch('/api/admin/time-off/stats', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
+        fetch(`/api/admin/timecards/team-summary?weekStart=${weekStart}`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
+      ]);
 
-        if (statsRes.status === 'fulfilled' && statsRes.value.success) {
-          setStats(statsRes.value.data ?? []);
-        }
-        if (teamRes.status === 'fulfilled' && teamRes.value.success) {
-          setTeamSummary(teamRes.value.data?.teamMembers ?? []);
-        }
-      } catch {
-        // silent
+      // The stats endpoint is the primary data source for this tab. If it
+      // failed (rejected or unsuccessful), surface a retryable error.
+      if (statsRes.status === 'fulfilled' && statsRes.value.success) {
+        setStats(statsRes.value.data ?? []);
+      } else {
+        setLoadError(true);
       }
-      setLoading(false);
-    };
-    load();
+      if (teamRes.status === 'fulfilled' && teamRes.value.success) {
+        setTeamSummary(teamRes.value.data?.teamMembers ?? []);
+      }
+    } catch {
+      setLoadError(true);
+    }
+    setLoading(false);
   }, [token]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // Build scorecard data by merging stats + team summary
   const scorecards = useMemo((): ScorecardData[] => {
@@ -465,6 +490,22 @@ function ScorecardsTab({ token }: { token: string }) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
+  if (loadError && stats.length === 0) {
+    return (
+      <div className="bg-white dark:bg-white/[0.05] border border-red-200 dark:border-red-500/30 rounded-2xl p-10 text-center">
+        <AlertTriangle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-3" />
+        <p className="text-gray-700 dark:text-white/80 font-semibold mb-1">Couldn&apos;t load operator metrics</p>
+        <p className="text-sm text-gray-400 dark:text-white/40 mb-5">Check your connection and try again.</p>
+        <button
+          onClick={load}
+          className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" /> Try again
+        </button>
       </div>
     );
   }

@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
+import { sendPushToUser } from '@/lib/send-push';
 
 const VALID_TYPES = ['vacation', 'sick', 'personal', 'pto', 'unpaid'];
 
@@ -133,6 +134,16 @@ export async function POST(request: NextRequest) {
               is_read: false,
             }));
             await supabaseAdmin.from('notifications').insert(notifRows);
+
+            // Parallel native push to each notified admin — already inside a
+            // fire-and-forget async block; per-call .catch keeps it isolated.
+            for (const a of admins as { id: string }[]) {
+              sendPushToUser(a.id, {
+                title: 'New Time-Off Request',
+                body: msg,
+                data: { route: '/dashboard/admin/time-off' },
+              }).catch(() => {});
+            }
           }
         } catch {
           /* non-fatal */
