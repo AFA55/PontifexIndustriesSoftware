@@ -258,7 +258,7 @@ export default function MaintenanceNewPage() {
                 value={equipSearch}
                 onChange={e => setEquipSearch(e.target.value)}
                 placeholder="Search by name or unit #..."
-                className="w-full pl-9 pr-4 py-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="w-full pl-9 pr-4 py-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-base sm:text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
             </div>
 
@@ -322,7 +322,7 @@ export default function MaintenanceNewPage() {
                 value={freeTextName}
                 onChange={e => setFreeTextName(e.target.value)}
                 placeholder="e.g. 'Big blue slab saw near dock 2'"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-base sm:text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
                 autoFocus
               />
             )}
@@ -358,7 +358,7 @@ export default function MaintenanceNewPage() {
               onChange={e => setDescription(e.target.value)}
               placeholder="Describe the issue in detail... (e.g. 'Blade wobbles at high RPM, making a grinding noise')"
               rows={5}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-base sm:text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
               autoFocus
             />
 

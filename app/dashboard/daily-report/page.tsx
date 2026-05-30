@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   Loader2,
   Clock,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
@@ -124,6 +126,7 @@ function DailyReportPage() {
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,40 +171,43 @@ function DailyReportPage() {
   }, []);
 
   // ── Load existing draft/report ────────────────────────────────────────────
+  const loadReport = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/operator/daily-report?date=${todayString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const json = await res.json();
+      if (json.data) {
+        const r = json.data;
+        setDraft({
+          what_i_did: r.what_i_did ?? '',
+          what_i_learned: r.what_i_learned ?? '',
+          what_to_work_on: r.what_to_work_on ?? '',
+          additional_notes: r.additional_notes ?? '',
+        });
+        if (r.submitted_at && !r.is_draft) {
+          alreadySubmitted.current = true;
+          setSubmitted(true);
+        }
+      }
+    } catch (err: any) {
+      // Loading an existing draft failed. The form is still usable, but flag it
+      // so the operator can retry rather than risk overwriting a hidden draft.
+      console.warn('[daily-report] load error:', err?.message);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authChecked) return;
-
-    async function load() {
-      try {
-        const token = await getToken();
-        const res = await fetch(`/api/operator/daily-report?date=${todayString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const json = await res.json();
-        if (json.data) {
-          const r = json.data;
-          setDraft({
-            what_i_did: r.what_i_did ?? '',
-            what_i_learned: r.what_i_learned ?? '',
-            what_to_work_on: r.what_to_work_on ?? '',
-            additional_notes: r.additional_notes ?? '',
-          });
-          if (r.submitted_at && !r.is_draft) {
-            alreadySubmitted.current = true;
-            setSubmitted(true);
-          }
-        }
-      } catch (err: any) {
-        // Non-fatal — user can still fill in the form fresh
-        console.warn('[daily-report] load error:', err?.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
-  }, [authChecked]);
+    loadReport();
+  }, [authChecked, loadReport]);
 
   // ── Auto-save (debounced, 10 s) ───────────────────────────────────────────
   const scheduleSave = useCallback(() => {
@@ -433,6 +439,25 @@ function DailyReportPage() {
 
       {/* Content */}
       <main className="flex-1 px-4 py-5 space-y-4 max-w-xl mx-auto w-full pb-36">
+        {/* Load-error banner — couldn't fetch any existing draft for today */}
+        {loadError && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-red-300">Couldn&apos;t load today&apos;s report</p>
+              <p className="text-xs text-red-300/70 mt-0.5">
+                You can still fill this out fresh, but any saved draft from earlier may not show.
+              </p>
+              <button
+                onClick={loadReport}
+                className="mt-3 inline-flex items-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" /> Try again
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Intro pill */}
         <p className="text-white/50 text-sm leading-relaxed">
           Fill this out before you clock out. It only takes a couple of minutes and helps the team track progress.

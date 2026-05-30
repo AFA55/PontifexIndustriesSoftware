@@ -8,7 +8,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Loader2, MapPin, Phone, User, Navigation,
   AlertTriangle, FileText, Shield, Inbox, CheckCircle,
-  Paperclip, Image, File, Eye
+  Paperclip, Image, File, Eye, RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -19,10 +19,12 @@ export default function JobsitePage() {
 
   const [job, setJob] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [documents, setDocuments] = useState<any[]>([]);
 
   const fetchJob = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -55,10 +57,15 @@ export default function JobsitePage() {
           } else {
             router.push('/dashboard/my-jobs');
           }
+        } else {
+          setLoadError(true);
         }
+      } else {
+        setLoadError(true);
       }
     } catch (err) {
       console.error('Error fetching job:', err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -95,6 +102,28 @@ export default function JobsitePage() {
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 text-lg font-medium">Loading jobsite info...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError && !loading && !job) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center px-4">
+        <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl p-8 text-center shadow-xl border border-red-200 dark:border-red-500/30 max-w-sm w-full">
+          <div className="w-14 h-14 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-7 h-7 text-red-600 dark:text-red-400" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white mb-2">Couldn&apos;t load jobsite info</h1>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mb-5">
+            Check your connection and try again.
+          </p>
+          <button
+            onClick={fetchJob}
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 w-full rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" /> Try Again
+          </button>
         </div>
       </div>
     );

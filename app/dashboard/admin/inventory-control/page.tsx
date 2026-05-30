@@ -651,7 +651,7 @@ function CheckoutTab({
         <button
           type="button"
           onClick={() => setMode('truck')}
-          className={`min-h-[40px] rounded-lg text-sm font-semibold transition ${
+          className={`min-h-[44px] px-2 rounded-lg text-sm font-semibold transition ${
             mode === 'truck'
               ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-md shadow-rose-500/30'
               : 'text-gray-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800'
@@ -662,13 +662,13 @@ function CheckoutTab({
         <button
           type="button"
           onClick={() => setMode('handheld')}
-          className={`min-h-[40px] rounded-lg text-sm font-semibold transition ${
+          className={`min-h-[44px] px-2 rounded-lg text-sm font-semibold transition leading-tight ${
             mode === 'handheld'
               ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/30'
               : 'text-gray-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800'
           }`}
         >
-          ✋ Handheld (to operator directly)
+          ✋ Handheld <span className="hidden sm:inline">(to operator directly)</span>
         </button>
       </div>
 
@@ -1505,7 +1505,7 @@ function PendingTray({
           type="button"
           onClick={onClearAll}
           disabled={submitting}
-          className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 hover:underline disabled:opacity-50"
+          className="text-xs font-semibold text-rose-700 dark:text-rose-300 hover:underline disabled:opacity-50 px-2 min-h-[44px] flex-shrink-0"
         >
           Clear all
         </button>
@@ -1568,7 +1568,7 @@ function DraftRow({
         <button
           type="button"
           onClick={onRemove}
-          className="text-[11px] font-semibold text-gray-500 hover:text-rose-600 px-2 py-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 transition flex-shrink-0"
+          className="text-xs font-semibold text-gray-500 hover:text-rose-600 px-3 min-h-[44px] rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 transition flex-shrink-0"
         >
           Remove
         </button>
@@ -1596,7 +1596,7 @@ function DraftRow({
         <button
           type="button"
           onClick={() => onUpdate({ mode: 'truck' })}
-          className={`min-h-[36px] rounded-md text-xs font-semibold transition ${
+          className={`min-h-[44px] rounded-md text-sm font-semibold transition ${
             draft.mode === 'truck'
               ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow shadow-rose-500/30'
               : 'text-gray-600 dark:text-slate-300'
@@ -1607,7 +1607,7 @@ function DraftRow({
         <button
           type="button"
           onClick={() => onUpdate({ mode: 'handheld' })}
-          className={`min-h-[36px] rounded-md text-xs font-semibold transition ${
+          className={`min-h-[44px] rounded-md text-sm font-semibold transition ${
             draft.mode === 'handheld'
               ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow shadow-amber-500/30'
               : 'text-gray-600 dark:text-slate-300'

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { MapPin, Phone, User, PlayCircle, ArrowLeft, AlertTriangle, FileText, Briefcase } from 'lucide-react';
+import { MapPin, Phone, User, PlayCircle, ArrowLeft, AlertTriangle, FileText, Briefcase, RefreshCw } from 'lucide-react';
 import Notification from '@/components/Notification';
 
 interface JobOrder {
@@ -34,6 +34,7 @@ export default function InRoutePage() {
   const jobId = params.id as string;
   const [job, setJob] = useState<JobOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [equipmentChecklistComplete, setEquipmentChecklistComplete] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -144,6 +145,8 @@ export default function InRoutePage() {
   };
 
   const fetchJobDetails = async () => {
+    setLoading(true);
+    setLoadError(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -161,10 +164,15 @@ export default function InRoutePage() {
         const result = await response.json();
         if (result.success && result.data.length > 0) {
           setJob(result.data[0]);
+        } else {
+          setLoadError(true);
         }
+      } else {
+        setLoadError(true);
       }
     } catch (error) {
       console.error('Error fetching job:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -260,6 +268,28 @@ export default function InRoutePage() {
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError && !loading && !job) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:bg-[#0b0618] dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720] flex items-center justify-center px-4">
+        <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl p-8 text-center shadow-xl border border-red-200 dark:border-red-500/30 max-w-sm w-full">
+          <div className="w-14 h-14 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-7 h-7 text-red-600 dark:text-red-400" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white mb-2">Couldn&apos;t load job details</h1>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mb-5">
+            Check your connection and try again.
+          </p>
+          <button
+            onClick={fetchJobDetails}
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 w-full rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" /> Try Again
+          </button>
         </div>
       </div>
     );

@@ -11,6 +11,7 @@ import {
   ArrowLeft, Bell, BellOff, CheckCircle, AlertCircle, Clock,
   MessageSquare, Send, ChevronRight, CheckCheck, Loader2,
   CalendarDays, FileSignature, Receipt, Wrench, Truck,
+  AlertTriangle, RefreshCw,
 } from 'lucide-react';
 
 interface Notification {
@@ -31,6 +32,7 @@ export default function NotificationsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const [filter, setFilter] = useState<FilterMode>('all');
   const router = useRouter();
@@ -42,9 +44,11 @@ export default function NotificationsPage() {
   }, [router]);
 
   const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) { setLoading(false); return; }
 
       const res = await fetch('/api/notifications?limit=50', {
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -52,9 +56,12 @@ export default function NotificationsPage() {
       if (res.ok) {
         const json = await res.json();
         setNotifications(json.data || []);
+      } else {
+        setLoadError(true);
       }
     } catch (err) {
       console.error('Error fetching notifications:', err);
+      setLoadError(true);
     }
     setLoading(false);
   }, []);
@@ -202,7 +209,21 @@ export default function NotificationsPage() {
       </div>
 
       <div className="container mx-auto px-4 py-6 max-w-2xl">
-        {visible.length > 0 ? (
+        {loadError && notifications.length === 0 ? (
+          <div className="rounded-2xl p-8 text-center shadow-sm bg-white dark:bg-white/[0.04] border border-red-200 dark:border-red-500/30">
+            <AlertTriangle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Couldn&apos;t load your inbox</h3>
+            <p className="text-gray-500 dark:text-white/50 mb-5 text-sm">
+              Check your connection and try again.
+            </p>
+            <button
+              onClick={fetchNotifications}
+              className="inline-flex items-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" /> Try again
+            </button>
+          </div>
+        ) : visible.length > 0 ? (
           <div className="space-y-2">
             {visible.map(notif => (
               <div
