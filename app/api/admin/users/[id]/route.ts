@@ -82,6 +82,23 @@ export async function PATCH(
 
     sanitizedUpdates.updated_at = new Date().toISOString();
 
+    // Role-grant cap: only super_admin may grant the super_admin role or modify an
+    // existing super_admin. Prevents a tenant admin from self-promoting to platform-wide
+    // super_admin (which would grant cross-tenant access).
+    if (profile.role !== 'super_admin') {
+      const { data: targetUser } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', id)
+        .single();
+      if (sanitizedUpdates.role === 'super_admin' || targetUser?.role === 'super_admin') {
+        return NextResponse.json(
+          { error: 'Forbidden: insufficient privilege for super_admin role' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Resolve tenant scope
     const tenantId = await getTenantId(user.id);
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });

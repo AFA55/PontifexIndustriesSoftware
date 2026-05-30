@@ -135,12 +135,12 @@ export async function POST(request: NextRequest) {
     const statusMap: Record<string, string> = {
       active: 'active',
       past_due: 'past_due',
-      canceled: 'cancelled',
+      canceled: 'canceled',
       unpaid: 'past_due',
       trialing: 'active',
       paused: 'paused',
       incomplete: 'incomplete',
-      incomplete_expired: 'cancelled',
+      incomplete_expired: 'canceled',
     };
     const subscriptionStatus = statusMap[subscription.status] ?? subscription.status;
 
@@ -160,8 +160,8 @@ export async function POST(request: NextRequest) {
       ? subscription.customer
       : subscription.customer.id;
 
-    await updateTenantByCustomer(customerId, { subscription_status: 'cancelled' });
-    fireAuditLog('customer.subscription.deleted', customerId, { subscription_status: 'cancelled' });
+    await updateTenantByCustomer(customerId, { subscription_status: 'canceled' });
+    fireAuditLog('customer.subscription.deleted', customerId, { subscription_status: 'canceled' });
   }
 
   else if (event.type === 'invoice.payment_failed') {

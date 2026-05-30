@@ -27,12 +27,18 @@ export async function GET(
 
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, hire_date, next_review_date, role, active, profile_picture_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, created_at')
+      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, hire_date, next_review_date, role, active, profile_picture_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, created_at, tenant_id')
       .eq('id', id)
       .single();
 
     if (error || !profile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    // Tenant isolation: a non-super-admin may only view profiles in their own tenant
+    // (or their own profile). super_admin may view any tenant.
+    if (id !== auth.userId && auth.role !== 'super_admin' && profile.tenant_id !== auth.tenantId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Fetch project history — jobs where this person was operator or helper
@@ -72,6 +78,27 @@ export async function PATCH(
     const isAdmin = ADMIN_ROLES.includes(auth.role as typeof ADMIN_ROLES[number]);
     if (id !== auth.userId && !isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Resolve the target to enforce tenant isolation + role-grant caps before updating.
+    const { data: target } = await supabaseAdmin
+      .from('profiles')
+      .select('tenant_id, role')
+      .eq('id', id)
+      .single();
+    if (!target) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+    // Non-super-admin may only edit profiles within their own tenant (or themselves).
+    if (id !== auth.userId && auth.role !== 'super_admin' && target.tenant_id !== auth.tenantId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    // Only super_admin may grant the super_admin role or edit an existing super_admin.
+    if (
+      auth.role !== 'super_admin' &&
+      (body.role === 'super_admin' || target.role === 'super_admin')
+    ) {
+      return NextResponse.json({ error: 'Forbidden: insufficient privilege for super_admin role' }, { status: 403 });
     }
 
     // Non-admins editing their own profile cannot change role or active status.
