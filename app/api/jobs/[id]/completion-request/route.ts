@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { sendPushToUser } from '@/lib/send-push';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -110,6 +111,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
           if (error) console.error('Failed to send completion review notification:', error);
         })
         .catch(() => {});
+
+      // Parallel native push to the salesperson/admin — fire-and-forget.
+      sendPushToUser(notifyUserId, {
+        title: 'Job Completion Review Required',
+        body: `Operator has submitted ${job.job_number} for completion approval. Please review and confirm.`,
+        data: { route: `/dashboard/admin/jobs/${jobId}` },
+      }).catch(() => {});
     }
 
     return NextResponse.json({

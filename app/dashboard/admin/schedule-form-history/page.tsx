@@ -120,6 +120,7 @@ export default function ScheduleFormHistoryPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('pending_approval');
   const [forms, setForms] = useState<ScheduleForm[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [userRole, setUserRole] = useState<string>('admin');
@@ -142,6 +143,7 @@ export default function ScheduleFormHistoryPage() {
   // Fetch data
   const fetchForms = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await apiFetch(`/api/admin/schedule-forms?status=${activeTab}`);
       if (!res.ok) {
@@ -154,6 +156,7 @@ export default function ScheduleFormHistoryPage() {
     } catch (err) {
       console.error('Error fetching schedule forms:', err);
       setForms([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -282,8 +285,27 @@ export default function ScheduleFormHistoryPage() {
           </div>
         )}
 
+        {/* Load error — friendly message with retry instead of a false "empty" state */}
+        {!loading && loadError && (
+          <div className="bg-white rounded-2xl border border-red-200 ring-1 ring-slate-200 p-12 text-center shadow-sm">
+            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-700 mb-1">Couldn&apos;t load forms</h3>
+            <p className="text-sm text-gray-400 mb-6">
+              Check your connection and try again. If this keeps happening, your session may have expired.
+            </p>
+            <button
+              onClick={fetchForms}
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" /> Try again
+            </button>
+          </div>
+        )}
+
         {/* Empty state */}
-        {!loading && filteredForms.length === 0 && (
+        {!loading && !loadError && filteredForms.length === 0 && (
           <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
             <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-600 mb-1">No forms found</h3>
@@ -294,7 +316,7 @@ export default function ScheduleFormHistoryPage() {
         )}
 
         {/* Form list */}
-        {!loading && filteredForms.length > 0 && (
+        {!loading && !loadError && filteredForms.length > 0 && (
           <div className="space-y-3">
             {filteredForms.map(form => {
               const isExpanded = expandedId === form.id;

@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { sendPushToUser } from '@/lib/send-push';
 
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'] as const;
 type Priority = typeof VALID_PRIORITIES[number];
@@ -82,6 +83,15 @@ export async function POST(request: NextRequest) {
         action_url: '/dashboard/admin/maintenance',
       }));
       await supabaseAdmin.from('notifications').insert(notifRows);
+
+      // Parallel native push to each notified manager — fire-and-forget.
+      for (const m of managers as { id: string }[]) {
+        sendPushToUser(m.id, {
+          title,
+          body: message,
+          data: { route: '/dashboard/admin/maintenance' },
+        }).catch(() => {});
+      }
     }
   })()).catch(() => {});
 

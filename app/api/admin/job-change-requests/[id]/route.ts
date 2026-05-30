@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { sendPushToUser } from '@/lib/send-push';
 
 export async function PUT(
   request: NextRequest,
@@ -78,6 +79,13 @@ export async function PUT(
       is_read: false,
     })
   ).catch(() => {});
+
+  // Parallel native push to the requester — fire-and-forget.
+  sendPushToUser(cr.requested_by, {
+    title: `Change Request ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+    body: reviewNotes || `Your schedule change request was ${status}.`,
+    data: { route: `/dashboard/admin/jobs/${cr.job_order_id}` },
+  }).catch(() => {});
 
   return NextResponse.json({ success: true });
 }

@@ -12,7 +12,7 @@ import {
   Loader2, ChevronRight, Activity, Clock, UserCheck, Pencil,
   Wrench, Save, CheckCircle, Award, Truck,
   Plus, Trash2, IdCard, ShieldCheck, Percent,
-  MessageSquare, BarChart3, XCircle,
+  MessageSquare, BarChart3, XCircle, RefreshCw,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
@@ -2077,6 +2077,7 @@ export default function TeamProfilesPage() {
   const [userRole, setUserRole] = useState('');
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
@@ -2094,17 +2095,29 @@ export default function TeamProfilesPage() {
   }, []);
 
   const fetchMembers = useCallback(async () => {
+    setLoadError(false);
     try {
       const headers = await getAuthHeaders();
       const res = await fetch('/api/admin/users', { headers });
+      if (!res.ok) { setLoadError(true); return; }
       const json = await res.json();
-      if (res.ok && json.data) {
+      if (json.data) {
         setMembers(json.data);
+      } else {
+        setLoadError(true);
       }
     } catch (e) {
       console.error('Error fetching team members:', e);
+      setLoadError(true);
     }
   }, [getAuthHeaders]);
+
+  // Retry handler for the blocking member fetch (re-shows skeleton, then reloads).
+  const retryLoad = useCallback(async () => {
+    setLoading(true);
+    await fetchMembers();
+    setLoading(false);
+  }, [fetchMembers]);
 
   useEffect(() => {
     const init = async () => {
@@ -2264,6 +2277,29 @@ export default function TeamProfilesPage() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Blocking-fetch failure — friendly error with retry instead of a blank directory.
+  if (loadError && members.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-white/90 dark:bg-white/[0.04] rounded-2xl border border-red-200 dark:border-red-500/30 ring-1 ring-slate-200 dark:ring-white/10 shadow-sm p-8 text-center">
+          <div className="w-12 h-12 bg-red-50 dark:bg-red-500/15 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Couldn&apos;t load team profiles</h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
+            Check your connection and try again. If this keeps happening, your session may have expired.
+          </p>
+          <button
+            onClick={retryLoad}
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" /> Try again
+          </button>
         </div>
       </div>
     );

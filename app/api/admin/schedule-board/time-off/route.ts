@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { sendPushToUser } from '@/lib/send-push';
 
 export async function GET(request: NextRequest) {
   try {
@@ -172,6 +173,15 @@ export async function POST(request: NextRequest) {
         Promise.resolve(supabaseAdmin.from('notifications').insert(notifRows))
           .then((res: any) => { if (res.error) console.error('Notification insert error:', res.error); })
           .catch(() => {});
+
+        // Parallel native push to each notified admin — fire-and-forget.
+        for (const a of admins as { id: string }[]) {
+          sendPushToUser(a.id, {
+            title: 'Operator Marked Unavailable',
+            body: notifMessage,
+            data: { route: '/dashboard/admin/schedule-board' },
+          }).catch(() => {});
+        }
       }
     }
 

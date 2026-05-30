@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { notifySalesperson } from '@/lib/notify-salesperson';
+import { sendPushToUser } from '@/lib/send-push';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -192,6 +193,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         })
         .catch(() => {});
 
+      // Parallel native push to the operator — fire-and-forget.
+      sendPushToUser(completionRequest.submitted_by, {
+        title: 'Job Completion Approved',
+        body: `Your job ${job.job_number} has been approved as complete.${review_notes ? ' Note: ' + review_notes : ''}`,
+        data: { route: `/dashboard/my-jobs` },
+      }).catch(() => {});
+
       // Notify the ticket creator / salesperson that the job is complete and
       // ready for invoicing (they confirm invoice details, then bill it).
       Promise.resolve((async () => {
@@ -273,6 +281,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
           if (error) console.error('Failed to send rejection notification:', error);
         })
         .catch(() => {});
+
+      // Parallel native push to the operator — fire-and-forget.
+      sendPushToUser(completionRequest.submitted_by, {
+        title: 'Completion Rejected',
+        body: `Completion of ${job.job_number} was rejected.${review_notes ? ' Reason: ' + review_notes : ''}`,
+        data: { route: `/dashboard/my-jobs` },
+      }).catch(() => {});
 
       return NextResponse.json({
         success: true,

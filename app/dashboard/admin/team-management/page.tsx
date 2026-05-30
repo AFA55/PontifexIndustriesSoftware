@@ -23,7 +23,7 @@ import {
   ArrowLeft, Users, UserPlus, Shield, Bell, CheckCircle2,
   ChevronDown, ChevronUp, Search, Trash2, UserCheck, UserX,
   Settings, AlertCircle, X, Eye, Lock, Mail, KeyRound, User,
-  Crown, Briefcase, Star, Activity,
+  Crown, Briefcase, Star, Activity, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 
 // ============================================================
@@ -105,6 +105,7 @@ export default function TeamManagementPage() {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   // Access request UI
   const [requestsExpanded, setRequestsExpanded] = useState(true);
@@ -195,8 +196,7 @@ export default function TeamManagementPage() {
         return;
       }
 
-      await Promise.all([fetchRequests(), fetchTeamMembers()]);
-      setLoading(false);
+      await loadData();
     };
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -205,31 +205,47 @@ export default function TeamManagementPage() {
   // Data fetching
   // ============================================================
 
-  const fetchRequests = async () => {
+  const fetchRequests = async (): Promise<boolean> => {
     try {
       const headers = await getAuthHeaders();
       const res = await fetch('/api/access-requests/list', { headers });
+      if (!res.ok) return false;
       const json = await res.json();
-      if (res.ok && json.data) {
+      if (json.data) {
         setRequests(json.data);
       }
+      return true;
     } catch (e) {
       console.error('Error fetching access requests:', e);
+      return false;
     }
   };
 
-  const fetchTeamMembers = async () => {
+  const fetchTeamMembers = async (): Promise<boolean> => {
     try {
       const headers = await getAuthHeaders();
       const res = await fetch('/api/admin/users', { headers });
+      if (!res.ok) return false;
       const json = await res.json();
-      if (res.ok && json.data) {
+      if (json.data) {
         setTeamMembers(json.data);
       }
+      return true;
     } catch (e) {
       console.error('Error fetching team members:', e);
+      return false;
     }
   };
+
+  // Primary blocking load — gates the page's main content. Surfaces a retry
+  // affordance if either core fetch fails.
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    const [reqOk, teamOk] = await Promise.all([fetchRequests(), fetchTeamMembers()]);
+    if (!reqOk || !teamOk) setLoadError(true);
+    setLoading(false);
+  }, [getAuthHeaders]);
 
   // ============================================================
   // Actions
@@ -498,6 +514,29 @@ export default function TeamManagementPage() {
           </div>
           <div className="animate-spin w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-3"></div>
           <p className="text-gray-500 text-sm font-medium">Loading team data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Blocking-fetch failure — friendly error with retry instead of an empty directory.
+  if (loadError && teamMembers.length === 0 && requests.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-red-200 ring-1 ring-slate-200 shadow-sm p-8 text-center">
+          <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-6 h-6 text-red-600" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Couldn&apos;t load team data</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Check your connection and try again. If this keeps happening, your session may have expired.
+          </p>
+          <button
+            onClick={loadData}
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" /> Try again
+          </button>
         </div>
       </div>
     );

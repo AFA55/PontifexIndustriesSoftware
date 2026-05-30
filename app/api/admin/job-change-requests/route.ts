@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { sendPushToUser } from '@/lib/send-push';
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
@@ -104,6 +105,15 @@ export async function POST(request: NextRequest) {
       }));
 
       await supabaseAdmin.from('notifications').insert(notifs);
+
+      // Parallel native push to each notified admin — fire-and-forget.
+      for (const admin of admins) {
+        sendPushToUser(admin.id, {
+          title: 'Schedule Change Request',
+          body: `${requesterName} requested a change to job ${job?.job_number || ''}: ${body.reason}`,
+          data: { route: `/dashboard/admin/jobs/${body.jobId}` },
+        }).catch(() => {});
+      }
     })()
   ).catch(() => {});
 

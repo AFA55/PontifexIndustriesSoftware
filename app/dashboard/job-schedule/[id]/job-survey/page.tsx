@@ -17,6 +17,8 @@ import {
   MessageSquare,
   CheckCircle,
   Loader2,
+  AlertTriangle,
+  RefreshCw,
   Drill,
   Scissors,
   Cable,
@@ -93,6 +95,7 @@ export default function JobSurveyPage() {
   const jobId = params.id as string;
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [jobNumber, setJobNumber] = useState('');
 
@@ -119,6 +122,8 @@ export default function JobSurveyPage() {
   }, []);
 
   const loadData = async () => {
+    setLoading(true);
+    setLoadError(false);
     try {
       // Load work performed from localStorage
       const stored = localStorage.getItem(`work-performed-${jobId}`);
@@ -158,9 +163,12 @@ export default function JobSurveyPage() {
           if (s.equipment_questions) setEquipmentQuestions(s.equipment_questions);
           if (s.additional_notes) setAdditionalNotes(s.additional_notes);
         }
+      } else {
+        setLoadError(true);
       }
     } catch (err) {
       console.error('Error loading survey data:', err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -288,6 +296,29 @@ export default function JobSurveyPage() {
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-purple-600 dark:text-purple-400 mx-auto mb-4" />
           <p className="text-gray-600 dark:text-white/60 font-medium">Loading survey...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Load error ───────────────────────────────────────────────────────────
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-sm border border-rose-200 dark:border-rose-500/30 p-8 max-w-sm w-full text-center">
+          <div className="w-14 h-14 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-7 h-7 text-rose-600 dark:text-rose-400" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Couldn&apos;t load survey</h2>
+          <p className="text-sm text-gray-500 dark:text-white/60 mb-5">
+            Check your connection and try again.
+          </p>
+          <button
+            onClick={loadData}
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" /> Try again
+          </button>
         </div>
       </div>
     );

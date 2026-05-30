@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { sendPushToUser } from '@/lib/send-push';
 
 const SHOP_ROLES = ['shop_manager', 'admin', 'super_admin', 'operations_manager'];
 const VALID_STATUSES = ['open', 'in_progress', 'done', 'cancelled'];
@@ -158,6 +159,13 @@ export async function PATCH(
         related_entity_id: id,
         action_url: '/dashboard/maintenance/new',
       });
+
+      // Parallel native push to the submitter — fire-and-forget.
+      sendPushToUser(existing.submitted_by, {
+        title: 'Issue Resolved',
+        body: `Your maintenance request for ${equipmentLabel} has been resolved.`,
+        data: { route: '/dashboard/maintenance/new' },
+      }).catch(() => {});
     })()).catch(() => {});
 
     // Fire-and-forget: if the equipment is a vehicle, auto-create a service record

@@ -14,6 +14,7 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { apiFetch } from '@/lib/api-client';
@@ -126,25 +127,24 @@ export default function NotificationSettingsPage() {
     }
   }, [router]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const json = await apiFetch<{ success: boolean; data: PreferenceRow[] }>(
-          '/api/notification-preferences'
-        );
-        if (!cancelled) setPrefs(json.data || []);
-      } catch {
-        if (!cancelled) setLoadError('Could not load your notification settings. Pull to refresh or try again.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const loadPrefs = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const json = await apiFetch<{ success: boolean; data: PreferenceRow[] }>(
+        '/api/notification-preferences'
+      );
+      setPrefs(json.data || []);
+    } catch {
+      setLoadError('Could not load your notification settings. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    loadPrefs();
+  }, [loadPrefs]);
 
   const handleToggle = useCallback(
     async (category: string, channel: ChannelKey) => {
@@ -219,7 +219,13 @@ export default function NotificationSettingsPage() {
         ) : loadError ? (
           <div className="bg-white dark:bg-white/[0.05] rounded-2xl ring-1 ring-slate-200 dark:ring-white/10 p-6 text-center shadow-sm">
             <AlertCircle className="w-10 h-10 mx-auto mb-3 text-rose-400" />
-            <p className="text-slate-600 dark:text-slate-300">{loadError}</p>
+            <p className="text-slate-600 dark:text-slate-300 mb-4">{loadError}</p>
+            <button
+              onClick={loadPrefs}
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" /> Try again
+            </button>
           </div>
         ) : (
           <div className="space-y-3">
