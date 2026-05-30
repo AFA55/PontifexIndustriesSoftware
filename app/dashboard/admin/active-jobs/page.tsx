@@ -95,6 +95,7 @@ export default function ActiveJobsPage() {
   const [user, setUser] = useState<any>(null);
   const [jobs, setJobs] = useState<ActiveJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'coming_up' | 'attention'>('all');
   const [viewAll, setViewAll] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<ActiveJob | null>(null);
@@ -228,6 +229,7 @@ export default function ActiveJobsPage() {
 
   const fetchJobs = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -238,15 +240,19 @@ export default function ActiveJobsPage() {
       const res = await fetch(`/api/admin/active-jobs?${params}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
+      if (!res.ok) { setLoadError(true); return; }
       const json = await res.json();
       if (json.success) {
         setJobs(json.data || []);
         if (json.scope) setScopeMeta(json.scope as ScopeMeta);
         // Reset progress map — will be rehydrated by the progress effect.
         setProgressMap({});
+      } else {
+        setLoadError(true);
       }
     } catch (err) {
       console.error('Error fetching active jobs:', err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -773,6 +779,18 @@ export default function ActiveJobsPage() {
                 <div className="mt-3 h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
               </div>
             ))}
+          </div>
+        ) : loadError ? (
+          <div className="rounded-2xl p-10 text-center shadow-sm bg-white border border-red-200 dark:bg-white/5 dark:border-red-500/30">
+            <p className="text-slate-700 dark:text-red-300 mb-4">
+              Couldn&apos;t load active jobs. Check your connection and try again.
+            </p>
+            <button
+              onClick={fetchJobs}
+              className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" /> Retry
+            </button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="

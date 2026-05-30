@@ -33,7 +33,12 @@ export const getCurrentUser = (): User | null => {
           }
         }
       } catch {
-        // If validation fails, trust the localStorage value (best-effort)
+        // Fail CLOSED: if we can't validate the cached user against the live
+        // Supabase session token, treat the cache as untrustworthy and force a
+        // fresh login rather than trusting a possibly-stale cached profile.
+        // Prevents role/tenant bleed (previously this trusted localStorage).
+        localStorage.removeItem('supabase-user');
+        return null;
       }
 
       return user;

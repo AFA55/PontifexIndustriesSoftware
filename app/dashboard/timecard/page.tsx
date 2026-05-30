@@ -63,6 +63,7 @@ export default function TimecardPageWrapper() {
 function TimecardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [timecards, setTimecards] = useState<TimecardEntry[]>([]);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const [weekData, setWeekData] = useState<WeekData | null>(null);
@@ -263,6 +264,7 @@ function TimecardPage() {
     if (isRedirecting.current) return;
     try {
       setLoading(true);
+      setLoadError(false);
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) { redirectToLogin(); return; }
       const session = data.session;
@@ -273,6 +275,7 @@ function TimecardPage() {
       });
 
       if (response.status === 401) { redirectToLogin(); return; }
+      if (!response.ok) { setLoadError(true); return; }
       const result = await response.json();
 
       if (result.success) {
@@ -293,9 +296,12 @@ function TimecardPage() {
           weeklyOvertimeHours, nightShiftHours, mandatoryOvertimeHours, shopHours,
           daysWorked: uniqueDays.size,
         });
+      } else {
+        setLoadError(true);
       }
     } catch (error) {
       console.error('Error fetching timecards:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -493,6 +499,22 @@ function TimecardPage() {
       </header>
 
       <div className="max-w-[1024px] mx-auto px-4 sm:px-6 py-6">
+        {/* Load-failure banner — distinguish a failed fetch from a genuinely empty week
+            so an operator on flaky signal doesn't think their hours vanished. */}
+        {loadError && (
+          <div className="mb-6 rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20 p-4 flex items-center justify-between gap-3">
+            <p className="text-sm text-red-700 dark:text-red-300">
+              Couldn&apos;t load your timecard. Check your connection and try again.
+            </p>
+            <button
+              onClick={() => fetchTimecards()}
+              className="shrink-0 min-h-[44px] px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* ── Clock-In/Out Section ─────────────────────── */}
         <div className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200/60 dark:border-white/10 shadow-sm p-5 mb-6">
           {clockLoading ? (

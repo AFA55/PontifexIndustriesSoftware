@@ -4297,7 +4297,7 @@ export default function WorkPerformed() {
       {/* Notification Toast */}
       {notification && (
         <div className="fixed top-4 right-4 z-[60] animate-slide-in">
-          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 min-w-[300px] ${
+          <div className={`rounded-2xl shadow-2xl p-4 flex items-center gap-3 max-w-[calc(100vw-2rem)] sm:min-w-[300px] ${
             notification.type === 'success' ? 'bg-green-500 text-white' :
             notification.type === 'error' ? 'bg-red-500 text-white' :
             'bg-yellow-500 text-white'
