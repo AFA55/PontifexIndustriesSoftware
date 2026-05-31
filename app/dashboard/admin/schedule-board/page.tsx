@@ -1671,13 +1671,15 @@ export default function ScheduleBoardPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 w-full sm:w-auto flex-wrap">
+            {/* Action toolbar — labels stay visible on narrow screens and the row
+                wraps neatly instead of collapsing to icon-only buttons. */}
+            <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end flex-wrap">
               {/* Notification bell for all users */}
               <NotificationBell />
 
               {canEdit && (
                 <button onClick={() => setShowPendingQueue(true)} className="relative h-9 px-3 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg text-orange-700 text-sm font-semibold transition-all flex items-center gap-1.5">
-                  <Bell className="w-4 h-4" /> <span className="hidden sm:inline">Pending</span>
+                  <Bell className="w-4 h-4" /> <span className="whitespace-nowrap">Pending</span>
                   {pendingJobs.length > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{pendingJobs.length}</span>
                   )}
@@ -1685,12 +1687,12 @@ export default function ScheduleBoardPage() {
               )}
 
               <button onClick={() => setShowWillCall(!showWillCall)} className={`h-9 px-3 border rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${showWillCall ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700'}`}>
-                <FolderOpen className="w-4 h-4" /> <span className="hidden sm:inline">Will Call</span>
+                <FolderOpen className="w-4 h-4" /> <span className="whitespace-nowrap">Will Call</span>
                 <span className="px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-bold">{willCallJobs.length}</span>
               </button>
 
               <button className="relative h-9 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 text-sm font-semibold transition-all flex items-center gap-1.5">
-                <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Changes</span>
+                <FileText className="w-4 h-4" /> <span className="whitespace-nowrap">Changes</span>
                 {changeRequestCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{changeRequestCount}</span>
                 )}
@@ -1712,7 +1714,7 @@ export default function ScheduleBoardPage() {
                     ) : (
                       <Sparkles className="w-4 h-4" />
                     )}
-                    <span className="hidden sm:inline">{autoScheduleLoading ? 'Scheduling...' : 'AI Schedule'}</span>
+                    <span className="whitespace-nowrap">{autoScheduleLoading ? 'Scheduling...' : 'AI Schedule'}</span>
                     {unassignedJobs.length > 0 && !autoScheduleLoading && (
                       <span className="px-1.5 py-0.5 bg-white/20 rounded-full text-xs">{unassignedJobs.length}</span>
                     )}
@@ -1721,7 +1723,7 @@ export default function ScheduleBoardPage() {
                     onClick={() => setShowQuickAdd(true)}
                     className="h-9 px-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
                   >
-                    <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Quick Add</span>
+                    <Plus className="w-4 h-4" /> <span className="whitespace-nowrap">Quick Add</span>
                   </button>
                   <button
                     onClick={handleUpdateSchedule}
@@ -1730,9 +1732,9 @@ export default function ScheduleBoardPage() {
                     title="Re-push schedule changes to operators"
                   >
                     {updatingSchedule ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> <span className="hidden sm:inline">Updating...</span></>
+                      <><Loader2 className="w-4 h-4 animate-spin" /> <span className="whitespace-nowrap">Updating...</span></>
                     ) : (
-                      <><RefreshCw className="w-4 h-4" /> <span className="hidden sm:inline">Update Schedule</span></>
+                      <><RefreshCw className="w-4 h-4" /> <span className="whitespace-nowrap">Update Schedule</span></>
                     )}
                   </button>
                   <button
@@ -1742,7 +1744,7 @@ export default function ScheduleBoardPage() {
                     }}
                     className="relative h-9 px-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
                   >
-                    <Megaphone className="w-4 h-4" /> <span className="hidden sm:inline">Push Tickets</span>
+                    <Megaphone className="w-4 h-4" /> <span className="whitespace-nowrap">Push Tickets</span>
                     {dispatchInfo && dispatchInfo.total > 0 && (
                       <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex items-center justify-center">{dispatchInfo.total}</span>
                     )}
@@ -1751,7 +1753,7 @@ export default function ScheduleBoardPage() {
                     onClick={() => { setShowDailyCode(true); fetchDailyCode(); }}
                     className="h-9 px-3 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-400/30 rounded-lg text-indigo-700 dark:text-indigo-300 text-sm font-semibold transition-all flex items-center gap-1.5"
                   >
-                    <KeyRound className="w-4 h-4" /> <span className="hidden sm:inline">Daily Code</span>
+                    <KeyRound className="w-4 h-4" /> <span className="whitespace-nowrap">Daily Code</span>
                   </button>
                 </>
               )}
