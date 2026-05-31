@@ -42,10 +42,14 @@ function GoogleMapsLoader({ children }: GoogleMapsProviderProps) {
 }
 
 export function GoogleMapsProvider({ children }: GoogleMapsProviderProps) {
-  // If no API key is configured, skip loading entirely to avoid console error
-  // spam on every page. Components that call useGoogleMaps() receive
-  // { isLoaded: false } and gracefully degrade (plain text input fallback).
-  if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+  // Skip loading entirely when Maps is explicitly disabled OR no API key is set.
+  // This avoids the @react-google-maps/api retry loop + Next.js dev error-overlay
+  // spam on pages where the script can't load — e.g. local dev on a LAN IP whose
+  // referrer the (production-restricted) key doesn't allow. Set
+  // NEXT_PUBLIC_DISABLE_GOOGLE_MAPS=true to disable. Components that call
+  // useGoogleMaps() receive { isLoaded: false } and gracefully degrade.
+  const disabled = process.env.NEXT_PUBLIC_DISABLE_GOOGLE_MAPS === 'true';
+  if (disabled || !process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
     return (
       <GoogleMapsContext.Provider value={{ isLoaded: false, loadError: undefined }}>
         {children}
