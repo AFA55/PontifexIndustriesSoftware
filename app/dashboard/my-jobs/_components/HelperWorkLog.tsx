@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
   CheckCircle2, Send, FileText, ArrowRight, Wrench,
-  Clock, Loader2, ChevronDown, ChevronUp, Building2
+  Clock, Loader2, ChevronDown, ChevronUp, Building2, Eye
 } from 'lucide-react';
 
 interface HelperWorkLogProps {
@@ -451,58 +451,28 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, jobTitle
         </div>
       )}
 
-      {/* Work Log Entry */}
+      {/* Read-only helper note — helpers VIEW the ticket; the operator fills it out.
+          Helper hours are tracked automatically via clock in / clock out. */}
       <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${submitted ? 'bg-green-100' : 'bg-orange-100'}`}>
-            {submitted ? (
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-            ) : (
-              <Wrench className="w-5 h-5 text-orange-600" />
-            )}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-100">
+            <Eye className="w-5 h-5 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h3 className="font-bold text-gray-900">Work Log — #{jobNumber}</h3>
+            <h3 className="font-bold text-gray-900">Helper View — #{jobNumber}</h3>
             <p className="text-sm text-gray-500">{customerName}</p>
           </div>
-          {submitted && (
-            <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-semibold">
-              Saved
-            </span>
-          )}
         </div>
-
-        <textarea
-          value={workDescription}
-          onChange={(e) => {
-            setWorkDescription(e.target.value);
-            if (submitted && e.target.value !== existingLog) {
-              setSubmitted(false);
-            }
-          }}
-          placeholder="Describe the work you performed today..."
-          rows={4}
-          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"
-        />
-
-        {/* Two buttons: Save Draft + Complete Day */}
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={handleSaveOnly}
-            disabled={submitting || !workDescription.trim() || (submitted && workDescription === existingLog)}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all border-2 border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Send className="w-3.5 h-3.5" />
-            Save Draft
-          </button>
-          <button
-            onClick={handleCompleteDay}
-            disabled={submitting || !workDescription.trim()}
-            className="flex-[2] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            Complete Day
-          </button>
+        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+          <p className="text-sm text-blue-900 font-medium">
+            You&rsquo;re assigned to this job as a helper. Your operator manages the ticket —
+            you don&rsquo;t need to fill anything out here.
+          </p>
+          <p className="text-sm text-blue-700 mt-2">
+            Your hours are recorded automatically when you clock in and out. The job address
+            appears above once your operator confirms the equipment, so you know the gear is
+            loaded before you head out.
+          </p>
         </div>
       </div>
     </div>

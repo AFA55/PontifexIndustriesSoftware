@@ -295,6 +295,12 @@ export default function WorkPerformed() {
         if (res.ok) {
           const json = await res.json();
           const found = (json.data || [])[0];
+          // Helpers (apprentice in the helper slot) are read-only — they do NOT fill
+          // out the work ticket. Bounce them back to the read-only job ticket.
+          if (found && found.helper_assigned_to === session.user.id && found.assigned_to !== session.user.id) {
+            router.replace(`/dashboard/my-jobs/${params.id}`);
+            return;
+          }
           if (found?.job_type) setJobType(found.job_type);
           // Calculate the current day number: total_days_worked + 1 (today is a new day)
           const daysWorked = found?.total_days_worked || 0;

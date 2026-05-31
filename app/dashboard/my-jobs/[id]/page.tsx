@@ -899,7 +899,9 @@ export default function JobDetailPage() {
           ) : (
             <div className="bg-gray-100 dark:bg-white/[0.05] rounded-xl p-4 flex items-center gap-3 text-gray-400 dark:text-white/40 border border-gray-200 dark:border-white/10">
               <Lock className="w-5 h-5 flex-shrink-0" />
-              <p className="text-sm">Complete equipment checklist and start your route to view location & site contact</p>
+              <p className="text-sm">{jobIsHelper
+                ? 'The address unlocks once your operator confirms the equipment for this job — so you know the gear is loaded before you head out.'
+                : 'Complete equipment checklist and start your route to view location & site contact'}</p>
             </div>
           )
         )}

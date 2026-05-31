@@ -42,6 +42,12 @@ export default function JobsitePage() {
         if (json.success) {
           const found = (json.data || [])[0];
           if (found && found.id === jobId) {
+            // Helpers (apprentice in the helper slot) are read-only — they cannot
+            // proceed to the jobsite or advance status. Send them to the ticket.
+            if (found.helper_assigned_to === session.user.id && found.assigned_to !== session.user.id) {
+              router.replace(`/dashboard/my-jobs/${jobId}`);
+              return;
+            }
             setJob(found);
             // If status is still in_route, update to in_progress (arrived at site)
             if (found.status === 'in_route') {
