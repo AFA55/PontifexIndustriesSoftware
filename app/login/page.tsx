@@ -20,11 +20,20 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const DEMO_ACCOUNTS = [
-  { label: 'Operator', name: 'Zack',  email: 'zack@demopontifex.com',  password: 'Patriot2026!', color: 'blue' },
-  { label: 'Operator', name: 'Aiden', email: 'aiden@demopontifex.com', password: 'Patriot2026!', color: 'blue' },
-  { label: 'Helper',   name: 'Lucas', email: 'lucas@demopontifex.com', password: 'Patriot2026!', color: 'emerald' },
-  { label: 'Helper',   name: 'Javi',  email: 'javi@demopontifex.com',  password: 'Patriot2026!', color: 'emerald' },
+  { label: 'Admin',      name: 'Demo Admin', email: 'admin@pontifex.com',      password: 'PontifexDemo2026!', color: 'violet' },
+  { label: 'Supervisor', name: 'David',      email: 'supervisor@pontifex.com', password: 'PontifexDemo2026!', color: 'amber' },
+  { label: 'Operator',   name: 'Zack',  email: 'zack@demopontifex.com',  password: 'Patriot2026!', color: 'blue' },
+  { label: 'Operator',   name: 'Aiden', email: 'aiden@demopontifex.com', password: 'Patriot2026!', color: 'blue' },
+  { label: 'Helper',     name: 'Lucas', email: 'lucas@demopontifex.com', password: 'Patriot2026!', color: 'emerald' },
+  { label: 'Helper',     name: 'Javi',  email: 'javi@demopontifex.com',  password: 'Patriot2026!', color: 'emerald' },
 ];
+// per-color Tailwind classes (literal strings so Tailwind keeps them in the build)
+const DEMO_COLORS: Record<string, { wrap: string; text: string; badge: string }> = {
+  blue:    { wrap: 'bg-blue-50 border-blue-200 hover:border-blue-300',       text: 'text-blue-600',    badge: 'bg-blue-100 text-blue-700' },
+  emerald: { wrap: 'bg-emerald-50 border-emerald-200 hover:border-emerald-300', text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' },
+  violet:  { wrap: 'bg-violet-50 border-violet-200 hover:border-violet-300',  text: 'text-violet-600',  badge: 'bg-violet-100 text-violet-700' },
+  amber:   { wrap: 'bg-amber-50 border-amber-200 hover:border-amber-300',     text: 'text-amber-600',   badge: 'bg-amber-100 text-amber-700' },
+};
 const DEMO_GATE_PASSWORD = 'PontifexDemo2026';
 
 function LoginPageInner() {
@@ -341,15 +350,13 @@ function LoginPageInner() {
               ) : (
                 /* Unlocked: show demo accounts */
                 <div className="space-y-2">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Demo Accounts — Password: <span className="font-mono text-gray-700">Patriot2026!</span></p>
-                  {DEMO_ACCOUNTS.map(acc => (
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Demo Accounts — tap one to auto-fill &amp; sign in</p>
+                  {DEMO_ACCOUNTS.map(acc => {
+                    const c = DEMO_COLORS[acc.color] ?? DEMO_COLORS.blue;
+                    return (
                     <div
                       key={acc.email}
-                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all hover:shadow-sm ${
-                        acc.color === 'blue'
-                          ? 'bg-blue-50 border-blue-200 hover:border-blue-300'
-                          : 'bg-emerald-50 border-emerald-200 hover:border-emerald-300'
-                      }`}
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all hover:shadow-sm ${c.wrap}`}
                       onClick={() => {
                         setValue('email', acc.email, { shouldValidate: true });
                         setValue('password', acc.password, { shouldValidate: true });
@@ -358,22 +365,19 @@ function LoginPageInner() {
                       }}
                     >
                       <div>
-                        <p className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${acc.color === 'blue' ? 'text-blue-600' : 'text-emerald-600'}`}>
+                        <p className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${c.text}`}>
                           {acc.label} — {acc.name}
                         </p>
                         <p className="text-xs font-mono text-gray-700">{acc.email}</p>
                       </div>
                       <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${
-                        copiedEmail === acc.email
-                          ? 'bg-green-500 text-white'
-                          : acc.color === 'blue'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-emerald-100 text-emerald-700'
+                        copiedEmail === acc.email ? 'bg-green-500 text-white' : c.badge
                       }`}>
                         {copiedEmail === acc.email ? '✓ Filled!' : 'Use this account'}
                       </span>
                     </div>
-                  ))}
+                    );
+                  })}
                   <button
                     type="button"
                     onClick={() => { setDemoUnlocked(false); setDemoGateInput(''); }}
